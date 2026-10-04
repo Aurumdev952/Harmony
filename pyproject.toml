@@ -38,11 +38,15 @@ golden = [
     "boto3==1.16.25",
     "WTForms==2.1",
     "flask-user==0.6.21",
+    # requirements.txt pins 2.8.5, which has no CPython 3.9 wheel; only its
+    # error codes are imported here.
+    "psycopg2-binary==2.8.6",
+    "celery==5.4.0",
     "Flask-Potion",
     "pylib",
     "pydruid",
 ]
-dev = ["pytest>=7.4.3"]
+dev = ["pytest>=7.4.3", "freezegun>=1.5"]
 
 [tool.uv]
 package = false

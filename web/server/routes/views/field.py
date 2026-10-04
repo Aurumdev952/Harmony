@@ -7,6 +7,7 @@ from db.druid.query_builder import GroupByQueryBuilder
 from web.server.util.indicators import get_indicator_by_id, get_indicator_groups
 
 ISO_DATETIME_FORMAT = '%Y-%m-%d'
+MAX_FIELD_IDS_PER_REQUEST = 20
 
 
 # TODO - A parting gift from Vedant. Please make this a Potion API.

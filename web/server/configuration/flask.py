@@ -22,6 +22,21 @@ DEFAULT_DATABASE_NAME = 'zenysis'
 DEFAULT_DB_URI = f'postgresql:///{DEFAULT_DATABASE_NAME}'
 
 
+def require_jwt_secret_key(secret_key: str) -> str:
+    '''JWT_SECRET_KEY, refused when unset, blank, `changeme` or equal to `secret_key`.
+
+    Called when the JWT manager starts rather than in FlaskConfiguration, because
+    pipeline scripts build a FlaskConfiguration but never sign or verify tokens.
+    '''
+    jwt_secret_key = settings.require_secret('JWT_SECRET_KEY')
+    if jwt_secret_key == secret_key:
+        raise RuntimeError(
+            'JWT_SECRET_KEY equals DEFAULT_SECRET_KEY; refusing to start. Set '
+            'JWT_SECRET_KEY to a different random value, e.g. `openssl rand -hex 32`.'
+        )
+    return jwt_secret_key
+
+
 # The Flask Application expects capitalized keys to be provided.
 # TODO - Write a conversion method to uppercase all
 # configuration keys and disable this lint.
@@ -31,9 +46,8 @@ class FlaskConfiguration:
     def __init__(self):
         # Flask settings
         zen_env = getenv('ZEN_ENV')
-        self.SECRET_KEY = self.JWT_SECRET_KEY = getenv(
-            'SECRET_KEY', settings.DEFAULT_SECRET_KEY
-        )
+        # The JWT key is not read here: see require_jwt_secret_key.
+        self.SECRET_KEY = settings.DEFAULT_SECRET_KEY
         self.SQLALCHEMY_DATABASE_URI = getenv('DATABASE_URL', DEFAULT_DB_URI)
         self.SQLALCHEMY_TRACK_MODIFICATIONS = False
         self.SQLALCHEMY_ENGINE_OPTIONS = {

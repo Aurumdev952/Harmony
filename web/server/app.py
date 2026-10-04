@@ -18,7 +18,10 @@ from web.server.api_setup import initialize_api_models
 from web.server.app_base import create_app_base, initialize_zenysis_module
 from web.server.app_cache import initialize_cache
 from web.server.app_druid import initialize_druid_context
-from web.server.configuration.flask import FlaskConfiguration
+from web.server.configuration.flask import (
+    FlaskConfiguration,
+    require_jwt_secret_key,
+)
 from web.server.data.data_access import Transaction
 from web.server.database.setup import (
     initialize_user_manager,
@@ -204,6 +207,8 @@ def _create_app_internal(
     ):
         # NOTE: Not sure if this is the best way to accomplish this but it will at least
         # prevent errors from being thrown during server start.
+        # Refuses to start on an unusable JWT key, so it runs before slow setup.
+        initialize_jwt_manager(app)
         # NOTE: Initializing database seed values before app setup
         # so that if new database values are added, app setup won't error.
         initialize_database_seed_values(flask_config.SQLALCHEMY_DATABASE_URI)
@@ -220,7 +225,6 @@ def _create_app_internal(
             _initialize_query_data(app)
             _initialize_celery(app, instance_configuration)
             _initialize_notification_service(app, instance_configuration)
-            initialize_jwt_manager(app)
             _initialize_app(app, db, is_production)
 
     # NOTE: The last thing we need to do when bootstrapping our app is
@@ -297,6 +301,9 @@ def _initialize_notification_service(app, _instance_configuration):
 
 
 def initialize_jwt_manager(app):
+    # flask-jwt-extended signs with SECRET_KEY when JWT_SECRET_KEY is empty, so the
+    # key is set here, checked, before the manager can issue a token.
+    app.config['JWT_SECRET_KEY'] = require_jwt_secret_key(app.config['SECRET_KEY'])
     JWTManager(app)
 
 

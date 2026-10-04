@@ -153,7 +153,6 @@
     "postinstall": "(pkill -f prettier_d eslint_d stylelint_d) || true",
     "prod-server": "ZEN_PROD=1 ./web/gunicorn_server.py",
     "relay": "relay-compiler --watch",
-    "relay-web": "relay-compiler --schema ./graphql/v2/schema.graphql --watch",
     "server": "BUILD_TAG=$(git rev-parse --abbrev-ref HEAD || echo 'dev') FLASK_ENV=development python ./web/runserver.py",
     "start": "yarn run webpack & yarn run server",
     "styleguide": "yarn run styleguidist server --config web/client/styleguide/styleguide.config.js",

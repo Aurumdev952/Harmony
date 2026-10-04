@@ -24,14 +24,14 @@ volumes:
 
 services:
   postgres:
-    image: postgres:15.2-alpine
+    image: postgres:15.19-alpine@sha256:f7d23353e1b15400d22ebe31189f4d314b87a4c129cc400c8c2d8d4ca127bf81
     restart: always
     environment:
       POSTGRES_USER: ${POSTGRES_USER:-postgres}
-      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?set POSTGRES_PASSWORD for the postgres superuser}
       POSTGRES_DB: ${POSTGRES_DB:-postgres}
     ports:
-      - ${POSTGRES_HOST_PORT:-5432}:5432
+      - "${POSTGRES_BIND_ADDRESS:?set POSTGRES_BIND_ADDRESS to 127.0.0.1 when web runs on this host, or to this host's private IP when it runs elsewhere}:${POSTGRES_HOST_PORT:-5432}:5432"
     volumes:
       # If you don't want to use a volume, then use: /usr/local/pgsql/data
       - ${PG_DATA:-pgdata-volume}:/var/lib/postgresql/data

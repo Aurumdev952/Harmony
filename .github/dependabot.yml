@@ -6,6 +6,8 @@ updates:
     directory: /
     schedule:
       interval: weekly
+    cooldown:
+      default-days: 7
     groups:
       actions:
         patterns: ['*']
@@ -17,6 +19,8 @@ updates:
     directory: /
     schedule:
       interval: weekly
+    cooldown:
+      default-days: 7
     open-pull-requests-limit: 0
 
   # Tools for the CPython 3.13 lane.
@@ -24,6 +28,8 @@ updates:
     directory: /ci/tools313
     schedule:
       interval: weekly
+    cooldown:
+      default-days: 7
     groups:
       tools313:
         patterns: ['*']

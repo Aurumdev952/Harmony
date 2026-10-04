@@ -57,8 +57,10 @@ services:
     restart: always
     volumes:
       - metadata_data:/var/lib/postgresql/data
+    # Bound to the master's private address only: the coordinator connects
+    # through DRUID_POSTGRES_HOST, which is usually this host.
     ports:
-      - "5432:5432"
+      - "${DRUID_MASTER_HOST:?set DRUID_MASTER_HOST to this host's private IP}:5432:5432"
     environment:
       - POSTGRES_PASSWORD=${DRUID_POSTGRES_PASSWORD:?set DRUID_POSTGRES_PASSWORD in druid_setup/.env to a random value, e.g. openssl rand -hex 32}
       - POSTGRES_USER=${DRUID_POSTGRES_USER}
@@ -69,8 +71,8 @@ services:
     container_name: memcache
     image: memcached
     restart: always
-    ports:
-      - "11211:11211"
+    # Not published. Nothing in cluster mode uses it yet: broker and
+    # historical have no druid_cache_type, so they use the local cache.
     logging: *default-logging
 
   # Need 3.5 or later for container nodes
@@ -78,8 +80,10 @@ services:
     container_name: zookeeper
     image: zookeeper:${ZOOKEEPER_VERSION}
     restart: always
+    # Data and query hosts connect through DRUID_ZOOKEEPER_HOST, so bind to
+    # the master's private address, not to every interface.
     ports:
-      - "2181:2181"
+      - "${DRUID_MASTER_HOST:?set DRUID_MASTER_HOST to this host's private IP}:2181:2181"
     volumes:
       - zookeeper_data:/data
       - zookeeper_datalog:/datalog

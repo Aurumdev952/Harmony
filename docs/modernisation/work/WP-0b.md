@@ -73,6 +73,7 @@ None.
 - 2026-10-04 infra-1 unit 7: Dockerfile bases pinned by digest (python, node, ubuntu); mc moved to its pinned GitHub release (dl.minio.io returns 410) and verified with sha256sum; flow, pypy and CPython verified by checksum; check: `docker build --check` (no new warnings), dev and pipeline `downloader` stages built with every checksum OK, web-server image built (Evidence).
 - 2026-10-04 infra-1 unit 8: dev overlay runtime check; check: postgres 15.19 and redis 8.10.2 healthy, published on 127.0.0.1 only, Redis refuses unauthenticated clients from the host; torn down.
 - 2026-10-04 data-platform-1 R4.1: `FoolishPassword` removed from `druid_setup`; Compose requires `DRUID_POSTGRES_PASSWORD` (`${VAR:?}`) for postgres and the coordinator, Druid reads it through the `environment` password provider (in 0.23: `core/.../PasswordProvider.java` registers `environment`), the Makefile exports it from `druid_setup/.env`; check: `pytest tests/druid_setup` 9 failed before, 9 passed after.
+- 2026-10-04 data-platform-1 R4.2: single mode publishes no ZooKeeper, memcached or Postgres port; cluster master drops memcached and binds ZooKeeper and Postgres to `${DRUID_MASTER_HOST}`; check: port test failed for single and master before, 13 passed after; port summary under Evidence.
 
 ## Evidence
 

@@ -8,19 +8,15 @@ instances:
     branch: "mig/WP-0d-dead-backend-code"
     files:
       - docs/modernisation/work/WP-0d.md
-      - docs/modernisation/work/WP-0d-evidence/combined.diff
       - docs/modernisation/work/WP-0d-evidence/import_sweep.py
       - docs/modernisation/work/WP-0d-evidence/route_map.py
       - docs/modernisation/work/WP-0d-evidence/pipeline-harness-only.diff
       - docs/modernisation/work/WP-0d-evidence/wp0d_dead.sh
       - docs/modernisation/work/WP-0d-evidence/wp0d_dead.out
-      - docs/modernisation/work/WP-0d-evidence/routes-base.tsv
-      - docs/modernisation/work/WP-0d-evidence/routes-trim.tsv
-      - docs/modernisation/work/WP-0d-evidence/routes-merged.tsv
-      - docs/modernisation/work/WP-0d-evidence/sweep-web-base.tsv
-      - docs/modernisation/work/WP-0d-evidence/sweep-web-trim.tsv
-      - docs/modernisation/work/WP-0d-evidence/sweep-web-merged.tsv
-      - docs/modernisation/work/WP-0d-evidence/sweep-pipeline-trim.tsv
+      - docs/modernisation/work/WP-0d-evidence/sweep-web-summary.txt
+      - docs/modernisation/work/WP-0d-evidence/routes-summary.txt
+      - docs/modernisation/work/WP-0d-evidence/sweep-pipeline-trim-summary.txt
+      - tests/druid/test_hadoop_ingestion_removed.py
       - .claude/agent-memory/harmony-core-engineer/**
   - name: "backend-5"
     branch: "mig/WP-0d-dead-backend-code-backend"
@@ -150,11 +146,11 @@ Each request is the exact change verified in unit 4. The combined diff was appli
     - `pypy -m pip install --no-build-isolation -r requirements.txt -r requirements-pipeline.txt` resolves `cryptography>=38.0.3` to the `cryptography-47.0.0` sdist. There is no PyPy 3.8 wheel for it, and building it needs `maturin`, which is absent under `--no-build-isolation`.
     - Result: `ModuleNotFoundError: No module named 'maturin'`.
     - Baseline and trimmed builds fail identically. Suggested fix: pin `cryptography` to a version that has a `pp38` wheel in the PyPy install, or drop PyPy as WP-3b plans.
-- [ ] **lead**: edit `docs/modernisation/phase-0-security-and-subtraction.md` section 0d.
-  - Drop "Delete the unused `/api/timeout` route".
-  - Replace "Point `zen_environment.js` at the Hasura environment, or delete it" with "Delete it".
-  - Note that the Hadoop deletion includes `legacy_task_builder.py` and `scripts/run_indexing.py`.
-  - Optional: remove the `#Dask` / `dask-worker-space/` lines from `.gitignore`.
+- [x] **lead**: edit `docs/modernisation/phase-0-security-and-subtraction.md` section 0d. Done on `mig/integration`, and this branch picks it up when it next merges `mig/integration`.
+  - [x] Drop "Delete the unused `/api/timeout` route". Section 0d now says to keep it.
+  - [x] Replace "Point `zen_environment.js` at the Hasura environment, or delete it" with "Delete it".
+  - [x] Note that the Hadoop deletion includes `legacy_task_builder.py` and `scripts/run_indexing.py`.
+  - [x] Optional: remove the `#Dask` / `dask-worker-space/` lines from `.gitignore`. `7d6c4ad` removed `dask-worker-space/`. The orphaned `#Dask` comment is still at `.gitignore:216` on `mig/integration`, as a one-line lead follow-up.
 
 ## Log
 
@@ -169,12 +165,14 @@ Each request is the exact change verified in unit 4. The combined diff was appli
 - 2026-10-04 data-platform-2: deleted the Hadoop ingestion path (`db/druid/indexing/resources/`, `legacy_task_builder.py`, `scripts/run_indexing.py`) on `mig/WP-0d-dead-backend-code-druid` and added `tests/druid/test_hadoop_ingestion_removed.py`; check: grep report has 0 references outside the deleted files, `db/druid` import sweep 41/41 OK, the new test passes on the branch and fails on the pre-deletion tree.
 - 2026-10-04 frontend-platform-2: deleted `web/client/util/graphql/zen_environment.js` and its `zenEnvironment` re-export in `index.jsx` (branch `mig/WP-0d-dead-backend-code-frontend`); check: grep for `zen_environment|zenEnvironment` over `web` (excluding build output and node_modules, including flow-typed), `.flowconfig`, `relay.config.js`, `graphql/` and `package.json` finds nothing; Node 24.12 `yarn install --frozen-lockfile --ignore-scripts` then `yarn build` exit 0 with the same two webpack size warnings as before; `flow check` output identical before and after (19 errors); eslint on `index.jsx` clean; `commons` bundle 412 bytes smaller and no longer contains `fetch('/graphql')`, other entries +1 byte (module ids).
 - 2026-10-04 core-2 unit 5: merged backend `1e7cfa7`, infra `c310537`, data-platform `2ccbe74`, frontend-platform `ae5d798`, then `mig/integration`. Resolved the WP-file conflicts by keeping all lines, and took the done state of each request checkbox. Accepted the `metrics_spec.json` deletion. Check: the merged web-server image builds; the import sweep (752/625 OK, 0 removed-package errors) and URL map (315 rules) are byte-identical to the scratch `trim`; `tests/web` and `tests/druid` 3 passed (uv, Python 3.8); `tests/infra` 79 passed (uv, Python 3.13).
+- 2026-10-05 backend-5, reviewer fix: deleted the tool chain for the removed `/graphql` endpoint. That is `scripts/db/graphql/sync_schema.sh`, which introspected `http://0.0.0.0:5000/graphql` into `graphql/v2/schema.graphql`, the `graphql/v2/` snapshot of the graphene schema, and the `relay-web` npm script in `package.json`. `relay.config.js` and the `relay` script use `graphql/schema.graphql`, which stays. `graphqurl` stays, because `scripts/db/hasura/dev/sync_graphql_schema.sh` still runs `gq`. Check: `git grep -E "relay-web|graphql/v2|sync_schema\.sh|scripts/db/graphql"` over every tracked file (including Makefile, docs, `package.json` and CI) matches nothing outside this WP file; `package.json` parses as JSON.
+- 2026-10-05 core-2 unit 6 (review fixes 5-9): merged backend `d0c8f78`. Corrected the `/graphql` reference claim. Recorded the aniso8601 change. Replaced the bulky TSVs with summaries and reran the web sweep with `DRUID_HOST`. Removed the layout-asserting druid test, because WP-8b may add files under `resources/`; the native-indexing import test is kept. Ticked the lead request. Check: rerun web sweep with `DRUID_HOST` gives base 759/690 OK and merged 752/683 OK, 0 removed-package errors, diff = 7 deleted modules; `tests/web` + `tests/druid` 2 passed; ruff and black clean on the edited test.
 
 ## Evidence
 
 ### infra-5: requirements trim and PyPy fix
 
-Branch `mig/WP-0d-dead-backend-code-infra`, built from the WP branch with `mig/integration` merged. The six-file trim matches core-2's [`combined.diff`](WP-0d-evidence/combined.diff) line for line, plus `python-Levenshtein==0.12.1`.
+Branch `mig/WP-0d-dead-backend-code-infra`, built from the WP branch with `mig/integration` merged. The six-file trim matches core-2's scratch `combined.diff` (since deleted; the merged branch diff supersedes it) line for line, plus `python-Levenshtein==0.12.1`.
 
 **Nothing imports a removed package.** [`infra5_grep.sh`](WP-0d-evidence/infra5_grep.sh) excludes `docs/`, `.claude/`, VCS metadata and `node_modules`. Output: [`infra5_grep.out`](WP-0d-evidence/infra5_grep.out).
 - `flask_admin`, `dask`, `google`, `segment`, `analytics`, `paramiko`, `nacl`, `pyasn1`, `fuzzywuzzy`, `jellyfish`, `editdistance`, `Levenshtein`, `fabric` and `cryptography` have 0 importers.
@@ -194,7 +192,7 @@ Branch `mig/WP-0d-dead-backend-code-infra`, built from the WP branch with `mig/i
 - Against core-2's base sweep, the branch alone differs only in those 3 modules. With the backend deletion overlaid, it differs from core-2's trim sweep only in `db.druid.indexing.legacy_task_builder` and `scripts.run_indexing`. Those two are data-platform's deletion, which was not overlaid.
 - **URL map.** core-2's [`route_map.py`](WP-0d-evidence/route_map.py) also needs dummy `DRUID_HOST`, `POSTGRES_HOST`, `POSTGRES_USER`, `POSTGRES_PASSWORD` and `DATABASE_URL`.
   - The branch alone exits 1 with `ModuleNotFoundError: No module named 'flask_graphql'`, raised from `_register_routes`. This is why the merge order matters.
-  - With the backend overlay it produces 315 rules, byte-identical to core-2's [`routes-trim.tsv`](WP-0d-evidence/routes-trim.tsv).
+  - With the backend overlay it produces 315 rules, byte-identical to core-2's scratch `routes-trim.tsv` (counts and diff in [`routes-summary.txt`](WP-0d-evidence/routes-summary.txt)).
 - `log/config.py`: `logging.config.dictConfig(DEV_CONFIG)` loads, `black -S --check` (22.6.0) passes, and `ruff check --select F` passes.
 
 **`etl-pipeline` image.**
@@ -234,7 +232,13 @@ Command: a grep over the repo, excluding `docs/`, `.claude/` and `node_modules`.
   - `log/config.py:18`, the `segment` logger.
   - npm `*levenshtein` packages in `yarn.lock` and flow-typed stubs. These are unrelated JavaScript packages.
   - Two docstring mentions of "Google Cloud Storage" in `util/dataprep/utils.py`. These are prose, not imports.
-- **The `/graphql` route** is referenced only from `web/server/app.py:61,83,94`. The only client that calls `/graphql` is `zen_environment.js`, and that file is itself unused. No nginx or compose config routes `/graphql`.
+- **The `/graphql` route.** *Corrected 2026-10-04 after QA and reviewer review.* The unit 2 grep searched only module names (`graphql_api`, `GraphqlPageRouter`), never the URL. Those module names occur only in `web/server/app.py:61,83,94`.
+  - `git grep` on `main` for the URL `/graphql` (excluding `/api/graphql` and `/v1/graphql`, `docs/`, `.claude/` and `yarn.lock`) finds three references:
+    - `web/server/routes/graphql_api.py:21`, the route itself;
+    - `web/client/util/graphql/zen_environment.js:22`, which is unused (see below);
+    - `scripts/db/graphql/sync_schema.sh:11`, a developer tool. It introspects `http://0.0.0.0:5000/graphql` into `graphql/v2/schema.graphql`. Its only consumer is the `relay-web` npm script (`package.json:156`, `relay-compiler --schema ./graphql/v2/schema.graphql`).
+  - Without the endpoint the tool chain is dead. It is routed to backend-5 for deletion: `scripts/db/graphql/`, `graphql/v2/` and the `relay-web` script.
+  - No nginx or compose config routes `/graphql`.
 - **`/api/timeout`** is live: see Phase-file corrections.
 - **The Hadoop templates** are reached only through `legacy_task_builder.py`, which only `scripts/run_indexing.py` imports, and nothing references that script.
 - **`zenEnvironment`** is used only by its re-export in `web/client/util/graphql/index.jsx`.
@@ -246,7 +250,7 @@ Command: a grep over the repo, excluding `docs/`, `.claude/` and `node_modules`.
 
 **Method.**
 - `git archive HEAD` was unpacked twice under `/tmp/wp0d-core2/`, as `base` and `trim`.
-- The exact change from the Requests section was applied to `trim`. The result is [`WP-0d-evidence/combined.diff`](WP-0d-evidence/combined.diff) (`diff -ru base trim`). That copy is never committed and edits no owned path in this branch.
+- The exact change from the Requests section was applied to `trim`. The result was `combined.diff` (`diff -ru base trim`). It was deleted in unit 6, because the merged branch diff against `main` now shows the same change. That copy is never committed and edits no owned path in this branch.
 - Images were built with `DOCKER_NAMESPACE=local/wp0d-core2-<v> DOCKER_TAG=<v> docker compose -p wp0d-core2-<v> -f docker-compose.build.yaml build <service>`.
 
 **`web-server` image.**
@@ -263,18 +267,22 @@ Command: a grep over the repo, excluding `docs/`, `.claude/` and `node_modules`.
 | base | 759 | 631 | 0 |
 | trim | 752 | 625 | 0 |
 
-- `diff` of the two outputs ([base](WP-0d-evidence/sweep-web-base.tsv), [trim](WP-0d-evidence/sweep-web-trim.tsv)) differs only by the deleted modules:
+- `diff` of the two outputs (counts and diff in [`sweep-web-summary.txt`](WP-0d-evidence/sweep-web-summary.txt)) differs only by the deleted modules:
   - `db.druid.indexing.legacy_task_builder`
   - `db.druid.indexing.scripts.run_indexing`, which already failed on base with `KeyError: 'DRUID_HOST'`
   - `web.server.graphql`, `web.server.graphql.filters`, `web.server.graphql.schema` and `web.server.graphql.schemas`
   - `web.server.routes.graphql_api`
 - Every other module has the same status in both images. The remaining errors exist on both images: missing pipeline-only packages in the web image, Flask app-context access at import, and mapper initialisation without a database.
+- **Limit of this run (raised in review, fixed in unit 6).** This run did not set `DRUID_HOST`. In the trimmed image, 69 of 752 modules (70 of 759 on base) stopped at `KeyError: 'DRUID_HOST'` before importing the rest of their dependencies, so they were not checked for removed packages.
+  - Unit 6 reran both images with `-e DRUID_HOST=http://druid.invalid`. Then 0 modules stop on it.
+  - Base: 759 modules, 690 OK. Merged: 752 modules, 683 OK.
+  - Neither has an error from a removed package, and the diff is still exactly the 7 deleted modules. See [`sweep-web-summary.txt`](WP-0d-evidence/sweep-web-summary.txt), run 2.
 
 **URL map.**
 - Script: [`route_map.py`](WP-0d-evidence/route_map.py). It builds the app with `create_app(skip_db_check=True)`, mocks `template_renderer` and `druid_context`, runs the real `_initialize_query_data`, and then runs the real `_register_routes`, which includes Potion.
 - Run with `--network none` and dummy environment values.
 - Base has 316 rules and trim has 315. The 247 Potion `/api2` rules are identical.
-- [`diff`](WP-0d-evidence/routes-base.tsv) shows that the only change is the removal of `/graphql  graphql.graphql  DELETE,GET,POST,PUT`. `/api/timeout  api.timeout_session  POST` is still present in [trim](WP-0d-evidence/routes-trim.tsv).
+- The [diff](WP-0d-evidence/routes-summary.txt) shows that the only change is the removal of `/graphql  graphql.graphql  DELETE,GET,POST,PUT`. `/api/timeout  api.timeout_session  POST` is still present in trim.
 
 **`etl-pipeline` image.** It cannot build on `main` today, for two pre-existing reasons recorded under Requests (infra).
 - To verify around them, the scratch copy changes only harness lines, and the requirement lines are untouched. See [`pipeline-harness-only.diff`](WP-0d-evidence/pipeline-harness-only.diff):
@@ -290,7 +298,7 @@ Command: a grep over the repo, excluding `docs/`, `.claude/` and `node_modules`.
 | trim, CPython-only variant | image built (exit 0) | not built |
 
 - **Import sweep** in the CPython-only trimmed image (`/zenysis/venv/bin/python import_sweep.py pipeline data util db config models log`, `--network none`, dummy environment):
-  - 398 modules: 393 OK, and none failed because of a removed package. Output: [`sweep-pipeline-trim.tsv`](WP-0d-evidence/sweep-pipeline-trim.tsv).
+  - 398 modules: 393 OK, and none failed because of a removed package. Counts and every non-OK module: [`sweep-pipeline-trim-summary.txt`](WP-0d-evidence/sweep-pipeline-trim-summary.txt).
   - The 5 failures have nothing to do with this WP. Four modules call Druid at import time and get `ConnectionError` to `druid.invalid`: `config/harmony_demo/database.py`, `config/template/database.py`, `data/pydruid_query/pydruid_query.py` and `data/validation/scripts/validate_pivoted_csv.py`. That is a BE-2 item for WP-4a. The fifth is a mapper ordering error in `data.query.models.query_selections`.
 - **Limit.** PyPy resolution of the trimmed files cannot be shown while the pre-existing `cryptography`/`maturin` failure stands. The risk is low: the change only removes requirement lines, and no Python file in the repo imports `fuzzywuzzy`, `jellyfish` or `editdistance` (unit 2).
 
@@ -312,8 +320,9 @@ This was run on the merged head, which holds all four side branches plus `mig/in
 
 | Check | Result | Same as the verified scratch `trim`? |
 |---|---|---|
-| Import sweep ([tsv](WP-0d-evidence/sweep-web-merged.tsv)) | 752 modules, 625 OK, 0 removed-package errors | yes: `diff sweep-web-trim.tsv sweep-web-merged.tsv` is empty |
-| URL map ([tsv](WP-0d-evidence/routes-merged.tsv)) | 315 rules, 247 `/api2`, `/api/timeout api.timeout_session POST` present, no `/graphql` | yes: `diff routes-trim.tsv routes-merged.tsv` is empty |
+| Import sweep without `DRUID_HOST` ([summary](WP-0d-evidence/sweep-web-summary.txt), run 1) | 752 modules, 625 OK, 0 removed-package errors; 69 stop at `KeyError: 'DRUID_HOST'` | yes: `diff sweep-web-trim.tsv sweep-web-merged.tsv` is empty |
+| Import sweep with `DRUID_HOST=http://druid.invalid` (same summary, run 2; unit 6) | 752 modules, 683 OK, 0 removed-package errors; 0 stop at `DRUID_HOST` | against base (759, 690 OK), only the 7 deleted modules differ |
+| URL map ([summary](WP-0d-evidence/routes-summary.txt)) | 315 rules, 247 `/api2`, `/api/timeout api.timeout_session POST` present, no `/graphql` | yes: `diff routes-trim.tsv routes-merged.tsv` is empty |
 
 **Test suites, with uv.** There is no pyproject yet, so the web environment is built from the merged `requirements.txt` and `requirements-web.txt`. `-e git+…#egg=X` lines are rewritten to `X @ git+…`, as in backend-5's recipe.
 - `PYTHONPATH=<worktree> uv run --no-project -p 3.8 --with-requirements /tmp/wp0d-core2/reqs-web.txt --with 'pytest<8' python -m pytest tests/web tests/druid -q -p no:cacheprovider -W ignore` gives **3 passed**:
@@ -321,6 +330,22 @@ This was run on the merged head, which holds all four side branches plus `mig/in
   - `test_hadoop_ingestion_modules_are_gone`
   - `test_native_indexing_imports_without_druid`
 - `uv run --no-project -p 3.13 --with pytest python -m pytest tests/infra -q -p no:cacheprovider` gives **79 passed**. `prod/browser_share/browser_share.py` declares `requires-python >=3.13`.
+
+### core-2 unit 6: review fixes (QA and reviewer, changes-requested at `5f3e040`)
+
+- **Item 5, `/graphql` references.** Corrected under Unit 2 below. The URL grep found `scripts/db/graphql/sync_schema.sh` and the `relay-web` npm script. backend-5 deleted them in `d0c8f78`, merged here as `8cfbbaf`. The only `/graphql` match left outside `docs/` is the assertion in `tests/web/test_graphql_endpoint_removed.py:18`.
+- **Item 6, aniso8601.** Dropping graphene removes the `<8` cap on aniso8601, so the web image moves from 7.0.0 to 10.0.1, which Flask-Potion pulls in unpinned.
+  - Probe: `aniso_probe.py` (`/tmp/wp0d-core2/aniso_probe.py`), run through Potion's `DateString` and `DateTimeString` converters in both images. The repo has 12 such fields and no direct aniso8601 import.
+  - Valid ISO dates and datetimes parse identically.
+  - Malformed input still raises a `ValueError` subclass, but with a different class or message, for example `MonthOutOfBoundsError: Month must be between 1..12.` where it used to be `ValueError: month must be in 1..12`.
+- **Item 7, evidence trimmed.**
+  - The web, route and pipeline TSVs and `combined.diff` are replaced by [`sweep-web-summary.txt`](WP-0d-evidence/sweep-web-summary.txt), [`routes-summary.txt`](WP-0d-evidence/routes-summary.txt) and [`sweep-pipeline-trim-summary.txt`](WP-0d-evidence/sweep-pipeline-trim-summary.txt), each with counts and the base-to-trim diff.
+  - The scripts and the small grep outputs stay. infra-5's and data-platform-2's TSVs are theirs and stay.
+  - The `DRUID_HOST` gap of the first web sweep is stated, and the sweep was rerun, as described under Unit 4.
+- **Item 8, druid test.** Removed `test_hadoop_ingestion_modules_are_gone` from `tests/druid/test_hadoop_ingestion_removed.py`. It asserted repository layout: `db/druid/indexing/resources/` must not exist, and two module names must not resolve. WP-8b may legitimately add files under `resources/`, and the import sweep already proves the modules are gone.
+  - `test_native_indexing_imports_without_druid` stays.
+  - Check: `uvx ruff check` and `black==22.6.0 -S --check` are clean. `tests/web` and `tests/druid` give **2 passed** (uv, Python 3.8, merged requirements).
+- **Item 9.** The lead request is ticked. The phase 0d text and the `.gitignore` edit are on `mig/integration`, and the orphaned `#Dask` comment is noted.
 
 ### data-platform-2: the Hadoop ingestion path is deleted
 
@@ -354,5 +379,5 @@ Branch `mig/WP-0d-dead-backend-code-druid`. It was created from `mig/WP-0d-dead-
 | Role | Verdict | Notes |
 |---|---|---|
 | qa | changes-requested | 2026-10-04 qa-0d at 5f3e040: every deletion verified (grep, reverse deps, web image import sweep and 315-rule route map, 540 contract replays on the trimmed image, yarn build, pipeline image with WP-0b's Dockerfile). Blocker: the cryptography==41.0.7 PyPy pin installs but importing it aborts the pipeline image's PyPy 7.3.9 (Fatal RPython error); latent since nothing imports gspread/google.auth under PyPy. Fix evidence and either exclude gspread from PyPy with a marker (its only reverse dep) or track for WP-3b. Note: mypy.ini still has [mypy-graphql_relay.*]. |
-| reviewer | pending | |
+| reviewer | changes-requested | 2026-10-05 rev-0d at 5f3e040: deletions correct and tested. Fix: dead /graphql tool chain left (scripts/db/graphql/sync_schema.sh, graphql/v2/schema.graphql, relay-web npm script); WP-2f hand-off not recorded (requirements and mypy conflicts; the PyPy cryptography pin would be lost by make requirements); the pin has advisories and no removal plan (WP-3b deletes the line); aniso8601 7->10 transitive change unrecorded; [mypy-graphql_relay.*] dead; 350 KB of duplicate evidence; file-absence test; stale lead request. |
 | security | n/a | |

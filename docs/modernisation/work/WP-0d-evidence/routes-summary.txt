@@ -1,0 +1,11 @@
+# WP-0d Flask URL map (route_map.py: create_app(skip_db_check=True) + real _register_routes, incl. Potion)
+base   (main):    316 rules, 247 under /api2
+merged (branch):  315 rules, 247 under /api2
+trim == merged byte for byte: True
+still present: /api/timeout	api.timeout_session	POST
+
+## diff base -> merged
+--- base
++++ merged
+@@ -307 +306,0 @@
+-/graphql	graphql.graphql	DELETE,GET,POST,PUT

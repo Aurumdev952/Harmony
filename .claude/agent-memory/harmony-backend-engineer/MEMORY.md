@@ -1,2 +1,3 @@
 - [Local Flask stack](local-flask-stack.md) — run legacy Flask, Alembic and replays without images: py3.8 venv, Druid stub, SERVER_SOFTWARE=gunicorn
 - [Hasura roles](hasura-roles.md) — WP-0a user/anonymous roles, the public-access hole it closed, what WP-5e must tighten, parity scripts
+- [Template render diff](template_render_diff.md) — prove Jinja template edits without a running app; known baseline failures

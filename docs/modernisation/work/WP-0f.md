@@ -78,4 +78,4 @@ None.
 |---|---|---|
 | qa | approved | 2026-10-04 qa-0f: actionlint 38 to 0 reproduced; SHA pins, permissions, Makefile and hostile-filename simulation verified. PR run of integration.yml deferred until push; human to confirm Jenkinsfile. |
 | reviewer | pending | |
-| security | pending | |
+| security | approved | 2026-10-04 sec-0f: SHA pins match tags and are signed upstream heads; zizmor 100 to 0, actionlint 38 to 0; least-privilege per job; no untrusted interpolation; nothing to rotate. Low: scope GH_TOKEN to the two list-changed-files steps (WP-2f); mutable :latest deploy tag (WP-0b/3b); retire any old Jenkins docker-io-credentials. |

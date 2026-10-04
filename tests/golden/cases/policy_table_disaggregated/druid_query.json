@@ -33,14 +33,22 @@
     },
     "dataSource": "harmony_demo_20260101",
     "dimensions": [
-      "StateName"
+      "StateName",
+      "MunicipalityName"
     ],
     "filter": {
       "fields": [
         {
+          "dimension": "StateName",
+          "type": "in",
+          "values": [
+            "Pará"
+          ]
+        },
+        {
           "dimension": "__time",
           "intervals": [
-            "2024-01-01/2024-04-01"
+            "2024-03-04/2024-03-18"
           ],
           "type": "interval"
         },
@@ -48,32 +56,14 @@
           "dimension": "field",
           "type": "selector",
           "value": "yellow_fever_cases"
-        },
-        {
-          "field": {
-            "dimension": "StateName",
-            "type": "in",
-            "values": [
-              "Pará"
-            ]
-          },
-          "type": "not"
-        },
-        {
-          "field": {
-            "dimension": "StateName",
-            "type": "selector",
-            "value": ""
-          },
-          "type": "not"
         }
       ],
       "type": "and"
     },
-    "granularity": "all",
+    "granularity": "day",
     "having": null,
     "intervals": [
-      "2024-01-01/2024-04-01"
+      "2024-03-04/2024-03-18"
     ],
     "postAggregations": [],
     "queryType": "groupBy"

@@ -1,8 +1,12 @@
 {
-  "description": "Multi-dimension need (JWT query_needs claim) ORed with a simple state policy.",
+  "description": "JWT sign-in whose query_needs claim grants one multi-dimension need (Pará and the yellow_fever source); needs are intersected with the account policies (Pará, Roraima, all sources) as signal_handlers._install_token_needs does, leaving StateName in [Pará] and source in [yellow_fever].",
   "endpoint": "table",
   "policy": {
     "query_policies": [
+      {
+        "dimension": "StateName",
+        "dimension_value": "Pará"
+      },
       {
         "dimension": "StateName",
         "dimension_value": "Roraima"
@@ -12,7 +16,7 @@
         "dimension_value": null
       }
     ],
-    "query_needs": [
+    "jwt_query_needs": [
       {
         "StateName": {
           "include_values": [

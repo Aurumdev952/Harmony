@@ -2,11 +2,7 @@
   "data": [
     {
       "StateName": "Pará",
-      "yellow_fever_cases": 274.0
-    },
-    {
-      "StateName": "Roraima",
-      "yellow_fever_cases": 385.0
+      "yellow_fever_cases": 367.0
     }
   ],
   "dimensions": [

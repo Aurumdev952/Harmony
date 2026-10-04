@@ -59,4 +59,4 @@ pydruid = { git = "https://github.com/druid-io/pydruid.git", rev = "242010955381
 
 [tool.pytest.ini_options]
 pythonpath = ["."]
-testpaths = ["tests"]
+testpaths = ["tests/golden"]

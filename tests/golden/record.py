@@ -24,7 +24,9 @@ FIXTURES = ('druid_query.json', 'druid_response.json', 'expected_response.json')
 
 def record(case) -> dict:
     options = case.meta.get('druid', {})
-    exchanges, body = run_case(case, lambda query: synthesize(case.name, query, options))
+    exchanges, body = run_case(
+        case, lambda query: synthesize(case.name, query, options)
+    )
     return {
         'druid_query.json': [query for query, _ in exchanges],
         'druid_response.json': [response for _, response in exchanges],

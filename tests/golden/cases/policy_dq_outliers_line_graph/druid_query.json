@@ -38,9 +38,16 @@
     "filter": {
       "fields": [
         {
+          "dimension": "StateName",
+          "type": "in",
+          "values": [
+            "Pará"
+          ]
+        },
+        {
           "dimension": "__time",
           "intervals": [
-            "2024-01-01/2024-04-01"
+            "2024-03-04/2024-03-18"
           ],
           "type": "interval"
         },
@@ -56,45 +63,14 @@
             "value": ""
           },
           "type": "not"
-        },
-        {
-          "fields": [
-            {
-              "dimension": "StateName",
-              "type": "in",
-              "values": [
-                "Roraima"
-              ]
-            },
-            {
-              "fields": [
-                {
-                  "dimension": "StateName",
-                  "type": "in",
-                  "values": [
-                    "Pará"
-                  ]
-                },
-                {
-                  "dimension": "source",
-                  "type": "in",
-                  "values": [
-                    "yellow_fever"
-                  ]
-                }
-              ],
-              "type": "and"
-            }
-          ],
-          "type": "or"
         }
       ],
       "type": "and"
     },
-    "granularity": "all",
+    "granularity": "day",
     "having": null,
     "intervals": [
-      "2024-01-01/2024-04-01"
+      "2024-03-04/2024-03-18"
     ],
     "postAggregations": [],
     "queryType": "groupBy"

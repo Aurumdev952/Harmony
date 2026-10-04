@@ -2,15 +2,15 @@
   "data": [
     {
       "StateName": "Acre",
-      "case_fatality_rate": 766.2981
+      "case_fatality_rate": 888.5183
     },
     {
       "StateName": "Pará",
-      "case_fatality_rate": 601.4544
+      "case_fatality_rate": 396.5764
     },
     {
       "StateName": "Roraima",
-      "case_fatality_rate": 816.2597
+      "case_fatality_rate": 953.681
     }
   ],
   "dimensions": [

@@ -1,18 +1,5 @@
 {
-  "data": [
-    {
-      "StateName": "Acre",
-      "broken_formula": null
-    },
-    {
-      "StateName": "Pará",
-      "broken_formula": null
-    },
-    {
-      "StateName": "Roraima",
-      "broken_formula": 262.0
-    }
-  ],
+  "data": [],
   "dimensions": [
     "StateName"
   ],

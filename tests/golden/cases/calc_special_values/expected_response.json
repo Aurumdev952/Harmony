@@ -13,7 +13,7 @@
         "MunicipalityName": "Belém"
       },
       "metrics": {
-        "case_fatality_rate": 878.9925
+        "case_fatality_rate": null
       }
     },
     {
@@ -29,7 +29,7 @@
         "MunicipalityName": "Cruzeiro do Sul"
       },
       "metrics": {
-        "case_fatality_rate": 975.7059
+        "case_fatality_rate": 246.1293
       }
     },
     {
@@ -45,7 +45,7 @@
         "MunicipalityName": "Rio Branco"
       },
       "metrics": {
-        "case_fatality_rate": 861.2368
+        "case_fatality_rate": 672.697
       }
     }
   ],

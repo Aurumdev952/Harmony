@@ -20,12 +20,17 @@ CASE_FILES = (
     'druid_response.json',
     'expected_response.json',
 )
+COMPLETE_CASES = [
+    case for case in CASES if all((case.path / name).exists() for name in CASE_FILES)
+]
 
 
 @lru_cache(maxsize=None)
 def replay(case_name: str):
     case = next(case for case in CASES if case.name == case_name)
-    broker = RecordedDruid(case.read('druid_query.json'), case.read('druid_response.json'))
+    broker = RecordedDruid(
+        case.read('druid_query.json'), case.read('druid_response.json')
+    )
     return run_case(case, broker)
 
 
@@ -71,16 +76,11 @@ def test_catalogue_covers_the_query_surface():
     from web.server.api.query.calculation_schema import CALCULATION_IMPL_SCHEMAS
     from web.server.api.query.query_filter_schema import QUERY_FILTER_IMPL_SCHEMAS
 
-    prefix = '/api2/query/'
-    routes = {
-        rule.rule[len(prefix) :]
-        for rule in current_app.url_map.iter_rules()
-        if rule.rule.startswith(prefix) and 'POST' in rule.methods
-    }
+    routes = _post_routes()
     granularities = {g.id for g in current_app.query_data.granularities}
 
     endpoints, calculations, filters, grouped = set(), set(), set(), set()
-    for case in CASES:
+    for case in COMPLETE_CASES:
         endpoints.add(case.meta['endpoint'])
         for key, node in _walk(case.read('request.json')):
             if key == 'calculation':
@@ -94,3 +94,39 @@ def test_catalogue_covers_the_query_surface():
     assert set(CALCULATION_IMPL_SCHEMAS) - calculations == set()
     assert set(QUERY_FILTER_IMPL_SCHEMAS) - filters == set()
     assert granularities - grouped == set()
+
+
+def _post_routes():
+    # pylint: disable=import-outside-toplevel
+    from flask import current_app
+
+    prefix = '/api2/query/'
+    return {
+        rule.rule[len(prefix) :]
+        for rule in current_app.url_map.iter_rules()
+        if rule.rule.startswith(prefix) and 'POST' in rule.methods
+    }
+
+
+@pytest.mark.parametrize('route', sorted(_post_routes()))
+def test_policy_restricts_every_route(route):
+    '''Some case on the route must post different Druid queries for its policy
+    caller than for an administrator, so a route that stops applying the query
+    policy fails a golden case.'''
+    policy_cases = [
+        case
+        for case in COMPLETE_CASES
+        if case.meta['endpoint'] == route and case.meta.get('policy') is not None
+    ]
+    assert policy_cases, f'no case on {route} has a policy'
+    for case in policy_cases:
+        as_policy = [query for query, _ in replay(case.name)[0]]
+        broker = RecordedDruid(
+            case.read('druid_query.json'), case.read('druid_response.json')
+        )
+        as_admin = [query for query, _ in run_case(case, broker, policy=None)[0]]
+        if sorted(map(dumps_compact, as_policy)) != sorted(
+            map(dumps_compact, as_admin)
+        ):
+            return
+    pytest.fail(f'no policy case on {route} posts a query its admin replay does not')

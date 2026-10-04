@@ -1,2 +1,3 @@
 - [CI tooling and Bash guards](ci_tooling_and_guards.md): actionlint and shellcheck install, action SHA lookup, worktree guard, Actions default shell
 - [WP-0f open items](wp_0f_open_items.md): Docker Hub path removal awaits the human; slash-tag bug for WP-3b; comma `--cache-from` is fine
+- [WP-2f next](wp_2f_next.md): starts after WP-0f merges; replace the py3.9 black and pylint job with uv, ruff and mypy on 3.13

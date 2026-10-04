@@ -156,6 +156,7 @@
     "server": "BUILD_TAG=$(git rev-parse --abbrev-ref HEAD || echo 'dev') FLASK_ENV=development python ./web/runserver.py",
     "start": "yarn run webpack & yarn run server",
     "styleguide": "yarn run styleguidist server --config web/client/styleguide/styleguide.config.js",
+    "test": "vitest run",
     "translations": "yarn cli-translations watch --verbose",
     "tunnel": "lt --port 5000",
     "webpack": "node_modules/.bin/webpack-cli serve --config web/webpack.config.js --mode 'development'"

@@ -1,7 +1,7 @@
 ---
 wp: "0a"
 title: "Lock down Hasura"
-status: review
+status: blocked
 owner_role: "backend"
 instances:
   - name: "backend-1"
@@ -27,6 +27,20 @@ security_review: true
 ---
 
 # WP-0a: Lock down Hasura
+
+## Blocked: needs a human decision (SPEC 7.5)
+
+QA, reviewer and security have all approved. INV-3 says authorisation decisions change only on purpose, in a security-reviewed WP, so this WP needs your explicit acceptance before it can be marked ready.
+
+**Do you accept these authorisation changes through `/api/graphql`?** (Details in "Invariant impact" below.)
+
+1. **Tightened:**
+   - Signed-in users lose all GraphQL access to the 28 tracked tables the UI never uses, for example `dashboard`, `alert_definitions`, `case*` and `pipeline_entity*`. On main they could read and write them as Hasura admin.
+   - Signed-out visitors on public-access deployments can no longer run arbitrary queries and mutations by smuggling a second operation past the proxy. They can read only six public dimension columns.
+   - The Hasura metadata API, including `run_sql`, needs the admin secret and is no longer published on a host port.
+2. **Still open until WP-5e (row "Per-permission checks"):** any signed-in user, whatever their `can_view_data_catalog`, `can_view_fields_setup` or `can_upload_data` permissions, can still edit or bulk-delete catalog, field setup and data upload rows through GraphQL, as on main. Hasura takes one role per request, so per-permission checks are left to WP-5e, which ports the catalog to FastAPI with `can()`.
+
+Answer by ticking the "human" request below, or say what to change.
 
 ## Plan
 
@@ -153,8 +167,8 @@ None.
   
   Only their Flow input-type declarations change: nested-insert paths into tables `user` cannot write are removed, and v2.45 adds aggregate filters. The operation text, AST, `cacheID` and runtime behaviour are identical (Evidence 11). Nothing breaks meanwhile: no CI step runs `relay-compiler`, and the build reads the committed artifacts. This does not block review.
 - [x] frontend-design (done on `mig/WP-0a-lock-down-hasura-design`, 43e4846): in your own branch, run `./node_modules/.bin/relay-compiler` once (no `--watch`; Relay 10.1.0, schema from `relay.config.js`) after `yarn install --frozen-lockfile --ignore-scripts` on Node 24, and commit the result as `WP-0a: regenerate Relay artifacts against the user-role schema`. Expected output: `Updated:` exactly the six artifacts above, `Unchanged: 102 files`; diff stat 6 files, 654 insertions, 1914 deletions. frontend-platform-2 verified this output (log line below). The regeneration is deterministic, so no patch needs handing over. Does not block review.
-- [ ] human: accept the deliberate INV-3 change in the "Invariant impact" table. Signed-in users lose GraphQL access to 28 tables the UI never uses, and signed-out visitors lose the smuggled-operation path. Security asked for this acceptance to be recorded.
-- [ ] lead (for routing, outside this WP):
+- [ ] human: accept the authorisation changes in the "Invariant impact" table (INV-3), both what is tightened and what stays open until WP-5e. The question is at the top of this file. Security asked for this acceptance to be recorded.
+- [x] lead (for routing, outside this WP): both items were fixed in WP-0b.
   - The base Compose file also publishes `web` on 5000 (SEC-1). WP-0b's list covers redis, worker and postgres only.
   - Locally, `scripts/create_user.py` fails with bcrypt 4.1+ and passlib ("password cannot be longer than 72 bytes"). bcrypt is unpinned, so a fresh image build can hit it. Pinning it belongs to infra or core.
 
@@ -188,6 +202,12 @@ None.
   - `test_hasura_proxy.py` plus `test_hasura_permissions.py`: 12 passed.
   - `test_compose_hasura.py`: 17 passed.
   - relay-compiler 10.1.0 `--validate` against the committed `graphql/schema.graphql`: exit 0, so the artifacts are current.
+- 2026-10-04 backend-1 folded in QA's three non-blocking notes, after all three gates approved at f325155:
+  - The `ANONYMOUS_SUBSET_OPERATIONS` comment now says the proxy checks only the query-text prefix, so that query can be smuggled; it reveals nothing new.
+  - The live check now also asserts that `anonymous` has no mutation root. A negative control, passing the `user` schema as `anonymous`, reports `anonymous has a mutation root: mutation_root`.
+  - The replay docstring says it works once per database.
+  
+  Checks: `check_role_permissions.py` reports 0 failures on v2.11.3 and v2.45.8-ce. ruff, black, pylint and `uv lock --script --check` are clean. Status set to `blocked` for the human INV-3 acceptance.
 
 ## Evidence
 

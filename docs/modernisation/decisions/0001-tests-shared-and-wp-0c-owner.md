@@ -26,3 +26,4 @@ The first wave exposed two ownership gaps:
 - SPEC section 6 table and the WP-0c row are edited; version bumped to 1.2.
 - Builders already running must merge branch `mig/decisions-0001-ownership` so their worktree's hook reads the new table.
 - `core-1`'s analysis and failing tests for WP-0c are handed to the backend builder on the same branch.
+- `scripts/agents/ownership.py` now scores the `shared` row like any other row (longest literal prefix wins) instead of short-circuiting, so `tests/golden/**` stays with qa while `tests/**` is shared.

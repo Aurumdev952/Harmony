@@ -92,7 +92,7 @@ def load_rules(root: Path) -> tuple[tuple[str, str, re.Pattern[str]], ...]:
 def owner_of(root: Path, rel: str) -> str | None:
     best: tuple[int, str] | None = None
     for role, glob, regex in load_rules(root):
-        if role == SHARED or not regex.match(rel):
+        if not regex.match(rel):
             continue
         score = literal_prefix_len(glob)
         if best is None or score > best[0]:
@@ -101,7 +101,7 @@ def owner_of(root: Path, rel: str) -> str | None:
 
 
 def is_shared(root: Path, rel: str) -> bool:
-    return any(role == SHARED and regex.match(rel) for role, _, regex in load_rules(root))
+    return owner_of(root, rel) == SHARED
 
 
 def may_edit(root: Path, role: str, rel: str) -> tuple[bool, str | None]:

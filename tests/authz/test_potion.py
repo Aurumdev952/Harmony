@@ -142,7 +142,8 @@ def test_list_filter_column(name, resources):
     target = hybrid.fields[-1].target if via else resources[name]
     column = via['list_filter_id'] if via else spec['id']
     assert target.manager.id_attribute == column
-    expression = str(target.manager._expression_for_ids([11]))  # pylint: disable=protected-access
+    # pylint: disable-next=protected-access
+    expression = str(target.manager._expression_for_ids([11]))
     assert expression.split(' IN ')[0].endswith(f'.{column}'), expression
 
 

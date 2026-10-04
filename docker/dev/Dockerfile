@@ -1,9 +1,10 @@
+# syntax=docker/dockerfile:1
 # This Dockerfile used for local development.
 # Not to be confused with what we used in production.
 # The development environment is very different from production w.r.t. tools
 # installed etc.
 # This Dockerfile installs dependencies for the web app and the pipeline.
-FROM ubuntu:22.04 as downloader
+FROM ubuntu:jammy-20260924.1@sha256:5ec03bb3441e8b0bf3b4f9cd4629a1ae763010dc3035bb8da3ae6cf026486401 AS downloader
 ENV DEBIAN_FRONTEND noninteractive
 
 RUN apt-get update \
@@ -16,43 +17,40 @@ RUN apt-get update \
     && update-ca-certificates \
     && rm -rf /var/lib/apt/lists/*
 
-# Download minio client
+# Download minio client. dl.min.io answers 410 Gone since MinIO archived mc, so
+# fetch the last GitHub release and verify it.
+ARG MC_RELEASE=RELEASE.2025-08-13T08-35-41Z
 RUN case $(uname -m) in \
-    "x86_64")\
-    wget https://dl.minio.io/client/mc/release/linux-amd64/mc -O /usr/local/bin/mc;\
-    ;;\
-    "aarch64")\
-    wget https://dl.minio.io/client/mc/release/linux-arm64/mc -O /usr/local/bin/mc;\
-    ;;\
-    esac;
+    "x86_64") arch=amd64; sha256=01f866e9c5f9b87c2b09116fa5d7c06695b106242d829a8bb32990c00312e891 ;; \
+    "aarch64") arch=arm64; sha256=14c8c9616cfce4636add161304353244e8de383b2e2752c0e9dad01d4c27c12c ;; \
+    *) echo "unsupported architecture $(uname -m)" >&2; exit 1 ;; \
+    esac; \
+    wget "https://github.com/minio/mc/releases/download/${MC_RELEASE}/mc.linux-${arch}.${MC_RELEASE}" -O /usr/local/bin/mc \
+    && echo "${sha256}  /usr/local/bin/mc" | sha256sum -c -
 
 # Download flow
 RUN case $(uname -m) in \
-    "x86_64")\
-    wget https://github.com/facebook/flow/releases/download/v0.200.0/flow-linux64-v0.200.0.zip -O /tmp/flow.zip;\
-    ;;\
-    "aarch64")\
-    wget https://github.com/facebook/flow/releases/download/v0.200.0/flow-linux-arm64-v0.200.0.zip -O /tmp/flow.zip;\
-    ;;\
+    "x86_64") asset=flow-linux64-v0.200.0.zip; sha256=589e98143c1b24986f389184b1d6471d8bbe0111bcbc4b162d1932e9c7d6448c ;; \
+    "aarch64") asset=flow-linux-arm64-v0.200.0.zip; sha256=5aec3c8b8e23be1acd64b46804626feee1f32a420de1979534e3da2774bee046 ;; \
+    *) echo "unsupported architecture $(uname -m)" >&2; exit 1 ;; \
     esac; \
-    cd /tmp && unzip flow.zip && mv flow/flow /usr/local/bin/flow && rm -rf flow*;
+    wget "https://github.com/facebook/flow/releases/download/v0.200.0/${asset}" -O /tmp/flow.zip \
+    && echo "${sha256}  /tmp/flow.zip" | sha256sum -c - \
+    && cd /tmp && unzip flow.zip && mv flow/flow /usr/local/bin/flow && rm -rf flow*;
 
 # Download pypy
 RUN case $(uname -m) in \
-    "x86_64")\
-    wget https://downloads.python.org/pypy/pypy3.9-v7.3.11-linux64.tar.bz2 -O /tmp/pypy3.9-v7.3.11-linux64.tar.bz2;\
-    cd /tmp && tar -xf pypy3.9-v7.3.11-linux64.tar.bz2;\
-    mv /tmp/pypy3.9-v7.3.11-linux64 /opt/pypy3.9-v7.3.11;\
-    ;;\
-    "aarch64")\
-    wget https://downloads.python.org/pypy/pypy3.9-v7.3.11-aarch64.tar.bz2 -O /tmp/pypy3.9-v7.3.11-aarch64.tar.bz2;\
-    cd /tmp && tar -xf pypy3.9-v7.3.11-aarch64.tar.bz2;\
-    mv /tmp/pypy3.9-v7.3.11-aarch64 /opt/pypy3.9-v7.3.11;\
-    ;;\
+    "x86_64") dist=pypy3.9-v7.3.11-linux64; sha256=d506172ca11071274175d74e9c581c3166432d0179b036470e3b9e8d20eae581 ;; \
+    "aarch64") dist=pypy3.9-v7.3.11-aarch64; sha256=09175dc652ed895d98e9ad63d216812bf3ee7e398d900a9bf9eb2906ba8302b9 ;; \
+    *) echo "unsupported architecture $(uname -m)" >&2; exit 1 ;; \
     esac; \
-    rm /tmp/pypy3.9*;
+    wget "https://downloads.python.org/pypy/${dist}.tar.bz2" -O /tmp/pypy.tar.bz2 \
+    && echo "${sha256}  /tmp/pypy.tar.bz2" | sha256sum -c - \
+    && cd /tmp && tar -xf pypy.tar.bz2 \
+    && mv "/tmp/${dist}" /opt/pypy3.9-v7.3.11 \
+    && rm /tmp/pypy.tar.bz2;
 
-FROM ubuntu:22.04
+FROM ubuntu:jammy-20260924.1@sha256:5ec03bb3441e8b0bf3b4f9cd4629a1ae763010dc3035bb8da3ae6cf026486401
 
 RUN apt-get update \
     && apt-get -y upgrade \
@@ -109,7 +107,7 @@ RUN curl -sL https://deb.nodesource.com/setup_14.x | bash - \
     && apt-get install -y nodejs
 
 # Bring in the exact version of CPython we currently use:
-ADD https://www.python.org/ftp/python/3.9.16/Python-3.9.16.tgz /tmp/Python-3.9.16.tgz
+ADD --checksum=sha256:1ad539e9dbd2b42df714b69726e0693bc6b9d2d2c8e91c2e43204026605140c5 https://www.python.org/ftp/python/3.9.16/Python-3.9.16.tgz /tmp/Python-3.9.16.tgz
 RUN cd /tmp && tar -xvf Python-3.9.16.tgz && cd Python-3.9.16 \
     && ./configure --prefix=/opt/python/3.9.16/ --enable-optimizations --with-lto --with-computed-gotos --with-system-ffi \
     && make -j "$(nproc)" \

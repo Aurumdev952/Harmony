@@ -62,6 +62,8 @@ None.
 - 2026-10-04 infra-1 unit 4: `:-changeme` fallbacks removed; `DEFAULT_SECRET_KEY`, `JWT_SECRET_KEY` (web, worker), `POSTGRES_PASSWORD`, `MINIO_ROOT_USER`/`MINIO_ROOT_PASSWORD` are `${VAR:?message}`; check: `pytest tests/infra` 14 new cases failed before, 27 passed after.
 - 2026-10-04 infra-1 unit 5: Redis runs with `--requirepass ${REDIS_PASSWORD:?}`; `REDISCLI_AUTH` for the healthcheck, which now matches `PONG`; web and worker get `REDIS_PASSWORD`, worker `BROKER_URL` carries it; check: `pytest tests/infra` 3 new cases failed before, 30 passed after; throwaway Redis rejects unauthenticated clients (Evidence). Merge-blocked on R2.
 - 2026-10-04 infra-1 unit 6: nginx-proxy, acme-companion, redis and postgres pinned by version tag and digest; check: `pytest tests/infra` pin test failed for 3 file sets before, 34 passed after; each tag re-resolved to its digest with `docker buildx imagetools inspect`.
+- 2026-10-04 infra-1 unit 7: Dockerfile bases pinned by digest (python, node, ubuntu); mc moved to its pinned GitHub release (dl.minio.io returns 410) and verified with sha256sum; flow, pypy and CPython verified by checksum; check: `docker build --check` (no new warnings), dev and pipeline `downloader` stages built with every checksum OK, web-server image built (Evidence).
+- 2026-10-04 infra-1 unit 8: dev overlay runtime check; check: postgres 15.19 and redis 8.10.2 healthy, published on 127.0.0.1 only, Redis refuses unauthenticated clients from the host; torn down.
 
 ## Evidence
 
@@ -129,6 +131,49 @@ Not yet exercised: the web container against the password-protected Redis. That 
 | `minio/minio:latest` | unchanged | image no longer published anywhere (R5) |
 
 Each tag resolved to the pinned digest at the time of writing. `test_third_party_images_are_pinned_by_digest` fails if a new third-party image arrives without a version tag and digest.
+
+### Unit 7: Dockerfile bases and downloads
+
+Base images (each digest equals what the floating tag resolved to on 2026-10-04, so the bytes do not change):
+
+| Dockerfile | Before | After |
+|---|---|---|
+| `docker/web/Dockerfile_web-server` | `python:3.8` | `python:3.8.20-bookworm@sha256:d4112707…070e390c` |
+| `docker/web/Dockerfile_web-client` | `node:18.17` | `node:18.17.1-bookworm@sha256:933bcfad…7b23c24` |
+| `docker/pipeline/Dockerfile`, `docker/dev/Dockerfile` (2 stages each) | `ubuntu:22.04` | `ubuntu:jammy-20260924.1@sha256:5ec03bb3…6486401` |
+
+Downloads:
+
+| Artefact | Checksum source |
+|---|---|
+| `mc` RELEASE.2025-08-13T08-35-41Z, amd64 and arm64 (pipeline, dev) | the release's own `.sha256sum` files and GitHub's asset digests agree with my download |
+| flow v0.200.0, linux64 and linux-arm64 (dev) | no published digest; computed from the GitHub release asset (trust on first use) |
+| pypy3.9 v7.3.11, linux64 and aarch64 (dev) | match pypy.org/checksums.html |
+| CPython 3.9.16 tarball (dev, `ADD --checksum`) | GPG signature verified: "Good signature from Łukasz Langa", key E3FF 2839 C048 B25C 084D EBE9 B269 95E3 1025 0568 |
+
+Found on the way: `https://dl.minio.io/client/mc/release/...` now returns **410 Gone**, so the pipeline and dev images could not be built from `main`. The pinned GitHub release fixes that. The `minio/mc` repository is archived; mc needs a successor along with the server (R5).
+
+Checks:
+- `docker build --check` on the pipeline and dev Dockerfiles: before 1 `FromAsCasing` plus 6 and 2 `LegacyKeyValueFormat`; after 0 `FromAsCasing`, same `LegacyKeyValueFormat` (pre-existing, WP-3b rewrites these files). web-server and web-client: 1 pre-existing warning each.
+- `docker build --target downloader -f docker/dev/Dockerfile .`: `/usr/local/bin/mc: OK`, `/tmp/flow.zip: OK`, `/tmp/pypy.tar.bz2: OK`; mc, flow and pypy present in the stage.
+- `docker build --target downloader -f docker/pipeline/Dockerfile .`: `/usr/local/bin/mc: OK`.
+- `ADD --checksum` line in a scratch Dockerfile: correct digest builds; one changed hex digit fails with `digest mismatch`.
+- `docker build -f docker/web/Dockerfile_web-server .`: exit 0; image runs Python 3.8.20, flask 1.0.1, celery 5.4.0, redis-py 5.0.1.
+- Not built: the full dev and pipeline images (their apt and pip layers do not touch the pins) and web-client (digest equals today's `node:18.17`).
+
+### Unit 8: dev-overlay runtime check
+
+Throwaway project `wp0b-dev-check`: `docker-compose.yaml` + `docker-compose.dev.yaml` + an overlay that moves the host ports to 15432/16379 (this host already runs Postgres and Redis on 5432/6379) and drops the named volumes.
+
+```
+postgres  postgres:15.19-alpine@sha256:f7d23353…  Up (healthy)  127.0.0.1:15432->5432/tcp
+redis     redis:8.10.2-alpine@sha256:38117873…    Up (healthy)  127.0.0.1:16379->6379/tcp
+select version()                      -> PostgreSQL 15.19 on x86_64-pc-linux-musl
+redis-cli -h 127.0.0.1 -p 16379 ping  -> NOAUTH Authentication required.
+down                                  -> containers and network removed
+```
+
+Not run: `make up DEV=1` with web and the pipeline. The dev image takes a long time to build (it compiles CPython), web needs a reachable Druid, and web against the password-protected Redis needs R2. QA should run the full `make up DEV=1` plus the smoke list once R1 to R3 land.
 
 ## Verdicts
 

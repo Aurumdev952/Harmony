@@ -1,7 +1,7 @@
 ---
 wp: "0c"
 title: "Fix the pure-mistake bugs"
-status: review            # backend-2 on mig/WP-0c-pure-mistake-bugs-backend (decision 0001). Open items listed under "Open SEC-4 items" and Requests.
+status: blocked           # waiting for the human to accept the "Who sees what differently" table (SPEC 7.5). qa and reviewer approved; security approves once accepted.
 owner_role: "backend"
 instances:
   - name: "core-1"
@@ -36,6 +36,10 @@ security_review: true
 ---
 
 # WP-0c: Fix the pure-mistake bugs
+
+> **Question for the human (blocks merge, SPEC 7.5):** Accept the authorisation and session changes in the Who-sees-what table, including the one-time sign-out of pre-deploy remember-me sessions and the /api/field narrowing?
+>
+> The table is under "Who sees what differently" below. QA and the reviewer have approved. Security has no findings and approves once you accept. Nothing else is outstanding for this WP.
 
 **Handover to backend-2.** Decision 0001 moved this WP to `backend`. core-1 has done the following on this branch:
 - committed failing regression tests;
@@ -267,6 +271,7 @@ C-5's token claims gain `user_claims.remember_me: bool` (listed in `contracts_ch
   - `ef790b0` capability-based guard over four trees, with `ALLOWLIST` and `KNOWN_VIOLATIONS`.
   - WP file: sign-out effect corrected; "Who sees what differently" table and release note added; `contracts_changed: [C-5]`; security lows recorded as open item 8.
   - Check: `pytest tests/web` gives 61 passed.
+- 2026-10-05 backend-2: merged the WP branch verdict commits and `mig/integration` (one add/add conflict in the core agent-memory index, resolved by keeping both sides; `.playwright-mcp` has no tracked files). Check: `pytest tests/web` gives 61 passed. Status `blocked` on the human question at the top of this file.
 - 2026-10-04 core-1, review follow-up (branch `mig/WP-0c-pure-mistake-bugs-core`, from backend-2's `7ffdff4`): in `web/server/data/time_boundary.py`, deleted `DataTimeBoundary.get_field_time_boundary`, the `time_boundary_cache` and the `cache_key` path of `get_filtered_time_boundary`. Requested by interrogate A, B and C and the code reviewer. The only live caller (`views/field.py`) passes no key, and a `field__<id>` key would serve one user's policy-filtered dates to another. Check: a grep of `web`, `scripts`, `data`, `db`, `util`, `models` and `tests` finds no remaining reference (`tests/web/test_field_info_route.py` uses a real `DataTimeBoundary`, not a stub, so it needs no change). `pytest tests/web tests/infra` gives 46 passed. `ruff --select F`, black and mypy (`--disallow-untyped-defs`, module in isolation) are clean.
 
 ## Evidence

@@ -5,10 +5,34 @@ status: review
 owner_role: "core"
 instances:
   - name: "core-2"
+    branch: "mig/WP-0d-dead-backend-code"
     files:
       - docs/modernisation/work/WP-0d.md
-      - docs/modernisation/work/WP-0d-evidence/**
+      - docs/modernisation/work/WP-0d-evidence/combined.diff
+      - docs/modernisation/work/WP-0d-evidence/import_sweep.py
+      - docs/modernisation/work/WP-0d-evidence/route_map.py
+      - docs/modernisation/work/WP-0d-evidence/pipeline-harness-only.diff
+      - docs/modernisation/work/WP-0d-evidence/wp0d_dead.sh
+      - docs/modernisation/work/WP-0d-evidence/wp0d_dead.out
+      - docs/modernisation/work/WP-0d-evidence/routes-base.tsv
+      - docs/modernisation/work/WP-0d-evidence/routes-trim.tsv
+      - docs/modernisation/work/WP-0d-evidence/routes-merged.tsv
+      - docs/modernisation/work/WP-0d-evidence/sweep-web-base.tsv
+      - docs/modernisation/work/WP-0d-evidence/sweep-web-trim.tsv
+      - docs/modernisation/work/WP-0d-evidence/sweep-web-merged.tsv
+      - docs/modernisation/work/WP-0d-evidence/sweep-pipeline-trim.tsv
+      - .claude/agent-memory/harmony-core-engineer/**
+  - name: "backend-5"
+    branch: "mig/WP-0d-dead-backend-code-backend"
+    files:
+      - web/server/app.py
+      - web/server/routes/graphql_api.py
+      - web/server/graphql/**
+      - tests/web/conftest.py
+      - tests/web/test_graphql_endpoint_removed.py
+      - .claude/agent-memory/harmony-backend-engineer/**
   - name: "infra-5"
+    branch: "mig/WP-0d-dead-backend-code-infra"
     files:
       - requirements.txt
       - requirements-web.txt
@@ -18,6 +42,22 @@ instances:
       - log/config.py
       - docs/modernisation/work/WP-0d-evidence/infra5*
       - docs/modernisation/work/WP-0d-evidence/sweep-*infra5*
+      - .claude/agent-memory/harmony-infra-engineer/**
+  - name: "data-platform-2"
+    branch: "mig/WP-0d-dead-backend-code-druid"
+    files:
+      - db/druid/indexing/legacy_task_builder.py
+      - db/druid/indexing/scripts/run_indexing.py
+      - db/druid/indexing/resources/**
+      - tests/druid/test_hadoop_ingestion_removed.py
+      - docs/modernisation/work/WP-0d-evidence/dp2_*
+      - .claude/agent-memory/harmony-data-platform-engineer/**
+  - name: "frontend-platform-2"
+    branch: "mig/WP-0d-dead-backend-code-frontend"
+    files:
+      - web/client/util/graphql/zen_environment.js
+      - web/client/util/graphql/index.jsx
+      - .claude/agent-memory/harmony-frontend-platform-engineer/**
 branch: "mig/WP-0d-dead-backend-code"
 requirements: []
 contracts_consumed: []
@@ -61,7 +101,18 @@ No core-owned file (`config/`, `data/query/`, `db/` outside `db/druid/indexing/`
 
 ## Branch note
 
-At the lead's instruction on 2026-10-04, this branch merges `mig/decisions-0001-ownership` (merge commit `35e9d62`). The diff against `main` therefore includes that branch's `docs/modernisation/SPEC.md` and `docs/modernisation/decisions/0001-*.md` changes. They are not WP-0d edits, and they drop out once the decision branch lands on `main`. `task_gate.py` flags `SPEC.md` (owner: lead) for this reason only.
+At the lead's instruction on 2026-10-04, this branch merges `mig/decisions-0001-ownership` (merge commit `35e9d62`). The diff against `main` therefore includes that branch's `docs/modernisation/SPEC.md` and `docs/modernisation/decisions/0001-*.md` changes. They are not WP-0d edits, and they drop out once the decision branch lands on `main`. Since unit 5 merged `mig/integration`, `task_gate.py WP-0d` reports no file outside the five contributing roles. It lists only the pending status and verdicts.
+
+## Merge order
+
+- This branch already contains the four side branches. The integrated head therefore lands as one unit, which satisfies the backend-before-infra order. Merged on 2026-10-04 in this order:
+  1. backend `1e7cfa7`
+  2. infra `c310537`
+  3. data-platform `2ccbe74`
+  4. frontend-platform `ae5d798`
+  5. `mig/integration`
+- The infra trim must never land without the backend deletion. Without it, `_register_routes` fails with `No module named 'flask_graphql'`.
+- The `etl-pipeline` image builds only once WP-0b's MinIO fix (`mig/WP-0b-ports-secrets-pins`) is merged. Until then, it stops at the `mc` download with HTTP 410, the same as on `main`. With WP-0b's Dockerfile, infra-5 built it with exit 0, and the PyPy step now installs the `cryptography 41.0.7` pp38 wheel. Merge WP-0b before, or together with, WP-0d.
 
 ## Contract changes
 
@@ -87,6 +138,10 @@ Each request is the exact change verified in unit 4. The combined diff was appli
 - [x] **data-platform**: delete the Hadoop ingestion path as one change: `db/druid/indexing/resources/task_templates/`, `db/druid/indexing/resources/tuning_configs/on_prem.json` (the directory's only file), `db/druid/indexing/legacy_task_builder.py` and `db/druid/indexing/scripts/run_indexing.py`. `run_native_indexing.py` and `task_runner_util.py` do not depend on them.
   - Done on `mig/WP-0d-dead-backend-code-druid` (data-platform-2).
   - Also deleted `db/druid/indexing/resources/metrics_spec.json`. Only `legacy_task_builder.py` read it, and it duplicates the inline `metricsSpec` in `db/druid/indexing/common.py:35-40`. `db/druid/indexing/resources/` is now gone.
+  - **Accepted by core-2 (2026-10-04).**
+    - On `main`, the file holds the same four metrics as the inline `metricsSpec` in `common.py:35-40`: `count`; and `doubleSum`, `doubleMin`, `doubleMax` over `val`, named `sum`, `min`, `max`. Only key order differs.
+    - On the merged branch, `git grep metrics_spec` outside `docs/` and `.claude/` finds nothing.
+    - Native ingestion builds its spec from `common.py`, so ingested metrics do not change.
 - [x] **frontend-platform** (done on `mig/WP-0d-dead-backend-code-frontend`): delete `web/client/util/graphql/zen_environment.js`. In `web/client/util/graphql/index.jsx`, delete the line `import zenEnvironment from 'util/graphql/zen_environment';` and the `zenEnvironment,` export entry. This can land in WP-0e.
 - [x] **infra (found during verification; already broken on `main`, not caused by this WP)**: the `etl-pipeline` image does not build. infra-5 on `mig/WP-0d-dead-backend-code-infra`: PyPy failure fixed with `cryptography==41.0.7 ; platform_python_implementation == 'PyPy'` in `requirements-pipeline.txt`. The MinIO 410 is fixed on WP-0b's branch (`mig/WP-0b-ports-secrets-pins`) and is not duplicated here, so this branch's own pipeline build still stops at the `mc` download until WP-0b lands.
   - `docker/pipeline/Dockerfile:29-36` downloads the MinIO client from `https://dl.minio.io/client/mc/release/linux-*/mc`. That URL now returns `HTTP 410 Gone`, so the `downloader` stage fails with `wget` exit 8. This breaks INV-1 for the pipeline image.
@@ -112,6 +167,7 @@ Each request is the exact change verified in unit 4. The combined diff was appli
 - 2026-10-04 infra-5 unit 2: pinned `cryptography==41.0.7` for PyPy in `requirements-pipeline.txt`; check: scratch pipeline build with WP-0b's Dockerfile exit 0, PyPy step installs the pp38 wheel, PyPy and CPython sweeps have 0 removed-package errors. Real-branch pipeline build stops at the `mc` 410, which WP-0b fixes.
 - 2026-10-04 data-platform-2: deleted the Hadoop ingestion path (`db/druid/indexing/resources/`, `legacy_task_builder.py`, `scripts/run_indexing.py`) on `mig/WP-0d-dead-backend-code-druid` and added `tests/druid/test_hadoop_ingestion_removed.py`; check: grep report has 0 references outside the deleted files, `db/druid` import sweep 41/41 OK, the new test passes on the branch and fails on the pre-deletion tree.
 - 2026-10-04 frontend-platform-2: deleted `web/client/util/graphql/zen_environment.js` and its `zenEnvironment` re-export in `index.jsx` (branch `mig/WP-0d-dead-backend-code-frontend`); check: grep for `zen_environment|zenEnvironment` over `web` (excluding build output and node_modules, including flow-typed), `.flowconfig`, `relay.config.js`, `graphql/` and `package.json` finds nothing; Node 24.12 `yarn install --frozen-lockfile --ignore-scripts` then `yarn build` exit 0 with the same two webpack size warnings as before; `flow check` output identical before and after (19 errors); eslint on `index.jsx` clean; `commons` bundle 412 bytes smaller and no longer contains `fetch('/graphql')`, other entries +1 byte (module ids).
+- 2026-10-04 core-2 unit 5: merged backend `1e7cfa7`, infra `c310537`, data-platform `2ccbe74`, frontend-platform `ae5d798`, then `mig/integration`. Resolved the WP-file conflicts by keeping all lines, and took the done state of each request checkbox. Accepted the `metrics_spec.json` deletion. Check: the merged web-server image builds; the import sweep (752/625 OK, 0 removed-package errors) and URL map (315 rules) are byte-identical to the scratch `trim`; `tests/web` and `tests/druid` 3 passed (uv, Python 3.8); `tests/infra` 79 passed (uv, Python 3.13).
 
 ## Evidence
 
@@ -235,8 +291,31 @@ Command: a grep over the repo, excluding `docs/`, `.claude/` and `node_modules`.
 
 **Not run.**
 - The end-to-end smoke list from `testing.md` (`e2e/`) does not exist yet (WP-2e). In its place: the URL-map diff and the import sweeps above.
-- The front-end half (`zen_environment.js`) was not built with `yarn build`. That change is owned by frontend-platform, and WP-0e verifies it.
-- Lint and type checks: this branch changes no Python, so ruff and mypy have nothing to check.
+- core-2 did not run `yarn build` for the front-end half (`zen_environment.js`). frontend-platform-2 did: Node 24.12, `yarn install --frozen-lockfile --ignore-scripts`, then `yarn build`, exit 0. Its `flow check` output is unchanged, and the `commons` bundle is 412 bytes smaller. See the frontend-platform-2 log line.
+- Lint and type checks on core-2's own commits: none needed, since they change no Python. The Python changes from the other roles are linted by their owners (see their log lines and Evidence sections).
+
+### core-2 unit 5: the integrated branch
+
+This was run on the merged head, which holds all four side branches plus `mig/integration`. The tree was exported with `git archive HEAD`, never committed, to `/tmp/wp0d-core2/merged`.
+
+**Leftover references.** `git grep -i` for every removed package name, plus `graphql_api`, `GraphqlPageRouter`, `web.server.graphql`, `legacy_task_builder`, `task_templates`, `on_prem.json` and `zen_environment|zenEnvironment`.
+- Scope: excludes `docs/`, `.claude/`, `yarn.lock`, `web/public/js/vendor` and `tests/`.
+- The only hits are `.gitignore:216-217` (`dask-worker-space/`), which is in the lead's optional request.
+- All deleted paths are absent. `/api/timeout` is still registered in `web/server/routes/api.py:405`.
+
+**`web-server` image.** Built with `DOCKER_NAMESPACE=local/wp0d-core2-merged DOCKER_TAG=merged docker compose -p wp0d-core2-merged -f docker-compose.build.yaml build web-server`. Exit 0.
+
+| Check | Result | Same as the verified scratch `trim`? |
+|---|---|---|
+| Import sweep ([tsv](WP-0d-evidence/sweep-web-merged.tsv)) | 752 modules, 625 OK, 0 removed-package errors | yes: `diff sweep-web-trim.tsv sweep-web-merged.tsv` is empty |
+| URL map ([tsv](WP-0d-evidence/routes-merged.tsv)) | 315 rules, 247 `/api2`, `/api/timeout api.timeout_session POST` present, no `/graphql` | yes: `diff routes-trim.tsv routes-merged.tsv` is empty |
+
+**Test suites, with uv.** There is no pyproject yet, so the web environment is built from the merged `requirements.txt` and `requirements-web.txt`. `-e git+…#egg=X` lines are rewritten to `X @ git+…`, as in backend-5's recipe.
+- `PYTHONPATH=<worktree> uv run --no-project -p 3.8 --with-requirements /tmp/wp0d-core2/reqs-web.txt --with 'pytest<8' python -m pytest tests/web tests/druid -q -p no:cacheprovider -W ignore` gives **3 passed**:
+  - `test_graphql_endpoint_is_not_registered`
+  - `test_hadoop_ingestion_modules_are_gone`
+  - `test_native_indexing_imports_without_druid`
+- `uv run --no-project -p 3.13 --with pytest python -m pytest tests/infra -q -p no:cacheprovider` gives **79 passed**. `prod/browser_share/browser_share.py` declares `requires-python >=3.13`.
 
 ### data-platform-2: the Hadoop ingestion path is deleted
 

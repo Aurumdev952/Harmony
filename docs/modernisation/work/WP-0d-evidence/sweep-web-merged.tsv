@@ -1,0 +1,752 @@
+config.druid_base	OK
+config.harmony_demo.aggregation	OK
+config.harmony_demo.aggregation_rules	OK
+config.harmony_demo.calculated_indicator_defs.calculated_indicator_defs	OK
+config.harmony_demo.calculated_indicator_defs	OK
+config.harmony_demo.calculated_indicators	OK
+config.harmony_demo.database	ERR KeyError: 'DRUID_HOST'
+config.harmony_demo.data_status	OK
+config.harmony_demo.datatypes	OK
+config.harmony_demo.druid	ERR KeyError: 'DRUID_HOST'
+config.harmony_demo.filters	OK
+config.harmony_demo.general	ERR KeyError: 'DRUID_HOST'
+config.harmony_demo.indicator_groups	OK
+config.harmony_demo.indicator_groups.yellow_fever	OK
+config.harmony_demo.indicators	OK
+config.harmony_demo	OK
+config.harmony_demo.pipeline_sources	OK
+config.harmony_demo.ui	ERR KeyError: 'DRUID_HOST'
+config.loader	OK
+config.locales	OK
+config	OK
+config.settings	ERR KeyError: 'DRUID_HOST'
+config.system	OK
+config.template.aggregation	OK
+config.template.aggregation_rules	OK
+config.template.calculated_indicator_defs.calculated_indicator_defs	OK
+config.template.calculated_indicator_defs	OK
+config.template.calculated_indicators	OK
+config.template.database	ERR KeyError: 'DRUID_HOST'
+config.template.data_status	OK
+config.template.datatypes	OK
+config.template.druid	ERR KeyError: 'DRUID_HOST'
+config.template.filters	OK
+config.template.general	ERR KeyError: 'DRUID_HOST'
+config.template.indicator_groups.demo.demo	OK
+config.template.indicator_groups.demo	OK
+config.template.indicator_groups	OK
+config.template.indicators	OK
+config.template	OK
+config.template.pipeline_sources	OK
+config.template.ui	ERR KeyError: 'MAPBOX_ACCESS_TOKEN'
+config.utils	OK
+data.access	OK
+data.alerts.alert	ERR KeyError: 'DRUID_HOST'
+data.alerts.alerts_query	OK
+data.alerts	OK
+data.alerts.send_alert_notifications	ERR KeyError: 'DRUID_HOST'
+data.aqt_datasources	OK
+data.calculated_indicator	OK
+data.calculated_indicator.util	OK
+data.composite_indicator	OK
+data.composite_indicator.util	OK
+data.composite_indicator.validation	OK
+data.dimension.base_dimension	OK
+data.dimension.common.age_range	OK
+data.dimension.common.fuzzy_age	OK
+data.dimension.common	OK
+data.dimension.common.simple	OK
+data.dimension	OK
+data.feed.seed_updates	OK
+data.field	OK
+data.field.util	OK
+data	OK
+data.pipeline.datatypes.base_row_factory	OK
+data.pipeline.datatypes.base_row	OK
+data.pipeline.datatypes.dimension_cleaner	OK
+data.pipeline.datatypes.dimension_collector_io	OK
+data.pipeline.datatypes.dimension_collector	OK
+data.pipeline.datatypes.dimension_factory	OK
+data.pipeline.datatypes.full_dimension_data_collector	OK
+data.pipeline.datatypes.generate_metadata	OK
+data.pipeline.datatypes.geocoder	OK
+data.pipeline.datatypes.location_info_builder	OK
+data.pipeline.datatypes	OK
+data.pipeline.datatypes.util	OK
+data.pipeline.field_setup	OK
+data.pipeline.field_setup.util	OK
+data.pipeline.gis.canonical_geojson_builder	ERR ModuleNotFoundError: No module named 'pyproj'
+data.pipeline.gis.geojson_builder	ERR ModuleNotFoundError: No module named 'pyproj'
+data.pipeline.gis	OK
+data.pipeline.gis.pipeline_shapefile_processor	ERR ModuleNotFoundError: No module named 'shapefile'
+data.pipeline.gis.scripts.build_centroid_from_geojson	ERR ModuleNotFoundError: No module named 'shapely'
+data.pipeline.gis.scripts	OK
+data.pipeline.gis.scripts.process_shapefiles	ERR ModuleNotFoundError: No module named 'shapefile'
+data.pipeline.gis.scripts.store_canonical_locations	ERR ModuleNotFoundError: No module named 'pyproj'
+data.pipeline.gis.shapefile_processor	ERR ModuleNotFoundError: No module named 'shapefile'
+data.pipeline.io.druid_writer	OK
+data.pipeline.io	OK
+data.pipeline	OK
+data.pipeline.resampler	OK
+data.pipeline.restful.async_fetcher	OK
+data.pipeline.restful.common	OK
+data.pipeline.restful	OK
+data.pipeline.restful.writer	OK
+data.pipeline.row_merger	OK
+data.pipeline.scripts.compare_datasets	OK
+data.pipeline.scripts.count_linelist_data	OK
+data.pipeline.scripts.data_digest.create_datasource_metadata	OK
+data.pipeline.scripts.data_digest.fetch_metadata_from_druid	ERR KeyError: 'DRUID_HOST'
+data.pipeline.scripts.data_digest.populate_pipeline_run_metadata	ERR ModuleNotFoundError: No module named 'croniter'
+data.pipeline.scripts.disaggregate_columns	OK
+data.pipeline.scripts.fetch_database_tables	ERR KeyError: 'DRUID_HOST'
+data.pipeline.scripts.fill_dimension_data	ERR ModuleNotFoundError: No module named 'contextlib2'
+data.pipeline.scripts.generate_cumulative_data	OK
+data.pipeline.scripts.generate_metadata	ERR KeyError: 'DRUID_HOST'
+data.pipeline.scripts.generate_pipeline_sources	OK
+data.pipeline.scripts	OK
+data.pipeline.scripts.process_csv	OK
+data.pipeline.scripts.resample_fields	ERR KeyError: 'DRUID_HOST'
+data.pipeline.scripts.translate_csv	OK
+data.pipeline.scripts.unroll	OK
+data.pipeline.scripts.xlsx_to_csv	ERR ModuleNotFoundError: No module named 'xlrd'
+data.pipeline.self_serve	OK
+data.pipeline.self_serve.scripts	OK
+data.pipeline.self_serve.scripts.process_csv_wrapper	OK
+data.pipeline.self_serve.types	OK
+data.pipeline.util	OK
+data.pydruid_query	OK
+data.pydruid_query.pydruid_query	ERR KeyError: 'DRUID_HOST'
+data.query.mock	OK
+data.query.models.calculation.average_calculation	OK
+data.query.models.calculation.average_over_time_calculation	OK
+data.query.models.calculation.calculation	OK
+data.query.models.calculation.cohort_calculation.cohort_calculation	OK
+data.query.models.calculation.cohort_calculation	OK
+data.query.models.calculation.complex_calculation	OK
+data.query.models.calculation.count_calculation	OK
+data.query.models.calculation.count_distinct_calculation	OK
+data.query.models.calculation.formula_calculation	OK
+data.query.models.calculation.last_value_calculation	OK
+data.query.models.calculation.max_calculation	OK
+data.query.models.calculation.min_calculation	OK
+data.query.models.calculation	OK
+data.query.models.calculation.sum_calculation	OK
+data.query.models.calculation.synthetic_calculation	OK
+data.query.models.calculation.synthetic_calculation.synthetic_calculation	OK
+data.query.models.calculation.synthetic_calculation.window_calculation	OK
+data.query.models.category	OK
+data.query.models.dataset	OK
+data.query.models.dimension	OK
+data.query.models.dimension_value	OK
+data.query.models.field_metadata	OK
+data.query.models.field	OK
+data.query.models.filter_items	OK
+data.query.models.granularity.granularity_extraction	OK
+data.query.models.granularity.granularity	OK
+data.query.models.granularity	OK
+data.query.models	OK
+data.query.models.query_filter.and_filter	OK
+data.query.models.query_filter.field_filter	OK
+data.query.models.query_filter.field_in_filter	OK
+data.query.models.query_filter.in_filter	OK
+data.query.models.query_filter.interval_filter	OK
+data.query.models.query_filter.not_filter	OK
+data.query.models.query_filter	OK
+data.query.models.query_filter.or_filter	OK
+data.query.models.query_filter.query_filter	OK
+data.query.models.query_filter.raw_filter	OK
+data.query.models.query_filter.selector_filter	OK
+data.query.models.query_selections	ERR InvalidRequestError: When initializing mapper mapped class Resource->resource, expression 'security_group_acl' failed to locate a name ("name 'security_group_acl' is not defined"). 
+data.query	OK
+data.query_policy.check_existing_and_add_new_policies	ERR KeyError: 'DRUID_HOST'
+data.query_policy	OK
+data.query_policy.query_policy	ERR KeyError: 'DRUID_HOST'
+data.query.query_models_util	ERR ModuleNotFoundError: No module named 'scripts'
+data.test_utils.mock_file	OK
+data.test_utils	OK
+data.validation.datatypes	OK
+data.validation.metrics.base_metric_validator	OK
+data.validation.metrics.csv_validator	OK
+data.validation.metrics.datatypes	OK
+data.validation.metrics	OK
+data.validation	OK
+data.validation.scripts	OK
+data.validation.scripts.validate_pivoted_csv	ERR KeyError: 'DRUID_HOST'
+db.druid.aggregations.exact_unique_count_aggregation	OK
+db.druid.aggregations	OK
+db.druid.aggregations.query_dependent_aggregation	OK
+db.druid.aggregations.query_modifying_aggregation	OK
+db.druid.aggregations.time_interval_aggregation	OK
+db.druid.calculations.base_calculation	OK
+db.druid.calculations.calculation_merger	OK
+db.druid.calculations.complex_calculation	OK
+db.druid.calculations.count_calculation	OK
+db.druid.calculations	OK
+db.druid.calculations.simple_calculation	OK
+db.druid.calculations.unique_calculations	OK
+db.druid.clean_old_datasources	ERR KeyError: 'DRUID_HOST'
+db.druid.config	ERR KeyError: 'DRUID_HOST'
+db.druid.datasource	OK
+db.druid.errors	OK
+db.druid.indexing.common	ERR KeyError: 'DRUID_HOST'
+db.druid.indexing.minio_task_builder	ERR KeyError: 'DRUID_HOST'
+db.druid.indexing	OK
+db.druid.indexing.scripts.fetch_status	ERR KeyError: 'DRUID_HOST'
+db.druid.indexing.scripts	OK
+db.druid.indexing.scripts.run_compaction	ERR KeyError: 'DRUID_HOST'
+db.druid.indexing.scripts.run_native_indexing	ERR KeyError: 'DRUID_HOST'
+db.druid.indexing.task_runner_util	ERR KeyError: 'DRUID_HOST'
+db.druid.js_formulas.base_formula	OK
+db.druid.js_formulas	OK
+db.druid.js_formulas.week_extraction	OK
+db.druid.metadata	ERR KeyError: 'DRUID_HOST'
+db.druid	OK
+db.druid.post_aggregation_builder	OK
+db.druid.post_aggregations	OK
+db.druid.post_aggregations.theta_sketch	OK
+db.druid.query_builder	OK
+db.druid.query_builder_util	OK
+db.druid.query_builder_util.optimization.basic_optimizations	OK
+db.druid.query_builder_util.optimization.filter_optimizations	OK
+db.druid.query_builder_util.optimization	OK
+db.druid.query_builder_util.optimization.sketch_optimizations	OK
+db.druid.query_client	ERR KeyError: 'DRUID_HOST'
+db.druid.update_db_datasource	ERR KeyError: 'DRUID_HOST'
+db.druid.util	OK
+db	OK
+db.postgres.common	ERR KeyError: 'DRUID_HOST'
+db.postgres.config	OK
+db.postgres.connection	OK
+db.postgres.cur_datasource	ERR KeyError: 'DRUID_HOST'
+db.postgres	OK
+db.postgres.utils	OK
+db.sqlalchemy	OK
+log.config	OK
+log.log	OK
+log	OK
+models.alchemy.alerts.model	OK
+models.alchemy.alerts	OK
+models.alchemy.api_token.model	OK
+models.alchemy.api_token	OK
+models.alchemy.base	OK
+models.alchemy.case_management.model	OK
+models.alchemy.case_management	OK
+models.alchemy.configuration.model	OK
+models.alchemy.configuration	OK
+models.alchemy.dashboard.model	OK
+models.alchemy.dashboard	OK
+models.alchemy.data_upload.model	OK
+models.alchemy.data_upload	OK
+models.alchemy.entity_matching.match_status	OK
+models.alchemy.entity_matching.model	OK
+models.alchemy.entity_matching	OK
+models.alchemy.feed.model	OK
+models.alchemy.feed	OK
+models.alchemy.mixin	OK
+models.alchemy	OK
+models.alchemy.permission.model	OK
+models.alchemy.permission	OK
+models.alchemy.pipeline_runs.model	OK
+models.alchemy.pipeline_runs	OK
+models.alchemy.query.model	OK
+models.alchemy.query	OK
+models.alchemy.query_policy.model	OK
+models.alchemy.query_policy	OK
+models.alchemy.schedule.model	OK
+models.alchemy.schedule	OK
+models.alchemy.security_group.model	OK
+models.alchemy.security_group	OK
+models.alchemy.user.base_user	OK
+models.alchemy.user.model	OK
+models.alchemy.user	OK
+models.alchemy.user_query_session.model	OK
+models.alchemy.user_query_session	OK
+models.alchemy.user.web_base_user	OK
+models	OK
+models.python.base	OK
+models.python.config.calendar_settings	OK
+models.python.config.datepicker_settings	OK
+models.python.config	OK
+models.python.config.pipeline_sources_settings	OK
+models.python.dashboard.latest.model	OK
+models.python.dashboard.latest	OK
+models.python.dashboard.latest.visualization_settings.model	OK
+models.python.dashboard.latest.visualization_settings	OK
+models.python.dashboard.latest.visualization_settings.table_theme	OK
+models.python.dashboard.latest.visualization_settings.visualization_specific_model	OK
+models.python.dashboard	OK
+models.python.dashboard.schema_20210805.model	OK
+models.python.dashboard.schema_20210805	OK
+models.python.dashboard.schema_20210805.visualization_settings.model	OK
+models.python.dashboard.schema_20210805.visualization_settings	OK
+models.python.dashboard.schema_20210805.visualization_settings.table_theme	OK
+models.python.dashboard.schema_20210805.visualization_settings.visualization_specific_model	OK
+models.python.dashboard.schema_20210816.model	OK
+models.python.dashboard.schema_20210816	OK
+models.python.dashboard.schema_20210816.visualization_settings.model	OK
+models.python.dashboard.schema_20210816.visualization_settings	OK
+models.python.dashboard.schema_20210816.visualization_settings.table_theme	OK
+models.python.dashboard.schema_20210816.visualization_settings.visualization_specific_model	OK
+models.python.dashboard.schema_20211014.model	OK
+models.python.dashboard.schema_20211014	OK
+models.python.dashboard.schema_20211014.visualization_settings.model	OK
+models.python.dashboard.schema_20211014.visualization_settings	OK
+models.python.dashboard.schema_20211014.visualization_settings.table_theme	OK
+models.python.dashboard.schema_20211014.visualization_settings.visualization_specific_model	OK
+models.python.dashboard.schema_20211019.model	OK
+models.python.dashboard.schema_20211019	OK
+models.python.dashboard.schema_20211019.visualization_settings.model	OK
+models.python.dashboard.schema_20211019.visualization_settings	OK
+models.python.dashboard.schema_20211019.visualization_settings.table_theme	OK
+models.python.dashboard.schema_20211019.visualization_settings.visualization_specific_model	OK
+models.python.dashboard.schema_20211025.model	OK
+models.python.dashboard.schema_20211025	OK
+models.python.dashboard.schema_20211025.visualization_settings.model	OK
+models.python.dashboard.schema_20211025.visualization_settings	OK
+models.python.dashboard.schema_20211025.visualization_settings.table_theme	OK
+models.python.dashboard.schema_20211025.visualization_settings.visualization_specific_model	OK
+models.python.dashboard.schema_20220808.model	OK
+models.python.dashboard.schema_20220808	OK
+models.python.dashboard.schema_20220808.visualization_settings.model	OK
+models.python.dashboard.schema_20220808.visualization_settings	OK
+models.python.dashboard.schema_20220808.visualization_settings.table_theme	OK
+models.python.dashboard.schema_20220808.visualization_settings.visualization_specific_model	OK
+models.python.dashboard.schema_20220909.model	OK
+models.python.dashboard.schema_20220909	OK
+models.python.dashboard.schema_20220909.visualization_settings.model	OK
+models.python.dashboard.schema_20220909.visualization_settings	OK
+models.python.dashboard.schema_20220909.visualization_settings.table_theme	OK
+models.python.dashboard.schema_20220909.visualization_settings.visualization_specific_model	OK
+models.python.dashboard.schema_20221003.model	OK
+models.python.dashboard.schema_20221003	OK
+models.python.dashboard.schema_20221003.visualization_settings.model	OK
+models.python.dashboard.schema_20221003.visualization_settings	OK
+models.python.dashboard.schema_20221003.visualization_settings.table_theme	OK
+models.python.dashboard.schema_20221003.visualization_settings.visualization_specific_model	OK
+models.python.dashboard.schema_20230117.model	OK
+models.python.dashboard.schema_20230117	OK
+models.python.dashboard.schema_20230117.visualization_settings.model	OK
+models.python.dashboard.schema_20230117.visualization_settings	OK
+models.python.dashboard.schema_20230117.visualization_settings.table_theme	OK
+models.python.dashboard.schema_20230117.visualization_settings.visualization_specific_model	OK
+models.python.dashboard.schema_20230329.model	OK
+models.python.dashboard.schema_20230329	OK
+models.python.dashboard.schema_20230329.visualization_settings.model	OK
+models.python.dashboard.schema_20230329.visualization_settings	OK
+models.python.dashboard.schema_20230329.visualization_settings.table_theme	OK
+models.python.dashboard.schema_20230329.visualization_settings.visualization_specific_model	OK
+models.python.dashboard.version	OK
+models.python	OK
+models.python.permissions	OK
+util.analysis.filtering.filter_util	OK
+util.analysis.filtering	OK
+util.analysis	OK
+util.aws	OK
+util.aws.status	OK
+util.connections.connection_manager	ERR KeyError: 'DRUID_HOST'
+util.connections	OK
+util.credentials.generate	OK
+util.credentials.provider	OK
+util.currency.converter	OK
+util.currency	OK
+util.dataprep.api	ERR KeyError: 'DRUID_HOST'
+util.dataprep	OK
+util.dataprep.utils	ERR KeyError: 'DRUID_HOST'
+util.druid	ERR KeyError: 'DRUID_HOST'
+util.ethiopian_calendar.converter	OK
+util.ethiopian_calendar.ethiopian_calendar	OK
+util.ethiopian_calendar.formatter	OK
+util.ethiopian_calendar.moh_calendar	OK
+util.ethiopian_calendar	OK
+util.file.ambiguous_file	OK
+util.file.compression.common	OK
+util.file.compression.lz4	OK
+util.file.compression	OK
+util.file.compression.pigz	OK
+util.file.delimited_reader	OK
+util.file.directory_util	OK
+util.file.file_config	OK
+util.file	OK
+util.file.shard	ERR ModuleNotFoundError: No module named 'contextlib2'
+util.file.stdin_reader	OK
+util.file.unicode_csv	OK
+util.fiscal_calendar	OK
+util.flask	ERR KeyError: 'DRUID_HOST'
+util.init.datatypes	OK
+util.init	OK
+util.javarandom	OK
+util.local_script_wrapper	ERR KeyError: 'DRUID_HOST'
+util.offline_mode	ERR KeyError: 'DRUID_HOST'
+util	OK
+util.pipeline.database_dump	OK
+util.pipeline	OK
+util.pipeline.tools	OK
+util.pipeline.tools.pview	OK
+util.pipeline.tools.pview.pipeline_files	OK
+util.push_id	OK
+util.randomized_data	OK
+util.related	OK
+util.related.polymorphic_model	OK
+util.stat_month_calendar	OK
+util.thread	OK
+util.thread.task_list	OK
+util.unix	OK
+web.background_worker	ERR AttributeError: 'NoneType' object has no attribute '_instantiate_plugins'
+web.dev_reloader	OK
+web.gunicorn_server	ERR KeyError: 'DRUID_HOST'
+web	OK
+web.runserver	ERR KeyError: 'DRUID_HOST'
+web.server.api.alerts_api_models	ERR InvalidRequestError: One or more mappers failed to initialize - can't proceed with initialization of other mappers. Triggering mapper: 'mapped class Resource->resource'. Original ex
+web.server.api.alerts_api_schemas	OK
+web.server.api.api_models	OK
+web.server.api.api_token_models	ERR InvalidRequestError: One or more mappers failed to initialize - can't proceed with initialization of other mappers. Triggering mapper: 'mapped class Resource->resource'. Original ex
+web.server.api.authentication_api_models	OK
+web.server.api.authentication_api_schemas	OK
+web.server.api.configuration_api_models	ERR InvalidRequestError: One or more mappers failed to initialize - can't proceed with initialization of other mappers. Triggering mapper: 'mapped class Resource->resource'. Original ex
+web.server.api.dashboard_api_models	ERR InvalidRequestError: One or more mappers failed to initialize - can't proceed with initialization of other mappers. Triggering mapper: 'mapped class Resource->resource'. Original ex
+web.server.api.dashboard_session_api_models	OK
+web.server.api.data_upload_api_models	ERR KeyError: 'DRUID_HOST'
+web.server.api.data_upload_api_schema	OK
+web.server.api.feed_api_models	OK
+web.server.api.group_api_models	ERR RuntimeError: Working outside of application context.
+web.server.api.metadata	ERR KeyError: 'DRUID_HOST'
+web.server.api.model_schemas	OK
+web.server.api	OK
+web.server.api.permission_api_models	ERR RuntimeError: Working outside of application context.
+web.server.api.permission_api_schemas	OK
+web.server.api.pipeline_config_api_models	ERR InvalidRequestError: One or more mappers failed to initialize - can't proceed with initialization of other mappers. Triggering mapper: 'mapped class Resource->resource'. Original ex
+web.server.api.pipeline_config_api_schema	OK
+web.server.api.pipeline_runs_api_models	ERR InvalidRequestError: One or more mappers failed to initialize - can't proceed with initialization of other mappers. Triggering mapper: 'mapped class Resource->resource'. Original ex
+web.server.api.query.api_models	ERR InvalidRequestError: One or more mappers failed to initialize - can't proceed with initialization of other mappers. Triggering mapper: 'mapped class Resource->resource'. Original ex
+web.server.api.query_api_models	ERR RuntimeError: Working outside of application context.
+web.server.api.query.calculation_schema	OK
+web.server.api.query.grouping_item_schema	ERR InvalidRequestError: One or more mappers failed to initialize - can't proceed with initialization of other mappers. Triggering mapper: 'mapped class Resource->resource'. Original ex
+web.server.api.query	OK
+web.server.api.query.query_filter_schema	OK
+web.server.api.query.query_models	ERR InvalidRequestError: One or more mappers failed to initialize - can't proceed with initialization of other mappers. Triggering mapper: 'mapped class Resource->resource'. Original ex
+web.server.api.responses	OK
+web.server.api_setup	OK
+web.server.api.share_analysis_api_models	OK
+web.server.api.thumbnail_storage_models	ERR KeyError: 'DRUID_HOST'
+web.server.api.user_api_models	ERR InvalidRequestError: One or more mappers failed to initialize - can't proceed with initialization of other mappers. Triggering mapper: 'mapped class Resource->resource'. Original ex
+web.server.api.user_api_schemas	OK
+web.server.api.user_query_session_api_models	OK
+web.server.app_base	ERR KeyError: 'DRUID_HOST'
+web.server.app_cache	OK
+web.server.app_db	OK
+web.server.app_druid	ERR KeyError: 'DRUID_HOST'
+web.server.app	ERR KeyError: 'DRUID_HOST'
+web.server.configuration.bots	OK
+web.server.configuration.celery	OK
+web.server.configuration.flask	ERR KeyError: 'DRUID_HOST'
+web.server.configuration.instance	OK
+web.server.configuration	OK
+web.server.configuration.settings	OK
+web.server.configuration.sms	OK
+web.server.database.alerts	OK
+web.server.database	OK
+web.server.database.setup	OK
+web.server.data.dashboard_specification	OK
+web.server.data.data_access	OK
+web.server.data.dimension_metadata	ERR KeyError: 'DRUID_HOST'
+web.server.data.dimension_metadata_util.compute_sketch_sizes	ERR KeyError: 'DRUID_HOST'
+web.server.data.dimension_metadata_util	OK
+web.server.data.dimension_values	OK
+web.server.data.druid_context	ERR KeyError: 'DRUID_HOST'
+web.server.data	OK
+web.server.data.row_count	OK
+web.server.data.status	OK
+web.server.data.status_page	OK
+web.server.data.time_boundary	ERR KeyError: 'DRUID_HOST'
+web.server.environment	OK
+web.server.errors.error_handlers	ERR KeyError: 'DRUID_HOST'
+web.server.errors.errors	OK
+web.server.errors	OK
+web.server.migrations.env	ERR AttributeError: module 'alembic.context' has no attribute 'config'
+web.server.migrations	OK
+web.server.migrations.seed_scripts	OK
+web.server.migrations.seed_scripts.seed_0899aad0cf2f_populate_null_file_summary	OK
+web.server.migrations.seed_scripts.seed_189373be1240_limit_em_raw_distinct_metadata_to_filterable	OK
+web.server.migrations.seed_scripts.seed_1a448e61b057	ERR InvalidRequestError: One or more mappers failed to initialize - can't proceed with initialization of other mappers. Triggering mapper: 'mapped class Resource->resource'. Original ex
+web.server.migrations.seed_scripts.seed_1d09a4f69ae4_add_self_serve_source_pipeline_source_fk	OK
+web.server.migrations.seed_scripts.seed_1d82c5f424f4_migrate_official_dash	OK
+web.server.migrations.seed_scripts.seed_2be1fb67c14f_populate_alert_title	OK
+web.server.migrations.seed_scripts.seed_3846793ccd75	ERR InvalidRequestError: One or more mappers failed to initialize - can't proceed with initialization of other mappers. Triggering mapper: 'mapped class Resource->resource'. Original ex
+web.server.migrations.seed_scripts.seed_50f9404b84ae_alerts_switch_to_fields_filters_and_add_title	OK
+web.server.migrations.seed_scripts.seed_546034ace769_rm_default_roles_add_sitewide_acl	OK
+web.server.migrations.seed_scripts.seed_678bbb66356c	OK
+web.server.migrations.seed_scripts.seed_6aec17d57ff8_add_entity_matching_materialized_views	OK
+web.server.migrations.seed_scripts.seed_6ba94d12d7d8	OK
+web.server.migrations.seed_scripts.seed_7d247dadfba0_manager_role	ERR InvalidRequestError: One or more mappers failed to initialize - can't proceed with initialization of other mappers. Triggering mapper: 'mapped class Resource->resource'. Original ex
+web.server.migrations.seed_scripts.seed_83644d6eb47f_remove_resource_type	OK
+web.server.migrations.seed_scripts.seed_84a8f91cfbb3_remove_dashboard_tool_manager	ERR InvalidRequestError: One or more mappers failed to initialize - can't proceed with initialization of other mappers. Triggering mapper: 'mapped class Resource->resource'. Original ex
+web.server.migrations.seed_scripts.seed_856eb1abdbce_create_acl_tables	OK
+web.server.migrations.seed_scripts.seed_93bb8d693499_add_data_export_field_to_role	ERR KeyError: 'DRUID_HOST'
+web.server.migrations.seed_scripts.seed_951e632061d2_add_full_dimensions_to_alerts	OK
+web.server.migrations.seed_scripts.seed_97b0abb262bf_entity_type_metadata_columns	ERR InvalidRequestError: One or more mappers failed to initialize - can't proceed with initialization of other mappers. Triggering mapper: 'mapped class Resource->resource'. Original ex
+web.server.migrations.seed_scripts.seed_9a485a630d00_create_related_query_policy_tables	OK
+web.server.migrations.seed_scripts.seed_9a628ffd6795	OK
+web.server.migrations.seed_scripts.seed_a43bff717c71_add_dash_resourcerole_to_role	OK
+web.server.migrations.seed_scripts.seed_b2690a565224	OK
+web.server.migrations.seed_scripts.seed_be489b58a4343	OK
+web.server.migrations.seed_scripts.seed_c04c7f84420e	ERR InvalidRequestError: One or more mappers failed to initialize - can't proceed with initialization of other mappers. Triggering mapper: 'mapped class Resource->resource'. Original ex
+web.server.migrations.seed_scripts.seed_c30c94961873_sort_em_raw_distinct_metadata	OK
+web.server.migrations.seed_scripts.seed_ca5ccf4e8a59_migrate_query_policy_resources_to_roles	OK
+web.server.migrations.seed_scripts.seed_d325772895f7_data_upload_roles	ERR InvalidRequestError: One or more mappers failed to initialize - can't proceed with initialization of other mappers. Triggering mapper: 'mapped class Resource->resource'. Original ex
+web.server.migrations.seed_scripts.seed_d5a1a7abe938_role_roles	OK
+web.server.migrations.seed_scripts.seed_deed35b6fd36	OK
+web.server.migrations.seed_scripts.seed_eb1742dac26e_enable_data_upload_appending	OK
+web.server.migrations.seed_scripts.seed_ed9866de10d8_entity_matching_roles	ERR InvalidRequestError: One or more mappers failed to initialize - can't proceed with initialization of other mappers. Triggering mapper: 'mapped class Resource->resource'. Original ex
+web.server.migrations.seed_scripts.seed_ed989d15dc61_alerts_populate_full_field	ERR ModuleNotFoundError: No module named 'scripts'
+web.server.migrations.seed_scripts.seed_f193e47caa08_add_data_upload_permissions	ERR InvalidRequestError: One or more mappers failed to initialize - can't proceed with initialization of other mappers. Triggering mapper: 'mapped class Resource->resource'. Original ex
+web.server.migrations.seed_scripts.seed_fab84c999c8a	ERR InvalidRequestError: One or more mappers failed to initialize - can't proceed with initialization of other mappers. Triggering mapper: 'mapped class Resource->resource'. Original ex
+web.server.migrations.util	OK
+web.server.migrations.versions.010bef7d6239_adding_alerts	OK
+web.server.migrations.versions.02d20fb0c3ed_add_category_status	OK
+web.server.migrations.versions.0331609ed38d_set_alert_notification_ondelete_cascade	OK
+web.server.migrations.versions.05cc6c8d7b0a_user_query_session_cascade_delete	OK
+web.server.migrations.versions.0899aad0cf2f_disallow_null_file_summary	OK
+web.server.migrations.versions.0b6daf057ae2_update_fiel_table_for_copies	OK
+web.server.migrations.versions.0c2dd30d5bee_is_important_flag	OK
+web.server.migrations.versions.0d0f346a242f_add_crontab_schedule_dashboard_report	OK
+web.server.migrations.versions.0dc00a57046c_adding_case_management	OK
+web.server.migrations.versions.1183eb8e2a0a_data_upload_add_user_file_name	OK
+web.server.migrations.versions.12786dfb3980_	OK
+web.server.migrations.versions.1683303b140a_cm_primary_druid_dimension	OK
+web.server.migrations.versions.18246ae1f1a2_	OK
+web.server.migrations.versions.18429a152520_	OK
+web.server.migrations.versions.189373be1240_limit_em_raw_distinct_metadata_to_filterable	OK
+web.server.migrations.versions.1a448e61b057_adding_query_policy	ERR InvalidRequestError: One or more mappers failed to initialize - can't proceed with initialization of other mappers. Triggering mapper: 'mapped class Resource->resource'. Original ex
+web.server.migrations.versions.1a712d1436eb_updating_case_management_tables	OK
+web.server.migrations.versions.1b25c9c0b5dc_	OK
+web.server.migrations.versions.1bb8b462a580_rename_data_digest_table	OK
+web.server.migrations.versions.1d09a4f69ae4_add_self_serve_source_pipeline_source_fk	OK
+web.server.migrations.versions.1d52cbac7f72_em_add_user_and_date	OK
+web.server.migrations.versions.1d82c5f424f4_migrate_official_dashboards	OK
+web.server.migrations.versions.1e6aa4f75d79_	OK
+web.server.migrations.versions.1ee42f0ba37d_	OK
+web.server.migrations.versions.1fdcf826e468_add_show_case_type_in_dossier	OK
+web.server.migrations.versions.1fe113553bb6_create_dashboard_filter_session	OK
+web.server.migrations.versions.213b541d942f_add_user_query_sessions_table	OK
+web.server.migrations.versions.2235d00f9ebb_	OK
+web.server.migrations.versions.23525d8da689_	OK
+web.server.migrations.versions.25faffac83d1_add_id_to_group_users	OK
+web.server.migrations.versions.2b730c14f514_add_data_catalog_tables_sql_trigger	OK
+web.server.migrations.versions.2be1fb67c14f_populate_alert_title	OK
+web.server.migrations.versions.2c2d9357157c_configuration_overwrite	OK
+web.server.migrations.versions.3071258606d2_allow_null_dataprep_job_ids	OK
+web.server.migrations.versions.31805c1630cf_add_dimension_values_to_alerts	OK
+web.server.migrations.versions.347d0217289b_remove_location_tables	OK
+web.server.migrations.versions.34ef9489bfc1_	OK
+web.server.migrations.versions.359fc1764f11_nonnullable_constraints_data_upload	OK
+web.server.migrations.versions.3846793ccd75_add_alert_authorization	ERR InvalidRequestError: One or more mappers failed to initialize - can't proceed with initialization of other mappers. Triggering mapper: 'mapped class Resource->resource'. Original ex
+web.server.migrations.versions.3b18f32329fa_	OK
+web.server.migrations.versions.3badb035b6ba_dashboard_views_metadata	OK
+web.server.migrations.versions.3c3ef4a761ed_create_api_token_table	OK
+web.server.migrations.versions.3c9bde88ba8a_	OK
+web.server.migrations.versions.4189ebe6c090_	OK
+web.server.migrations.versions.43f128934e5d_preserve_history_on_user_delete	OK
+web.server.migrations.versions.4ba4caf5d5b4_	OK
+web.server.migrations.versions.4c19fa30d958_add_quarterly_semi_annual_reporting_periods	OK
+web.server.migrations.versions.4d1872f4a1d3_add_data_digest_overview	OK
+web.server.migrations.versions.50f9404b84ae_alerts_switch_to_fields_filters_and_add_title	OK
+web.server.migrations.versions.522563aa77c7_add_entity_matching_self_match	OK
+web.server.migrations.versions.5259b9c6d7a6_add_dashboard_report_generator	OK
+web.server.migrations.versions.546034ace769_rm_default_roles_add_sitewide_acl	OK
+web.server.migrations.versions.58add9b07431_trim_configuration	OK
+web.server.migrations.versions.58ea420663e7_generation_datetime	OK
+web.server.migrations.versions.596dfa77bb84_field_category_mapping_visibility_status	OK
+web.server.migrations.versions.59f23455295a_allow_null_file_summary	OK
+web.server.migrations.versions.5f298008d3b8_add_in_latest_datasource_to_raw_pipeline_entity	OK
+web.server.migrations.versions.60327b532405_ add_uniqueness_constraints_to_entity_matching_tables	OK
+web.server.migrations.versions.657727059a29_	OK
+web.server.migrations.versions.65fda57202a5_ add_use_recipient_permissions_scheduled_dashboard_report	OK
+web.server.migrations.versions.671f6396c2be_update_dashboard_resource_onupdate	OK
+web.server.migrations.versions.6722855f6ce5_update_ondelete_resource_role	OK
+web.server.migrations.versions.678bbb66356c_add_feed_update	OK
+web.server.migrations.versions.6aec17d57ff8_add_entity_matching_materialized_views	OK
+web.server.migrations.versions.6b05b608e3b3_add_dimension_category_mapping	OK
+web.server.migrations.versions.6ba94d12d7d8_	OK
+web.server.migrations.versions.6d4dc6809e6c_add_self_serve_source	OK
+web.server.migrations.versions.703e797521a0_em_add_banned_status	OK
+web.server.migrations.versions.70835f75f7c6_add_created_last_modified_to_data_catalog_tables	OK
+web.server.migrations.versions.70d2040c87e3_create_unpublished_field_mapping_tables	OK
+web.server.migrations.versions.70e1269c0db2_	OK
+web.server.migrations.versions.77142d54b64d_dataprep_flow_and_dataprep_job	OK
+web.server.migrations.versions.7bc724e03ded_add_indicator_raw_formula	OK
+web.server.migrations.versions.7d247dadfba0_manager_role	ERR InvalidRequestError: One or more mappers failed to initialize - can't proceed with initialization of other mappers. Triggering mapper: 'mapped class Resource->resource'. Original ex
+web.server.migrations.versions.7df5cba3d971_default_roles	OK
+web.server.migrations.versions.83644d6eb47f_remove_resource_type	OK
+web.server.migrations.versions.84a8f91cfbb3_remove_dashboard_tool_manager	ERR InvalidRequestError: One or more mappers failed to initialize - can't proceed with initialization of other mappers. Triggering mapper: 'mapped class Resource->resource'. Original ex
+web.server.migrations.versions.853e0e8aa6a0_add_created_field_on_user	OK
+web.server.migrations.versions.856eb1abdbce_create_acl_tables	OK
+web.server.migrations.versions.86cb7933619c_	OK
+web.server.migrations.versions.8d2c718eadfa_	OK
+web.server.migrations.versions.8e52d9ff28d7_	OK
+web.server.migrations.versions.915286bb532c_	OK
+web.server.migrations.versions.925fed9a10e4_remove_history_record_model	OK
+web.server.migrations.versions.93bb8d693499_add_data_export_field_to_role	ERR KeyError: 'DRUID_HOST'
+web.server.migrations.versions.951e632061d2_add_full_dimensions_to_alerts	OK
+web.server.migrations.versions.961f42e2e5e9_	OK
+web.server.migrations.versions.97b0abb262bf_pipeline_entity_type_metadata	ERR InvalidRequestError: One or more mappers failed to initialize - can't proceed with initialization of other mappers. Triggering mapper: 'mapped class Resource->resource'. Original ex
+web.server.migrations.versions.99859a8ef2fc_create_dashboard_analysis_download_fields	OK
+web.server.migrations.versions.9a211d5417c7_	OK
+web.server.migrations.versions.9a485a630d00_create_related_query_policy_tables	OK
+web.server.migrations.versions.9a628ffd6795_	OK
+web.server.migrations.versions.a06ef37f9e93_	OK
+web.server.migrations.versions.a43bff717c71_add_dash_resourcerole_to_role	OK
+web.server.migrations.versions.a53982a375ec_add_banned_raw_pipeline_entity_match.py	ERR ModuleNotFoundError: No module named 'web.server.migrations.versions.a53982a375ec_add_banned_raw_pipeline_entity_match'
+web.server.migrations.versions.aad4ae0ffda6_update_category_hierarchy_modeling	OK
+web.server.migrations.versions.aae58915bafb_add_dashboard_report_groups	OK
+web.server.migrations.versions.ad0d35c05a7d_	OK
+web.server.migrations.versions.ae9a40cd9103_source_config	OK
+web.server.migrations.versions.afa5069f67d0_add_dashboard_metadata	OK
+web.server.migrations.versions.b2690a565224_adding_user_status	OK
+web.server.migrations.versions.b281ae64d45d_	OK
+web.server.migrations.versions.b619b8b27577_	OK
+web.server.migrations.versions.b8be31b0936f_add_entity_matching_search_term	OK
+web.server.migrations.versions.bb520d4aa8fd_changing_validation_status_entity_matching	OK
+web.server.migrations.versions.bb8d1e7a1640_remove_indicator_model	OK
+web.server.migrations.versions.bcfc6763c18c_create_dv_cache_tables	OK
+web.server.migrations.versions.be489b5a4343_	OK
+web.server.migrations.versions.be6b1d1a30d2_	OK
+web.server.migrations.versions.c04c7f84420e_	ERR InvalidRequestError: One or more mappers failed to initialize - can't proceed with initialization of other mappers. Triggering mapper: 'mapped class Resource->resource'. Original ex
+web.server.migrations.versions.c30c94961873_sort_em_raw_distinct_metadata	OK
+web.server.migrations.versions.c35c7fbe172f_	OK
+web.server.migrations.versions.c6c1151430dd_add_canonical_index_to_pipeline_entity_match	OK
+web.server.migrations.versions.c8a9fb8f786b_	OK
+web.server.migrations.versions.ca5ccf4e8a59_migrate_query_policy_resources_to_roles	OK
+web.server.migrations.versions.d0252bd4b32e_	OK
+web.server.migrations.versions.d325772895f7_data_upload_roles	ERR InvalidRequestError: One or more mappers failed to initialize - can't proceed with initialization of other mappers. Triggering mapper: 'mapped class Resource->resource'. Original ex
+web.server.migrations.versions.d5a1a7abe938_	OK
+web.server.migrations.versions.dc3a3339dab6_	OK
+web.server.migrations.versions.de1372d2c1b3_create_dimension_tables	OK
+web.server.migrations.versions.de78dcd90eb3_	OK
+web.server.migrations.versions.deed35b6fd36_	OK
+web.server.migrations.versions.e15c910d7f81_add_description_to_field_model	OK
+web.server.migrations.versions.e1e665f992c7_add_data_upload_file_summary	OK
+web.server.migrations.versions.e8f6ad35d0f0_add_status_to_dashboard_report_run	OK
+web.server.migrations.versions.e92d061b0bfc_	OK
+web.server.migrations.versions.eb1742dac26e_enable_data_upload_appending	OK
+web.server.migrations.versions.ed9866de10d8__entity_matching_roles	ERR InvalidRequestError: One or more mappers failed to initialize - can't proceed with initialization of other mappers. Triggering mapper: 'mapped class Resource->resource'. Original ex
+web.server.migrations.versions.ed989d15dc61_alerts_populate_full_field	ERR ModuleNotFoundError: No module named 'scripts'
+web.server.migrations.versions.edcaeb0d4329_field_onupdate_cascade_constraint	OK
+web.server.migrations.versions.f193e47caa08_add_data_upload_permissions	ERR InvalidRequestError: One or more mappers failed to initialize - can't proceed with initialization of other mappers. Triggering mapper: 'mapped class Resource->resource'. Original ex
+web.server.migrations.versions.f2b1e3aa0001_	OK
+web.server.migrations.versions.f3e8008ed008_case_management_remodel	OK
+web.server.migrations.versions.f4a399b73f71_alerts_add_field	OK
+web.server.migrations.versions.f66b2477cc4d_	OK
+web.server.migrations.versions.f9f6f74c64ee_create_unpublished_field	OK
+web.server.migrations.versions.fa4b961b5ecd_alerts_add_compared_val	OK
+web.server.migrations.versions.fab84c999c8a_adding_analyst_role	ERR InvalidRequestError: One or more mappers failed to initialize - can't proceed with initialization of other mappers. Triggering mapper: 'mapped class Resource->resource'. Original ex
+web.server.migrations.versions.fc7d305d0341_delete_message_column_alert_notifications	OK
+web.server.migrations.versions.fcd59de9d36d_	OK
+web.server.migrations.versions.fce9e77aafea_add_entity_matching_tables.py	ERR ModuleNotFoundError: No module named 'web.server.migrations.versions.fce9e77aafea_add_entity_matching_tables'
+web.server.migrations.versions.fe9a588011c4_query_policy_refactor	OK
+web.server.migrations.versions	OK
+web.server.notifications.notification_service	OK
+web.server.notifications	OK
+web.server.notifications.sms_client	OK
+web.server	OK
+web.server.potion.access	OK
+web.server.potion.filters	OK
+web.server.potion.managers	OK
+web.server.potion	OK
+web.server.potion.signals	OK
+web.server.query.data_quality.data_quality_report	ERR RuntimeError: Working outside of application context.
+web.server.query.data_quality.data_quality_score	OK
+web.server.query.data_quality.data_quality_table	OK
+web.server.query.data_quality.data_quality_util	OK
+web.server.query.data_quality.field_reporting_stats_query	OK
+web.server.query.data_quality	OK
+web.server.query.data_quality.outliers_base	ERR RuntimeError: Working outside of application context.
+web.server.query.data_quality.outliers_box_plot	ERR RuntimeError: Working outside of application context.
+web.server.query.data_quality.outliers_line_graph	OK
+web.server.query.data_quality.outliers_report	ERR RuntimeError: Working outside of application context.
+web.server.query.data_quality.outliers_score	OK
+web.server.query.data_quality.outliers_table	ERR RuntimeError: Working outside of application context.
+web.server.query.data_quality.outliers_util	OK
+web.server.query.data_quality.reporting_completeness_line_graph	OK
+web.server.query.data_quality.types	OK
+web.server.query.insights.util	OK
+web.server.query	OK
+web.server.query.request	OK
+web.server.query.request.query_request	OK
+web.server.query.request.util	OK
+web.server.query.util	OK
+web.server.query.visualizations.bar_graph	OK
+web.server.query.visualizations.base	OK
+web.server.query.visualizations.hierarchy	OK
+web.server.query.visualizations.line_graph	OK
+web.server.query.visualizations.map	OK
+web.server.query.visualizations.map_util	OK
+web.server.query.visualizations	OK
+web.server.query.visualizations.table	OK
+web.server.query.visualizations.test_util	OK
+web.server.query.visualizations.util	OK
+web.server.redis	OK
+web.server.redis.thumbnail_storage_service	ERR KeyError: 'DRUID_HOST'
+web.server.routes.api	ERR KeyError: 'DRUID_HOST'
+web.server.routes.dashboard	ERR KeyError: 'DRUID_HOST'
+web.server.routes.data_catalog	OK
+web.server.routes.embedded_query	ERR KeyError: 'DRUID_HOST'
+web.server.routes.index	ERR KeyError: 'DRUID_HOST'
+web.server.routes	OK
+web.server.routes.page_renderer	ERR KeyError: 'DRUID_HOST'
+web.server.routes.upload	ERR KeyError: 'DRUID_HOST'
+web.server.routes.user_authentication	OK
+web.server.routes.util	OK
+web.server.routes.views.admin	OK
+web.server.routes.views.aggregate	OK
+web.server.routes.views.alerts	OK
+web.server.routes.views.authentication	OK
+web.server.routes.views.authorization	OK
+web.server.routes.views.core	OK
+web.server.routes.views.dashboard	ERR KeyError: 'DRUID_HOST'
+web.server.routes.views.dashboard_session	OK
+web.server.routes.views.data_upload_summary	ERR KeyError: 'DRUID_HOST'
+web.server.routes.views.dimension	OK
+web.server.routes.views.feed	OK
+web.server.routes.views.field	OK
+web.server.routes.views.flask_user_views	OK
+web.server.routes.views.groups	OK
+web.server.routes.views.health_check	OK
+web.server.routes.views.invite	OK
+web.server.routes.views	OK
+web.server.routes.views.page_renderer	ERR KeyError: 'DRUID_HOST'
+web.server.routes.views.permission	OK
+web.server.routes.views.pipeline_config	OK
+web.server.routes.views.pipeline_data_digest	ERR KeyError: 'DRUID_HOST'
+web.server.routes.views.query_policy	OK
+web.server.routes.views.resource	OK
+web.server.routes.views.series_statistics	OK
+web.server.routes.views.user_query_session	OK
+web.server.routes.views.users	OK
+web.server.routes.views.util	OK
+web.server.routes.views.validate_data_catalog	ERR KeyError: 'DRUID_HOST'
+web.server.routes.webpack_dev_proxy	OK
+web.server.security.jwt_manager	OK
+web.server.security	OK
+web.server.security.permissions	OK
+web.server.security.signal_handlers	OK
+web.server.services	OK
+web.server.services.self_serve	OK
+web.server.services.self_serve.self_serve_connection	ERR KeyError: 'DRUID_HOST'
+web.server.tasks.notifications	OK
+web.server.tasks	OK
+web.server.util.api_validation	OK
+web.server.util.authentication	OK
+web.server.util.data_catalog	OK
+web.server.util.dev	OK
+web.server.util.dev.static_data_query_client	ERR KeyError: 'DRUID_HOST'
+web.server.util.email_client	OK
+web.server.util.emails	ERR KeyError: 'DRUID_HOST'
+web.server.util.email_translations	OK
+web.server.util.error_links	OK
+web.server.util.html_email_builder	OK
+web.server.util.indicators	OK
+web.server.util	OK
+web.server.util.template_renderer	OK
+web.server.util.util	OK
+web.server.workers	OK

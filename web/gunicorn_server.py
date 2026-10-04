@@ -1,17 +1,20 @@
 #!/usr/bin/env python
 import argparse
 import os
-import sys
+from typing import Any, Dict, Optional
 
 # gevent monkey patch before all other imports
 import gevent.monkey
 
 gevent.monkey.patch_all()
 
-from gunicorn.app.base import BaseApplication
-from multiprocessing import cpu_count
+from multiprocessing import cpu_count  # noqa: E402
 
-from web.server.app import create_app
+from flask import Flask  # noqa: E402
+from gunicorn.app.base import BaseApplication  # noqa: E402
+
+from log.config import logging_config  # noqa: E402
+from web.server.app import create_app  # noqa: E402
 
 # NOTE: Add the gunicorn environment variable so that the existing
 # zen_app initialization code still runs. Figure out a better method soon.
@@ -28,18 +31,18 @@ DEFAULT_WORKER_THREAD_COUNT = cpu_count()
 DEFAULT_WORKER_TIMEOUT = 60
 
 
-class GunicornApplication(BaseApplication):
+class GunicornApplication(BaseApplication):  # type: ignore[misc]
     '''
     Simple gunicorn application customization wrapper based on:
     http://docs.gunicorn.org/en/stable/custom.html
     '''
 
-    def __init__(self, app, options=None):
+    def __init__(self, app: Flask, options: Optional[Dict[str, Any]] = None):
         self.options = options or {}
         self.app = app
         super().__init__()
 
-    def load_config(self):
+    def load_config(self) -> None:
         '''
         Add customized instance options to the gunicorn config.
         '''
@@ -47,11 +50,11 @@ class GunicornApplication(BaseApplication):
             if key in self.cfg.settings and value:
                 self.cfg.set(key.lower(), value)
 
-    def load(self):
+    def load(self) -> Flask:
         return self.app
 
 
-def main():
+def main() -> None:
     parser = argparse.ArgumentParser(
         description='The production hosting environment for the Zenysis Application.'
     )
@@ -158,6 +161,7 @@ def main():
         'timeout': worker_timeout,
         'reload': True,
         'pidfile': arguments.pidfile,
+        'logconfig_dict': logging_config(),
     }
 
     flask_application = create_app()
@@ -166,4 +170,4 @@ def main():
 
 
 if __name__ == '__main__':
-    sys.exit(main())
+    main()

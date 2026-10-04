@@ -14,7 +14,6 @@ import pytest
 os.environ.setdefault('DEFAULT_SECRET_KEY', 'tests-web-placeholder-key')
 os.environ.setdefault('DRUID_HOST', 'http://druid.invalid')
 os.environ.setdefault('ZEN_ENV', 'harmony_demo')
-os.environ.setdefault('RENDERBOT_EMAIL', 'render-bot@tests.invalid')
 
 # pylint: disable=wrong-import-position
 from flask import Blueprint, Flask, g, request

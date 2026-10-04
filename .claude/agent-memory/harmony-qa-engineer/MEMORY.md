@@ -1,2 +1,5 @@
+- [Contract stack traps](contract_stack_traps.md) — running Flask locally: Druid stub, bcrypt pin, mail sink, gunicorn-only routes, role-map deletion, thumbnail PENDING
+- [Contract stack reference](reference_contract_stack.md) — how to start/replay the WP-2c stack: stack.sh only, secrets file, overlays, per-instance project/port
+- [Worktree command guard](worktree_command_guard.md) — compound Bash is refused in worktrees; use plain commands and /tmp scripts
 - [Frontend build and template verification](frontend-build-and-template-verification.md): build diff, CSS rule diff, Jinja render, script URLs, static Playwright smoke, isolated-shell traps
 - [Golden suite harness](golden-suite-harness.md) — offline bootstrap of the legacy query engine, hash-seed traps, mutation-check approach

@@ -34,7 +34,11 @@ None.
 
 ## Requests
 
+- [ ] human: confirm that no deployment builds or pushes images with Jenkins from `ci/docker/Jenkinsfile`. Unit 1 deleted it without asking because the human was unavailable. Object before merge and the file comes back from `0c45a48`. Evidence: nothing in the repo references the file (only planning docs and agent instructions name it). It calls eight Makefile targets (`web_client_build`, `web_server_build`, `web_build`, `web_client_push`, `web_server_push`, `web_push`, `etl_pipeline_build`, `etl_pipeline_push`) that no commit of the Makefile has ever defined (`git log -S web_client_build -- Makefile` is empty), so it cannot have run green since it was added on 2023-11-16. `.github/workflows/web.yml` and `pipeline.yml` already build and push the same images.
+
 ## Log
+
+2026-10-04 infra-2 unit 1: delete `ci/docker/Jenkinsfile` and the now-empty `ci/`; check: `grep -rIli jenkins` outside planning docs finds only README's generic mention of task runners and an issue-template option; none of the eight targets it calls match `^<target>[: ]` in the Makefile.
 
 ## Evidence
 

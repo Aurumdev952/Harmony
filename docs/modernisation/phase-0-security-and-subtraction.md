@@ -9,7 +9,7 @@ Each unit is one PR.
 ## 0a. Lock down Hasura
 
 - **Changes.**
-  - Set `HASURA_GRAPHQL_ADMIN_SECRET` and `HASURA_GRAPHQL_UNAUTHORIZED_ROLE` in `docker-compose.yaml` and stop publishing port 8088.
+  - Set `HASURA_GRAPHQL_ADMIN_SECRET` in `docker-compose.yaml` and stop publishing port 8088. Do not set `HASURA_GRAPHQL_UNAUTHORIZED_ROLE`: in admin-secret mode it serves requests without the secret as that role, which defeats the lockdown (WP-0a decision).
   - Have the Flask proxy (`web/server/routes/api.py:144-176`) send the admin secret plus `x-hasura-role` and `x-hasura-user-id` headers from `current_user`.
   - Pass `apply_metadata_snapshot.py` the secret.
   - Upgrade Hasura to v2.45 LTS in the same PR, since v2.11 has been out of support since 2024-09. It is an interim step; phase 5 retires Hasura.
@@ -79,3 +79,29 @@ Each unit is one PR.
 - **Changes.** Add a script that summarises user agents from production nginx access logs, sorted by deployment.
 - **Data structure.** `BrowserShare = {family, major, share_pct}` per deployment.
 - **Verification.** It runs against one deployment's logs. The share of sessions below Chrome 111, Safari 16.4 or Firefox 128 is recorded in the phase 7 decision log. If more than 5% of sessions fall below that line, phase 7 needs a fallback plan before it starts.
+
+## 0h. Close the privilege escalations in group and role management
+
+Added by decision 0003 after WP-2b reproduced them; scope widened by decision 0004 (N3 to N6, the `/users` self-add and the `/roles` empty-map deletion). Rule: a non-superuser caller may attach or confer only grants it already holds, on roles, groups, query policies and data export alike; existing grants may be re-sent unchanged.
+
+- **Changes.**
+  - `POST /api2/group` and `PATCH /api2/group/<id>`: resolve role URIs through the `RoleResourceManager` filter, and refuse to attach a role the caller could not grant directly (the admin role needs sitewide admin; resource roles need the matching resource permission).
+  - `POST /api2/role` and `PATCH /api2/role/<id>`: creating or editing a role with permissions or resource roles passes the same `update_permissions` gate as editing permissions directly; the creator is not auto-added unless the caller may grant that role.
+  - Audit log entries for every refused attempt.
+- **Verification.**
+  - The three WP-2b escalation cases flip from pinned to refused (403) in the same change.
+  - The rest of the WP-2b table is unchanged: no other role loses or gains anything.
+  - The INV-3 difference table in the WP file is accepted by security and the human.
+
+## 0i. Guard the dashboard render and thumbnail routes
+
+Added by decision 0004 after the WP-2b security review.
+
+- **Changes.**
+  - `/dashboard/<slug>/png/thumbnail`, `/pdf`, `/jpeg` and every other `page_renderer` route require an authenticated caller with `view_resource` on that dashboard, the same check the dashboard page applies.
+  - `/api2/storage/retrieve` serves a thumbnail only to a caller allowed to view the dashboard; the cache key includes the viewer's policy, or thumbnails for policy-restricted viewers are rendered as the requesting user, until WP-1h replaces the renderer.
+  - The render bot stops being a site admin if the renderer can run under the requesting user's token; otherwise record the bot's scope as a carried risk for WP-1h.
+- **Verification.**
+  - Anonymous and unauthorised requests to every render route get 401 or 403 and no outbound render call is made (mock the renderer; never call urlbox from tests).
+  - A policy-restricted viewer never receives a thumbnail rendered with a wider policy.
+  - The WP-2b pins for these routes flip from today's behaviour to the new one in the same stack.

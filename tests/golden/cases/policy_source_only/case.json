@@ -1,0 +1,12 @@
+{
+  "description": "Policy: a source but no state, so the state default-deny filter removes every row.",
+  "endpoint": "bar_graph",
+  "policy": {
+    "query_policies": [
+      {
+        "dimension": "source",
+        "dimension_value": "yellow_fever"
+      }
+    ]
+  }
+}

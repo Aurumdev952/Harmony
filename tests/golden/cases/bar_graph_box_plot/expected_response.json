@@ -1,0 +1,62 @@
+{
+  "data": [
+    {
+      "dimensions": {
+        "MunicipalityName": "Cruzeiro do Sul",
+        "StateName": "Acre"
+      },
+      "metrics": {
+        "yellow_fever_cases": 335.0
+      }
+    },
+    {
+      "dimensions": {
+        "MunicipalityName": "Rio Branco",
+        "StateName": "Acre"
+      },
+      "metrics": {
+        "yellow_fever_cases": 271.0
+      }
+    },
+    {
+      "dimensions": {
+        "MunicipalityName": "Belém",
+        "StateName": "Pará"
+      },
+      "metrics": {
+        "yellow_fever_cases": 280.97
+      }
+    },
+    {
+      "dimensions": {
+        "MunicipalityName": "Conceição do Araguaia",
+        "StateName": "Pará"
+      },
+      "metrics": {
+        "yellow_fever_cases": null
+      }
+    },
+    {
+      "dimensions": {
+        "MunicipalityName": "Alto Alegre",
+        "StateName": "Roraima"
+      },
+      "metrics": {
+        "yellow_fever_cases": 329.47
+      }
+    },
+    {
+      "dimensions": {
+        "MunicipalityName": "Pacaraima",
+        "StateName": "Roraima"
+      },
+      "metrics": {
+        "yellow_fever_cases": 141.0
+      }
+    }
+  ],
+  "dimensions": [
+    "StateName",
+    "MunicipalityName"
+  ]
+}

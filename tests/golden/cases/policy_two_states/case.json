@@ -1,0 +1,20 @@
+{
+  "description": "Policy: two states and one source; the in-filter values come from a set.",
+  "endpoint": "table",
+  "policy": {
+    "query_policies": [
+      {
+        "dimension": "StateName",
+        "dimension_value": "Acre"
+      },
+      {
+        "dimension": "StateName",
+        "dimension_value": "Roraima"
+      },
+      {
+        "dimension": "source",
+        "dimension_value": "yellow_fever"
+      }
+    ]
+  }
+}

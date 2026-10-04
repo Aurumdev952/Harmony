@@ -1,0 +1,5 @@
+{
+  "description": "Data quality location reporting table.",
+  "endpoint": "data_quality_table",
+  "policy": null
+}

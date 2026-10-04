@@ -1,0 +1,67 @@
+{
+  "data": [
+    {
+      "dimensions": {
+        "MunicipalityName": "Alto Alegre"
+      },
+      "metrics": {
+        "yellow_fever_cases__a3": null,
+        "yellow_fever_cases__k2": 0.0,
+        "yellow_fever_cases__s1": null
+      }
+    },
+    {
+      "dimensions": {
+        "MunicipalityName": "Belém"
+      },
+      "metrics": {
+        "yellow_fever_cases__a3": 78.2542,
+        "yellow_fever_cases__k2": 337.0,
+        "yellow_fever_cases__s1": 358.0
+      }
+    },
+    {
+      "dimensions": {
+        "MunicipalityName": "Conceição do Araguaia"
+      },
+      "metrics": {
+        "yellow_fever_cases__a3": 342.6699,
+        "yellow_fever_cases__k2": 372.0,
+        "yellow_fever_cases__s1": 259.95
+      }
+    },
+    {
+      "dimensions": {
+        "MunicipalityName": "Cruzeiro do Sul"
+      },
+      "metrics": {
+        "yellow_fever_cases__a3": null,
+        "yellow_fever_cases__k2": 0.0,
+        "yellow_fever_cases__s1": null
+      }
+    },
+    {
+      "dimensions": {
+        "MunicipalityName": "Pacaraima"
+      },
+      "metrics": {
+        "yellow_fever_cases__a3": 787.195,
+        "yellow_fever_cases__k2": 24.0,
+        "yellow_fever_cases__s1": 283.0
+      }
+    },
+    {
+      "dimensions": {
+        "MunicipalityName": "Rio Branco"
+      },
+      "metrics": {
+        "yellow_fever_cases__a3": 382.486,
+        "yellow_fever_cases__k2": 26.0,
+        "yellow_fever_cases__s1": 214.0
+      }
+    }
+  ],
+  "dimensions": [
+    "MunicipalityName"
+  ]
+}

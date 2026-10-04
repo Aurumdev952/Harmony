@@ -1,0 +1,5 @@
+{
+  "description": "MAP: municipality level within two states; adds parents and lat/lng dimensions and admin boundary lists.",
+  "endpoint": "map",
+  "policy": null
+}

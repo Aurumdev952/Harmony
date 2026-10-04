@@ -4,7 +4,7 @@
 # tree is not yet formatted or lint-clean, so the full rule set applies to the
 # files a change touches. With --fix, fix and format those files instead.
 #
-#   ci/lint_python.sh main          # what CI runs, against the PR's base
+#   ci/lint_python.sh main          # CI passes HEAD^1, the PR's base
 #   ci/lint_python.sh --fix main
 set -euo pipefail
 

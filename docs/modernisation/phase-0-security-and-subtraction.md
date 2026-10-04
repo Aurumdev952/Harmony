@@ -37,7 +37,7 @@ Each unit is one PR.
 ## 0c. Fix the bugs that are pure mistakes
 
 - **Changes.** Each fix gets a regression test, even before phase 2 exists, as a plain pytest file run locally.
-  - `docker-compose.pipeline.yaml:17`: `POSTGRES_DB_URI:=` becomes `POSTGRES_DB_URI=`.
+  - `docker-compose.pipeline.yaml:17`: delete the `POSTGRES_DB_URI:=` line. Nothing reads `POSTGRES_DB_URI`; Alembic reads `SQLALCHEMY_DATABASE_URI`, which comes from `DATABASE_URL`.
   - `web/server/routes/dashboard.py:44`: point at the correct blueprint endpoint.
   - `web/server/util/util.py:622`: `is_session_persisted` reads the `accessKey` cookie's persistence instead of `remember_token`.
   - `run_raw_query`: apply the query policy, or restrict callers to service code. Decide this with `pstack:interrogate`.

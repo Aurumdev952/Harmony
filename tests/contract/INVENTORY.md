@@ -25,6 +25,7 @@ tests/contract/stack/stack.sh down
 - Record against a fresh stack (`down`, then `up`): some list endpoints return everything in the database, so leftovers from an earlier run change their shape. Replay is idempotent: every case cleans up what it creates (`95-cleanup.json` last).
 - In CI, give each job its own `CONTRACT_PROJECT` (compose project) and `CONTRACT_WEB_PORT` (loopback port), for example `CONTRACT_PROJECT=contract-$CI_JOB_ID`.
 - The stack has no route to the internet (`internal: true` network); only a small forwarder publishes `127.0.0.1:$CONTRACT_WEB_PORT`.
+- The stack scripts run on Linux only: `stack.sh` uses GNU `stat -c`, bash 4 `mapfile`, `sha256sum` and `$XDG_RUNTIME_DIR`, and builds `linux/amd64` images. On macOS, run them in a Linux VM or a CI runner.
 
 ## Endpoints
 
@@ -44,7 +45,6 @@ tests/contract/stack/stack.sh down
 | GET | `/api/field/<field_ids>` | r/api.py:374 (since WP-0c unknown ids are 404 and more than 20 ids 400) | services/FieldInfoService.js:37 (ZenClient) | recorded |
 | GET | `/api/field_names` | r/api.py:381 | components/common/SharingUtil/ShareQueryModal/index.jsx:334 (download) | recorded |
 | POST | `/api/graphql` | r/api.py:397 (proxy to Hasura `/v1beta1/relay`) | util/graphql/environment.js:22 (Relay; per-operation coverage in the Relay table below) | recorded |
-| POST | `/graphql` | r/graphql_api.py:20 | util/graphql/zen_environment.js:22 | deferred: dead client code; nothing imports `zenEnvironment` |
 | POST | `/api/validate_self_serve_upload` | r/api.py:435 | services/AdminService.js:21 (multipart) | recorded |
 | POST | `/api/import_self_serve` | r/api.py:429 | components/AdminApp/ConfigurationTab/SelfServeControlBlock/ImportSelfServeWrapper.jsx:144 (multipart) | recorded |
 | GET | `/api/download_data_catalog_changes` | r/api.py:441 | ImportSelfServeWrapper.jsx:105 (download) | recorded |
@@ -183,33 +183,33 @@ Sent as `{query, variables}` to `POST /api/graphql`. Cases load the text from th
 
 | Kind | Operation | Artifact | Coverage |
 |---|---|---|---|
-| mutation | BatchPublishModalMutation | `web/client/components/FieldSetupApp/FieldSetupPageHeaderActions/BatchPublishAction/__generated__/BatchPublishModalMutation.graphql.js` | deferred: edits unpublished_field rows, which only the pipeline writes and no client operation creates; WP-0a's scripts/db/hasura/replay_relay_operations.py drives it for role permissions |
-| mutation | CalculationInputMutation | `web/client/components/FieldSetupApp/UnpublishedFieldsTable/UnpublishedFieldTableRows/__generated__/CalculationInputMutation.graphql.js` | deferred: edits unpublished_field rows, which only the pipeline writes and no client operation creates; WP-0a's scripts/db/hasura/replay_relay_operations.py drives it for role permissions |
+| mutation | BatchPublishModalMutation | `web/client/components/FieldSetupApp/FieldSetupPageHeaderActions/BatchPublishAction/__generated__/BatchPublishModalMutation.graphql.js` | recorded |
+| mutation | CalculationInputMutation | `web/client/components/FieldSetupApp/UnpublishedFieldsTable/UnpublishedFieldTableRows/__generated__/CalculationInputMutation.graphql.js` | recorded |
 | mutation | CalculationRowMutation | `web/client/components/DataCatalogApp/FieldDetailsPage/FieldDetailsSection/CalculationRow/__generated__/CalculationRowMutation.graphql.js` | recorded |
 | mutation | CategoryGroupRowValueMutation | `web/client/components/DataCatalogApp/DirectoryPage/DirectoryTableContainer/DirectoryTable/DirectoryRow/__generated__/CategoryGroupRowValueMutation.graphql.js` | recorded |
-| mutation | CategoryInputMutation | `web/client/components/FieldSetupApp/UnpublishedFieldsTable/UnpublishedFieldTableRows/__generated__/CategoryInputMutation.graphql.js` | deferred: edits unpublished_field rows, which only the pipeline writes and no client operation creates; WP-0a's scripts/db/hasura/replay_relay_operations.py drives it for role permissions |
+| mutation | CategoryInputMutation | `web/client/components/FieldSetupApp/UnpublishedFieldsTable/UnpublishedFieldTableRows/__generated__/CategoryInputMutation.graphql.js` | recorded |
 | mutation | CreateCalculationIndicatorViewMutation | `web/client/components/DataCatalogApp/common/CreateCalculationIndicatorView/__generated__/CreateCalculationIndicatorViewMutation.graphql.js` | recorded |
 | mutation | CreateGroupModalMutation | `web/client/components/DataCatalogApp/common/GroupActionModals/__generated__/CreateGroupModalMutation.graphql.js` | recorded |
 | mutation | DeleteCategoryModalMutation | `web/client/components/DataCatalogApp/common/GroupActionModals/__generated__/DeleteCategoryModalMutation.graphql.js` | recorded |
 | mutation | DeleteFieldModalMutation | `web/client/components/DataCatalogApp/common/GroupActionModals/__generated__/DeleteFieldModalMutation.graphql.js` | recorded |
-| mutation | DescriptionInputMutation | `web/client/components/FieldSetupApp/UnpublishedFieldsTable/UnpublishedFieldTableRows/__generated__/DescriptionInputMutation.graphql.js` | deferred: edits unpublished_field rows, which only the pipeline writes and no client operation creates; WP-0a's scripts/db/hasura/replay_relay_operations.py drives it for role permissions |
+| mutation | DescriptionInputMutation | `web/client/components/FieldSetupApp/UnpublishedFieldsTable/UnpublishedFieldTableRows/__generated__/DescriptionInputMutation.graphql.js` | recorded |
 | mutation | DescriptionRowMutation | `web/client/components/DataCatalogApp/FieldDetailsPage/FieldDetailsSection/__generated__/DescriptionRowMutation.graphql.js` | recorded |
 | mutation | EditGroupModalMutation | `web/client/components/DataCatalogApp/common/GroupActionModals/__generated__/EditGroupModalMutation.graphql.js` | recorded |
 | mutation | FieldCalculationSectionMutation | `web/client/components/DataCatalogApp/FieldDetailsPage/FieldCalculationSection/__generated__/FieldCalculationSectionMutation.graphql.js` | recorded |
 | mutation | FieldRowValueMutation | `web/client/components/DataCatalogApp/DirectoryPage/DirectoryTableContainer/DirectoryTable/DirectoryRow/__generated__/FieldRowValueMutation.graphql.js` | recorded |
-| mutation | NameInputMutation | `web/client/components/FieldSetupApp/UnpublishedFieldsTable/UnpublishedFieldTableRows/__generated__/NameInputMutation.graphql.js` | deferred: edits unpublished_field rows, which only the pipeline writes and no client operation creates; WP-0a's scripts/db/hasura/replay_relay_operations.py drives it for role permissions |
+| mutation | NameInputMutation | `web/client/components/FieldSetupApp/UnpublishedFieldsTable/UnpublishedFieldTableRows/__generated__/NameInputMutation.graphql.js` | recorded |
 | mutation | NameRowMutation | `web/client/components/DataCatalogApp/FieldDetailsPage/FieldDetailsSection/__generated__/NameRowMutation.graphql.js` | recorded |
-| mutation | ShortNameInputMutation | `web/client/components/FieldSetupApp/UnpublishedFieldsTable/UnpublishedFieldTableRows/__generated__/ShortNameInputMutation.graphql.js` | deferred: edits unpublished_field rows, which only the pipeline writes and no client operation creates; WP-0a's scripts/db/hasura/replay_relay_operations.py drives it for role permissions |
+| mutation | ShortNameInputMutation | `web/client/components/FieldSetupApp/UnpublishedFieldsTable/UnpublishedFieldTableRows/__generated__/ShortNameInputMutation.graphql.js` | recorded |
 | mutation | ShortNameRowMutation | `web/client/components/DataCatalogApp/FieldDetailsPage/FieldDetailsSection/__generated__/ShortNameRowMutation.graphql.js` | recorded |
-| mutation | UnpublishedFieldRowMutation | `web/client/components/FieldSetupApp/UnpublishedFieldsTable/UnpublishedFieldTableRows/__generated__/UnpublishedFieldRowMutation.graphql.js` | deferred: edits unpublished_field rows, which only the pipeline writes and no client operation creates; WP-0a's scripts/db/hasura/replay_relay_operations.py drives it for role permissions |
-| mutation | UpdateCalculationActionMutation | `web/client/components/FieldSetupApp/FieldSetupPageHeaderActions/__generated__/UpdateCalculationActionMutation.graphql.js` | deferred: edits unpublished_field rows, which only the pipeline writes and no client operation creates; WP-0a's scripts/db/hasura/replay_relay_operations.py drives it for role permissions |
-| mutation | UpdateCategoryActionMutation | `web/client/components/FieldSetupApp/FieldSetupPageHeaderActions/__generated__/UpdateCategoryActionMutation.graphql.js` | deferred: edits unpublished_field rows, which only the pipeline writes and no client operation creates; WP-0a's scripts/db/hasura/replay_relay_operations.py drives it for role permissions |
+| mutation | UnpublishedFieldRowMutation | `web/client/components/FieldSetupApp/UnpublishedFieldsTable/UnpublishedFieldTableRows/__generated__/UnpublishedFieldRowMutation.graphql.js` | recorded |
+| mutation | UpdateCalculationActionMutation | `web/client/components/FieldSetupApp/FieldSetupPageHeaderActions/__generated__/UpdateCalculationActionMutation.graphql.js` | recorded |
+| mutation | UpdateCategoryActionMutation | `web/client/components/FieldSetupApp/FieldSetupPageHeaderActions/__generated__/UpdateCategoryActionMutation.graphql.js` | recorded |
 | mutation | VisibilityRowMutation | `web/client/components/DataCatalogApp/FieldDetailsPage/FieldDetailsSection/__generated__/VisibilityRowMutation.graphql.js` | recorded |
 | mutation | useBatchParentCategoryChangeMutation | `web/client/components/DataCatalogApp/DirectoryPage/hooks/ParentCategoryChange/__generated__/useBatchParentCategoryChangeMutation.graphql.js` | recorded |
-| mutation | useDeleteSourceMutation | `web/client/components/DataUploadApp/SourceTable/__generated__/useDeleteSourceMutation.graphql.js` | deferred: self-serve sources need object storage and Dataprep flows the stack does not run; WP-0a's scripts/db/hasura/replay_relay_operations.py drives it for role permissions |
+| mutation | useDeleteSourceMutation | `web/client/components/DataUploadApp/SourceTable/__generated__/useDeleteSourceMutation.graphql.js` | recorded |
 | mutation | useParentCategoryChangeForCategoryMutation | `web/client/components/DataCatalogApp/DirectoryPage/hooks/ParentCategoryChange/__generated__/useParentCategoryChangeForCategoryMutation.graphql.js` | recorded |
 | mutation | useParentCategoryChangeForFieldMutation | `web/client/components/DataCatalogApp/DirectoryPage/hooks/ParentCategoryChange/__generated__/useParentCategoryChangeForFieldMutation.graphql.js` | recorded |
-| mutation | useSelfServeMutation | `web/client/components/DataUploadApp/AddDataModal/__generated__/useSelfServeMutation.graphql.js` | deferred: self-serve sources need object storage and Dataprep flows the stack does not run; WP-0a's scripts/db/hasura/replay_relay_operations.py drives it for role permissions |
+| mutation | useSelfServeMutation | `web/client/components/DataUploadApp/AddDataModal/__generated__/useSelfServeMutation.graphql.js` | recorded |
 | query | BatchPublishModalContentsQuery | `web/client/components/FieldSetupApp/FieldSetupPageHeaderActions/BatchPublishAction/__generated__/BatchPublishModalContentsQuery.graphql.js` | recorded |
 | query | BreadcrumbLeafItemQuery | `web/client/components/DataCatalogApp/DirectoryPage/BreadcrumbPath/__generated__/BreadcrumbLeafItemQuery.graphql.js` | recorded |
 | query | BreadcrumbPathQuery | `web/client/components/DataCatalogApp/DirectoryPage/BreadcrumbPath/__generated__/BreadcrumbPathQuery.graphql.js` | recorded |
@@ -234,6 +234,16 @@ Sent as `{query, variables}` to `POST /api/graphql`. Cases load the text from th
 | query | usePipelineTimesHistoricalPipelinesQuery | `web/client/components/DataUploadApp/__generated__/usePipelineTimesHistoricalPipelinesQuery.graphql.js` | recorded |
 | query | usePipelineTimesLastPipelineQuery | `web/client/components/DataUploadApp/__generated__/usePipelineTimesLastPipelineQuery.graphql.js` | recorded |
 | query | usePipelineTimesLastSuccessfulPipelineQuery | `web/client/components/DataUploadApp/__generated__/usePipelineTimesLastSuccessfulPipelineQuery.graphql.js` | recorded |
+
+## What phase 5 needs (QA-2)
+
+Pointing `CONTRACT_BASE_URL` at FastAPI does not work as the suite stands. A phase-5 WP must supply:
+
+- **Login.** `runner.Runner.session` logs `admin*` sessions in through `POST /api2/authentication/login?set_cookie=true` and sends `X-Username`/`X-Password` for `client*` sessions. WP-5d changes both (C-5) and adds CSRF on unsafe methods (SEC-5). Make login and CSRF a hook the runner calls, chosen per target.
+- **A route map.** Cases name `/api` and `/api2` paths; new endpoints live under `/api/v3/` (BE-5). Either the strangler keeps the old paths (nginx or FastAPI aliases), or each case gains a mapping from its legacy route to the v3 route, and recordings whose shape deliberately changes (the C-10 error envelope, columnar `QueryResponse`) are re-recorded in that WP with the reason.
+- **Query data.** Query cases run against Flask's `ZEN_OFFLINE` mock client, which invents rows; the Druid stub answers `[]` to `groupBy`. FastAPI has no such mock, so its query routes would return empty shapes and fail. Give the stub fixed rows for the recorded queries (or run a small Druid with `harmony_demo` data), and re-record queries once with Flask against that, so both stacks read the same rows.
+- **Hasura.** The GraphQL cases go through Flask's proxy to Hasura; WP-5e retires both, so those recordings become the parity target for whatever replaces them.
+- **Seeded catalogue rows.** `stack/seed_catalog.py` inserts the dimension, pipeline datasources, unpublished field, Dataprep flow and self-serve source that only the pipeline writes. A FastAPI stack needs the same rows (or the same script against its database) before replay.
 
 ## Server routes no client calls
 

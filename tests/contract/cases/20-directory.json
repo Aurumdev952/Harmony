@@ -223,7 +223,7 @@
           "resources": {}
         }
       },
-      "note": "Any non-empty role map 500s: add_user_role passes resource_id, which UserRoles no longer accepts (web/server/routes/views/users.py). web/python_client sends this shape (WP-2c finding F11)."
+      "note": "Any non-empty role map 500s: add_user_role passes resource_id, which UserRoles no longer accepts (web/server/routes/views/users.py). web/python_client sends this shape (WP-2c finding F10)."
     },
     {
       "id": "user.update",
@@ -253,12 +253,44 @@
       "id": "user.generate_api_token",
       "route": "POST /api2/user/<id>/generate_api_token",
       "body": {},
-      "path": "{invitee}/generate_api_token"
+      "path": "{invitee}/generate_api_token",
+      "note": "Returns a signed token without storing it; it authenticates only once the admin app saves the user with it (user.update.persist_api_token, WP-2c finding F12).",
+      "capture": {
+        "api_token_uri": "/$uri",
+        "api_token_id": "/id"
+      }
+    },
+    {
+      "id": "user.update.persist_api_token",
+      "route": "PATCH /api2/user/<id>",
+      "path": "{invitee}",
+      "body": {
+        "$uri": "{invitee}",
+        "username": "contract-invitee@harmony.invalid",
+        "firstName": "Contract",
+        "lastName": "Invitee",
+        "phoneNumber": "",
+        "status": "pending",
+        "acls": [],
+        "apiTokens": [
+          {
+            "$uri": "{api_token_uri}",
+            "id": "{api_token_id}",
+            "isRevoked": false,
+            "created": null,
+            "revoked": null
+          }
+        ],
+        "roles": [],
+        "groups": []
+      },
+      "note": "How the admin app stores a generated token: it PATCHes the user with the token in apiTokens (User.serialize(), web/client/services/models/User/index.js:139), because generate_api_token itself stores nothing (WP-2c finding F12)."
     },
     {
       "id": "user.get.with_api_token",
       "route": "GET /api2/user/<id>",
-      "path": "{invitee}"
+      "path": "{invitee}",
+      "note": "Reads the token stored by user.update.persist_api_token, so the apiTokens item shape is pinned."
     },
     {
       "id": "user.delete",

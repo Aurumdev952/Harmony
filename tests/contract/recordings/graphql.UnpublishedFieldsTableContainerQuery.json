@@ -124,7 +124,25 @@
           "unpublishedFieldConnection": {
             "properties": {
               "edges": {
-                "maxItems": 0,
+                "items": {
+                  "properties": {
+                    "node": {
+                      "properties": {
+                        "id": {
+                          "type": "string"
+                        }
+                      },
+                      "required": [
+                        "id"
+                      ],
+                      "type": "object"
+                    }
+                  },
+                  "required": [
+                    "node"
+                  ],
+                  "type": "object"
+                },
                 "type": "array"
               }
             },

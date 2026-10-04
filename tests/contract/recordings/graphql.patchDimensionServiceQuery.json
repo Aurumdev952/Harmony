@@ -10,7 +10,64 @@
           "dimensionConnection": {
             "properties": {
               "edges": {
-                "maxItems": 0,
+                "items": {
+                  "properties": {
+                    "node": {
+                      "properties": {
+                        "description": {
+                          "type": "string"
+                        },
+                        "dimensionCategoryMappings": {
+                          "items": {
+                            "properties": {
+                              "category": {
+                                "properties": {
+                                  "id": {
+                                    "type": "string"
+                                  },
+                                  "name": {
+                                    "type": "string"
+                                  }
+                                },
+                                "required": [
+                                  "id",
+                                  "name"
+                                ],
+                                "type": "object"
+                              },
+                              "id": {
+                                "type": "string"
+                              }
+                            },
+                            "required": [
+                              "category",
+                              "id"
+                            ],
+                            "type": "object"
+                          },
+                          "type": "array"
+                        },
+                        "id": {
+                          "type": "string"
+                        },
+                        "name": {
+                          "type": "string"
+                        }
+                      },
+                      "required": [
+                        "description",
+                        "dimensionCategoryMappings",
+                        "id",
+                        "name"
+                      ],
+                      "type": "object"
+                    }
+                  },
+                  "required": [
+                    "node"
+                  ],
+                  "type": "object"
+                },
                 "type": "array"
               }
             },

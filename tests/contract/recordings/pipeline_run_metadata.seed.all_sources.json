@@ -18,8 +18,15 @@
             "type": "string",
             "x-format": "date"
           },
+          "failed": {
+            "type": "boolean"
+          },
           "fields_count": {
             "type": "integer"
+          },
+          "next_run": {
+            "type": "string",
+            "x-format": "date-time"
           },
           "start_date": {
             "type": "string",
@@ -33,7 +40,9 @@
         "required": [
           "data_points_count",
           "end_date",
+          "failed",
           "fields_count",
+          "next_run",
           "start_date",
           "start_ts"
         ],

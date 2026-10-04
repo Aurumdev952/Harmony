@@ -1,25 +1,63 @@
 {
   "content_type": "text/html",
   "headers": [],
-  "id": "graphql.UnpublishedFieldTableRowsPaginationQuery",
+  "id": "graphql.UpdateCategoryActionMutation",
   "pinned": {},
   "response_schema": {
     "properties": {
       "data": {
         "properties": {
-          "unpublishedFieldConnection": {
+          "delete_unpublished_field_category_mapping": {
             "properties": {
-              "edges": {
+              "returning": {
                 "items": {
                   "properties": {
-                    "cursor": {
+                    "category_id": {
                       "type": "string"
                     },
-                    "node": {
+                    "id": {
+                      "type": "string"
+                    },
+                    "unpublished_field_id": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "category_id",
+                    "id",
+                    "unpublished_field_id"
+                  ],
+                  "type": "object"
+                },
+                "type": "array"
+              }
+            },
+            "required": [
+              "returning"
+            ],
+            "type": "object"
+          },
+          "insert_unpublished_field_category_mapping": {
+            "properties": {
+              "returning": {
+                "items": {
+                  "properties": {
+                    "category": {
                       "properties": {
-                        "__typename": {
+                        "id": {
                           "type": "string"
-                        },
+                        }
+                      },
+                      "required": [
+                        "id"
+                      ],
+                      "type": "object"
+                    },
+                    "id": {
+                      "type": "string"
+                    },
+                    "unpublished_field": {
+                      "properties": {
                         "calculation": {
                           "properties": {
                             "type": {
@@ -55,7 +93,37 @@
                           "type": "string"
                         },
                         "unpublishedFieldCategoryMappings": {
-                          "maxItems": 0,
+                          "items": {
+                            "properties": {
+                              "category": {
+                                "properties": {
+                                  "id": {
+                                    "type": "string"
+                                  },
+                                  "name": {
+                                    "type": "string"
+                                  }
+                                },
+                                "required": [
+                                  "id",
+                                  "name"
+                                ],
+                                "type": "object"
+                              },
+                              "categoryId": {
+                                "type": "string"
+                              },
+                              "id": {
+                                "type": "string"
+                              }
+                            },
+                            "required": [
+                              "category",
+                              "categoryId",
+                              "id"
+                            ],
+                            "type": "object"
+                          },
                           "type": "array"
                         },
                         "unpublishedFieldPipelineDatasourceMappings": {
@@ -64,7 +132,6 @@
                         }
                       },
                       "required": [
-                        "__typename",
                         "calculation",
                         "description",
                         "id",
@@ -78,38 +145,24 @@
                     }
                   },
                   "required": [
-                    "cursor",
-                    "node"
+                    "category",
+                    "id",
+                    "unpublished_field"
                   ],
                   "type": "object"
                 },
                 "type": "array"
-              },
-              "pageInfo": {
-                "properties": {
-                  "endCursor": {
-                    "type": "string"
-                  },
-                  "hasNextPage": {
-                    "type": "boolean"
-                  }
-                },
-                "required": [
-                  "endCursor",
-                  "hasNextPage"
-                ],
-                "type": "object"
               }
             },
             "required": [
-              "edges",
-              "pageInfo"
+              "returning"
             ],
             "type": "object"
           }
         },
         "required": [
-          "unpublishedFieldConnection"
+          "delete_unpublished_field_category_mapping",
+          "insert_unpublished_field_category_mapping"
         ],
         "type": "object"
       }

@@ -10,7 +10,30 @@
           "pipelineRunMetadataConnection": {
             "properties": {
               "edges": {
-                "maxItems": 0,
+                "items": {
+                  "properties": {
+                    "node": {
+                      "properties": {
+                        "id": {
+                          "type": "string"
+                        },
+                        "nextRun": {
+                          "type": "string",
+                          "x-format": "date-time"
+                        }
+                      },
+                      "required": [
+                        "id",
+                        "nextRun"
+                      ],
+                      "type": "object"
+                    }
+                  },
+                  "required": [
+                    "node"
+                  ],
+                  "type": "object"
+                },
                 "type": "array"
               }
             },

@@ -211,7 +211,8 @@
       "body": {
         "query": "relay:web/client/components/FieldSetupApp/FieldSetupPageHeaderActions/BatchPublishAction/__generated__/BatchPublishModalContentsQuery.graphql.js",
         "variables": {}
-      }
+      },
+      "note": "Records no publishable field: a field is publishable only with a datasource mapping, and self_serve.import.exported_zip deletes the seeded one (WP-2c finding F13). The node shape is pinned by UnpublishedFieldTableRowsQuery."
     },
     {
       "id": "graphql.EditableCalculationQuery",
@@ -289,9 +290,10 @@
         "query": "relay:web/client/components/FieldSetupApp/UnpublishedFieldsTable/UnpublishedFieldTableRows/__generated__/UnpublishedFieldTableRowsQuery.graphql.js",
         "variables": {
           "pageSize": 10,
-          "searchText": ""
+          "searchText": "%%"
         }
-      }
+      },
+      "note": "The table wraps the search box text in % (UnpublishedFieldTableRows/index.jsx:35), so an empty box sends %%."
     },
     {
       "id": "graphql.UnpublishedFieldTableRowsPaginationQuery",
@@ -300,10 +302,11 @@
         "query": "relay:web/client/components/FieldSetupApp/UnpublishedFieldsTable/UnpublishedFieldTableRows/__generated__/UnpublishedFieldTableRowsPaginationQuery.graphql.js",
         "variables": {
           "first": 10,
-          "searchText": "",
+          "searchText": "%%",
           "after": null
         }
-      }
+      },
+      "note": "The table wraps the search box text in % (UnpublishedFieldTableRows/index.jsx:35), so an empty box sends %%."
     },
     {
       "id": "graphql.NameRowMutation",
@@ -458,6 +461,202 @@
             }
           ],
           "newParentCategoryName": "Contract batch category"
+        }
+      }
+    },
+    {
+      "id": "graphql.NameInputMutation",
+      "route": "POST /api/graphql",
+      "body": {
+        "query": "relay:web/client/components/FieldSetupApp/UnpublishedFieldsTable/UnpublishedFieldTableRows/__generated__/NameInputMutation.graphql.js",
+        "variables": {
+          "fieldId": "contract_unpublished_field",
+          "name": "Contract unpublished renamed"
+        }
+      }
+    },
+    {
+      "id": "graphql.ShortNameInputMutation",
+      "route": "POST /api/graphql",
+      "body": {
+        "query": "relay:web/client/components/FieldSetupApp/UnpublishedFieldsTable/UnpublishedFieldTableRows/__generated__/ShortNameInputMutation.graphql.js",
+        "variables": {
+          "fieldId": "contract_unpublished_field",
+          "shortName": "Contract unp"
+        }
+      }
+    },
+    {
+      "id": "graphql.DescriptionInputMutation",
+      "route": "POST /api/graphql",
+      "body": {
+        "query": "relay:web/client/components/FieldSetupApp/UnpublishedFieldsTable/UnpublishedFieldTableRows/__generated__/DescriptionInputMutation.graphql.js",
+        "variables": {
+          "fieldId": "contract_unpublished_field",
+          "description": "Changed by the contract cases"
+        }
+      }
+    },
+    {
+      "id": "graphql.CalculationInputMutation",
+      "route": "POST /api/graphql",
+      "body": {
+        "query": "relay:web/client/components/FieldSetupApp/UnpublishedFieldsTable/UnpublishedFieldTableRows/__generated__/CalculationInputMutation.graphql.js",
+        "variables": {
+          "fieldId": "contract_unpublished_field",
+          "calculation": {
+            "type": "SUM"
+          }
+        }
+      }
+    },
+    {
+      "id": "graphql.UpdateCalculationActionMutation",
+      "route": "POST /api/graphql",
+      "body": {
+        "query": "relay:web/client/components/FieldSetupApp/FieldSetupPageHeaderActions/__generated__/UpdateCalculationActionMutation.graphql.js",
+        "variables": {
+          "id": "contract_unpublished_field",
+          "calculation": {
+            "type": "SUM"
+          }
+        }
+      }
+    },
+    {
+      "id": "graphql.CategoryInputMutation",
+      "route": "POST /api/graphql",
+      "body": {
+        "query": "relay:web/client/components/FieldSetupApp/UnpublishedFieldsTable/UnpublishedFieldTableRows/__generated__/CategoryInputMutation.graphql.js",
+        "variables": {
+          "categoryId": "root",
+          "unpublishedFieldId": "contract_unpublished_field"
+        }
+      }
+    },
+    {
+      "id": "graphql.UpdateCategoryActionMutation",
+      "route": "POST /api/graphql",
+      "body": {
+        "query": "relay:web/client/components/FieldSetupApp/FieldSetupPageHeaderActions/__generated__/UpdateCategoryActionMutation.graphql.js",
+        "variables": {
+          "fieldIds": [
+            "contract_unpublished_field"
+          ],
+          "fieldCategoryMappingObjs": [
+            {
+              "unpublished_field_id": "contract_unpublished_field",
+              "category_id": "root"
+            }
+          ]
+        }
+      }
+    },
+    {
+      "id": "graphql.UnpublishedFieldRowMutation",
+      "route": "POST /api/graphql",
+      "body": {
+        "query": "relay:web/client/components/FieldSetupApp/UnpublishedFieldsTable/UnpublishedFieldTableRows/__generated__/UnpublishedFieldRowMutation.graphql.js",
+        "variables": {
+          "id": "contract_published_row",
+          "name": "Contract published row",
+          "shortName": "Published row",
+          "description": "",
+          "calculation": {
+            "type": "SUM"
+          },
+          "fieldCategoryMappings": [
+            {
+              "category_id": "root"
+            }
+          ],
+          "fieldPipelineDatasourceMappings": [
+            {
+              "pipeline_datasource_id": "contract_source"
+            }
+          ]
+        }
+      },
+      "note": "Publishes an id with no unpublished row, so delete_unpublished_field_by_pk is null and the seeded unpublished field survives for the next run; the inserted field is deleted below."
+    },
+    {
+      "id": "graphql.BatchPublishModalMutation",
+      "route": "POST /api/graphql",
+      "body": {
+        "query": "relay:web/client/components/FieldSetupApp/FieldSetupPageHeaderActions/BatchPublishAction/__generated__/BatchPublishModalMutation.graphql.js",
+        "variables": {
+          "fieldIds": [
+            "contract_published_batch"
+          ],
+          "fieldObjects": [
+            {
+              "id": "contract_published_batch",
+              "name": "Contract published batch",
+              "short_name": "Published batch",
+              "description": "",
+              "calculation": {
+                "type": "SUM"
+              },
+              "field_category_mappings": {
+                "data": [
+                  {
+                    "category_id": "root"
+                  }
+                ]
+              }
+            }
+          ]
+        }
+      },
+      "note": "As above: the deleted-unpublished list is empty so the seed survives."
+    },
+    {
+      "id": "graphql.DeleteFieldModalMutation.published_row",
+      "route": "POST /api/graphql",
+      "body": {
+        "query": "relay:web/client/components/DataCatalogApp/common/GroupActionModals/__generated__/DeleteFieldModalMutation.graphql.js",
+        "variables": {
+          "dbFieldId": "contract_published_row"
+        }
+      }
+    },
+    {
+      "id": "graphql.DeleteFieldModalMutation.published_batch",
+      "route": "POST /api/graphql",
+      "body": {
+        "query": "relay:web/client/components/DataCatalogApp/common/GroupActionModals/__generated__/DeleteFieldModalMutation.graphql.js",
+        "variables": {
+          "dbFieldId": "contract_published_batch"
+        }
+      }
+    },
+    {
+      "id": "graphql.useSelfServeMutation",
+      "route": "POST /api/graphql",
+      "body": {
+        "query": "relay:web/client/components/DataUploadApp/AddDataModal/__generated__/useSelfServeMutation.graphql.js",
+        "variables": {
+          "fileSummariesToUnlink": [],
+          "insertNewSource": true,
+          "selfServeSource": {
+            "source_id": "contract_upload_source"
+          }
+        }
+      },
+      "capture": {
+        "self_serve_source_id": "/data/insert_self_serve_source/returning/0/id#relay"
+      }
+    },
+    {
+      "id": "graphql.useDeleteSourceMutation",
+      "route": "POST /api/graphql",
+      "body": {
+        "query": "relay:web/client/components/DataUploadApp/SourceTable/__generated__/useDeleteSourceMutation.graphql.js",
+        "variables": {
+          "selfServeSourceId": "{self_serve_source_id}",
+          "sourceId": "contract_upload_source",
+          "isDataprep": false,
+          "dataprepFlowId": 0
         }
       }
     },

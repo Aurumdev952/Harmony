@@ -10,7 +10,30 @@
           "dataprep_flow_connection": {
             "properties": {
               "edges": {
-                "maxItems": 0,
+                "items": {
+                  "properties": {
+                    "node": {
+                      "properties": {
+                        "dataprepJobs": {
+                          "maxItems": 0,
+                          "type": "array"
+                        },
+                        "id": {
+                          "type": "string"
+                        }
+                      },
+                      "required": [
+                        "dataprepJobs",
+                        "id"
+                      ],
+                      "type": "object"
+                    }
+                  },
+                  "required": [
+                    "node"
+                  ],
+                  "type": "object"
+                },
                 "type": "array"
               }
             },

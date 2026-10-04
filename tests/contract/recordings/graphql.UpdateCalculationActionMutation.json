@@ -1,0 +1,81 @@
+{
+  "content_type": "text/html",
+  "headers": [],
+  "id": "graphql.UpdateCalculationActionMutation",
+  "pinned": {},
+  "response_schema": {
+    "properties": {
+      "data": {
+        "properties": {
+          "update_unpublished_field_by_pk": {
+            "properties": {
+              "calculation": {
+                "properties": {
+                  "type": {
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "type"
+                ],
+                "type": "object"
+              },
+              "description": {
+                "type": "string"
+              },
+              "id": {
+                "type": "string"
+              },
+              "name": {
+                "type": "string"
+              },
+              "serializedCalculation": {
+                "properties": {
+                  "type": {
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "type"
+                ],
+                "type": "object"
+              },
+              "shortName": {
+                "type": "string"
+              },
+              "unpublishedFieldCategoryMappings": {
+                "maxItems": 0,
+                "type": "array"
+              },
+              "unpublishedFieldPipelineDatasourceMappings": {
+                "maxItems": 0,
+                "type": "array"
+              }
+            },
+            "required": [
+              "calculation",
+              "description",
+              "id",
+              "name",
+              "serializedCalculation",
+              "shortName",
+              "unpublishedFieldCategoryMappings",
+              "unpublishedFieldPipelineDatasourceMappings"
+            ],
+            "type": "object"
+          }
+        },
+        "required": [
+          "update_unpublished_field_by_pk"
+        ],
+        "type": "object"
+      }
+    },
+    "required": [
+      "data"
+    ],
+    "type": "object"
+  },
+  "route": "POST /api/graphql",
+  "status": 200
+}

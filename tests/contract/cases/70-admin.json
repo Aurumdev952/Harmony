@@ -36,7 +36,7 @@
       "pin": [
         "/success"
       ],
-      "note": "Re-imports what self_serve.export produced, so the data catalog ends where it started."
+      "note": "Re-imports what self_serve.export produced. The import truncates each data-catalog table with CASCADE, so rows in tables outside the export that reference them (unpublished-field category and datasource mappings) are deleted (WP-2c finding F13)."
     },
     {
       "id": "configuration.reset.after_import",

@@ -14,7 +14,40 @@
         "type": "array"
       },
       "apiTokens": {
-        "maxItems": 0,
+        "items": {
+          "properties": {
+            "$uri": {
+              "type": "string",
+              "x-format": "api-uri"
+            },
+            "created": {
+              "type": "string",
+              "x-format": "date"
+            },
+            "id": {
+              "type": "string"
+            },
+            "isRevoked": {
+              "type": "boolean"
+            },
+            "revoked": {
+              "type": "string",
+              "x-format": "date"
+            },
+            "token": {
+              "type": "null"
+            }
+          },
+          "required": [
+            "$uri",
+            "created",
+            "id",
+            "isRevoked",
+            "revoked",
+            "token"
+          ],
+          "type": "object"
+        },
         "type": "array"
       },
       "created": {

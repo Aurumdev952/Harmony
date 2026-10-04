@@ -1,0 +1,48 @@
+{
+  "content_type": "text/html",
+  "headers": [],
+  "id": "graphql.useDeleteSourceMutation",
+  "pinned": {},
+  "response_schema": {
+    "properties": {
+      "data": {
+        "properties": {
+          "delete_data_upload_file_summary": {
+            "properties": {
+              "returning": {
+                "maxItems": 0,
+                "type": "array"
+              }
+            },
+            "required": [
+              "returning"
+            ],
+            "type": "object"
+          },
+          "delete_self_serve_source_by_pk": {
+            "properties": {
+              "id": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "id"
+            ],
+            "type": "object"
+          }
+        },
+        "required": [
+          "delete_data_upload_file_summary",
+          "delete_self_serve_source_by_pk"
+        ],
+        "type": "object"
+      }
+    },
+    "required": [
+      "data"
+    ],
+    "type": "object"
+  },
+  "route": "POST /api/graphql",
+  "status": 200
+}

@@ -1,1 +1,1 @@
-- [Infra tooling traps](infra_tooling_traps.md) — mypy.ini plugin, scripts/ vs prod/ ownership, nginx-proxy vhost logs, worktree git limits
+- [Infra tooling traps](infra_tooling_traps.md) — *.log gitignored, mypy.ini plugin, scripts/ vs prod/ ownership, nginx-proxy logs, worktree git

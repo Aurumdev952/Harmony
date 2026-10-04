@@ -8,6 +8,7 @@ metadata:
 - `scripts/**` belongs to the lead, except `scripts/druid`, `scripts/db` and `scripts/perf`. Infra's home for operational scripts is `prod/**`; WP-0g put its script in `prod/browser_share/`. Unit tests go under `tests/infra/`, which is shared since decision 0001.
 - The repo `mypy.ini` loads the legacy `sqlmypy` plugin, and the repo root has an `__init__.py`. To strict-check a standalone script, run `uvx --python 3.13 mypy --config-file=/dev/null --strict --explicit-package-bases <files>`, with `MYPYPATH` set to the script dir when tests import it.
 - Production nginx is `nginxproxy/nginx-proxy`. Its access log is the `vhost` format (`$host` prefix, `$upstream_addr` suffix) on the container's stdout, not the combined format in a file.
+- `.gitignore` ignores `*.log`, so a fixture named `access.log` is silently never committed and tests pass only in your worktree. Name log fixtures `*.txt`, and run the final evidence from a clean `git clone` plus `checkout --detach` of the branch tip, with `git status --ignored` showing nothing.
 - In a worktree-isolated agent, a Bash command that mixes `git` with loops, `$(git ...)` or long heredocs is refused. Run git commands on their own.
 
 **Why:** each of these cost a retry during WP-0g (2026-10-04).

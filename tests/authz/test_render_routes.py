@@ -183,10 +183,11 @@ def test_render_route(principal, route, status, rendered_as, render_app, renders
 
 
 def test_stored_thumbnail_is_rendered_by_the_render_bot_and_shared(render_app, renders):
-    '''N2: defect pinned as today; flips in WP-0i. A viewer restricted to one
-    source asks for the thumbnail: it is rendered under the render bot's token
-    with every query need, and cached on the slug alone, so a viewer with a
-    different policy gets the same image without a new render.'''
+    '''N2: defect pinned as today; flips in WP-0i. dashboard_acl_viewer may
+    view the dashboard but holds no query policy, so its own queries see no
+    rows. Its thumbnail is rendered under the render bot's token with every
+    query need and cached on the slug alone, so a second viewer gets the same
+    image without a new render.'''
     render_app.cache.values.clear()
 
     first = _get(

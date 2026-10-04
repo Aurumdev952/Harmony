@@ -139,6 +139,9 @@ None of these blocks this WP.
 - [ ] **lead:** plan one repo-wide `ruff format` commit for a quiet point after phase 2, recorded in `.git-blame-ignore-revs`. ruff formats in black 24 style, so until then the first PR to touch a file gets a whole-file reformat. 283 files are affected (Decisions).
 - [x] **data-platform:** (done by data-platform-1 on `mig/WP-2f-uv-ruff-mypy-ci-druid`) delete the dead code at `scripts/druid/druid_task_memory_stats.py:54-59`, which reads an undefined `raw_timestamp` (ruff F821), then delete its line in `[tool.ruff.lint.per-file-ignores]`.
 - [x] **core** (done on `mig/WP-2f-uv-ruff-mypy-ci-core`, core-3): fix `util/unix.py:111`, where `subprocess` is undefined (ruff F821), then delete its line in `[tool.ruff.lint.per-file-ignores]`.
+- [x] **Both side branches merged** (`ca8afea` druid, `d4ec15e` core). `[tool.ruff.lint.per-file-ignores]` now holds only the `tests/**` entry, and the tree-wide `ruff check --select E9,F63,F7,F82 .` passes with no exclusions.
+  - Local CI: 3.9 job 352 passed (including `tests/core/test_unix.py`); 3.13 job 108 passed; mypy clean in both jobs.
+  - Two new `noqa` lines in `util/unix.py` are for security's re-review. `S602` on the existing `Popen(..., shell=True)`: the reason is in the comment, since callers in `util/file/compression` pass a shell pipeline. `S110` on a deliberate `except Exception: pass` in the cleanup loop.
 - [ ] **core, WP-3 follow-up (found while fixing the F821; not changed here).** In `util/unix.py`:
   - in `BackgroundProcess.wait()`, the `except CalledProcessError` can never run, because `Popen.wait` never raises it; and `wait()` never checks the exit code, so a failed child passes silently;
   - `finalize()` builds an error without raising it;

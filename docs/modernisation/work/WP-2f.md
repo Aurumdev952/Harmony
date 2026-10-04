@@ -1,7 +1,7 @@
 ---
 wp: "2f"
 title: "uv, ruff, mypy, CI running every suite"
-status: review
+status: ready
 owner_role: "infra"
 instances:
   - name: "infra-2"
@@ -132,8 +132,8 @@ None of these blocks this WP.
   - WP-0b: 2 F401 and 2 to reformat (reviewer's count);
   - WP-2a: `tests/golden` (4 files to reformat);
   - WP-2c: its test files;
-  - **S-rule hits in QA's in-flight files** that remain after the `tests/**` ignores (S101, S105, S106, S108, S311):
-    - WP-2c `tests/contract/stack/druid_stub.py:71` and `tests/contract/stack/port_forward.py:43`: S104, binding to all interfaces. This is intended inside the stack container, so add `# noqa: S104` with the reason;
+  - **S-rule hits in QA's in-flight files** that remain after the `tests/**` ignores (S101, S104, S105, S106, S108, S311):
+    - WP-2c `tests/contract/stack/druid_stub.py:71` and `tests/contract/stack/port_forward.py:43`: S104, binding to all interfaces. This is intended inside the stack container, and the `tests/**` S104 ignore now covers it, so no `noqa` is needed;
     - WP-2d `tests/pipeline/pipeline_cases.py:237`: S604, `shell=True`. The file is already on `mig/integration`, so this trips the next PR that touches it; add `# noqa: S604` with the reason or drop the shell;
     - WP-2b `tests/authz/test_render_routes.py:97`, and WP-2c `tests/contract/cases.py:216,219` and `test_cases.py:143`: S105 and S106. The new ignores now cover them (checked with ruff 0.16.10 on the branches' files).
   - `mig/integration` against `main`: `scripts/create_user.py` (5 F401 model-registration imports that need `# noqa: F401`, 1 E711, and a reformat) and `scripts/agents/{check_team,ownership,task_gate}.py` (reformat), owned by the lead.
@@ -151,7 +151,7 @@ None of these blocks this WP.
 
 - [x] **lead:** `scripts/watch/watch_mypy.py` and `.vscode` now follow the pyproject mypy configuration and the ruff formatter. That was `17dcbce`; then `e4d1060` made watch_mypy run `dmypy run --` with no positional target, so `[tool.mypy] files` applies. Both are merged here (`1b9f6a7`).
 - [ ] **qa and backend, low:** `tests/golden` leaves Flask-Potion resources registered on a module-level Api, so a later `create_app()` in the same process (`tests/web/test_graphql_endpoint_removed.py`) raises "already registered with a different Api". CI runs suites in separate processes, so nothing is red. Fixing it would let a developer run `uv run pytest` over all of `tests/` in one go.
-- [ ] **core (core-3), nit:** drop the stale `# pylint: disable=broad-except` at `util/unix.py:99`. pylint no longer runs, and the line already carries `# noqa: S110`. One line in a core file.
+- [ ] **core (core-3), nit, known leftover at close:** drop the stale `# pylint: disable=broad-except` at `util/unix.py:99`. pylint no longer runs, and the line already carries `# noqa: S110`. One line in a core file. It stays with core and does not block this WP; the reviewer accepted it as non-blocking at `512eccf`.
 - [x] **lead (done in `665401e`):** add `.hypothesis/` to `.gitignore`. The contract suite's property tests write a Hypothesis example database at the repo root (`tests/pipeline` turns it off).
 - [ ] **lead:** delete the scripts nothing calls any more: `scripts/lint_python.sh`, `scripts/format_python.sh`, `scripts/format_python_files.sh`, `scripts/pylint/` and `scripts/mypy_parse.py`.
 - [ ] **lead:** plan one repo-wide `ruff format` commit for a quiet point after phase 2, recorded in `.git-blame-ignore-revs`. ruff formats in black 24 style, so until then the first PR to touch a file gets a whole-file reformat. 283 files are affected (Decisions).
@@ -164,7 +164,8 @@ None of these blocks this WP.
   - in `BackgroundProcess.wait()`, the `except CalledProcessError` can never run, because `Popen.wait` never raises it; and `wait()` never checks the exit code, so a failed child passes silently;
   - `finalize()` builds an error without raising it;
   - the errno 3 (`ESRCH`) handling re-raises in the case where the process was already killed, which is the case it should tolerate.
-- [ ] **frontend-platform and qa:** no Jest or Playwright suite exists on `mig/integration`. Ask infra for a CI job when the first suite lands (Vitest in WP-6, Playwright smoke from QA).
+- [ ] **JS test job (WP-2e's request): infra follow-up, not this WP.** WP-2e's Vitest harness (`yarn test` over `tests/frontend/unit`, green at `391079f`) is still `building` and is not on `mig/integration` or this branch. A CI job for it cannot be run or tested from here, and a job for a suite that does not exist on the base would fail. When WP-2e lands on `mig/integration`, infra adds one job next to `lint-js`: Node from the same pinned setup, the cached `yarn install`, then `yarn test`, with `permissions: contents: read`. It is tested with a deliberately broken assertion that makes the job exit non-zero. The lead tracks it with the stack job, as WP-2f follow-ups. Playwright smoke from QA, and WP-6's move to pnpm and Node 24, extend the same job later.
+- [ ] **human, recommended:** in the GitHub branch protection for `main`, require the `Integration` checks and "Require branches to be up to date before merging". The push trigger added at close (Decisions) shows a red `main` after the fact; requiring up-to-date branches stops it from happening (INV-8).
 - [ ] **qa (WP-2c), low:** no offline contract test pins the `date` format tag. Renaming it in `tests/contract/schema.py` left the suite green, while renaming `http-date` failed it (Unit 7 evidence). A `("2024-01-01", "date")` row in `test_string_format_tags` would close the gap.
 
 ## Log
@@ -183,7 +184,7 @@ None of these blocks this WP.
   - a deliberately broken golden case exits 1 and names the case.
 - 2026-10-04 infra-2 unit 6: `.github/dependabot.yml` covers github-actions (weekly, grouped), `uv` at `/` (security updates only) and `uv` at `/ci/tools313` (weekly). Check: `check-jsonschema --builtin-schema vendor.dependabot` passes.
 - 2026-10-04 infra-2: merged `mig/integration` (WP-0e). Every check above was re-run, all green.
-- 2026-10-05 infra-2 unit 7 (review fixes and the WP-2c/2d suites):
+- 2026-10-04 infra-2 unit 7 (review fixes and the WP-2c/2d suites):
   - **Build tools:** pinned with `[tool.uv] build-constraint-dependencies`; `uv.lock` records them.
   - **Merges:** `mig/integration` merged twice, first WP-2a, then the lead's fixes and `2086a21`.
   - **Dependencies:** `hypothesis==6.91.0` and `jsonschema==4.17.3` added to `dev`, and freezegun pinned at 1.5.5.
@@ -204,9 +205,9 @@ None of these blocks this WP.
   - golden, pipeline and contract breaks each exit 1 and name the case;
   - actionlint 0, zizmor 0 findings, and the WP-0f policy passes;
   - `git ls-files .playwright-mcp` is empty.
-- 2026-10-05 data-platform-1 (request, branch `mig/WP-2f-uv-ruff-mypy-ci-druid`): in `scripts/druid/druid_task_memory_stats.py`, deleted the unreachable second `return` in `build_timestamp`. It read the undefined `raw_timestamp`, and the function returns on its first line. Nothing else in the file reads `raw_timestamp`. Removed the file's F821 entry from `[tool.ruff.lint.per-file-ignores]`. Touching the file subjects it to the full changed-file rules, which flagged S101 on `assert False` in `_convert_to_mb`. It now raises `ValueError` for an unknown unit; before, it raised `AssertionError`, or under `-O` returned `'ERR'`. Check: the old file gives 6 errors under `ruff check --select E9,F63,F7,F82` without the ignore; `ci/lint_python.sh mig/WP-2f-uv-ruff-mypy-ci` exits 0 (tree-wide check passes, changed file lint-clean and formatted); the script on a sample filtered GC log writes `2026-10-04 16:14:20	30.5	1024.0	9.5	1000.0`.
+- 2026-10-04 data-platform-1 (request, branch `mig/WP-2f-uv-ruff-mypy-ci-druid`): in `scripts/druid/druid_task_memory_stats.py`, deleted the unreachable second `return` in `build_timestamp`. It read the undefined `raw_timestamp`, and the function returns on its first line. Nothing else in the file reads `raw_timestamp`. Removed the file's F821 entry from `[tool.ruff.lint.per-file-ignores]`. Touching the file subjects it to the full changed-file rules, which flagged S101 on `assert False` in `_convert_to_mb`. It now raises `ValueError` for an unknown unit; before, it raised `AssertionError`, or under `-O` returned `'ERR'`. Check: the old file gives 6 errors under `ruff check --select E9,F63,F7,F82` without the ignore; `ci/lint_python.sh mig/WP-2f-uv-ruff-mypy-ci` exits 0 (tree-wide check passes, changed file lint-clean and formatted); the script on a sample filtered GC log writes `2026-10-04 16:14:20	30.5	1024.0	9.5	1000.0`.
 - 2026-10-04 core-3: `util/unix.py` `BackgroundProcess.wait` catches the already-imported `CalledProcessError` instead of the undefined `subprocess.CalledProcessError`, so an error from `Popen.wait()` (e.g. Ctrl-C) now propagates as itself instead of becoming a `NameError`; its `F821` per-file ignore is gone. That was the module's only undefined name. Touching the file brought it under the full rule set: `# noqa: S602` on the `shell=True` `Popen` (its callers in `util/file/compression` pass shell pipelines, for security to review), `# noqa: S110` on the deliberate swallow in `finalize`, and one blank line from `ruff format`. Check: `tests/core/test_unix.py` failed with `NameError` before and passes after; `ci/lint_python.sh mig/WP-2f-uv-ruff-mypy-ci` exit 0; a gzip round trip through `CommandLineCompressor`/`CommandLineDecompressor` returns the input.
-- 2026-10-05 infra-2 unit 8 (reviewer round 3, and the merge of WP-0d, WP-2d, WP-2e and WP-2g from `mig/integration` in `1b9f6a7`). Changes:
+- 2026-10-04 infra-2 unit 8 (reviewer round 3, and the merge of WP-0d, WP-2d, WP-2e and WP-2g from `mig/integration` in `1b9f6a7`). Changes:
   - **WP-0d ported** (Merge-order items).
   - **Lint gate.** `ci/lint_python.sh` resolves `git merge-base HEAD <base>` and writes the diff to a file under `set -e` before reading it. A bad ref or a shallow clone now stops the script instead of reporting "no Python files changed". The new `tests/infra/test_lint_python.py` failed on the old script, both cases, and passes now.
   - **Pipeline tools** install before the linters, so a lint failure cannot skip them.
@@ -231,6 +232,20 @@ None of these blocks this WP.
   - `record.py --check` reports "85 cases, 0 fixture files would change";
   - the 3.13 job gives 160 passed, and strict mypy is clean;
   - passlib's bcrypt `CryptContext` hashes and verifies an 80-byte password.
+- 2026-10-04 infra-2 close-out (the reviewer's non-blocking items at `512eccf`). Changes:
+  - S104 added to the `tests/**` ignore, with the counts in Decisions;
+  - `integration.yml` also runs on pushes to `main`, with a concurrency fallback on `github.ref` (Decisions);
+  - the `util/unix.py:99` nit recorded as a known leftover for core;
+  - WP-2e's JS test job recorded as an infra follow-up;
+  - every 2026-10-05 date in this file corrected to 2026-10-04;
+  - `status: ready`.
+
+  Check:
+  - `ruff check tests/`: 3 findings before, 1 after (the known S604);
+  - `ci/lint_python.sh mig/integration` exits 0, and `uv lock --check` passes;
+  - actionlint 1.7.12 with shellcheck 0.11.0 exits 0, and a mutated `cancel-in-progress` expression is flagged;
+  - zizmor 1.30.1 `--offline`: "No findings to report";
+  - the re-created WP-0f policy: `policy OK`.
 
 ## Decisions
 
@@ -255,10 +270,18 @@ None of these blocks this WP.
   - **The S rules widen the ratchet.**
     - At `9202899` the reviewer counted 162 S findings in 87 non-test files. 78 of those files had no E or F finding, so the first PR to touch one now fails where it passed before.
     - Recounted at `e3fc2bd` after the WP-0d merge: 153 S findings in 82 non-test files, 73 of them with no E or F finding. The main codes are S101 ×83, S602 ×17, S113 ×12, S105 ×12 and S311 ×11.
-    - `tests/**` ignores S101, S105, S106, S108 and S311 (asserts, placeholder credentials, fixed temp paths, synthetic random data). What remains in tests is listed for its owners under Merge-order items.
-  - **S (bandit) rules, at security's request.** S101, S105, S106, S108 and S311 are ignored under `tests/**`. S603 and S607 are ignored everywhere: they flag every `subprocess` call, including fixed argument lists with no shell, and fired on every subprocess call in `scripts/agents`. The shell rules S602, S604 and S605 stay on.
+    - `tests/**` ignores S101, S104, S105, S106, S108 and S311 (asserts, wildcard addresses, placeholder credentials, fixed temp paths, synthetic random data). What remains in tests is listed for its owners under Merge-order items.
+    - **S104 joined at close.** The WP-0b merge brought two S104 false positives: `tests/druid_setup/test_druid_compose.py:188` and `tests/druid_setup/test_druid_makefile.py:28` hold `'0.0.0.0'` and `'::'` as literals, so they can assert that nothing publishes on a wildcard address. They bind nothing. With the configured rule set, `ruff check tests/` gave 3 findings (S104 ×2, S604 ×1); it now gives 1, the known S604 at `tests/pipeline/pipeline_cases.py:237`. The ignore also covers WP-2c's intended wildcard binds inside the stack container.
+  - **S (bandit) rules, at security's request.** S101, S104, S105, S106, S108 and S311 are ignored under `tests/**`; S104 needs security's confirmation alongside the others (Verdicts). S603 and S607 are ignored everywhere: they flag every `subprocess` call, including fixed argument lists with no shell, and fired on every subprocess call in `scripts/agents`. The shell rules S602, S604 and S605 stay on.
   - ruff ignores `# pylint: disable` comments (412 in the tree). Touching such a file means turning, for example, `# pylint:disable=W0611` into `# noqa: F401`.
   - ruff's formatter follows black 24, not black 22.6. Of the 655 files under `web/server`, `data`, `models` and `db` that black 22.6 accepts, ruff would reformat 239. Repo-wide, 283 files would change, mostly blank lines after docstrings and parenthesised right-hand sides. Hence the lead request for one format commit.
+- **`integration.yml` also runs on pushes to `main`** (INV-8, CI is green on `main`). On `pull_request` only, a PR that passed against an old base could merge and turn `main` red unseen, unless branch protection requires up-to-date branches, which is a human setting (Requests). The push run makes a red `main` visible either way:
+  - the concurrency group falls back from the PR number to `github.ref`. Without that, every push run would share the group `integration-` and cancel the others;
+  - `cancel-in-progress` holds only for `pull_request`, so each commit on `main` gets its own result;
+  - on a push, `HEAD^1` with `fetch-depth: 2` is the previous `main` tip, for a merge commit and for a squash merge alike, so the changed-file lint and the JS lint check what landed. A direct push of several commits lints only the last one's diff, while the tree-wide checks and every suite still run; branch protection forbids such pushes anyway;
+  - permissions stay `contents: read`, and no step reads event text, so there is nothing new to inject. Push events on `main` carry only trusted code.
+
+  Tested statically: actionlint 0, zizmor 0, and the WP-0f policy re-created from WP-0f's Evidence (the `/tmp` copy did not survive the reboot) passes. actionlint flags `cancel-in-progress: ${{ github.event_name }}` as "type of expression must be bool", so it type-checks the new expression. The first run on `main` after merge is the runtime proof.
 - **Changed files come from `git diff HEAD^1 HEAD`** on the PR merge commit (`fetch-depth: 2`), not `gh pr view`. Every job now needs only `contents: read`, and no step holds `GITHUB_TOKEN` except inside `setup-uv`, which uses it for its downloads.
 - **`pytest-selenium` is disabled** (`addopts = "-p no:selenium"`). The `dev` group pins 4.0.1, and on pytest 8.4.2 it raises an INTERNALERROR whenever a test fails. The run still exits 3, but the failing test is hidden. No suite uses it.
 - **Build tools are locked too.** `uv sync` builds 29 packages from source: 3 git dependencies and 26 sdists, gevent among them. `[tool.uv] build-constraint-dependencies` pins every build requirement a fresh-cache sync installs:
@@ -353,5 +376,5 @@ These ran after merging `mig/integration` at `2988d85`. `git ls-files .playwrigh
 | Role | Verdict | Notes |
 |---|---|---|
 | qa | approved | 2026-10-04 qa-2f at 7b2f9b6: lock, cold uv sync (231 pkgs), CI run blocks replayed on a simulated PR merge commit, mypy parity with mypy.ini, requirements drift test, broken-case exit codes, actionlint 0 and WP-0f policy, new SHAs match tags. Follow-ups: hypothesis (and 2c/2d deps) in the dev group; make format-python stops on unfixable errors; druid_task_memory_stats dead code (delete); .vscode points at black (lead). |
-| reviewer | approved | 2026-10-04 | 2026-10-04 rev-2f final at 512eccf: all 9202899 items closed and reproduced (lint gate exits 128 on a bad ref and passes on a depth-2 PR merge checkout; lz4/pigz before linters; S counts recounted; stack job names authz_http; instances listed; bcrypt port: uv lock --check, make requirements clean, drift test discriminates, passlib on 4.0.1 works; 8 suites 613 tests; mypy 517 files; 3.13 lane 160 tests). Non-blocking: S104 false positives in tests/druid_setup from the WP-0b merge (list or add S104 to the tests ignore, security to confirm with S105/S106/S108); util/unix.py:99 stale pylint disable routed to core; integration.yml runs only on pull_request so INV-8 rests on branch protection requiring up-to-date branches (human); 2026-10-05 dates in the WP file should read 2026-10-04. |
-| security | approved | 2026-10-05 sec-2f re-review at 9202899: build-tool pins enforced (fresh-cache sync installs exactly the pinned tools; uv lock --check rejects a changed pin); zizmor and actionlint 0; hostile-filename probe fails to inject; S603/S607 off and S101/S311 under tests accepted; noqa S602 and S110 in util/unix.py accepted. Low: JS changed-file list should be NUL-delimited; the ==-pin test accepts wildcards; hashed build-tool entries need uv 0.12.16+ (WP-3b). Route: core shell-rewrite of the compression helpers (phase 3/4). |
+| reviewer | approved | 2026-10-04 | 2026-10-04 rev-2f final at 512eccf: all 9202899 items closed and reproduced (lint gate exits 128 on a bad ref and passes on a depth-2 PR merge checkout; lz4/pigz before linters; S counts recounted; stack job names authz_http; instances listed; bcrypt port: uv lock --check, make requirements clean, drift test discriminates, passlib on 4.0.1 works; 8 suites 613 tests; mypy 517 files; 3.13 lane 160 tests). Non-blocking: S104 false positives in tests/druid_setup from the WP-0b merge (list or add S104 to the tests ignore, security to confirm with S105/S106/S108); util/unix.py:99 stale pylint disable routed to core; integration.yml runs only on pull_request so INV-8 rests on branch protection requiring up-to-date branches (human); 2026-10-04 dates in the WP file should read 2026-10-04. |
+| security | approved | 2026-10-04 sec-2f re-review at 9202899: build-tool pins enforced (fresh-cache sync installs exactly the pinned tools; uv lock --check rejects a changed pin); zizmor and actionlint 0; hostile-filename probe fails to inject; S603/S607 off and S101/S311 under tests accepted; noqa S602 and S110 in util/unix.py accepted. Low: JS changed-file list should be NUL-delimited; the ==-pin test accepts wildcards; hashed build-tool entries need uv 0.12.16+ (WP-3b). Route: core shell-rewrite of the compression helpers (phase 3/4). |

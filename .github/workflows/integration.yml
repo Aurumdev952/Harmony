@@ -3,13 +3,19 @@ name: Integration
 on:
   # Trigger on all pull requests.
   pull_request:
+  # And on main itself, so a red main shows even when a PR merged without
+  # being up to date with its base (INV-8).
+  push:
+    branches:
+      - main
 
 permissions: {}
 
-# A new push to a PR cancels the run still going for the previous one.
+# A new push to a PR cancels the run still going for the previous one. Runs on
+# main are grouped by ref and never cancelled, so every commit there gets a result.
 concurrency:
-  group: integration-${{ github.event.pull_request.number }}
-  cancel-in-progress: true
+  group: integration-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 jobs:
   python:

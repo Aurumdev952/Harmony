@@ -18,6 +18,8 @@ services:
       - COMMAND=${COMMAND-echo Specify a pipeline command, e.g. "./pipeline/harmony_demo/generate/zeus_generate run"}
       - DEFAULT_SECRET_KEY=${DEFAULT_SECRET_KEY:?set DEFAULT_SECRET_KEY to a random value, e.g. openssl rand -hex 32}
       - SQLALCHEMY_DATABASE_URI=${DATABASE_URL}
+      # Logs stay on stderr (the default): pipeline steps capture scripts' stdout.
+      - LOG_FORMAT=json
     deploy:
       resources:
         limits:

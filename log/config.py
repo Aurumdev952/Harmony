@@ -3,7 +3,8 @@ pipeline: every record goes to a single stream handler on the root logger.
 
 Environment:
     LOG_FORMAT  `json` (one JSON object per line) or `text` (for people). Unset means
-                `json` when ZEN_PROD is set, as in the web image, and `text` otherwise.
+                `json` when ZEN_PROD is set and `text` otherwise. The images do not
+                set ZEN_PROD; the Compose files set LOG_FORMAT for each service.
     LOG_STREAM  `stdout` or `stderr`, default `stderr`. Pipeline steps read other
                 scripts' stdout (`SOURCES=($(generate_pipeline_sources.py ...))`), so
                 only long-running services, whose stdout carries no data, use stdout.

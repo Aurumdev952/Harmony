@@ -6,7 +6,7 @@ WT=$(cd "$(dirname "$0")/../../../.." && pwd)
 HERE="$WT/docs/modernisation/work/WP-2g-evidence"
 OUT=${OUT:-/tmp/wp2g}
 mkdir -p "$OUT"
-cd "$WT"
+cd "$WT" || exit 1
 PORT=18742
 LOG="$OUT/gunicorn_live.jsonl"
 : > "$LOG"

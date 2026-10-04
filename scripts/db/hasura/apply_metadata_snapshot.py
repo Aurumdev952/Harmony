@@ -2,6 +2,7 @@
 from glob import glob
 import os
 import sys
+import time
 import yaml
 
 import requests
@@ -11,6 +12,8 @@ from pylib.file.file_utils import FileUtils
 
 from log import LOG
 
+HEALTH_ATTEMPTS = 30
+HEALTH_INTERVAL_SECONDS = 5
 METADATA_FOLDER = FileUtils.GetAbsPathForFile('graphql/hasura/metadata/versions/latest')
 
 
@@ -40,50 +43,58 @@ def build_metadata_dict():
     return output
 
 
+def wait_for_hasura(hasura_host):
+    for attempt in range(HEALTH_ATTEMPTS):
+        try:
+            if requests.get(f'{hasura_host}/healthz', timeout=10).ok:
+                return True
+        except requests.exceptions.ConnectionError:
+            pass
+        LOG.info(
+            'Waiting for hasura at %s (attempt %s of %s)',
+            hasura_host,
+            attempt + 1,
+            HEALTH_ATTEMPTS,
+        )
+        time.sleep(HEALTH_INTERVAL_SECONDS)
+    return False
+
+
 def main():
     Flags.PARSER.add_argument(
         '--hasura_host', type=str, required=True, help='Hasura host'
     )
-    Flags.PARSER.add_argument(
-        '--hasura_admin_secret', type=str, required=False, help='Hasura host'
-    )
     Flags.InitArgs()
 
-    LOG.info('Starting hasura metadata processing.')
+    hasura_admin_secret = os.environ.get('HASURA_ADMIN_SECRET')
+    if not hasura_admin_secret:
+        LOG.error('HASURA_ADMIN_SECRET must be set to apply hasura metadata.')
+        return 1
 
     hasura_host = Flags.ARGS.hasura_host
-    hasura_metadata_api_endpoint = f'{hasura_host}/v1/query'
-    hasura_admin_secret = Flags.ARGS.hasura_admin_secret
-    headers = {}
-    if hasura_admin_secret:
-        headers.update({'X-Hasura-Admin-Secret': hasura_admin_secret})
+    hasura_metadata_api_endpoint = f'{hasura_host}/v1/metadata'
+    if not wait_for_hasura(hasura_host):
+        LOG.error('Hasura at %s did not become healthy.', hasura_host)
+        return 1
 
-    data = build_metadata_dict()
-    try:
-        res = requests.post(
-            hasura_metadata_api_endpoint,
-            headers=headers,
-            json={'type': 'replace_metadata', 'args': data},
-        )
-        if res.status_code != 200:
-            # pylint: disable=line-too-long
-            LOG.error(
-                'Failed to apply metadata to %s with status code: %s',
-                hasura_metadata_api_endpoint,
-                res.status_code,
-            )
-        else:
-            LOG.info(
-                'Successfully applied metadata to %s', hasura_metadata_api_endpoint
-            )
-    except requests.exceptions.ConnectionError:
+    LOG.info('Starting hasura metadata processing.')
+    res = requests.post(
+        hasura_metadata_api_endpoint,
+        headers={'X-Hasura-Admin-Secret': hasura_admin_secret},
+        json={'type': 'replace_metadata', 'args': build_metadata_dict()},
+        timeout=120,
+    )
+    if res.status_code != 200:
         LOG.error(
-            'Could not connect to the hasura host: %s', hasura_metadata_api_endpoint
+            'Failed to apply metadata to %s with status code %s: %s',
+            hasura_metadata_api_endpoint,
+            res.status_code,
+            res.text,
         )
-    except (requests.exceptions.InvalidSchema, requests.exceptions.InvalidURL) as error:
-        LOG.error('Could not apply metadata due to %s', error.__str__())
+        return 1
 
-    LOG.info('Done!')
+    LOG.info('Successfully applied metadata to %s', hasura_metadata_api_endpoint)
+    return 0
 
 
 if __name__ == '__main__':

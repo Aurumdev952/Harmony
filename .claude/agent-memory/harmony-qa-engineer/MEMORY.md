@@ -3,3 +3,4 @@
 - [Frontend build and template verification](frontend-build-and-template-verification.md): build diff, CSS rule diff, Jinja render, script URLs, static Playwright smoke, isolated-shell traps
 - [Golden suite harness](golden-suite-harness.md) — offline bootstrap of the legacy query engine, hash-seed traps, mutation-check approach
 - [Golden contract vs layout](golden_contract_vs_layout.md) — goldens guarding a rewrite: store-level contract layer, typed round-trip test, consumed files are contract
+- [Tooling traps](tooling_traps.md) — lint gate scope post WP-2f, golden record --check, expected pipeline skip, ruff py39 with-format

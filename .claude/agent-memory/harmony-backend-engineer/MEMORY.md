@@ -7,3 +7,4 @@
 - [Template render diff](template_render_diff.md) — prove Jinja template edits without a running app; known baseline failures
 - [Flask web tests](flask_web_tests.md) — run tests/web on py3.8, call handlers directly, worktree-guard and auth/policy traps
 - [Gunicorn server checks](gunicorn_server_checks.md) — test web/gunicorn_server.py despite its gevent patch, mypy strict on 3.8, live run with a stub app
+- [Request logging wiring](request_logging_wiring.md) — test create_app/create_celery log wiring: non-gunicorn path gaps, global Celery signals, mypy on tasks

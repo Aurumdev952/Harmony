@@ -56,18 +56,31 @@ A case whose last step is expected to fail pins only its error text (`step<N>.<s
 
 **`contract/`** is the INV-2 contract. WP-8d must reproduce it exactly.
 - `druid_rollup.jsonl`: what Druid stores after ingest rollup (`db/druid/indexing`). For each (dimensions, `Real_Date`, `source`, `field`) it holds `count`, plus `doubleSum`, `doubleMin` and `doubleMax` of `val`. Collapsed zero rows and nestedJson `data` rows are expanded per field. The sum is `math.fsum`, so row order does not change it.
-- `druid_columns.txt`: the Druid column set.
-- A case with no Druid rows has empty contract files. A rewrite must also produce none.
+- `druid_columns.txt`: the Druid columns that hold a stored value in at least one row.
+- `metadata_digest_file.csv.jsonl`: the digest rows, sorted. The digest is an interface, not an intermediate. These read it:
+  - `web/client/models/DataDigestApp/DatasourceDigest.js` and `IndicatorDigestData.js` (`indicator_id`, `count`, `start_date`, `end_date`);
+  - `data/pipeline/scripts/data_digest/populate_pipeline_run_metadata.py`;
+  - `90_shared/20_sync_digest_files`, which uploads it.
+
+  WP-8d keeps writing it (INV-1).
+- A case with no Druid rows has empty rollup and column files. A rewrite must also produce none.
+
+The contract compares dimension values as Druid stores them, so a typed Parquet round trip of the same rows gives the same contract (`test_contract_survives_a_typed_table_round_trip`):
+- a missing column, null and `[]` are all "no value";
+- a one-element list equals its element;
+- multi-value lists compare sorted;
+- `''` stays distinct from no value, as under Druid 37's SQL-compatible null handling.
 
 **`canonical/`** is today's JSON row layout, with ordering removed:
 - `druid_rows.jsonl` and `druid_schema.json`: `val` as int or float, `field` as a string or a list for collapsed zeros, and per-column presence;
-- the intermediates: `*.base_rows.jsonl`, `locations*.csv.jsonl`, `fields*.csv.lines.txt`, `metadata_digest_file.csv.jsonl`, `indicators.json`.
+- the intermediates: `*.base_rows.jsonl`, `locations*.csv.jsonl`, `fields*.csv.lines.txt` and `indicators.json`;
+- `metadata_digest_file.csv.jsonl`, which is also in `contract/`.
 
 A typed Parquet writer cannot reproduce `druid_rows.jsonl` and `druid_schema.json`. WP-8d may change or retire them and the intermediates, recording the change in its WP file.
 
 **`raw/`** is every output file, decompressed, byte for byte: key order, CRLF in `locations.csv` and the digest, shard boundaries, float rendering through `repr`. WP-8d retires the files it no longer writes, recording that in its WP file.
 
-A Parquet-writing reimplementation reads its rows into dicts, calls `contract_rollup` and `contract_columns` from `pipeline_fixtures.py`, and compares against `contract/`.
+A Parquet-writing reimplementation reads its rows into dicts, calls `contract_rollup` and `contract_columns` from `pipeline_fixtures.py`, canonicalises its digest, and compares against `contract/`.
 
 ## Regenerating goldens
 

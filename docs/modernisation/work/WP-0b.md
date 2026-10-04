@@ -378,6 +378,6 @@ Web hosts:
 
 | Role | Verdict | Notes |
 |---|---|---|
-| qa | pending | |
+| qa | changes-requested | 2026-10-04 qa-0b at c03a86d: 69 and 81 tests pass, fail-before confirmed, ports, digests, checksums, Redis auth, web and worker up on authenticated Redis with a special-character password, JWT split verified. Fix: the Celery worker swallows the SEC-3 refusal (pool children log RuntimeError but the worker reports ready); deployment notes omit pipeline hosts (pipeline compose now requires DEFAULT_SECRET_KEY and settings refuse changeme). black wants to reformat tests/druid_setup/test_druid_compose.py:52-53. |
 | reviewer | pending | |
 | security | pending | |

@@ -20,4 +20,10 @@ Traps found while building it:
 - Users are created through the admin API like this: `POST /api2/user` (needs `phoneNumber`), then `POST /api2/user/<id>/password`, then a full-object `PATCH /api2/user/<id>` with role URIs. `POST /api2/user/<id>/roles` returns 500. `username` is varchar(50).
 - Pooled keep-alive connections get dropped now and then. Sessions use a urllib3 Retry for idempotent methods.
 
+Mutation checks that need no production edit:
+- Production mutant in memory: put a module that monkeypatches the class in /tmp/<dir>, then `PYTHONPATH=/tmp/<dir> tests/authz/run.sh -p <module> -k ...`.
+- Live test mutant: write a mutated copy as tests/authz/http/mut_<name>.py (untracked, conftest still applies), run with `-o "python_files=mut_*.py" -m authz_http`, then delete it.
+- Live run off the 58660 default: `AUTHZ_PROJECT=<p> AUTHZ_WEB_PORT=<port>` for stack.sh and evidence_run.sh. Pass the env values literally; the guard refuses `source` of the env file. Before WP-2c merges, extract tests/contract/stack with `git archive <2c sha> tests/contract/stack` and leave it untracked.
+- Leftovers: `docker exec <project>-postgres-1 psql -U postgres -d harmony_demo-local -tAc ...` (evidence_run.sh prints them).
+
 Related: [[authz-escalations-found]]

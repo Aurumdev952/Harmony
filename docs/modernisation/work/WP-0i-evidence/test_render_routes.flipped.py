@@ -1,3 +1,5 @@
+# A copy of tests/authz/test_render_routes.py for qa-2b; the tests/ lint rules apply.
+# ruff: noqa: S101, S106
 '''The dashboard render routes (web/server/routes/page_renderer.py) and the
 thumbnail store (/api2/storage/retrieve), run in-process.
 
@@ -101,7 +103,9 @@ def fixture_renders(monkeypatch) -> list:
         dashboard_views,
         'get_dashboard',
         lambda slug, session=None: (
-            SimpleNamespace(slug=SLUG, resource_id=RESOURCE_ID) if slug == SLUG else None
+            SimpleNamespace(slug=SLUG, resource_id=RESOURCE_ID)
+            if slug == SLUG
+            else None
         ),
     )
     return calls
@@ -152,8 +156,11 @@ def fixture_render_app(app: Flask) -> Flask:
 
 def _get(render_app, principal, path, headers=None):
     spec = principal_specs()[principal]
-    with configuration(spec.public_access), mock.patch.object(
-        authentication_views, 'get_configuration', lambda key: spec.public_access
+    with (
+        configuration(spec.public_access),
+        mock.patch.object(
+            authentication_views, 'get_configuration', lambda key: spec.public_access
+        ),
     ):
         return render_app.test_client().get(
             path, headers={PRINCIPAL_HEADER: principal, **(headers or {})}
@@ -171,7 +178,12 @@ RENDER_ROUTES = [
     ('anonymous', 'png/thumbnail', 401, None),
     ('anonymous_public', 'png/thumbnail', 401, None),
     ('role:query_runner', 'png/thumbnail', 403, None),
-    ('dashboard_acl_viewer', 'png/thumbnail', 200, 'dashboard_acl_viewer@authz.invalid'),
+    (
+        'dashboard_acl_viewer',
+        'png/thumbnail',
+        200,
+        'dashboard_acl_viewer@authz.invalid',
+    ),
     ('anonymous', 'pdf', 401, None),
     ('anonymous_public', 'pdf', 401, None),
     ('anonymous', 'jpeg', 401, None),

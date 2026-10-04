@@ -3,6 +3,7 @@ from urllib.parse import urlparse
 
 import requests
 from flask import current_app, request, url_for
+from requests import RequestException
 from flask_jwt_extended import create_access_token
 from werkzeug.exceptions import HTTPException
 
@@ -64,10 +65,18 @@ def dashboard_page_args(dashboard_url):
     return locale, session_hash
 
 
+def deployment_dashboard_url(name, locale=None):
+    """The dashboard page's absolute URL on the deployment's configured origin.
+
+    Never built from the request's Host header: renders send a token to this
+    URL, and emails send it to their recipients.
+    """
+    origin = current_app.zen_config.general.DEPLOYMENT_BASE_URL.rstrip("/")
+    return origin + url_for("dashboard.grid_dashboard", locale=locale, name=name)
+
+
 def get_dashboard_downloadable_url(locale, name, output_format, session_hash):
-    dashboard_url = url_for(
-        "dashboard.grid_dashboard", locale=locale, name=name, _external=True
-    )
+    dashboard_url = deployment_dashboard_url(name, locale)
     hash_suffix = f"#h={session_hash}" if session_hash else ""
     dash_url = (
         f"{dashboard_url}?screenshot=1&pdf=1{hash_suffix}"
@@ -147,18 +156,26 @@ def grid_dashboard_urlbox_renderer(
         if param_value:
             params[_param] = param_value
 
+    # The request URL carries the API key and the minted token, and requests puts
+    # it in its exception messages, so neither the URL nor the exception is logged.
+    dashboard_path = urlparse(dash_url).path
     try:
         res = requests.get(req_url, params=params, stream=True, timeout=300)
-        if res.status_code != 200:
-            # The request URL carries the API key and the minted token.
-            LOG.error(
-                "Urlbox failed to generate %s for %s with status code %s",
-                output_format,
-                dash_url,
-                res.status_code,
-            )
-    except ConnectionError:
+    except RequestException as error:
+        LOG.error(
+            "Urlbox request for %s of %s failed: %s",
+            output_format,
+            dashboard_path,
+            type(error).__name__,
+        )
         return None
+    if res.status_code != 200:
+        LOG.error(
+            "Urlbox failed to generate %s for %s with status code %s",
+            output_format,
+            dashboard_path,
+            res.status_code,
+        )
     return res
 
 

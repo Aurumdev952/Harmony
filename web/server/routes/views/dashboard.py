@@ -8,7 +8,7 @@ import sqlalchemy
 from sqlalchemy.orm import aliased
 from slugify import slugify
 
-from flask import current_app, g, url_for
+from flask import current_app, g
 from flask_user import current_user
 from werkzeug.exceptions import Forbidden, NotFound
 
@@ -27,7 +27,7 @@ from models.python.dashboard import (
 from models.python.dashboard.latest.model import (
     DashboardItemHolder,
 )
-from web.server.data.data_access import find_one_by_fields, find_by_id, Transaction
+from web.server.data.data_access import find_by_id, get_db_adapter, Transaction
 from web.server.data.dashboard_specification import ValidationFault, ValidationResult
 from web.server.errors import (
     BadDashboardSpecification,
@@ -41,6 +41,7 @@ from web.server.routes.views.feed import add_share_notification
 from web.server.routes.views.users import add_user_acl, get_current_user, try_get_user
 from web.server.routes.views.page_renderer import (
     dashboard_page_args,
+    deployment_dashboard_url,
     grid_dashboard_to_pdf,
     grid_dashboard_to_image,
 )
@@ -111,8 +112,13 @@ def upgrade_dashboard_specification(specification):
 
 
 def get_dashboard(slug, session=None) -> Dashboard:
-    return find_one_by_fields(
-        Dashboard, case_sensitive=False, search_fields={'slug': slug}, session=session
+    # Equal ignoring case, not ILIKE: '%' and '_' in a requested slug are not
+    # wildcards, so a 403 versus a 404 does not reveal which slugs exist.
+    session = session or get_db_adapter().session
+    return (
+        session.query(Dashboard)
+        .filter(sqlalchemy.func.lower(Dashboard.slug) == sqlalchemy.func.lower(slug))
+        .first()
     )
 
 
@@ -176,7 +182,7 @@ def convert_and_upgrade_specification(dashboard_specification):
 
 
 def format_and_upgrade_specification(
-    dashboard_specification: Dict[str, Any]
+    dashboard_specification: Dict[str, Any],
 ) -> Dict[str, Any]:
     try:
         final_specification = convert_and_upgrade_specification(dashboard_specification)
@@ -201,7 +207,7 @@ class SpecificationTuple(TypedDict):
 
 # pylint: disable=invalid-name
 def format_and_upgrade_specification_list(
-    spec_list: Union[List[SpecificationTuple], List[Tuple[str, Dict[str, Any]]]]
+    spec_list: Union[List[SpecificationTuple], List[Tuple[str, Dict[str, Any]]]],
 ) -> List[SpecificationTuple]:
     '''This function is used to upgrade a list of dashboard specifications,
     not just a single one. This function will attempt to upgrade ALL the
@@ -403,7 +409,7 @@ def get_email_attachments(
             auth_user_email=auth_user_email,
             session_hash=session_hash,
         )
-        if render_response.status_code != 200:
+        if render_response is None or render_response.status_code != 200:
             g.request_logger.error(f'Failed to render dashboard: "{slug}" to PDF')
             return None, None
         attachments.append(
@@ -420,7 +426,7 @@ def get_email_attachments(
             auth_user_email=auth_user_email,
             session_hash=session_hash,
         )
-        if image_render_response.status_code != 200:
+        if image_render_response is None or image_render_response.status_code != 200:
             g.request_logger.error(f'Failed to render dashboard: "{slug}" to JPEG')
             return None, None
         image_name = f'{slug}.jpeg'
@@ -454,9 +460,7 @@ def send_email(
     '''
     dashboard_url = kwargs.get('dashboard_url')
     if not dashboard_url:
-        dashboard_url = url_for(
-            'dashboard.grid_dashboard', name=dashboard.slug, _external=True
-        )
+        dashboard_url = deployment_dashboard_url(dashboard.slug)
 
     should_attach_pdf = kwargs.get('should_attach_pdf')
     should_embed_image = kwargs.get('should_embed_image')
@@ -594,7 +598,7 @@ def attach_my_roles_to_dashboard_query(query, user_id=None):
         )
         .with_entities(
             sqlalchemy.func.array_agg(ResourceRole.name)
-            .filter(ResourceRole.name != None)  # pylint:disable=C0121
+            .filter(ResourceRole.name.isnot(None))
             .label('my_roles'),
             Dashboard.id.label('dashboard_id'),
         )
@@ -623,9 +627,7 @@ def attach_metadata_to_dashboard_query(
 
     # NOTE: I don't think a transaction is necessary for this
     # read only query, but it is an easy way to access the session.
-    with Transaction() as transaction:
-        session = transaction.run_raw()
-
+    with Transaction():
         # Include all dashboard columns. Otherwise, a new query will be issued EACH
         # TIME we access a dashboard value in the query result.
         dashboard_columns = [
@@ -668,9 +670,8 @@ def attach_metadata_to_dashboard_query(
                 query.with_entities(Dashboard.id), user_id
             )
             # Attach user info so we can extract the author username.
-            .outerjoin(User, Dashboard.author_id == User.id).add_columns(
-                *required_columns
-            )
+            .outerjoin(User, Dashboard.author_id == User.id)
+            .add_columns(*required_columns)
         )
 
         return full_query.group_by(Dashboard.id, User.id)
@@ -710,7 +711,7 @@ def _downgrade_dashboard_specification(specification):
 
 
 def format_and_downgrade_specification(
-    dashboard_specification: Dict[str, Any]
+    dashboard_specification: Dict[str, Any],
 ) -> Dict[str, Any]:
     raw_specification = json.loads(json.dumps(dashboard_specification))
     return _downgrade_dashboard_specification(raw_specification)

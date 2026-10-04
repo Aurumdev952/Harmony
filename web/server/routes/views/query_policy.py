@@ -2,6 +2,7 @@
 converting query policies into Druid Filters which are used to restrict query access.
 '''
 
+import json
 from collections import defaultdict
 from functools import wraps
 from datetime import datetime
@@ -161,22 +162,62 @@ def _construct_authorization_filter(user_identity):
     ANDed to form a full_filter.
     authorization filter.
     '''
-    query_needs = enumerate_query_needs(user_identity)
-    category_map = _categorize_query_needs_type(query_needs)
-
-    simple_dimension_to_filters_map = _categorize_query_needs(category_map[SIMPLE])
-    hierarchical_dimension_to_filters_map = _categorize_query_needs(
-        category_map[HIERARCHICAL], dimensions_type=HIERARCHICAL
+    simple_map, hierarchical_map, complex_maps = _policy_filter_maps(
+        enumerate_query_needs(user_identity)
     )
     simple_and_hierarchical_filters = _and_simple_and_hierarchical_filters(
-        simple_dimension_to_filters_map, hierarchical_dimension_to_filters_map
+        simple_map, hierarchical_map
     )
+    return _or_all_filters(simple_and_hierarchical_filters, complex_maps)
 
-    all_dimension_value_maps = [
+
+def _policy_filter_maps(query_needs):
+    '''The simple, hierarchical and per-complex-need dimension maps that
+    `_construct_authorization_filter` builds a policy filter from.
+    '''
+    category_map = _categorize_query_needs_type(query_needs)
+    simple_map = _categorize_query_needs(category_map[SIMPLE])
+    hierarchical_map = _categorize_query_needs(
+        category_map[HIERARCHICAL], dimensions_type=HIERARCHICAL
+    )
+    complex_maps = [
         _categorize_query_needs([query_need]) for query_need in category_map[COMPLEX]
     ]
+    return simple_map, hierarchical_map, complex_maps
 
-    return _or_all_filters(simple_and_hierarchical_filters, all_dimension_value_maps)
+
+def canonical_policy(query_needs):
+    '''The maps a policy filter is built from, as JSON-ready values that do not
+    depend on set order: query needs with equal canonical policies build equal
+    filters.
+    '''
+
+    def canonical(dimension_map):
+        return {
+            dimension: {'all_values': True}
+            if values['all_values']
+            else {
+                'include': sorted(values['include'], key=str),
+                'exclude': sorted(values['exclude'], key=str),
+            }
+            for dimension, values in dimension_map.items()
+        }
+
+    simple_map, hierarchical_map, complex_maps = _policy_filter_maps(query_needs)
+    # Any all-values hierarchical dimension lifts the whole hierarchical filter.
+    hierarchical = (
+        'all_values'
+        if any(values['all_values'] for values in hierarchical_map.values())
+        else canonical(hierarchical_map)
+    )
+    return {
+        'simple': canonical(simple_map),
+        'hierarchical': hierarchical,
+        'complex': sorted(
+            (canonical(dimension_map) for dimension_map in complex_maps),
+            key=lambda value: json.dumps(value, sort_keys=True),
+        ),
+    }
 
 
 def _and_simple_and_hierarchical_filters(simple_value_map, hierarchical_value_map=None):

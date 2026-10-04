@@ -7,6 +7,7 @@ from flask import current_app
 from flask_user import current_user
 
 from web.server.routes.views.page_renderer import grid_dashboard_to_thumbnail
+from web.server.routes.views.query_policy import canonical_policy
 from web.server.security.permissions import SuperUserPermission
 from web.server.security.signal_handlers import render_token_query_needs
 
@@ -22,25 +23,8 @@ def query_policy_fingerprint():
     if SuperUserPermission().can():
         policy = 'superuser'
     else:
-        policy = sorted(
-            (
-                sorted(
-                    (
-                        [
-                            dimension_filter.dimension_name,
-                            dimension_filter.all_values,
-                            sorted(dimension_filter.include_values, key=str),
-                            sorted(dimension_filter.exclude_values, key=str),
-                        ]
-                        for dimension_filter in need.dimension_filters
-                    ),
-                    key=json.dumps,
-                )
-                for need in render_token_query_needs()
-            ),
-            key=json.dumps,
-        )
-    return hashlib.sha256(json.dumps(policy).encode()).hexdigest()
+        policy = canonical_policy(render_token_query_needs())
+    return hashlib.sha256(json.dumps(policy, sort_keys=True).encode()).hexdigest()
 
 
 def get_thumbnail_storage_name(dashboard):
@@ -62,12 +46,17 @@ def retrieve_item(dashboard):
     '''
     cache = current_app.cache
     storage_key = get_thumbnail_storage_name(dashboard)
+    deadline = time.monotonic() + PENDING_STATE_TIMEOUT
     while not cache.add(storage_key, PENDING, timeout=PENDING_STATE_TIMEOUT):
         value = cache.get(storage_key)
-        if value == PENDING:
-            time.sleep(1)
-        elif value:
+        if value and value != PENDING:
             return value
+        if time.monotonic() >= deadline:
+            return ''
+        if value is None:
+            # FileSystemCache keeps an expired entry: `get` misses but `add` fails.
+            cache.delete(storage_key)
+        time.sleep(1)
 
     new_base64_img = ''
     try:

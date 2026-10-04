@@ -118,8 +118,12 @@ HANDMADE_INPUT_PATH = '{work}/processed_data.json.lz4'
 
 
 def _cases() -> tuple[Case, ...]:
-    yellow_fever_process = _process(*YELLOW_FEVER_ARGS, input_path='{work}/yellow_fever_cases.csv')
-    yellow_fever_inputs = {'yellow_fever_cases.csv': 'process_csv/yellow_fever/input.csv'}
+    yellow_fever_process = _process(
+        *YELLOW_FEVER_ARGS, input_path='{work}/yellow_fever_cases.csv'
+    )
+    yellow_fever_inputs = {
+        'yellow_fever_cases.csv': 'process_csv/yellow_fever/input.csv'
+    }
     tall_process_gz = _process(*TALL_ARGS, input_path='{work}/tall.csv.gz')
     return (
         # harmony_demo, exactly as Zeus runs it.
@@ -141,7 +145,15 @@ def _cases() -> tuple[Case, ...]:
             steps=(
                 Step(
                     PROCESS_CSV,
-                    ('--sourcename', '', '--prefix', '', '--input', '/dev/null', *PROCESS_OUTPUTS),
+                    (
+                        '--sourcename',
+                        '',
+                        '--prefix',
+                        '',
+                        '--input',
+                        '/dev/null',
+                        *PROCESS_OUTPUTS,
+                    ),
                 ),
             ),
         ),
@@ -175,14 +187,22 @@ def _cases() -> tuple[Case, ...]:
         Case(
             name='process_csv__wide_tab_delimited',
             inputs={'wide.tsv': 'process_csv/wide_tab/input.tsv'},
-            steps=(_process(*WIDE_ARGS, '--delimiter=\\t', input_path='{work}/wide.tsv'),),
+            steps=(
+                _process(*WIDE_ARGS, '--delimiter=\\t', input_path='{work}/wide.tsv'),
+            ),
         ),
         _wide('process_csv__wide', '--output_indicators={out}/indicators.json'),
         # Flags.
         _wide('process_csv__wide_disable_rollup', '--disable_rollup'),
         _wide('process_csv__wide_exclude_zeros', '--exclude_zeros'),
-        _wide('process_csv__wide_tracer_field', '--tracer_field', 'demo_facility_count'),
-        _wide('process_csv__wide_disaggregate', '--disaggregate', 'Malaria Positive:Sex,Death'),
+        _wide(
+            'process_csv__wide_tracer_field', '--tracer_field', 'demo_facility_count'
+        ),
+        _wide(
+            'process_csv__wide_disaggregate',
+            '--disaggregate',
+            'Malaria Positive:Sex,Death',
+        ),
         _wide(
             'process_csv__wide_flatten_string_categories',
             '--flatten_string_categories',
@@ -191,7 +211,11 @@ def _cases() -> tuple[Case, ...]:
             'Status',
         ),
         _wide(
-            'process_csv__wide_join_cols', '--join_cols', 'Outcome+Gender:Death', '--join_str', '/'
+            'process_csv__wide_join_cols',
+            '--join_cols',
+            'Outcome+Gender:Death',
+            '--join_str',
+            '/',
         ),
         _wide(
             'process_csv__wide_multi_value_dimensions',
@@ -277,7 +301,10 @@ def _cases() -> tuple[Case, ...]:
         # fill_dimension_data: the location join on synthetic mappings.
         Case(
             name='fill_dimension_data__tall_synthetic_join',
-            inputs={'tall.csv.gz': 'process_csv/tall/input.csv', **SYNTHETIC_LOCATION_INPUTS},
+            inputs={
+                'tall.csv.gz': 'process_csv/tall/input.csv',
+                **SYNTHETIC_LOCATION_INPUTS,
+            },
             steps=(
                 tall_process_gz,
                 _fill(
@@ -290,7 +317,10 @@ def _cases() -> tuple[Case, ...]:
         ),
         Case(
             name='fill_dimension_data__unmatched_location_aborts',
-            inputs={'tall.csv.gz': 'process_csv/tall/input.csv', **SYNTHETIC_LOCATION_INPUTS},
+            inputs={
+                'tall.csv.gz': 'process_csv/tall/input.csv',
+                **SYNTHETIC_LOCATION_INPUTS,
+            },
             steps=(
                 tall_process_gz,
                 _fill(

@@ -29,7 +29,9 @@ from data.pipeline.scripts.process_csv import Aggregator, _get_date  # noqa: E40
 
 PIPELINE_SETTINGS = settings(database=None, deadline=None)
 
-DATES = st.dates(min_value=datetime.date(1900, 1, 1), max_value=datetime.date(2099, 12, 31))
+DATES = st.dates(
+    min_value=datetime.date(1900, 1, 1), max_value=datetime.date(2099, 12, 31)
+)
 
 
 @PIPELINE_SETTINGS
@@ -41,7 +43,9 @@ def test_iso_dates_parse_to_themselves(date):
 @PIPELINE_SETTINGS
 @given(DATES, st.times())
 def test_iso_datetimes_keep_their_date(date, time):
-    assert _get_date(f'{date.isoformat()}T{time.strftime("%H:%M:%S")}') == date.isoformat()
+    assert (
+        _get_date(f'{date.isoformat()}T{time.strftime("%H:%M:%S")}') == date.isoformat()
+    )
 
 
 @PIPELINE_SETTINGS
@@ -96,18 +100,23 @@ def _metadata_collector(
             for key, values in metadata.items()
         ],
     )
-    return DimensionFactoryType.create_metadata_collector(str(metadata_path), str(mapping_path))
+    return DimensionFactoryType.create_metadata_collector(
+        str(metadata_path), str(mapping_path)
+    )
 
 
 @st.composite
 def location_tables(draw):
     canonical_keys = draw(st.lists(CANONICAL_KEYS, min_size=1, max_size=6, unique=True))
     mapping = draw(
-        st.dictionaries(CLEAN_KEYS, st.sampled_from(canonical_keys), min_size=1, max_size=10)
+        st.dictionaries(
+            CLEAN_KEYS, st.sampled_from(canonical_keys), min_size=1, max_size=10
+        )
     )
     with_metadata = draw(st.lists(st.sampled_from(canonical_keys), unique=True))
     metadata = {
-        key: {column: draw(LOCATION_NAMES) for column in METADATA_COLUMNS} for key in with_metadata
+        key: {column: draw(LOCATION_NAMES) for column in METADATA_COLUMNS}
+        for key in with_metadata
     }
     unmapped = draw(CLEAN_KEYS.filter(lambda key: key not in mapping))
     return mapping, metadata, unmapped
@@ -121,7 +130,11 @@ def test_location_join_returns_canonical_names_and_their_metadata(tables):
     with tempfile.TemporaryDirectory() as directory:
         collector = _metadata_collector(mapping, metadata, Path(directory))
     for (clean_state, clean_municipality), canonical in mapping.items():
-        row = {'StateName': clean_state, 'MunicipalityName': clean_municipality, 'Sex': 'F'}
+        row = {
+            'StateName': clean_state,
+            'MunicipalityName': clean_municipality,
+            'Sex': 'F',
+        }
         expected = {'StateName': canonical[0], 'MunicipalityName': canonical[1]}
         expected.update(metadata.get(canonical, {}))
         assert collector.get_data_for_row(row) == expected
@@ -142,13 +155,19 @@ def test_location_keys_collide_when_names_contain_the_key_delimiter(tmp_path):
         {},
         tmp_path,
     )
-    first = collector.get_data_for_row({'StateName': 'Ash__ford', 'MunicipalityName': 'Mill'})
-    second = collector.get_data_for_row({'StateName': 'Ash', 'MunicipalityName': 'ford__Mill'})
+    first = collector.get_data_for_row(
+        {'StateName': 'Ash__ford', 'MunicipalityName': 'Mill'}
+    )
+    second = collector.get_data_for_row(
+        {'StateName': 'Ash', 'MunicipalityName': 'ford__Mill'}
+    )
     assert first == second == {'StateName': 'Southmere', 'MunicipalityName': 'Fordmill'}
 
 
 # Field ids are slugs by the time they reach a BaseRow; the writer does not escape them.
-FIELD_IDS = st.text(alphabet='abcdefghijklmnopqrstuvwxyz0123456789_', min_size=1, max_size=12)
+FIELD_IDS = st.text(
+    alphabet='abcdefghijklmnopqrstuvwxyz0123456789_', min_size=1, max_size=12
+)
 VALUES = st.one_of(
     st.integers(min_value=-(10**15), max_value=10**15),
     st.floats(allow_nan=False, allow_infinity=False),
@@ -173,7 +192,9 @@ def test_druid_rows_carry_every_value_and_collapse_zeros_into_one_row(data):
     zero_fields = [field for field, value in data.items() if not value]
 
     for line in lines:
-        assert {k: v for k, v in line.items() if k not in ('field', 'val')} == dimensions
+        assert {
+            k: v for k, v in line.items() if k not in ('field', 'val')
+        } == dimensions
     written = {line['field']: line['val'] for line in lines if line['val'] != 0}
     assert written == nonzero
     for field, value in written.items():
@@ -223,7 +244,10 @@ def _run_aggregator(rows, directory: Path) -> tuple[list[dict], list[str], list[
         None,
     )
     out = subprocess.run(
-        ['lz4cat', str(directory / 'rows.json.lz4')], check=True, capture_output=True, text=True
+        ['lz4cat', str(directory / 'rows.json.lz4')],
+        check=True,
+        capture_output=True,
+        text=True,
     ).stdout
     with open(directory / 'locations.csv', newline='') as handle:
         locations = list(csv.DictReader(handle))
@@ -247,7 +271,11 @@ def test_rollup_sums_each_field_per_dimensions_and_date(rows):
 
     actual: dict[tuple[str, str, str], dict[str, int]] = {}
     for row in output:
-        key = (row['key']['StateName'], row['key']['MunicipalityName'], row['Real_Date'])
+        key = (
+            row['key']['StateName'],
+            row['key']['MunicipalityName'],
+            row['Real_Date'],
+        )
         assert key not in actual, 'rollup must emit one row per dimensions and date'
         assert row['source'] == 'demo'
         actual[key] = row['data']

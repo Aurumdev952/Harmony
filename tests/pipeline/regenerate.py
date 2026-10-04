@@ -16,7 +16,12 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 
 from pipeline_cases import CASES  # noqa: E402
-from pipeline_fixtures import canonicalise, capture_raw, run_case, write_golden  # noqa: E402
+from pipeline_fixtures import (
+    canonicalise,
+    capture_raw,
+    run_case,
+    write_golden,
+)  # noqa: E402
 
 
 def main() -> int:

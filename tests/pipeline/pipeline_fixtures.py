@@ -31,9 +31,16 @@ FIXTURES_DIR = SUITE_DIR / 'fixtures'
 GOLDEN_DIR = SUITE_DIR / 'golden'
 DEMO_STATIC_DIR = REPO_ROOT / 'pipeline' / 'harmony_demo' / 'static_data'
 PROCESS_CSV = REPO_ROOT / 'data' / 'pipeline' / 'scripts' / 'process_csv.py'
-FILL_DIMENSION_DATA = REPO_ROOT / 'data' / 'pipeline' / 'scripts' / 'fill_dimension_data.py'
+FILL_DIMENSION_DATA = (
+    REPO_ROOT / 'data' / 'pipeline' / 'scripts' / 'fill_dimension_data.py'
+)
 PROCESS_CSV_WRAPPER = (
-    REPO_ROOT / 'data' / 'pipeline' / 'self_serve' / 'scripts' / 'process_csv_wrapper.py'
+    REPO_ROOT
+    / 'data'
+    / 'pipeline'
+    / 'self_serve'
+    / 'scripts'
+    / 'process_csv_wrapper.py'
 )
 
 DRUID_ROWS_PATTERN = re.compile(r'^processed_rows\.\d+\.json$')
@@ -65,9 +72,9 @@ class Case:
     inputs: dict[str, str] = dataclasses.field(default_factory=dict)
 
     def __post_init__(self) -> None:
-        assert all(step.expect_returncode == 0 for step in self.steps[:-1]), (
-            f'{self.name}: only the last step may be expected to fail'
-        )
+        assert all(
+            step.expect_returncode == 0 for step in self.steps[:-1]
+        ), f'{self.name}: only the last step may be expected to fail'
 
     @property
     def aborts(self) -> bool:
@@ -142,7 +149,8 @@ def _failure_text(stderr: str) -> str:
     """Keep the final exception and its message; drop tracebacks and log timestamps."""
     lines = stderr.rstrip('\n').split('\n')
     last_traceback = max(
-        (idx for idx, line in enumerate(lines) if line.startswith('Traceback ')), default=0
+        (idx for idx, line in enumerate(lines) if line.startswith('Traceback ')),
+        default=0,
     )
     for idx in range(last_traceback, len(lines)):
         if re.match(r'^[A-Za-z_.]+(Error|Exception): ', lines[idx]):
@@ -184,7 +192,9 @@ def run_case(case: Case, base: Path, hash_seed: str | None = None) -> Path:
 
 def _decompress(path: Path) -> tuple[str, bytes]:
     if path.name.endswith('.lz4'):
-        data = subprocess.run(['lz4cat', str(path)], check=True, capture_output=True).stdout
+        data = subprocess.run(
+            ['lz4cat', str(path)], check=True, capture_output=True
+        ).stdout
         return path.name[: -len('.lz4')], data
     if path.name.endswith('.gz'):
         return path.name[: -len('.gz')], gzip.decompress(path.read_bytes())
@@ -259,7 +269,8 @@ def _druid_facts(row: dict) -> list[tuple[str, float]]:
         return list(row[NESTED_DATA_COLUMN].items())
     fields = row[FIELD_COLUMN]
     return [
-        (field, row[VALUE_COLUMN]) for field in (fields if isinstance(fields, list) else [fields])
+        (field, row[VALUE_COLUMN])
+        for field in (fields if isinstance(fields, list) else [fields])
     ]
 
 
@@ -274,7 +285,11 @@ def canonical_rollup(rows: Iterable[dict]) -> str:
     groups: dict[str, list[float]] = {}
     for row in rows:
         for field, value in _druid_facts(row):
-            key = {k: v for k, v in row.items() if k not in (VALUE_COLUMN, NESTED_DATA_COLUMN)}
+            key = {
+                k: v
+                for k, v in row.items()
+                if k not in (VALUE_COLUMN, NESTED_DATA_COLUMN)
+            }
             key[FIELD_COLUMN] = field
             groups.setdefault(_dump(key), []).append(float(value))
     lines = []
@@ -319,7 +334,10 @@ def canonicalise(raw: dict[str, bytes]) -> dict[str, str]:
             canonical[f'{name}.jsonl'] = _canonical_csv(data)
         elif name.endswith('.json'):
             canonical[name] = (
-                json.dumps(json.loads(data), indent=2, sort_keys=True, ensure_ascii=False) + '\n'
+                json.dumps(
+                    json.loads(data), indent=2, sort_keys=True, ensure_ascii=False
+                )
+                + '\n'
             )
     if has_druid_shards:
         canonical['druid_rows.jsonl'] = canonical_rows(druid_rows)
@@ -335,7 +353,9 @@ def golden_files(case_name: str, layer: str) -> dict[str, bytes]:
     return {path.name: path.read_bytes() for path in sorted(directory.iterdir())}
 
 
-def write_golden(case_name: str, raw: dict[str, bytes], canonical: dict[str, str]) -> None:
+def write_golden(
+    case_name: str, raw: dict[str, bytes], canonical: dict[str, str]
+) -> None:
     case_dir = GOLDEN_DIR / case_name
     if case_dir.exists():
         shutil.rmtree(case_dir)

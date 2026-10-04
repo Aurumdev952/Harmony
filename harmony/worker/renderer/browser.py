@@ -130,6 +130,9 @@ async def _render(spec: RenderSpec, settings: RendererSettings, blocked: set[str
                 service_workers='block',
                 accept_downloads=False,
             )
+            # The render deadline bounds everything; Playwright's own 30 s
+            # per-action default would cut slow dashboards short of it.
+            context.set_default_timeout(spec.timeout_seconds * 1000)
             await context.route('**/*', guard)
             await context.route_web_socket(re.compile('.*'), refuse_web_socket)
             # A cookie is scoped to a host, not a port: the guard and the proxy

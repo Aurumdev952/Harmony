@@ -42,6 +42,10 @@ PAGES = {
         '<h1>Malaria</h1>', f'setTimeout(() => {{ {SIGNAL_READY} }}, 200);'
     ),
     '/dashboard/never-ready': _page('<h1>Still loading</h1>'),
+    # Ready after Playwright's own 30 s default action timeout.
+    '/dashboard/slow': _page(
+        '<h1>Slow tiles</h1>', f'setTimeout(() => {{ {SIGNAL_READY} }}, 32000);'
+    ),
     '/dashboard/tall': _page(f'<div style="height:6000px">tall</div>{READY}'),
     '/dashboard/egress': _page(
         '<img src="http://tiles.invalid/0/0/0.png">'
@@ -334,6 +338,19 @@ def test_a_page_error_fails_the_render(origins):
 
     with pytest.raises(PageFailed):
         render(_spec(origin, '/dashboard/broken'), _settings(origin))
+
+
+def test_a_slow_page_gets_the_whole_render_deadline(origins):
+    # Found end to end: the 30 s Playwright default cut renders short of the
+    # deadline the web app asked for.
+    origin, _, _ = origins
+
+    output = render(
+        _spec(origin, '/dashboard/slow', timeout_seconds=45.0),
+        _settings(origin, max_timeout_seconds=60.0),
+    )
+
+    assert _png_size(output.content) == (1280, 800)
 
 
 def test_a_page_that_never_signals_ready_times_out_on_the_deadline(origins):

@@ -140,6 +140,6 @@ The admin role is `/api2/role/1` by convention: the migrations seed it first, wi
 
 | Role | Verdict | Notes |
 |---|---|---|
-| qa | pending | |
+| qa | changes-requested | 2026-10-05 qa-2b-review: 2517 no-server tests under two seeds, 569 live twice on a fresh stack, characterisation on integration, discrimination flips and H1 by hand all reproduced. Fix: potion.yaml:33 read_via id for alert notifications is wrong (Potion checks AlertDefinition.id, not authorization_resource_id) and the agreement test is blind to it (production consequence: alert ACLs keyed on Resource.id govern notifications of whichever alert definition shares that pk); stack.sh needs WP-2c's :local image (undocumented); run.sh exec defeats the trap (temp leak); seed drift check partial; stale evidence numbers. |
 | reviewer | pending | |
 | security | pending | |

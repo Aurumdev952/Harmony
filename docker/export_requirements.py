@@ -45,9 +45,13 @@ def normalise(name: str) -> str:
     return re.sub(r"[-_.]+", "-", name).lower()
 
 
-def requirement_name(requirement: str) -> str:
+def project_name(requirement: str) -> str:
     match = NAME.match(requirement)
-    return normalise(match.group(0)) if match else ""
+    return match.group(0) if match else ""
+
+
+def requirement_name(requirement: str) -> str:
+    return normalise(project_name(requirement))
 
 
 def render(requirements: list[str], sources: dict[str, dict[str, str]]) -> str:
@@ -55,9 +59,8 @@ def render(requirements: list[str], sources: dict[str, dict[str, str]]) -> str:
     for requirement in requirements:
         source = sources.get(requirement_name(requirement))
         if source is not None:
-            name = NAME.match(requirement)
-            assert name is not None
-            lines.append(f"-e git+{source['git']}@{source['rev']}#egg={name.group(0)}")
+            egg = project_name(requirement)
+            lines.append(f"-e git+{source['git']}@{source['rev']}#egg={egg}")
         else:
             lines.append(requirement)
     return HEADER + "\n".join(lines) + "\n"

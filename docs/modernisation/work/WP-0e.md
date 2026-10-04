@@ -1,7 +1,7 @@
 ---
 wp: "0e"
 title: "Delete dead frontend code and dependencies"
-status: review
+status: ready
 owner_role: "frontend-platform"
 instances:
   - name: "frontend-platform-1"
@@ -77,6 +77,7 @@ None.
 - 2026-10-04 frontend-platform-1 units 5 and 6: deleted `bootstrap-5.2.0.js`, `bootstrap-datepicker-1.5.1.js` and `bootstrap-select-1.12.2.patched.js` from `web/public/js/vendor/` and `vendor/min/` (5522214); check: zero references repo-wide; `yarn install --frozen-lockfile` and `yarn build` pass on host Node 24 and in the node:18.17 image; JS bundles identical to `main`, CSS loses only plugin rules.
 - 2026-10-04 frontend-platform-1 unit 7: every page template rendered with Jinja2 on `main` and on this branch; the output differs only by the removed script tags, and every remaining script URL resolves to a file. The running-app check is deferred to the QA harness (WP-2e), see Evidence.
 - 2026-10-04 frontend-platform-1 review fixes (rev-0e): listed backend-3 and frontend-design-1 instances, corrected the `auth/` claim (20 templates lose Bootstrap 5, including `/user/profile`), added `/user/profile` and the embedded-query iframe to the WP-2e list, fixed the `.jsx` name in the navbar entry comment, and moved the `newUserButton` note to Requests; check: render harness extended to `auth/`, 0 failures, diff shows only removed script tags; eslint clean on `navbarEntry.js`.
+- 2026-10-04 frontend-platform-1: QA and reviewer approved; merged `mig/integration`; gate passes; status ready.
 
 ## Evidence
 
@@ -110,6 +111,7 @@ None.
   - a dashboard screenshot or export with a map tile (`is_screenshot_request`), to confirm that dropping the never-built `asyncMapChunk` tag leaves map tiles rendering as before;
   - a visual pass on pages using the query form, data quality and visualization controls, to confirm the 111 removed plugin CSS rules styled nothing on screen.
 - **Deslop (units 5 to 7).** The diff is six file deletions plus the WP file; there is nothing to narrate.
+- **Completion gate (2026-10-04, after merging `mig/integration` at 81f0667).** `uv run python scripts/agents/task_gate.py WP-0e` with `status: review` printed `status is "review", expected ready or done` (exit 1). After `status: ready` it printed `WP-0e meets the definition of done gates` (exit 0).
 - **R1 to R4 templates (backend-3).** Every file under `web/server/templates` was compiled and rendered with Jinja2 3 before and after the change. Undefined names and helpers were stubbed, and each template was rendered with `is_screenshot_request` both false and true. All 34 files compile before and all 32 compile after. `diff -r` of the rendered output shows only removed `<script>` tags (`bootstrap-5.2.0.js` from every page that extends `layout.html`; `bootstrap-datepicker`/`bootstrap-select` from every page that includes `query_app_vendor_scripts.html`; `asyncMapChunk.bundle.js` only from `grid_dashboard.html` with `is_screenshot_request` true) plus the outputs of the two deleted templates. Seven email and `auth/user_profile` templates do not render under this harness (they need the app's `flask_user` loader and repo-root paths). That fails identically before and after. *Correction by frontend-platform-1 (review rev-0e): `auth/user_profile` does use a changed file. It extends `auth/layout.html`, which extends `layout.html`, so `/user/profile` loses the `bootstrap-5.2.0.js` tag. The render check in unit 7 renders it, and it is on the WP-2e page list.* `grep -rnE "asyncMapChunk|bootstrap-5\.2\.0|bootstrap-datepicker|bootstrap-select|['\"/](query|facilities_map)\.html" --exclude-dir={node_modules,.git,docs,public} .` returns nothing. Under `web/public` the only matches are the vendor scripts (frontend-platform units 5 and 6) and the SCSS in R5.
 - **R5 SCSS deletion (frontend-design-1).**
   - **Scope.** Every top-level selector in the two vendor files names a plugin-only class: `datepicker`, `input-daterange`, `input-append`/`input-prepend`, `bootstrap-select` or `bs-*`. Neither file nests rules.

@@ -109,6 +109,7 @@ None. Note for WP-8c (C-8 owner is this role): the Parquet ingest schema must st
 
 - 2026-10-04 data-platform-3 unit 3: native epi week proven; check: `uv run pytest tests/druid` 9 passed, 1 strict xfail (the builder still emits JavaScript, pending the core request); live parity on 0.23 legacy and 0.23 SQL-compatible nulls: 73414 days 1900-01-01..2100-12-31, 0 mismatches between native, JavaScript and the Python port.
 - 2026-10-04 data-platform-3 unit 4: null audit and the N0 ingest transform; check: decision table above covers every differing case of 9 runs; `uv run pytest tests/druid` 10 passed, 1 strict xfail; native epi week on druid38 with JavaScript off: 0 mismatches.
+- 2026-10-04 data-platform-3 unit 6 (part 1): `druid_javascript_enabled=false` in `druid_setup/{single,cluster}`; check: all four compose files validate (`docker compose ... config --quiet`); the JavaScript-disabled Druid 38 refuses a JavaScript extraction (`IllegalStateException: JavaScript is disabled`). Still to do: a replay on mode `nojs` (0.23, legacy nulls, JavaScript off, which is what `druid_setup` runs after this WP), and the core J1 change must land before this WP merges, or `epi_week_of_year` breaks.
 
 ## Evidence
 

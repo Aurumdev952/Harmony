@@ -1,10 +1,10 @@
 # Throwaway Druid for the WP-8a null-handling audit. Never a deployment: one
 # loopback port (the router), throwaway volumes, a random metadata password.
-#   AUDIT_MODE=legacy|sqlnull|druid38  selects modes/<mode>.env
-#   DRUID_IMAGE                        apache/druid image (0.23.0 by default)
-#   AUDIT_PORT                         host port for the router, bound to 127.0.0.1
-#   AUDIT_DATA                         host directory holding the rows to index
-#   AUDIT_PG_PASSWORD                  throwaway metadata password
+#   AUDIT_MODE=legacy|nojs|sqlnull|druid38  selects modes/<mode>.env
+#   DRUID_IMAGE         apache/druid image (0.23.0 by default)
+#   AUDIT_PORT          host port for the router, bound to 127.0.0.1
+#   AUDIT_DATA          host directory holding the rows to index
+#   AUDIT_PG_PASSWORD   throwaway metadata password
 # run_audit.py drives it with one compose project per mode.
 name: wp8a-null-audit
 

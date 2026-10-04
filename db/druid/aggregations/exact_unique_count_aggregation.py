@@ -67,7 +67,7 @@ class ExactUniqueCountAggregation(QueryModifyingAggregation):
 
         # If requested, prevent empty dimension values from being counted
         if exclude_missing:
-            self.count_filter &= ~Filter(dimension=self.dimension, value='')
+            self.count_filter &= ~Filter(dimension=self.dimension, value=None)
 
         self.calculation = _HelperCalculation(self.name, self.count_filter)
         super().__init__()

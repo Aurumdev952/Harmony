@@ -1,0 +1,16 @@
+{
+  "description": "outliers_table for a user restricted to Pará.",
+  "endpoint": "outliers_table",
+  "policy": {
+    "query_policies": [
+      {
+        "dimension": "StateName",
+        "dimension_value": "Pará"
+      },
+      {
+        "dimension": "source",
+        "dimension_value": null
+      }
+    ]
+  }
+}

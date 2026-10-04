@@ -1,0 +1,62 @@
+[
+  {
+    "geographyHierarchy": {
+      "MunicipalityName": "Cruzeiro do Sul",
+      "StateName": "Acre"
+    },
+    "lastReport": 0.0,
+    "numPeriods": 193.0,
+    "numPeriodsWithReport": 0.0,
+    "silentDays": 0.0
+  },
+  {
+    "geographyHierarchy": {
+      "MunicipalityName": "Rio Branco",
+      "StateName": "Acre"
+    },
+    "lastReport": 167.0,
+    "numPeriods": 193.0,
+    "numPeriodsWithReport": 243.0,
+    "silentDays": 933.5837
+  },
+  {
+    "geographyHierarchy": {
+      "MunicipalityName": "Belém",
+      "StateName": "Pará"
+    },
+    "lastReport": 231.0,
+    "numPeriods": 193.0,
+    "numPeriodsWithReport": 327.0,
+    "silentDays": 930.478
+  },
+  {
+    "geographyHierarchy": {
+      "MunicipalityName": "Conceição do Araguaia",
+      "StateName": "Pará"
+    },
+    "lastReport": 399.22,
+    "numPeriods": 193.0,
+    "numPeriodsWithReport": 103.0,
+    "silentDays": 632.1596
+  },
+  {
+    "geographyHierarchy": {
+      "MunicipalityName": "Alto Alegre",
+      "StateName": "Roraima"
+    },
+    "lastReport": 223.0,
+    "numPeriods": 193.0,
+    "numPeriodsWithReport": 142.42,
+    "silentDays": 241.5126
+  },
+  {
+    "geographyHierarchy": {
+      "MunicipalityName": "Pacaraima",
+      "StateName": "Roraima"
+    },
+    "lastReport": 55.0,
+    "numPeriods": 193.0,
+    "numPeriodsWithReport": 187.0,
+    "silentDays": 139.0622
+  }
+]

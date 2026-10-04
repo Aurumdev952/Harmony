@@ -1,0 +1,41 @@
+[
+  {
+    "dimensions": {
+      "StateName": "Acre"
+    },
+    "metrics": {
+      "yellow_fever_cases": {
+        "count": 0,
+        "dateCount": 0,
+        "endDate": "1970-01-01",
+        "startDate": "1970-01-01"
+      }
+    }
+  },
+  {
+    "dimensions": {
+      "StateName": "Pará"
+    },
+    "metrics": {
+      "yellow_fever_cases": {
+        "count": 57,
+        "dateCount": 227,
+        "endDate": "1970-01-01",
+        "startDate": "1970-01-01"
+      }
+    }
+  },
+  {
+    "dimensions": {
+      "StateName": "Roraima"
+    },
+    "metrics": {
+      "yellow_fever_cases": {
+        "count": 59,
+        "dateCount": 315,
+        "endDate": "1970-01-01",
+        "startDate": "1970-01-01"
+      }
+    }
+  }
+]

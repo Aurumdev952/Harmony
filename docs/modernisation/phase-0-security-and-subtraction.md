@@ -9,7 +9,7 @@ Each unit is one PR.
 ## 0a. Lock down Hasura
 
 - **Changes.**
-  - Set `HASURA_GRAPHQL_ADMIN_SECRET` and `HASURA_GRAPHQL_UNAUTHORIZED_ROLE` in `docker-compose.yaml` and stop publishing port 8088.
+  - Set `HASURA_GRAPHQL_ADMIN_SECRET` in `docker-compose.yaml` and stop publishing port 8088. Do not set `HASURA_GRAPHQL_UNAUTHORIZED_ROLE`: in admin-secret mode it serves requests without the secret as that role, which defeats the lockdown (WP-0a decision).
   - Have the Flask proxy (`web/server/routes/api.py:144-176`) send the admin secret plus `x-hasura-role` and `x-hasura-user-id` headers from `current_user`.
   - Pass `apply_metadata_snapshot.py` the secret.
   - Upgrade Hasura to v2.45 LTS in the same PR, since v2.11 has been out of support since 2024-09. It is an interim step; phase 5 retires Hasura.

@@ -1,0 +1,7 @@
+heroui-react heroui-inc/heroui 73000ea8d13ee8aba6a098c93d1d3b5946fa036f
+fastapi fastapi/fastapi 5f9fc5c59a9bb54608aa35376715f3ba9708188e
+maplibre-v6-migration maplibre/maplibre-agent-skills bc6a884a6b6b08936cf917b26092463e5d22e180
+maplibre-source-wiring maplibre/maplibre-agent-skills bc6a884a6b6b08936cf917b26092463e5d22e180
+router-core TanStack/router b839f47027956f71ed2db51f436701801addb1d6
+router-plugin TanStack/router b839f47027956f71ed2db51f436701801addb1d6
+router-query TanStack/router b839f47027956f71ed2db51f436701801addb1d6

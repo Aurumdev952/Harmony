@@ -1,0 +1,2 @@
+- [Druid setup traps](druid-setup-traps.md) — password provider, Postgres major pinning, cluster binds, extension checksum table
+- [Worktree tooling traps](worktree-tooling-traps.md) — Bash guard rejections, Write-tool workaround, pytest basename clash

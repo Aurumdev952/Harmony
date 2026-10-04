@@ -1,0 +1,5 @@
+{
+  "description": "OR of two selectors.",
+  "endpoint": "table",
+  "policy": null
+}

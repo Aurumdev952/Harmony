@@ -1,0 +1,370 @@
+{
+  "data": [
+    {
+      "dimensions": {
+        "StateName": "Acre"
+      },
+      "key": "Acre",
+      "timestamp": "2024-03-04",
+      "yellow_fever_cases": 24.0
+    },
+    {
+      "dimensions": {
+        "StateName": "Pará"
+      },
+      "key": "Pará",
+      "timestamp": "2024-03-04",
+      "yellow_fever_cases": 0.0
+    },
+    {
+      "dimensions": {
+        "StateName": "Roraima"
+      },
+      "key": "Roraima",
+      "timestamp": "2024-03-04",
+      "yellow_fever_cases": 264.41
+    },
+    {
+      "dimensions": {
+        "StateName": "Roraima"
+      },
+      "key": "Roraima",
+      "timestamp": "2024-03-05",
+      "yellow_fever_cases": 262.0
+    },
+    {
+      "dimensions": {
+        "StateName": "Acre"
+      },
+      "key": "Acre",
+      "timestamp": "2024-03-06",
+      "yellow_fever_cases": 89.0
+    },
+    {
+      "dimensions": {
+        "StateName": "Pará"
+      },
+      "key": "Pará",
+      "timestamp": "2024-03-06",
+      "yellow_fever_cases": 79.0
+    },
+    {
+      "dimensions": {
+        "StateName": "Acre"
+      },
+      "key": "Acre",
+      "timestamp": "2024-03-07",
+      "yellow_fever_cases": 89.0
+    },
+    {
+      "dimensions": {
+        "StateName": "Pará"
+      },
+      "key": "Pará",
+      "timestamp": "2024-03-07",
+      "yellow_fever_cases": 203.22
+    },
+    {
+      "dimensions": {
+        "StateName": "Roraima"
+      },
+      "key": "Roraima",
+      "timestamp": "2024-03-07",
+      "yellow_fever_cases": 119.07
+    },
+    {
+      "dimensions": {
+        "StateName": "Pará"
+      },
+      "key": "Pará",
+      "timestamp": "2024-03-08",
+      "yellow_fever_cases": 204.0
+    },
+    {
+      "dimensions": {
+        "StateName": "Roraima"
+      },
+      "key": "Roraima",
+      "timestamp": "2024-03-08",
+      "yellow_fever_cases": 50.0
+    },
+    {
+      "dimensions": {
+        "StateName": "Acre"
+      },
+      "key": "Acre",
+      "timestamp": "2024-03-09",
+      "yellow_fever_cases": 79.66
+    },
+    {
+      "dimensions": {
+        "StateName": "Pará"
+      },
+      "key": "Pará",
+      "timestamp": "2024-03-09",
+      "yellow_fever_cases": 0.0
+    },
+    {
+      "dimensions": {
+        "StateName": "Roraima"
+      },
+      "key": "Roraima",
+      "timestamp": "2024-03-09",
+      "yellow_fever_cases": 241.0
+    },
+    {
+      "dimensions": {
+        "StateName": "Acre"
+      },
+      "key": "Acre",
+      "timestamp": "2024-03-10",
+      "yellow_fever_cases": 72.65
+    },
+    {
+      "dimensions": {
+        "StateName": "Pará"
+      },
+      "key": "Pará",
+      "timestamp": "2024-03-10",
+      "yellow_fever_cases": 381.72
+    },
+    {
+      "dimensions": {
+        "StateName": "Roraima"
+      },
+      "key": "Roraima",
+      "timestamp": "2024-03-10",
+      "yellow_fever_cases": 37.49
+    },
+    {
+      "dimensions": {
+        "StateName": "Pará"
+      },
+      "key": "Pará",
+      "timestamp": "2024-03-11",
+      "yellow_fever_cases": 0.0
+    },
+    {
+      "dimensions": {
+        "StateName": "Roraima"
+      },
+      "key": "Roraima",
+      "timestamp": "2024-03-11",
+      "yellow_fever_cases": 84.56
+    },
+    {
+      "dimensions": {
+        "StateName": "Acre"
+      },
+      "key": "Acre",
+      "timestamp": "2024-03-12",
+      "yellow_fever_cases": 133.0
+    },
+    {
+      "dimensions": {
+        "StateName": "Pará"
+      },
+      "key": "Pará",
+      "timestamp": "2024-03-12",
+      "yellow_fever_cases": 117.87
+    },
+    {
+      "dimensions": {
+        "StateName": "Roraima"
+      },
+      "key": "Roraima",
+      "timestamp": "2024-03-12",
+      "yellow_fever_cases": 377.0
+    },
+    {
+      "dimensions": {
+        "StateName": "Acre"
+      },
+      "key": "Acre",
+      "timestamp": "2024-03-13",
+      "yellow_fever_cases": 0.0
+    },
+    {
+      "dimensions": {
+        "StateName": "Pará"
+      },
+      "key": "Pará",
+      "timestamp": "2024-03-13",
+      "yellow_fever_cases": 0.0
+    },
+    {
+      "dimensions": {
+        "StateName": "Roraima"
+      },
+      "key": "Roraima",
+      "timestamp": "2024-03-13",
+      "yellow_fever_cases": 206.0
+    },
+    {
+      "dimensions": {
+        "StateName": "Acre"
+      },
+      "key": "Acre",
+      "timestamp": "2024-03-14",
+      "yellow_fever_cases": 118.0
+    },
+    {
+      "dimensions": {
+        "StateName": "Pará"
+      },
+      "key": "Pará",
+      "timestamp": "2024-03-14",
+      "yellow_fever_cases": 327.0
+    },
+    {
+      "dimensions": {
+        "StateName": "Acre"
+      },
+      "key": "Acre",
+      "timestamp": "2024-03-15",
+      "yellow_fever_cases": 5.0
+    },
+    {
+      "dimensions": {
+        "StateName": "Pará"
+      },
+      "key": "Pará",
+      "timestamp": "2024-03-15",
+      "yellow_fever_cases": 0.0
+    },
+    {
+      "dimensions": {
+        "StateName": "Acre"
+      },
+      "key": "Acre",
+      "timestamp": "2024-03-16",
+      "yellow_fever_cases": 0.0
+    },
+    {
+      "dimensions": {
+        "StateName": "Pará"
+      },
+      "key": "Pará",
+      "timestamp": "2024-03-16",
+      "yellow_fever_cases": 86.62
+    },
+    {
+      "dimensions": {
+        "StateName": "Roraima"
+      },
+      "key": "Roraima",
+      "timestamp": "2024-03-16",
+      "yellow_fever_cases": 0.0
+    },
+    {
+      "dimensions": {
+        "StateName": "Acre"
+      },
+      "key": "Acre",
+      "timestamp": "2024-03-17",
+      "yellow_fever_cases": 279.0
+    },
+    {
+      "dimensions": {
+        "StateName": "Pará"
+      },
+      "key": "Pará",
+      "timestamp": "2024-03-17",
+      "yellow_fever_cases": 219.0
+    },
+    {
+      "dimensions": {
+        "StateName": "Roraima"
+      },
+      "key": "Roraima",
+      "timestamp": "2024-03-17",
+      "yellow_fever_cases": 13.0
+    },
+    {
+      "dimensions": {
+        "StateName": "Acre"
+      },
+      "key": "Acre",
+      "timestamp": "2024-03-05",
+      "yellow_fever_cases": null
+    },
+    {
+      "dimensions": {
+        "StateName": "Acre"
+      },
+      "key": "Acre",
+      "timestamp": "2024-03-08",
+      "yellow_fever_cases": null
+    },
+    {
+      "dimensions": {
+        "StateName": "Acre"
+      },
+      "key": "Acre",
+      "timestamp": "2024-03-11",
+      "yellow_fever_cases": null
+    },
+    {
+      "dimensions": {
+        "StateName": "Pará"
+      },
+      "key": "Pará",
+      "timestamp": "2024-03-05",
+      "yellow_fever_cases": null
+    },
+    {
+      "dimensions": {
+        "StateName": "Roraima"
+      },
+      "key": "Roraima",
+      "timestamp": "2024-03-06",
+      "yellow_fever_cases": null
+    },
+    {
+      "dimensions": {
+        "StateName": "Roraima"
+      },
+      "key": "Roraima",
+      "timestamp": "2024-03-14",
+      "yellow_fever_cases": null
+    },
+    {
+      "dimensions": {
+        "StateName": "Roraima"
+      },
+      "key": "Roraima",
+      "timestamp": "2024-03-15",
+      "yellow_fever_cases": null
+    }
+  ],
+  "dates": [
+    "2024-03-04",
+    "2024-03-05",
+    "2024-03-06",
+    "2024-03-07",
+    "2024-03-08",
+    "2024-03-09",
+    "2024-03-10",
+    "2024-03-11",
+    "2024-03-12",
+    "2024-03-13",
+    "2024-03-14",
+    "2024-03-15",
+    "2024-03-16",
+    "2024-03-17"
+  ],
+  "fields": [
+    "yellow_fever_cases"
+  ],
+  "totals": {
+    "Acre": {
+      "yellow_fever_cases": 889.31
+    },
+    "Pará": {
+      "yellow_fever_cases": 1618.4299999999998
+    },
+    "Roraima": {
+      "yellow_fever_cases": 1654.53
+    }
+  }
+}

@@ -1,0 +1,5 @@
+{
+  "description": "COUNT_DISTINCT of municipalities with no groups.",
+  "endpoint": "table",
+  "policy": null
+}

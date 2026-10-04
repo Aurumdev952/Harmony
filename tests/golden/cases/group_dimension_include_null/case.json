@@ -1,0 +1,5 @@
+{
+  "description": "includeNull on municipality: no not-empty filter, null municipality rows kept.",
+  "endpoint": "table",
+  "policy": null
+}

@@ -1,0 +1,18 @@
+192.0.2.10 - - [15/Jan/2026:08:00:00 +0000] "GET /overview HTTP/1.1" 200 5120 "-" "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126.0.0.0 Safari/537.36"
+192.0.2.10 - - [15/Jan/2026:08:00:01 +0000] "GET /static/build/main.js HTTP/1.1" 200 90210 "https://zz.example.org/overview" "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126.0.0.0 Safari/537.36"
+192.0.2.10 - - [15/Jan/2026:09:00:00 +0000] "GET /overview HTTP/1.1" 200 5120 "-" "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126.0.0.0 Safari/537.36"
+192.0.2.10 - - [15/Jan/2026:10:20:00 +0200] "POST /api/query HTTP/1.1" 200 801 "https://zz.example.org/overview" "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126.0.0.0 Safari/537.36"
+192.0.2.10 - - [15/Jan/2026:08:10:00 +0000] "GET /overview HTTP/1.1" 200 5120 "-" "Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:130.0) Gecko/20100101 Firefox/130.0"
+zz.example.org 192.0.2.11 - - [15/Jan/2026:08:05:00 +0000] "GET /query HTTP/2.0" 200 4410 "-" "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/125.0.0.0 Safari/537.36 Edg/125.0.0.0" "172.18.0.5:5000"
+198.51.100.20 - - [15/Jan/2026:08:30:00 +0000] "GET /dashboard/malaria HTTP/1.1" 200 6000 "-" "Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:115.0) Gecko/20100101 Firefox/115.0"
+nginx-1  | 198.51.100.20 - - [15/Jan/2026:08:31:00 +0000] "POST /api/query HTTP/1.1" 200 700 "-" "Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:115.0) Gecko/20100101 Firefox/115.0"
+198.51.100.21 - - [15/Jan/2026:11:00:00 +0000] "GET /overview HTTP/1.1" 200 5120 "-" "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/16.3 Safari/605.1.15"
+203.0.113.30 - - [15/Jan/2026:12:00:00 +0000] "GET /overview HTTP/1.1" 200 5120 "-" "Mozilla/5.0 (iPhone; CPU iPhone OS 17_4 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.4 Mobile/15E148 Safari/604.1"
+203.0.113.31 - - [15/Jan/2026:12:05:00 +0000] "GET /overview HTTP/1.1" 200 5120 "-" "Mozilla/5.0 (iPhone; CPU iPhone OS 16_1 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) CriOS/118.0 Mobile/15E148 Safari/604.1"
+2001:db8::5 - - [15/Jan/2026:13:00:00 +0000] "GET /overview HTTP/1.1" 200 5120 "-" "Mozilla/5.0 (Windows NT 6.1; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/109.0.0.0 Safari/537.36"
+203.0.113.40 - - [15/Jan/2026:14:00:00 +0000] "GET /overview HTTP/1.1" 200 5120 "-" "SomeKiosk/1.0"
+198.51.100.99 - - [15/Jan/2026:14:10:00 +0000] "GET /robots.txt HTTP/1.1" 404 0 "-" "Mozilla/5.0 (compatible; Googlebot/2.1; +http://www.google.com/bot.html)"
+127.0.0.1 - - [15/Jan/2026:14:11:00 +0000] "GET /health HTTP/1.1" 200 2 "-" "curl/8.5.0"
+198.51.100.98 - - [15/Jan/2026:14:12:00 +0000] "GET / HTTP/1.1" 400 0 "-" "-"
+2026/01/15 14:13:00 [warn] 1#1: *9 an upstream response is buffered to a temporary file
+

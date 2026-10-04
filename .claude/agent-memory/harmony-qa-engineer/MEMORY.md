@@ -1,0 +1,2 @@
+- [Frontend build and template verification](frontend-build-and-template-verification.md): build diff, CSS rule diff, Jinja render, script URLs, static Playwright smoke, isolated-shell traps
+- [Golden suite harness](golden-suite-harness.md) — offline bootstrap of the legacy query engine, hash-seed traps, mutation-check approach

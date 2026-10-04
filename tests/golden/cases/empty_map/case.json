@@ -1,0 +1,8 @@
+{
+  "description": "map when Druid returns no rows.",
+  "endpoint": "map",
+  "policy": null,
+  "druid": {
+    "empty": true
+  }
+}

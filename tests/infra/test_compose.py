@@ -143,10 +143,13 @@ def test_redis_requires_auth_and_clients_carry_the_password(tmp_path):
     assert redis['command'] == ['redis-server', '--requirepass', password]
     assert redis['environment']['REDISCLI_AUTH'] == password
 
-    assert services['web']['environment']['REDIS_PASSWORD'] == password
-    worker_env = services['worker']['environment']
-    assert worker_env['REDIS_PASSWORD'] == password
-    assert worker_env['BROKER_URL'] == f'redis://:{password}@redis:6379/0'
+    # web.server.configuration builds (and URL-encodes) the broker URL and the
+    # cache settings from these two, so Compose never embeds the password in a URL.
+    for client in ('web', 'worker'):
+        environment = services[client]['environment']
+        assert environment['REDIS_HOST'] == 'redis', client
+        assert environment['REDIS_PASSWORD'] == password, client
+        assert 'BROKER_URL' not in environment, client
 
 
 # Hasura is upgraded and pinned by WP-0a. MinIO no longer publishes server

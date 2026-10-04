@@ -1,0 +1,90 @@
+{
+  "levels": [
+    "StateName",
+    "Age"
+  ],
+  "root": {
+    "children": [
+      {
+        "children": [
+          {
+            "children": [],
+            "dimension": "Age",
+            "metrics": {
+              "yellow_fever_cases": 123.0
+            },
+            "name": "15-49"
+          },
+          {
+            "children": [],
+            "dimension": "Age",
+            "metrics": {
+              "yellow_fever_cases": 162.0
+            },
+            "name": "50+"
+          }
+        ],
+        "dimension": "StateName",
+        "metrics": {
+          "yellow_fever_cases": 391.0
+        },
+        "name": "Acre"
+      },
+      {
+        "children": [
+          {
+            "children": [],
+            "dimension": "Age",
+            "metrics": {
+              "yellow_fever_cases": 325.0
+            },
+            "name": "15-49"
+          },
+          {
+            "children": [],
+            "dimension": "Age",
+            "metrics": {
+              "yellow_fever_cases": 128.78
+            },
+            "name": "50+"
+          }
+        ],
+        "dimension": "StateName",
+        "metrics": {
+          "yellow_fever_cases": 256.11
+        },
+        "name": "Pará"
+      },
+      {
+        "children": [
+          {
+            "children": [],
+            "dimension": "Age",
+            "metrics": {
+              "yellow_fever_cases": 123.53
+            },
+            "name": "15-49"
+          },
+          {
+            "children": [],
+            "dimension": "Age",
+            "metrics": {
+              "yellow_fever_cases": 59.08
+            },
+            "name": "50+"
+          }
+        ],
+        "dimension": "StateName",
+        "metrics": {
+          "yellow_fever_cases": 371.0
+        },
+        "name": "Roraima"
+      }
+    ],
+    "dimension": "",
+    "metrics": {
+      "yellow_fever_cases": 3.0
+    },
+    "name": "Overall"
+  }
+}

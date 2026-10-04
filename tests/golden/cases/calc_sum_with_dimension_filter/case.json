@@ -1,0 +1,5 @@
+{
+  "description": "SUM restricted by a calculation filter on a dimension (deaths only).",
+  "endpoint": "table",
+  "policy": null
+}

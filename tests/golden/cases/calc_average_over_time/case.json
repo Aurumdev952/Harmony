@@ -1,0 +1,5 @@
+{
+  "description": "AVERAGE_OVER_TIME by state: time-bound aggregators and a per-day average.",
+  "endpoint": "table",
+  "policy": null
+}

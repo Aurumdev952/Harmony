@@ -1,0 +1,11 @@
+[
+  [
+    {
+      "result": {
+        "yellow_fever_cases": 88.0,
+        "yellow_fever_cases__count": 30
+      },
+      "timestamp": "2024-01-01T00:00:00.000Z"
+    }
+  ]
+]

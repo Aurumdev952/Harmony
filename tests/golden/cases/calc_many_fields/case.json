@@ -1,0 +1,5 @@
+{
+  "description": "Six fields of different types in one query: the aggregator list order depends on set iteration.",
+  "endpoint": "table",
+  "policy": null
+}

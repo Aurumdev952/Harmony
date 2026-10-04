@@ -1,4 +1,4 @@
 - [Frontend build and template verification](frontend-build-and-template-verification.md): build diff, CSS rule diff, Jinja render, script URLs, static Playwright smoke, isolated-shell traps
 - [Golden suite harness](golden-suite-harness.md) — offline bootstrap of the legacy query engine, hash-seed traps, mutation-check approach
-- [Authz suite harness](authz_suite_harness.md) — how tests/authz runs (uv py3.8, private stack on 58660) and the traps hit building it
-- [Authz escalations found](authz_escalations_found.md) — pinned group_admin/group_moderator/role_administrator escalations; flipping them needs a Sec WP
+- [Authz suite harness](authz_suite_harness.md) — how tests/authz runs (root uv project py3.9, WP-2c stack on 58660) and the traps hit building it
+- [Authz escalations found](authz_escalations_found.md) — pinned group/role escalations (H1-H3, N3-N6); flipping them needs a Sec WP

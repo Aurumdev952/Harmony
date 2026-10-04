@@ -358,7 +358,6 @@
       permission:
         columns: '*'
         filter: {}
-        allow_aggregations: true
   update_permissions:
     - role: user
       permission:
@@ -398,7 +397,6 @@
       permission:
         columns: '*'
         filter: {}
-        allow_aggregations: true
   update_permissions:
     - role: user
       permission:
@@ -421,7 +419,6 @@
       permission:
         columns: '*'
         filter: {}
-        allow_aggregations: true
   delete_permissions:
     - role: user
       permission:
@@ -496,13 +493,15 @@
   select_permissions:
     - role: anonymous
       permission:
-        columns: '*'
+        columns:
+          - description
+          - id
+          - name
         filter: {}
     - role: user
       permission:
         columns: '*'
         filter: {}
-        allow_aggregations: true
 - table:
     name: dimension_category
     schema: public
@@ -528,13 +527,14 @@
   select_permissions:
     - role: anonymous
       permission:
-        columns: '*'
+        columns:
+          - id
+          - name
         filter: {}
     - role: user
       permission:
         columns: '*'
         filter: {}
-        allow_aggregations: true
 - table:
     name: dimension_category_mapping
     schema: public
@@ -548,13 +548,13 @@
   select_permissions:
     - role: anonymous
       permission:
-        columns: '*'
+        columns:
+          - id
         filter: {}
     - role: user
       permission:
         columns: '*'
         filter: {}
-        allow_aggregations: true
 - table:
     name: external_alert_activity_to_ignore
     schema: public
@@ -642,7 +642,6 @@
       permission:
         columns: '*'
         filter: {}
-        allow_aggregations: true
   update_permissions:
     - role: user
       permission:
@@ -696,7 +695,6 @@
       permission:
         columns: '*'
         filter: {}
-        allow_aggregations: true
 - table:
     name: field_pipeline_datasource_mapping
     schema: public
@@ -718,7 +716,6 @@
       permission:
         columns: '*'
         filter: {}
-        allow_aggregations: true
 - table:
     name: geo_dimension_metadata
     schema: public
@@ -796,7 +793,6 @@
       permission:
         columns: '*'
         filter: {}
-        allow_aggregations: true
   update_permissions:
     - role: user
       permission:
@@ -839,7 +835,6 @@
       permission:
         columns: '*'
         filter: {}
-        allow_aggregations: true
 - table:
     name: raw_pipeline_entity
     schema: public
@@ -907,7 +902,6 @@
       permission:
         columns: '*'
         filter: {}
-        allow_aggregations: true
   update_permissions:
     - role: user
       permission:
@@ -954,7 +948,6 @@
       permission:
         columns: '*'
         filter: {}
-        allow_aggregations: true
   update_permissions:
     - role: user
       permission:
@@ -986,7 +979,6 @@
       permission:
         columns: '*'
         filter: {}
-        allow_aggregations: true
   delete_permissions:
     - role: user
       permission:

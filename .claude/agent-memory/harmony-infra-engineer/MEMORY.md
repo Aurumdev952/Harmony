@@ -1,0 +1,2 @@
+- [CI tooling and Bash guards](ci_tooling_and_guards.md): actionlint and shellcheck install, action SHA lookup, getting past the worktree guard
+- [WP-0f open items](wp_0f_open_items.md): Jenkins deletion awaiting the human; cache-from and slash-tag bugs left for WP-3b

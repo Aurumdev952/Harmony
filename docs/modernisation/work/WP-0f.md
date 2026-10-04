@@ -1,7 +1,7 @@
 ---
 wp: "0f"
 title: "One CI system, `main` branch, least-privilege Actions"
-status: building
+status: review
 owner_role: "infra"
 instances:
   - name: "infra-2"

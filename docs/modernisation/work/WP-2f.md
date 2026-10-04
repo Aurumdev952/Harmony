@@ -127,18 +127,19 @@ None of these blocks this WP.
 
 - [x] **WP-0a and WP-0c** (on `mig/integration` at `9fedcce`, merged here). No toolchain file changed. Their suites `tests/web` (68) and `tests/graphql` (5) join the 3.9 job automatically, and `tests/infra/test_compose_hasura.py` joins the 3.13 job.
   - **`tests/web` fix.** Under the dev group, `test_timeout_clears_the_access_cookie_and_signs_the_user_out` failed because pytest-flask 1.3.0 pushes a request context around any test with an `app` fixture. On `mig/integration`'s own environment it passed. `-p no:flask` fixes it; no suite uses pytest-flask.
+  - **Resolved.** After merging `68d55c7` (QA's re-recording), the local CI's 3.9 job gives 351 passed and 0 failed, with or without `CI=true`. `record.py --check` reports "85 cases, 0 fixture files would change", and the 3.13 job gives 108 passed. The history follows.
   - **Golden failure, not mine.** `tests/golden::test_druid_queries[policy_include_all_all_time]` fails on `mig/integration` itself, under its own WP-2a environment, and `record.py --check` here lists only that file ("85 cases, 1 fixture files would change"). This is the INV-2 change WP-0c causes, which WP-2a's file says to regenerate on a branch carrying WP-0c. Until QA regenerates it, the 3.9 job is red on every PR based on `mig/integration`. Request below.
 
 ### Requests to other roles
 
-- [ ] **qa (WP-2a follow-up), blocks a green CI on `mig/integration`:** regenerate `tests/golden/cases/policy_include_all_all_time/druid_query.json` now that WP-0c is merged, following WP-2a's INV-2 note: `record.py --check` must list only that file, then a reviewer accepts the diff.
+- [x] **qa (WP-2a follow-up), done in `eeb2db1`, merged here through `68d55c7`:** regenerate `tests/golden/cases/policy_include_all_all_time/druid_query.json` now that WP-0c is merged, following WP-2a's INV-2 note: `record.py --check` must list only that file, then a reviewer accepts the diff.
 
 - [x] **lead:** `scripts/watch/watch_mypy.py` and `.vscode` now follow the pyproject mypy configuration and the ruff formatter (`17dcbce` on `mig/integration`, merged here).
-- [ ] **lead:** add `.hypothesis/` to `.gitignore`. The contract suite's property tests write a Hypothesis example database at the repo root (`tests/pipeline` turns it off).
+- [x] **lead (done in `665401e`):** add `.hypothesis/` to `.gitignore`. The contract suite's property tests write a Hypothesis example database at the repo root (`tests/pipeline` turns it off).
 - [ ] **lead:** delete the scripts nothing calls any more: `scripts/lint_python.sh`, `scripts/format_python.sh`, `scripts/format_python_files.sh`, `scripts/pylint/` and `scripts/mypy_parse.py`.
 - [ ] **lead:** plan one repo-wide `ruff format` commit for a quiet point after phase 2, recorded in `.git-blame-ignore-revs`. ruff formats in black 24 style, so until then the first PR to touch a file gets a whole-file reformat. 283 files are affected (Decisions).
-- [ ] **core:** fix `util/unix.py:111`, where `subprocess` is undefined (ruff F821), then delete its line in `[tool.ruff.lint.per-file-ignores]`.
-- [ ] **data-platform:** delete the dead code at `scripts/druid/druid_task_memory_stats.py:54-59`, which reads an undefined `raw_timestamp` (ruff F821), then delete its line in `[tool.ruff.lint.per-file-ignores]`.
+- [ ] **core (side branch `mig/WP-2f-uv-ruff-mypy-ci-core`, to merge here):** fix `util/unix.py:111`, where `subprocess` is undefined (ruff F821), then delete its line in `[tool.ruff.lint.per-file-ignores]`.
+- [ ] **data-platform (side branch `mig/WP-2f-uv-ruff-mypy-ci-druid`, to merge here):** delete the dead code at `scripts/druid/druid_task_memory_stats.py:54-59`, which reads an undefined `raw_timestamp` (ruff F821), then delete its line in `[tool.ruff.lint.per-file-ignores]`.
 - [ ] **frontend-platform and qa:** no Jest or Playwright suite exists on `mig/integration`. Ask infra for a CI job when the first suite lands (Vitest in WP-6, Playwright smoke from QA).
 - [ ] **qa (WP-2c), low:** no offline contract test pins the `date` format tag. Renaming it in `tests/contract/schema.py` left the suite green, while renaming `http-date` failed it (Unit 7 evidence). A `("2024-01-01", "date")` row in `test_string_format_tags` would close the gap.
 

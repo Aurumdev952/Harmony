@@ -10,11 +10,11 @@ replaced.
 from __future__ import annotations
 
 import os
+from collections.abc import Iterator
 from contextlib import ExitStack, contextmanager
 from dataclasses import dataclass, field
-from functools import lru_cache
+from functools import cache
 from types import SimpleNamespace
-from typing import Iterator
 from unittest import mock
 
 import yaml
@@ -68,7 +68,7 @@ def _spec(name: str, raw: dict) -> PrincipalSpec:
     )
 
 
-@lru_cache(maxsize=None)
+@cache
 def principal_specs() -> dict:
     specs = {}
     for role_name in SEED['roles']:

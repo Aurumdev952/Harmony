@@ -33,7 +33,7 @@ checks:
      allow: [tag:superuser, role:manager]}
   - {check: [delete_user, site, null], used_by: "DELETE /api2/user/<id>/force",
      allow: [tag:superuser, role:manager]}
-  - {check: [invite_user, site, null], used_by: "POST /api2/user/invite",
+  - {check: [invite_user, site, null], used_by: "POST /api2/user/invite", pin: "I3: defect pinned as today; flips in WP-5d",
      allow: [tag:superuser, role:manager]}
   - {check: [view_user, site, null], used_by: "GET /api2/user/<id>/ownership",
      allow: [tag:superuser, role:manager]}
@@ -79,11 +79,11 @@ checks:
      allow: [tag:superuser, role:alert_admin]}
   - {check: [view_resource, alert, 11], used_by: "/api/authorization",
      allow: [tag:superuser, role:alert_admin, role:alert_editor, role:alert_viewer, alert_owner]}
-  - {check: [view_resource, alert_definitions, null], used_by: "Potion alert list returns every alert",
+  - {check: [view_resource, alert_definitions, null], used_by: "Potion alert list returns every alert", pin: "I2: defect pinned as today; flips in WP-5f",
      allow: [tag:superuser]}
   - {check: [view_resource, alert_definitions, 11], used_by: "GET /api2/alert_definitions/<id>",
      allow: [tag:superuser, alert_owner]}
-  - {check: [create_resource, alert_definitions, null], used_by: "Potion create on alert_definitions",
+  - {check: [create_resource, alert_definitions, null], used_by: "Potion create on alert_definitions", pin: "I2: defect pinned as today; flips in WP-5f",
      allow: [tag:superuser]}
   - {check: [edit_resource, alert_definitions, 11], used_by: "PATCH /api2/alert_definitions/<id>",
      allow: [tag:superuser, alert_owner]}
@@ -99,9 +99,9 @@ checks:
      allow: [tag:superuser, role:user_admin]}
   - {check: [delete_resource, user, 43], used_by: "DELETE /api2/user/<id>",
      allow: [tag:superuser, role:user_admin]}
-  - {check: [change_password, user, 42], used_by: "own password, generate_api_token",
+  - {check: [change_password, user, 42], used_by: "own password, generate_api_token", pin: "I3: defect pinned as today; flips in WP-5d",
      allow: [tag:superuser]}
-  - {check: [reset_password, user, 43], used_by: "POST /api2/user/<id>/reset_password",
+  - {check: [reset_password, user, 43], used_by: "POST /api2/user/<id>/reset_password", pin: "I3: defect pinned as today; flips in WP-5d",
      allow: [tag:superuser, role:user_admin, role:user_moderator]}
   - {check: [invite_user, user, null], used_by: "/api/authorization only",
      allow: [tag:superuser, role:user_admin, role:user_moderator]}
@@ -143,3 +143,48 @@ checks:
      allow: [tag:superuser]}
   - {check: [view_resource, api-token, null], used_by: "Potion api-token list",
      allow: [tag:superuser]}
+
+  # Potion CRUD on types no seeded role can grant: admin only (or the ACL
+  # holder). Recorded so phase 5 has an expectation for every Potion
+  # (operation, type) pair when Potion goes; test_potion.py checks coverage.
+  - {check: [create_resource, configuration, null], used_by: "Potion configuration create (405 over HTTP)", allow: [tag:superuser]}
+  - {check: [delete_resource, configuration, null], used_by: "Potion configuration delete (405 over HTTP)", allow: [tag:superuser]}
+  - {check: [delete_resource, alert_definitions, 11], used_by: "DELETE /api2/alert_definitions/<id>", allow: [tag:superuser, alert_owner]}
+  - {check: [create_resource, alert_notifications, null], used_by: "Potion alert_notifications create, /bulk POST", allow: [tag:superuser]}
+  - {check: [edit_resource, alert_notifications, null], used_by: "Potion alert_notifications update, /bulk PATCH", allow: [tag:superuser]}
+  - {check: [delete_resource, alert_notifications, null], used_by: "Potion alert_notifications delete", allow: [tag:superuser]}
+  - {check: [edit_resource, query_policy, null], used_by: "Potion query_policy update", allow: [tag:superuser]}
+  - {check: [delete_resource, query_policy, null], used_by: "Potion query_policy delete", allow: [tag:superuser]}
+  - {check: [create_resource, resource, null], used_by: "Potion resource create (405 over HTTP)", allow: [tag:superuser]}
+  - {check: [edit_resource, resource, null], used_by: "Potion resource update (405 over HTTP)", allow: [tag:superuser]}
+  - {check: [delete_resource, resource, null], used_by: "Potion resource delete (405 over HTTP)", allow: [tag:superuser]}
+  - {check: [create_resource, user_acl, null], used_by: "Potion user_acl create", allow: [tag:superuser]}
+  - {check: [edit_resource, user_acl, null], used_by: "Potion user_acl update", allow: [tag:superuser]}
+  - {check: [delete_resource, user_acl, null], used_by: "Potion user_acl delete", allow: [tag:superuser]}
+  - {check: [create_resource, api-token, null], used_by: "Potion api-token create", allow: [tag:superuser]}
+  - {check: [edit_resource, api-token, null], used_by: "Potion api-token update", allow: [tag:superuser]}
+  - {check: [delete_resource, api-token, null], used_by: "Potion api-token delete", allow: [tag:superuser]}
+  - {check: [view_resource, group_acl, null], used_by: "Potion group_acl list", allow: [tag:superuser]}
+  - {check: [create_resource, group_acl, null], used_by: "Potion group_acl create", allow: [tag:superuser]}
+  - {check: [edit_resource, group_acl, null], used_by: "Potion group_acl update", allow: [tag:superuser]}
+  - {check: [delete_resource, group_acl, null], used_by: "Potion group_acl delete", allow: [tag:superuser]}
+  - {check: [view_resource, resource-type, null], used_by: "Potion resource-type list", allow: [tag:superuser]}
+  - {check: [create_resource, resource-type, null], used_by: "Potion resource-type create", allow: [tag:superuser]}
+  - {check: [edit_resource, resource-type, null], used_by: "Potion resource-type update", allow: [tag:superuser]}
+  - {check: [delete_resource, resource-type, null], used_by: "Potion resource-type delete", allow: [tag:superuser]}
+  - {check: [view_resource, resource_role, null], used_by: "Potion resource_role list", allow: [tag:superuser]}
+  - {check: [create_resource, resource_role, null], used_by: "Potion resource_role create", allow: [tag:superuser]}
+  - {check: [edit_resource, resource_role, null], used_by: "Potion resource_role update", allow: [tag:superuser]}
+  - {check: [delete_resource, resource_role, null], used_by: "Potion resource_role delete", allow: [tag:superuser]}
+  - {check: [view_resource, pipeline_run_metadata, null], used_by: "Potion pipeline_run_metadata list", allow: [tag:superuser]}
+  - {check: [create_resource, pipeline_run_metadata, null], used_by: "Potion pipeline_run_metadata create", allow: [tag:superuser]}
+  - {check: [edit_resource, pipeline_run_metadata, null], used_by: "Potion pipeline_run_metadata update", allow: [tag:superuser]}
+  - {check: [delete_resource, pipeline_run_metadata, null], used_by: "Potion pipeline_run_metadata delete", allow: [tag:superuser]}
+  - {check: [view_resource, data_upload_file_summary, null], used_by: "Potion data_upload_file_summary list", allow: [tag:superuser]}
+  - {check: [create_resource, data_upload_file_summary, null], used_by: "Potion data_upload_file_summary create", allow: [tag:superuser]}
+  - {check: [edit_resource, data_upload_file_summary, null], used_by: "Potion data_upload_file_summary update", allow: [tag:superuser]}
+  - {check: [delete_resource, data_upload_file_summary, null], used_by: "Potion data_upload_file_summary delete", allow: [tag:superuser]}
+  - {check: [view_resource, source_config, null], used_by: "Potion source_config list", allow: [tag:superuser]}
+  - {check: [create_resource, source_config, null], used_by: "Potion source_config create", allow: [tag:superuser]}
+  - {check: [edit_resource, source_config, null], used_by: "Potion source_config update", allow: [tag:superuser]}
+  - {check: [delete_resource, source_config, null], used_by: "Potion source_config delete", allow: [tag:superuser]}

@@ -6,31 +6,46 @@
 #   update -> edit_resource, delete -> delete_resource
 #
 # and each one passes on RoleNeed('admin'), on the sitewide
-# ItemNeed(<op>, None, <type>), or on the item's ItemNeed(<op>, item.<id>, <type>).
-# Lists are filtered to the ids the identity holds `view_resource` on.
+# ItemNeed(<op>, None, <type>), or on the item's ItemNeed(<op>, <id>, <type>).
+#
+# Reads never evaluate an item: list and item GETs filter the SQL query to the
+# ids the identity holds `view_resource` on (`identity_get_item_needs`), matched
+# against `list_filter_id`. Create, update and delete evaluate the item.
+#
+# `item_id` is an id the fixture principals hold needs on for that type
+# (principals.yaml); the stand-in item carries it in its id attribute and a
+# different value in every other id column.
 #
 # The query resources (query, query/granularities, query/dimension_values) need
-# the app's Druid metadata to register, so they are covered by tests/authz/http.
+# the app's Druid metadata to register and are not covered here.
 
 methods: {read: view_resource, create: create_resource, update: edit_resource, delete: delete_resource}
 
 principal_resources:
   UserAclResource: {type: user_acl, id: id}
-  UserResource: {type: user, id: id}                       # Meta {read: yes} has no effect
+  UserResource: {type: user, id: id, item_id: 42}          # Meta {read: yes} has no effect (P2)
   GroupAclResource: {type: group_acl, id: id}
-  GroupResource: {type: group, id: id}
+  GroupResource: {type: group, id: id, item_id: 5}
   BackendTypeResource: {type: resource-type, id: id}
   BackendResource: {type: resource, id: id}
   BackendResourceRole: {type: resource_role, id: id}
-  RoleResource: {type: role, id: id}
-  ConfigurationResource: {type: configuration, id: key}    # Meta {read: yes} has no effect
-  DashboardResource: {type: dashboard, id: resource_id}
-  AlertDefinitionResource: {type: alert_definitions, id: authorization_resource_id}
+  RoleResource: {type: role, id: id, item_id: 3}
+  ConfigurationResource: {type: configuration, id: key}    # Meta {read: yes} has no effect (P2)
+  DashboardResource: {type: dashboard, id: resource_id, item_id: 7}
+  AlertDefinitionResource: {type: alert_definitions, id: authorization_resource_id, item_id: 11}
   AlertNotificationResource:
     type: alert_notifications
     id: id
-    # read is checked on the parent alert definition
-    read_via: {attribute: alert_definition, type: alert_definitions, id: authorization_resource_id}
+    # Read is checked on the parent alert definition. The list filter joins on
+    # the parent's authorization_resource_id (correct). The item-level check
+    # (HybridRelationshipNeed.__call__) reads the parent's own primary key
+    # instead; no HTTP path calls it today (finding "Alert read_via").
+    read_via:
+      attribute: alert_definition
+      type: alert_definitions
+      item_id: 11
+      list_filter_id: authorization_resource_id
+      item_check_id: id
   QueryPolicyResource: {type: query_policy, id: id}
   PipelineRunMetadataResource: {type: pipeline_run_metadata, id: id}
   DataUploadFileSummaryResource: {type: data_upload_file_summary, id: id}
@@ -38,7 +53,7 @@ principal_resources:
   APITokenResource: {type: api-token, id: id}
 
 # No item-level permission at all: signing in (or public access with a Referer
-# header) is the only gate, plus whatever checks each custom route makes.
+# header) is the only gate, plus whatever checks each custom route makes (P1).
 unprotected_resources:
   - ShareAnalysisResource
   - MetadataResource

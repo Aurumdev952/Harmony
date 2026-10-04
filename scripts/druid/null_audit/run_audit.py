@@ -39,6 +39,7 @@ import requests
 sys.path.insert(0, str(Path(__file__).resolve().parents[3]))
 
 # pylint: disable=wrong-import-position
+from scripts.druid.null_audit.legacy_js import WHO_EPI_WEEK_EXTRACTION_FORMULA
 from tests.druid.epi_week import epi_week_of_year_extraction, js_epi_week_of_year
 from tests.golden.harness import (
     DEPLOYMENT,
@@ -361,9 +362,6 @@ def _index_parity_days(base: str, days: List[date]) -> None:
 
 
 def parity(port: int, with_js: bool) -> int:
-    # pylint: disable=import-outside-toplevel
-    from db.druid.js_formulas.week_extraction import WHO_EPI_WEEK_EXTRACTION_FORMULA
-
     days = _parity_days()
     _index_parity_days(_router(port), days)
     dimensions = [

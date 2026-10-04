@@ -1,6 +1,6 @@
 '''The native replacement for the `epi_week_of_year` JavaScript extraction.
 
-`WHO_EPI_WEEK_EXTRACTION_FORMULA` (db/druid/js_formulas/week_extraction.py) maps
+`WHO_EPI_WEEK_EXTRACTION_FORMULA` (scripts/druid/null_audit/legacy_js.py) maps
 a timestamp to `2999-12-30T00:00:00.000Z` plus seven days per epi week, where the
 epi year starts on the Monday of the week holding 4 January (the ISO week year
 start). It counts from the calendar year's start, except that 29 to 31 December

@@ -212,7 +212,6 @@ ignore = ["S603", "S607"]
 [tool.ruff.lint.per-file-ignores]
 # Undefined names that are real bugs, left to their owners (WP-2f Requests).
 "scripts/druid/druid_task_memory_stats.py" = ["F821"]
-"util/unix.py" = ["F821"]
 # Tests assert, and draw synthetic data from `random`.
 "tests/**" = ["S101", "S311"]
 

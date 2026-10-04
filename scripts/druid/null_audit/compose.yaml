@@ -1,0 +1,99 @@
+# Throwaway Druid for the WP-8a null-handling audit. Never a deployment: one
+# loopback port (the router), throwaway volumes, a random metadata password.
+#   AUDIT_MODE=legacy|sqlnull|druid38  selects modes/<mode>.env
+#   DRUID_IMAGE                        apache/druid image (0.23.0 by default)
+#   AUDIT_PORT                         host port for the router, bound to 127.0.0.1
+#   AUDIT_DATA                         host directory holding the rows to index
+#   AUDIT_PG_PASSWORD                  throwaway metadata password
+# run_audit.py drives it with one compose project per mode.
+name: wp8a-null-audit
+
+x-druid: &druid
+  image: ${DRUID_IMAGE:-apache/druid:0.23.0@sha256:ed9719968b4be3a2f1643907a1a5a5814e2ee1215f3604da8b2da2ac05f65912}
+  env_file:
+    - modes/common.env
+    - modes/${AUDIT_MODE:?set AUDIT_MODE}.env
+  environment:
+    AUDIT_PG_PASSWORD: ${AUDIT_PG_PASSWORD:?set AUDIT_PG_PASSWORD}
+  volumes:
+    - zen_extensions:/opt/zen-extensions:ro
+    - deep_storage:/druid-deep
+  depends_on:
+    extensions:
+      condition: service_completed_successfully
+    zookeeper:
+      condition: service_started
+    postgres:
+      condition: service_healthy
+
+services:
+  extensions:
+    image: alpine:3.22.2
+    volumes:
+      - zen_extensions:/ext
+      - deep_storage:/druid-deep
+    entrypoint:
+      - /bin/sh
+      - -euc
+      - |
+        chown 1000:1000 /druid-deep
+        mkdir -p /ext/druid-aggregatable-first-last
+        cd /ext/druid-aggregatable-first-last
+        if ! echo "$$SHA256  first-last.jar" | sha256sum -c -s 2>/dev/null; then
+          wget -q -O first-last.jar "$$URL"
+          echo "$$SHA256  first-last.jar" | sha256sum -c
+        fi
+    environment:
+      URL: https://github.com/Zenysis/druid-aggregatable-first-last/raw/c69abb35cc911eb4adb0276787ff462bd6df81e2/dist/druid-aggregatable-first-last-0.23.0.jar
+      SHA256: cfc5910193b63e87c6455a761eaf6513deb57d0ffc267244f41e9298dd21545a
+
+  zookeeper:
+    image: zookeeper:3.8.4
+    environment:
+      ZOO_MY_ID: "1"
+
+  postgres:
+    image: postgres:17.11-bookworm
+    environment:
+      POSTGRES_USER: druid
+      POSTGRES_DB: druid
+      POSTGRES_PASSWORD: ${AUDIT_PG_PASSWORD:?set AUDIT_PG_PASSWORD}
+    # Fresh metadata on every start, so the password always matches.
+    tmpfs:
+      - /var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD", "pg_isready", "-U", "druid"]
+      interval: 2s
+      timeout: 3s
+      retries: 30
+      start_period: 5s
+
+  coordinator:
+    <<: *druid
+    command: [coordinator]
+
+  broker:
+    <<: *druid
+    command: [broker]
+
+  historical:
+    <<: *druid
+    command: [historical]
+
+  middlemanager:
+    <<: *druid
+    command: [middleManager]
+    volumes:
+      - zen_extensions:/opt/zen-extensions:ro
+      - deep_storage:/druid-deep
+      - ${AUDIT_DATA:?set AUDIT_DATA}:/audit-data:ro
+
+  router:
+    <<: *druid
+    command: [router]
+    ports:
+      - "127.0.0.1:${AUDIT_PORT:?set AUDIT_PORT}:8888"
+
+volumes:
+  zen_extensions: {}
+  deep_storage: {}

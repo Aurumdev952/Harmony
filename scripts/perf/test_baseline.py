@@ -204,3 +204,45 @@ def test_samples_round_trip_through_jsonl(tmp_path: Path):
     baseline.write_results(tmp_path / 'run', samples, meta)
     assert baseline.read_samples(tmp_path / 'run.jsonl') == samples
     assert '| b | map |' in (tmp_path / 'run.md').read_text()
+
+
+def test_summarise_dashboard_uses_the_query_percentiles_and_median_bytes():
+    record = {
+        'case_id': 'perf-mixed-6',
+        'tiles': 6,
+        'latencies_ms': [700.0, 900.0, 800.0],
+        'bytes': [1859300, 1856230, 1859302],
+        'query_requests': [6, 6, 6],
+    }
+    assert baseline.summarise_dashboard(record) == PerfSample(
+        'perf-mixed-6', 'dashboard', 800.0, 890.0, 1859300, None, 3, 700.0, 900.0, None
+    )
+
+
+def test_summarise_dashboard_refuses_a_load_that_skipped_tile_queries():
+    record = {
+        'case_id': 'd',
+        'tiles': 2,
+        'latencies_ms': [1.0, 2.0],
+        'bytes': [5, 5],
+        'query_requests': [2, 1],
+    }
+    with pytest.raises(RuntimeError, match='query requests'):
+        baseline.summarise_dashboard(record)
+
+
+def test_split_cases_routes_dashboard_slugs_to_the_browser_run():
+    slugs = baseline.dashboard_slugs()
+    assert baseline.split_cases(None) == (list(baseline.CASES), slugs)
+    assert baseline.split_cases(['calc_formula', slugs[0]]) == (
+        ['calc_formula'],
+        [slugs[0]],
+    )
+
+
+def test_every_reference_dashboard_tile_is_a_query_tile():
+    specs = json.loads(baseline.DASHBOARD_SPECS.read_text())
+    assert len(specs) == 3
+    for slug, spec in specs.items():
+        assert spec['items'], slug
+        assert all(h['item']['type'] == 'QUERY_ITEM' for h in spec['items']), slug

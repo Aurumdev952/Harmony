@@ -9,6 +9,11 @@ bytes and Druid-side query time:
     uv run --no-project --with requests python scripts/perf/baseline.py --compare
     uv run --no-project python scripts/perf/baseline.py compare BASE.jsonl NEW.jsonl
 
+After the query cases it runs dashboards.mjs (unless --no-dashboards), which
+loads the reference dashboards of dashboards.json in headless Chromium and
+records time to last tile and bytes transferred; those rows have endpoint
+`dashboard`, and their p95 is held to the same limit.
+
 A run writes three files under docs/modernisation/perf/, named
 <date>-<git sha>[-<label>]: `.jsonl` (one PerfSample per case), `.meta.json`
 (hardware, versions, dataset, method) and `.md` (both, as tables).
@@ -44,7 +49,10 @@ from collections.abc import Iterable, Iterator
 from pathlib import Path
 from typing import Any
 
-REPO_ROOT = Path(__file__).resolve().parents[2]
+HERE = Path(__file__).resolve().parent
+REPO_ROOT = HERE.parents[1]
+DASHBOARD_SCRIPT = HERE / 'dashboards.mjs'
+DASHBOARD_SPECS = HERE / 'dashboards.json'
 GOLDEN_CASES = REPO_ROOT / 'tests/golden/cases'
 RESULTS_DIR = REPO_ROOT / 'docs/modernisation/perf'
 DATASET_START = '2023-01-01'
@@ -158,6 +166,42 @@ def summarise(
         max_ms=round(max(latencies_ms), 1),
         druid_queries=max(count for _, count in druid) if druid else None,
     )
+
+
+def summarise_dashboard(record: dict[str, Any]) -> PerfSample:
+    """Summarise one dashboards.mjs line. Bytes are the median: a load counts
+    what arrived before its last tile rendered, which can include a font or
+    not."""
+    case_id = record['case_id']
+    if len(set(record['query_requests'])) > 1:
+        raise RuntimeError(
+            f'{case_id}: query requests changed between loads: {record["query_requests"]}'
+        )
+    latencies = record['latencies_ms']
+    return PerfSample(
+        case_id=case_id,
+        endpoint='dashboard',
+        p50_ms=round(percentile(latencies, 0.5), 1),
+        p95_ms=round(percentile(latencies, 0.95), 1),
+        bytes=int(statistics.median(record['bytes'])),
+        druid_ms=None,
+        n=len(latencies),
+        min_ms=round(min(latencies), 1),
+        max_ms=round(max(latencies), 1),
+        druid_queries=None,
+    )
+
+
+def dashboard_slugs() -> list[str]:
+    return list(json.loads(DASHBOARD_SPECS.read_text()))
+
+
+def split_cases(names: list[str] | None) -> tuple[list[str], list[str]]:
+    """Split --case names into query cases and dashboard slugs (all of both by default)."""
+    slugs = dashboard_slugs()
+    if not names:
+        return list(CASES), slugs
+    return [n for n in names if n not in slugs], [n for n in names if n in slugs]
 
 
 def druid_times(lines: Iterable[str]) -> Iterator[float]:
@@ -352,6 +396,26 @@ def http_json(url: str) -> Any:
     return requests.get(url, timeout=30).json()
 
 
+def measure_dashboards(slugs: list[str], rounds: int, warmup: int) -> list[PerfSample]:
+    command = [
+        'node',
+        str(DASHBOARD_SCRIPT),
+        '--rounds',
+        str(rounds),
+        '--warmup',
+        str(warmup),
+    ]
+    for slug in slugs:
+        command += ['--dashboard', slug]
+    # stderr (progress) passes through; stdout is one JSON line per dashboard.
+    output = subprocess.run(
+        command, stdout=subprocess.PIPE, text=True, check=True
+    ).stdout
+    return [
+        summarise_dashboard(json.loads(line)) for line in output.splitlines() if line
+    ]
+
+
 def environment(rounds: int, warmup: int) -> dict[str, Any]:
     cpu = next(
         (
@@ -434,6 +498,14 @@ def markdown(title: str, samples: list[PerfSample], meta: dict[str, Any]) -> str
     if overrides:
         spans = ', '.join(f'{name} {span}' for name, span in overrides.items())
         lines.append(f'- Narrower intervals: {spans}')
+    dashboards = method.get('dashboards')
+    if dashboards:
+        lines.append(
+            f'- Dashboards (endpoint `dashboard`, time to last tile): '
+            f'{dashboards["rounds"]} loads after {dashboards["warmup_rounds"]} warm-up, '
+            f'{dashboards["view"]}; ends at the {dashboards["end"]}; bytes are the '
+            f'{dashboards["bytes"]}'
+        )
     if 'dataset' in meta:
         lines.append(f'- Dataset: {meta["dataset"]}')
     lines += [
@@ -458,7 +530,18 @@ def run(args: argparse.Namespace) -> int:
     meta = environment(args.rounds, args.warmup)
     if args.dataset:
         meta['dataset'] = args.dataset
-    names = args.case or CASES
+    names, slugs = split_cases(args.case)
+    if args.no_dashboards:
+        slugs = []
+    else:
+        meta['method']['dashboards'] = {
+            'rounds': args.dashboard_rounds,
+            'warmup_rounds': args.dashboard_warmup,
+            'view': '?screenshot=1 at 1440x900, fresh browser context per load, '
+            'requests leaving the stack aborted',
+            'end': 'first frame with every query tile rendered',
+            'bytes': 'median of headers plus encoded bodies received before the last tile',
+        }
     samples = []
     for name in names:
         sample = measure_case(
@@ -467,6 +550,15 @@ def run(args: argparse.Namespace) -> int:
         print(
             f'{name:40} p50 {sample.p50_ms:8.1f}  p95 {sample.p95_ms:8.1f} ms  '
             f'{sample.bytes:>9} B  druid {sample.druid_ms} ms',
+            flush=True,
+        )
+        samples.append(sample)
+    for sample in measure_dashboards(
+        slugs, args.dashboard_rounds, args.dashboard_warmup
+    ):
+        print(
+            f'{sample.case_id:40} p50 {sample.p50_ms:8.1f}  p95 {sample.p95_ms:8.1f} ms  '
+            f'{sample.bytes:>9} B  (time to last tile)',
             flush=True,
         )
         samples.append(sample)
@@ -497,7 +589,16 @@ def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description=__doc__.split('\n')[0])
     parser.add_argument('--rounds', type=int, default=30)
     parser.add_argument('--warmup', type=int, default=3)
-    parser.add_argument('--case', action='append', help='run only these cases')
+    parser.add_argument(
+        '--case',
+        action='append',
+        help='run only these cases (query case or dashboard slug)',
+    )
+    parser.add_argument(
+        '--no-dashboards', action='store_true', help='skip dashboards.mjs'
+    )
+    parser.add_argument('--dashboard-rounds', type=int, default=10)
+    parser.add_argument('--dashboard-warmup', type=int, default=2)
     parser.add_argument('--label', default='', help='suffix for the output file names')
     parser.add_argument('--out', type=Path, default=RESULTS_DIR)
     parser.add_argument(

@@ -5,6 +5,7 @@
 #   scripts/perf/stack.sh dataset   # generate the CSV, run process_csv and fill_dimension_data
 #   scripts/perf/stack.sh up        # build web, start Druid, index the dataset if Druid has none, start web
 #   scripts/perf/stack.sh index [--force]   # re-index, register the datasource with web, restart web
+#   scripts/perf/stack.sh ui        # build the production client and serve it on PERF_UI_PORT
 #   scripts/perf/stack.sh down      # stop everything, delete volumes, scratch and secrets
 #   scripts/perf/stack.sh env       # what baseline.py and dashboards.mjs read
 #   scripts/perf/stack.sh logs druid|web [service]
@@ -12,7 +13,7 @@
 #
 # Concurrent stacks need their own PERF_PROJECT and ports:
 #   PERF_PROJECT          default harmony-wp1a-perf (Compose projects <name>-druid, <name>-web)
-#   PERF_WEB_PORT         default 58700
+#   PERF_WEB_PORT         default 58700, PERF_UI_PORT 58701 (nginx in front of web)
 #   PERF_COORDINATOR_PORT default 58981, PERF_BROKER_PORT 58982, PERF_ROUTER_PORT 58988
 #   PERF_SCRATCH          default ${TMPDIR:-/tmp}/<project>: dataset, pipeline output, broker request log
 # Every port is published on 127.0.0.1 only. Secrets are generated per stack into a
@@ -26,6 +27,7 @@ HERE="$(cd "$(dirname "$0")" && pwd -P)"
 ROOT="$(cd "${HERE}/../.." && pwd -P)"
 export PERF_PROJECT="${PERF_PROJECT:-harmony-wp1a-perf}"
 export PERF_WEB_PORT="${PERF_WEB_PORT:-58700}"
+export PERF_UI_PORT="${PERF_UI_PORT:-58701}"
 export PERF_COORDINATOR_PORT="${PERF_COORDINATOR_PORT:-58981}"
 export PERF_BROKER_PORT="${PERF_BROKER_PORT:-58982}"
 export PERF_ROUTER_PORT="${PERF_ROUTER_PORT:-58988}"
@@ -174,6 +176,10 @@ web_answers() {
   curl -fsS -o /dev/null "http://127.0.0.1:${PERF_WEB_PORT}/login"
 }
 
+ui_answers() {
+  curl -fsS -o /dev/null "http://127.0.0.1:${PERF_UI_PORT}/build/dashboardBuilder.bundle.js"
+}
+
 apply_hasura_metadata() {
   for _ in $(seq 1 60); do
     if web_compose exec -T web python -c "import requests; requests.get('http://hasura:8080/healthz', timeout=2).raise_for_status()" 2>/dev/null; then
@@ -272,9 +278,38 @@ index() {
   wait_for "web is up at http://127.0.0.1:${PERF_WEB_PORT}" 120 web_answers
 }
 
+# The production client (`yarn build`, as WP-0e's checks build it on the host's
+# Node 24), staged for ui.nginx.conf: web/public/build/min as /build/min/, plus
+# every sourcemap.json name (`bundle.css`, `navbar.bundle.js`) at /build/<name>,
+# where the non-production templates ask for it.
+client() {
+  ( cd "${ROOT}"
+    NODE_OPTIONS=--dns-result-order=ipv4first yarn install --frozen-lockfile --ignore-scripts
+    yarn build )
+  local staged="${PERF_SCRATCH}/client"
+  rm -rf "${staged}"
+  mkdir -p "${staged}"
+  cp -a "${ROOT}/web/public/build/min" "${staged}/min"
+  uv run --no-project python - "${staged}" <<'PY'
+import json, os, sys
+staged = sys.argv[1]
+for name, path in json.load(open(os.path.join(staged, 'min', 'sourcemap.json'))).items():
+    if path.startswith('/build/min/') and '/' not in name:
+        os.symlink(os.path.join('min', path[len('/build/min/'):]), os.path.join(staged, name))
+PY
+}
+
+ui() {
+  load_secrets
+  use_built_image
+  client
+  web_compose --profile ui up -d ui
+  wait_for "the client is served at http://127.0.0.1:${PERF_UI_PORT}" 24 ui_answers
+}
+
 down() {
   placeholder_env
-  web_compose --profile index down --volumes --remove-orphans
+  web_compose --profile index --profile ui down --volumes --remove-orphans
   druid_compose --profile init down --volumes --remove-orphans
   rm -rf "${PERF_SCRATCH}"
   rm -f "${SECRETS}"
@@ -284,9 +319,11 @@ case "${1:-}" in
   dataset) dataset "${@:2}" ;;
   up) up ;;
   index) index "${@:2}" ;;
+  ui) ui ;;
   down) down ;;
   env)
     echo "export PERF_BASE_URL=http://127.0.0.1:${PERF_WEB_PORT}"
+    echo "export PERF_UI_URL=http://127.0.0.1:${PERF_UI_PORT}"
     echo "export PERF_USERNAME=${PERF_USERNAME}"
     echo "export PERF_CREDENTIALS_FILE=${SECRETS}"
     echo "export PERF_REQUEST_LOG_DIR=${PERF_REQUEST_LOG_DIR}"
@@ -297,7 +334,7 @@ case "${1:-}" in
     placeholder_env
     case "${2:-}" in
       druid) druid_compose --profile init config ;;
-      web) web_compose --profile index config ;;
+      web) web_compose --profile index --profile ui config ;;
       *) echo "usage: $0 config druid|web" >&2; exit 2 ;;
     esac
     ;;
@@ -310,7 +347,7 @@ case "${1:-}" in
     esac
     ;;
   *)
-    echo "usage: $0 dataset|up|index|down|env|config druid|web|logs druid|web [service]" >&2
+    echo "usage: $0 dataset|up|index|ui|down|env|config druid|web|logs druid|web [service]" >&2
     exit 2
     ;;
 esac

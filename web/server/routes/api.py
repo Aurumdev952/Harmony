@@ -52,6 +52,7 @@ from web.server.routes.views.validate_data_catalog import (
 )
 from web.server.security.permissions import ROOT_SITE_RESOURCE_ID
 from web.server.util.data_catalog import populate_fields, zip_data_catalog_metadata
+from web.server.util.hasura import build_hasura_headers
 from web.server.util.util import Success, is_session_persisted, unauthorized_error
 
 # Endpoints in this file should have minimal logic; serialization should happen elsewhere.
@@ -171,7 +172,17 @@ class ApiRouter:
             if not query.startswith('query patchDimensionServiceQuery'):
                 return Response('You are not authorized to perform this query', 401)
 
-        resp = requests.post(hasura_relay_endpoint, json=data, timeout=120)
+        admin_secret = current_app.config.get('HASURA_ADMIN_SECRET')
+        if not admin_secret:
+            LOG.error('HASURA_ADMIN_SECRET is not set; refusing to proxy to Hasura')
+            return Response('GraphQL endpoint is not configured', 503)
+
+        resp = requests.post(
+            hasura_relay_endpoint,
+            json=data,
+            headers=build_hasura_headers(current_user, admin_secret),
+            timeout=120,
+        )
         return Response(resp.content, resp.status_code)
 
     def proxy_hasura_health(self):

@@ -108,8 +108,8 @@ ALLOWLIST = {
 
 # Uses that do leak past a policy today. Each must still be present: when one is
 # fixed this test fails, and the entry moves to ALLOWLIST or is deleted.
-_DATASOURCE_DATES = 'Datasource-wide data dates or source status, shown to every '
-_DATASOURCE_DATES += 'user whatever their policy (SEC-4 open item 2).'
+_DATASOURCE_DATES = 'Datasource-wide data dates or source status, shown regardless '
+_DATASOURCE_DATES += "of the viewer's policy (SEC-4 open item 2)."
 KNOWN_VIOLATIONS = {
     (
         'web/server/routes/views/data_upload_summary.py',

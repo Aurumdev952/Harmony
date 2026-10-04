@@ -49,14 +49,14 @@ FRONTEND_GROUP_SCHEMA = fields.Object(
 )
 
 
-def build_group(group_obj):
+def build_group(group_obj, existing_roles=()):
     '''The group model fields from a `FRONTEND_GROUP_SCHEMA` body. Users are left
     out because `self.manager.update` cannot hash a users list; the routes set
     them separately.
     '''
     return {
         'name': group_obj.get('name'),
-        'roles': held_roles_from_uris(group_obj.get('roles')),
+        'roles': held_roles_from_uris(group_obj.get('roles'), existing=existing_roles),
     }
 
 
@@ -144,7 +144,7 @@ class GroupResource(PrincipalResource):
             )
             # We update users separately because self.manager.update cannot
             # hash users list.
-            updated_group = self.manager.update(group, build_group(obj))
+            updated_group = self.manager.update(group, build_group(obj, group.roles))
             update_group_users(updated_group, obj.get('users', []))
             replace_group_acls(updated_group, acl_grants)
             return None, OK

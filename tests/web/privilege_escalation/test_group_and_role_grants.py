@@ -13,7 +13,7 @@ import pytest
 from models.alchemy.permission import Resource, ResourceRole, ResourceTypeEnum, Role
 from models.alchemy.query_policy import QueryPolicy
 from models.alchemy.security_group import Group, GroupAcl
-from models.alchemy.user import User
+from models.alchemy.user import User, UserAcl
 
 
 @pytest.fixture(name='db')
@@ -160,6 +160,7 @@ def test_group_admin_cannot_create_a_group_holding_the_admin_role(db, make_user)
     assert response.status_code == 403
     assert _group(db, name) is None
     assert _roles_of(db, actor) == {'group_admin'}
+    assert "['admin']" not in response.get_data(as_text=True)
 
 
 def test_a_refused_grant_is_audited_with_the_caller(db, make_user, caplog):
@@ -212,8 +213,9 @@ def test_a_role_uri_naming_no_role_is_still_skipped(db, make_user):
     assert _group(db, name).roles == []
 
 
-def test_a_malformed_role_uri_is_a_bad_request(db, make_user):
-    actor = make_user(['group_admin'])
+@pytest.mark.parametrize('caller', ['group_admin', 'admin'])
+def test_a_malformed_role_uri_is_a_bad_request(db, make_user, caller):
+    actor = make_user([caller])
     name = _name('group')
 
     response = actor.request(
@@ -402,8 +404,11 @@ def test_group_moderator_cannot_grant_its_group_admin_of_a_dashboard_it_cannot_s
     assert _group(db, group_name).acls == []
 
 
-def test_a_group_acl_without_a_resource_is_a_bad_request(db, make_user):
-    actor = make_user(['group_moderator', 'dashboard_admin'])
+@pytest.mark.parametrize(
+    'caller', [['group_moderator', 'dashboard_admin'], ['admin']], ids=str
+)
+def test_a_group_acl_without_a_resource_is_a_bad_request(db, make_user, caller):
+    actor = make_user(caller)
     group = _make_group(db, users=[actor])
     group_id, group_name = group.id, group.name
     acl = _acl('dashboard_admin', _make_dashboard(db))
@@ -458,8 +463,9 @@ def test_clearing_a_groups_roles_keeps_the_roles(db, make_user):
     assert _group(db, group_name).roles == []
 
 
-def test_clearing_a_users_roles_keeps_the_roles(db, make_user):
-    actor = make_user(['user_admin'])
+@pytest.mark.parametrize('caller', ['user_admin', 'admin'])
+def test_clearing_a_users_roles_keeps_the_roles(db, make_user, caller):
+    actor = make_user([caller])
     held = Role(name=_name('held'), label='held')
     db.session.add(held)
     db.session.commit()
@@ -509,15 +515,20 @@ def test_role_administrator_cannot_create_a_role_reading_data_it_cannot_read(
 ):
     actor = make_user(['role_administrator'])
     label = _name('role')
+    policy = _policy(db, 'source', None)
 
     response = actor.request(
         'POST',
         '/api2/role',
-        _role_body(label, query_policies=[_policy(db, 'source', None)]),
+        _role_body(label, query_policies=[policy]),
     )
 
     assert response.status_code == 403
     assert _role_by_label(db, label) is None
+    # The caller cannot read the policy, so the body names it by URI only.
+    body = response.get_data(as_text=True)
+    assert f'/api2/query_policy/{policy.id}' in body
+    assert 'source' not in body
 
 
 def test_role_administrator_cannot_create_a_role_exporting_data(db, make_user):
@@ -750,3 +761,240 @@ def test_role_moderator_confers_only_roles_it_holds(db, make_user):
     assert [response.status_code for response in responses] == [404, 200]
     assert _roles_of(db, actor) == {'role_moderator', _role(db, held_id).name}
     assert _roles_of(db, other) == {_role(db, held_id).name}
+
+
+# F1 (decision 0004): PATCH /api2/user/<id> by a holder of manager and user_admin.
+
+_USER_EDITOR = ['manager', 'user_admin']
+
+
+def _user_body(db, user_id: int, roles=(), groups=(), acls=()) -> dict:
+    db.session.expire_all()
+    user = db.session.query(User).get(user_id)
+    return {
+        '$uri': f'/api2/user/{user_id}',
+        'username': user.username,
+        'firstName': user.first_name,
+        'lastName': 'Renamed',
+        'phoneNumber': '',
+        'status': 'active',
+        'acls': list(acls),
+        'apiTokens': [],
+        'roles': list(roles),
+        'groups': [f'/api2/group/{group_id}' for group_id in groups],
+    }
+
+
+def _acls_of(db, user_id: int) -> list:
+    db.session.expire_all()
+    return [
+        (acl.resource_role.name, acl.resource_id)
+        for acl in db.session.query(User).get(user_id).acls
+    ]
+
+
+@pytest.mark.parametrize('self_target', [False, True], ids=['another_user', 'itself'])
+def test_user_editor_cannot_make_a_user_admin(db, make_user, self_target):
+    actor = make_user(_USER_EDITOR)
+    target = actor if self_target else make_user()
+    before = _roles_of(db, target)
+
+    response = actor.request(
+        'PATCH',
+        f'/api2/user/{target.id}',
+        _user_body(db, target.id, roles=[_role_uri(db, 'admin')]),
+    )
+
+    assert response.status_code == 403
+    assert _roles_of(db, target) == before
+    assert db.session.query(User).get(target.id).last_name != 'Renamed'
+
+
+def test_user_editor_cannot_add_a_user_to_a_group_holding_admin(db, make_user):
+    actor = make_user(_USER_EDITOR)
+    target = make_user()
+    group_id = _make_group(db, roles=['admin']).id
+
+    response = actor.request(
+        'PATCH', f'/api2/user/{target.id}', _user_body(db, target.id, groups=[group_id])
+    )
+
+    assert response.status_code == 403
+    assert _roles_of(db, target) == set()
+
+
+def test_user_editor_cannot_add_a_user_to_a_group_sharing_a_dashboard_it_cannot_share(
+    db, make_user
+):
+    actor = make_user(_USER_EDITOR)
+    target = make_user()
+    dashboard_admin = (
+        db.session.query(ResourceRole).filter_by(name='dashboard_admin').one()
+    )
+    group_id = _make_group(db, acls=[(dashboard_admin, _make_dashboard(db))]).id
+
+    response = actor.request(
+        'PATCH', f'/api2/user/{target.id}', _user_body(db, target.id, groups=[group_id])
+    )
+
+    assert response.status_code == 403
+    db.session.expire_all()
+    assert db.session.query(User).get(target.id).groups == []
+
+
+def test_user_editor_cannot_grant_a_user_admin_of_a_dashboard_it_cannot_share(
+    db, make_user
+):
+    actor = make_user(_USER_EDITOR)
+    target = make_user()
+    dashboard = _make_dashboard(db)
+
+    response = actor.request(
+        'PATCH',
+        f'/api2/user/{target.id}',
+        _user_body(db, target.id, acls=[_acl('dashboard_admin', dashboard)]),
+    )
+
+    assert response.status_code == 403
+    assert _acls_of(db, target.id) == []
+
+
+def test_user_editor_renames_a_user_keeping_grants_it_could_not_make(db, make_user):
+    actor = make_user(_USER_EDITOR)
+    target = make_user(['all_sources_reader'])
+    dashboard = _make_dashboard(db)
+    dashboard_id = dashboard.id
+    viewer = db.session.query(ResourceRole).filter_by(name='dashboard_viewer').one()
+    db.session.add(
+        UserAcl(user_id=target.id, resource_role_id=viewer.id, resource_id=dashboard_id)
+    )
+    db.session.commit()
+    group_id = _make_group(db, roles=['dashboard_admin'], users=[target]).id
+
+    response = actor.request(
+        'PATCH',
+        f'/api2/user/{target.id}',
+        _user_body(
+            db,
+            target.id,
+            roles=[_role_uri(db, 'all_sources_reader')],
+            groups=[group_id],
+            acls=[_acl('dashboard_viewer', dashboard)],
+        ),
+    )
+
+    assert response.status_code == 200
+    db.session.expire_all()
+    renamed = db.session.query(User).get(target.id)
+    assert renamed.last_name == 'Renamed'
+    assert [role.name for role in renamed.roles] == ['all_sources_reader']
+    assert [group.id for group in renamed.groups] == [group_id]
+    assert _acls_of(db, target.id) == [('dashboard_viewer', dashboard_id)]
+
+
+@pytest.mark.parametrize('role_name', ['all_sources_reader', 'exporter'])
+def test_user_editor_cannot_grant_itself_data_access(db, make_user, role_name):
+    actor = make_user(_USER_EDITOR)
+
+    response = actor.request(
+        'PATCH',
+        f'/api2/user/{actor.id}',
+        _user_body(
+            db,
+            actor.id,
+            roles=[_role_uri(db, name) for name in [*_USER_EDITOR, role_name]],
+        ),
+    )
+
+    assert response.status_code == 403
+    assert _roles_of(db, actor) == set(_USER_EDITOR)
+
+
+def test_user_editor_grants_roles_it_holds_and_groups_it_belongs_to(db, make_user):
+    actor = make_user([*_USER_EDITOR, 'all_sources_reader'])
+    target = make_user()
+    group_id = _make_group(db, roles=['all_sources_reader'], users=[actor]).id
+
+    response = actor.request(
+        'PATCH',
+        f'/api2/user/{target.id}',
+        _user_body(db, target.id, roles=[_role_uri(db, 'manager')], groups=[group_id]),
+    )
+
+    assert response.status_code == 200
+    assert _roles_of(db, target) == {'manager', 'all_sources_reader'}
+
+
+def test_admin_makes_a_user_admin(db, make_user):
+    admin = make_user(['admin'])
+    target = make_user()
+
+    response = admin.request(
+        'PATCH',
+        f'/api2/user/{target.id}',
+        _user_body(db, target.id, roles=[_role_uri(db, 'admin')]),
+    )
+
+    assert response.status_code == 200
+    assert _roles_of(db, target) == {'admin'}
+
+
+def test_user_editor_removes_grants_it_does_not_hold(db, make_user):
+    actor = make_user(_USER_EDITOR)
+    target = make_user(['all_sources_reader'])
+    _make_group(db, roles=['admin'], users=[target])
+
+    response = actor.request(
+        'PATCH', f'/api2/user/{target.id}', _user_body(db, target.id)
+    )
+
+    assert response.status_code == 200
+    assert _roles_of(db, target) == set()
+
+
+def test_a_user_edit_without_edit_resource_on_users_is_refused_before_grants(
+    db, make_user, caplog
+):
+    actor = make_user(['manager'])
+    target = make_user()
+    app_logger = logging.getLogger('ZenysisLogger')
+    app_logger.addHandler(caplog.handler)
+    try:
+        response = actor.request(
+            'PATCH',
+            f'/api2/user/{target.id}',
+            _user_body(db, target.id, roles=[_role_uri(db, 'admin')]),
+        )
+    finally:
+        app_logger.removeHandler(caplog.handler)
+
+    assert response.status_code == 403
+    assert _roles_of(db, target) == set()
+    assert not [r for r in caplog.records if 'Refused grant' in r.getMessage()]
+
+
+@pytest.mark.parametrize('field', ['roles', 'groups'])
+def test_admin_sending_a_malformed_user_uri_gets_a_bad_request(db, make_user, field):
+    admin = make_user(['admin'])
+    target = make_user()
+    body = _user_body(db, target.id)
+    body[field] = ['/api2/x/admin']
+
+    response = admin.request('PATCH', f'/api2/user/{target.id}', body)
+
+    assert response.status_code == 400
+    assert db.session.query(User).get(target.id).last_name != 'Renamed'
+
+
+def test_admin_sending_a_user_acl_without_a_resource_gets_a_bad_request(db, make_user):
+    admin = make_user(['admin'])
+    target = make_user()
+    acl = _acl('dashboard_admin', _make_dashboard(db))
+    acl['resource']['name'] = ''
+
+    response = admin.request(
+        'PATCH', f'/api2/user/{target.id}', _user_body(db, target.id, acls=[acl])
+    )
+
+    assert response.status_code == 400
+    assert _acls_of(db, target.id) == []

@@ -237,5 +237,5 @@ Every fixture was recorded from, and replays green against, the current code.
 | Role | Verdict | Notes |
 |---|---|---|
 | qa | approved | 2026-10-05 qa-2a-review at ebeeee6: all 9 round-1 findings fixed; 269 pass clean, 3 seeds, integration tip, 0 drift; mutants: policy disabled 31, Decimal decode 146, rounding 55, per-engine bypass 2-8 each (all 12), catalogue. Note: tests/infra needs 3.11+ (WP-2f gives it its own interpreter). |
-| reviewer | changes-requested | 2026-10-04 rev-2a: harness, determinism, normalisation and code-derived catalogue sound. Fix: policy case per route (10 of 13 missing) with catalogue enforcement; JWT query_needs built unlike production (use _compute_token_query_needs; drop all_values; re-record two cases); replace only the requests transport, not run_raw_query (decoder skipped); synth invents rows for unknown field ids (calc_formula_invalid); testpaths tests/golden until 2f; dead normalisation/broker branches; load_cases skips dirs without case.json; lint evidence. |
+| reviewer | approved | 2026-10-05 rev-2a re-review at ebeeee6: all eight findings closed; decoder mutant 146 fail; each of 13 routes fails when its policy is dropped; INV-2 notes cover every re-recorded fixture; other cases byte-identical; drift and seeds clean. Optional nits: unused Case.write; string sentinel in run_case. |
 | security | n/a | |

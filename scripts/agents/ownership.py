@@ -120,6 +120,11 @@ def cmd_who(paths: list[str]) -> int:
     return 0
 
 
+def default_base() -> str:
+    probe = subprocess.run(['git', 'rev-parse', '--verify', '-q', 'mig/integration'], capture_output=True)
+    return 'mig/integration' if probe.returncode == 0 else 'main'
+
+
 def cmd_check(role: str, base: str, head: str) -> int:
     root = repo_root(Path.cwd())
     out = subprocess.run(
@@ -173,14 +178,14 @@ def main() -> int:
     who.add_argument('paths', nargs='+')
     check = sub.add_parser('check')
     check.add_argument('--role', required=True)
-    check.add_argument('--base', default='main')
+    check.add_argument('--base', default=None, help='defaults to mig/integration when it exists, else main')
     check.add_argument('--head', default='HEAD')
     sub.add_parser('hook')
     args = parser.parse_args()
     if args.mode == 'who':
         return cmd_who(args.paths)
     if args.mode == 'check':
-        return cmd_check(args.role, args.base, args.head)
+        return cmd_check(args.role, args.base or default_base(), args.head)
     return cmd_hook()
 
 

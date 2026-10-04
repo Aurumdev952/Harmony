@@ -75,7 +75,7 @@ Each request is the exact change verified in unit 4. The combined diff was appli
   - Leave `/api/timeout` in place (see Phase-file corrections).
   - This WP does not touch `web/server/routes/api.py` (WP-0a and WP-0c).
 - [ ] **data-platform**: delete the Hadoop ingestion path as one change: `db/druid/indexing/resources/task_templates/`, `db/druid/indexing/resources/tuning_configs/on_prem.json` (the directory's only file), `db/druid/indexing/legacy_task_builder.py` and `db/druid/indexing/scripts/run_indexing.py`. `run_native_indexing.py` and `task_runner_util.py` do not depend on them.
-- [ ] **frontend-platform**: delete `web/client/util/graphql/zen_environment.js`. In `web/client/util/graphql/index.jsx`, delete the line `import zenEnvironment from 'util/graphql/zen_environment';` and the `zenEnvironment,` export entry. This can land in WP-0e.
+- [x] **frontend-platform** (done on `mig/WP-0d-dead-backend-code-frontend`): delete `web/client/util/graphql/zen_environment.js`. In `web/client/util/graphql/index.jsx`, delete the line `import zenEnvironment from 'util/graphql/zen_environment';` and the `zenEnvironment,` export entry. This can land in WP-0e.
 - [ ] **infra (found during verification; already broken on `main`, not caused by this WP)**: the `etl-pipeline` image does not build.
   - `docker/pipeline/Dockerfile:29-36` downloads the MinIO client from `https://dl.minio.io/client/mc/release/linux-*/mc`. That URL now returns `HTTP 410 Gone`, so the `downloader` stage fails with `wget` exit 8. This breaks INV-1 for the pipeline image.
   - Suggested fix: pin a versioned `mc` release URL with a SHA-256 check (SEC-9), or copy it from a pinned `minio/mc` image. WP-0b may be the natural home.
@@ -95,6 +95,7 @@ Each request is the exact change verified in unit 4. The combined diff was appli
 - 2026-10-04 core-2 unit 2: proved targets dead, found `/api/timeout` live; check: `/tmp/wp0d_dead.sh` transcript under Evidence.
 - 2026-10-04 core-2 unit 3: wrote per-owner requests; check: each names files, lines and scope.
 - 2026-10-04 core-2 unit 4: verified combined change in scratch copy; check: web-server base/trim build exit 0, sweep diff = deleted modules only, URL map diff = `/graphql` only (Potion 247/247); pipeline CPython install passes base and trim, trimmed sweep 0 removed-package errors; pipeline image itself broken on `main` (mc 410, PyPy maturin), reported to infra.
+- 2026-10-04 frontend-platform-2: deleted `web/client/util/graphql/zen_environment.js` and its `zenEnvironment` re-export in `index.jsx` (branch `mig/WP-0d-dead-backend-code-frontend`); check: grep for `zen_environment|zenEnvironment` over `web` (excluding build output and node_modules, including flow-typed), `.flowconfig`, `relay.config.js`, `graphql/` and `package.json` finds nothing; Node 24.12 `yarn install --frozen-lockfile --ignore-scripts` then `yarn build` exit 0 with the same two webpack size warnings as before; `flow check` output identical before and after (19 errors); eslint on `index.jsx` clean; `commons` bundle 412 bytes smaller and no longer contains `fetch('/graphql')`, other entries +1 byte (module ids).
 
 ## Evidence
 

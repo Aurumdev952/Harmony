@@ -11,6 +11,7 @@ from flask_potion import Api
 from flask_principal import Principal
 from werkzeug.serving import is_running_from_reloader
 from log import LOG
+from log.flask_request import install_request_logging
 
 from data.query.mock import generate_web_query_mock_data
 from models.alchemy.query import DruidDatasource
@@ -326,4 +327,6 @@ def create_app(
     app = _create_app_internal(
         flask_config, instance_config, skip_db_check, force_druid_db_update
     )
+    # Last, so the request id middleware wraps every other wsgi_app wrapper.
+    install_request_logging(app)
     return app

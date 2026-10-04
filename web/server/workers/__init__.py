@@ -1,9 +1,12 @@
+from typing import Any, Dict, Optional
+
 from celery import current_app, Celery
 from celery.signals import worker_process_init
 from flask import current_app as flask_app
 from sqlalchemy import create_engine
 
 import config as zen_config
+from log.celery_signals import connect_celery_logging
 from web.server.configuration.celery import CeleryConfig
 from web.server.configuration.instance import load_instance_configuration_from_file
 from util.credentials.provider import CredentialProvider
@@ -33,8 +36,10 @@ celery_app = Celery(__name__, include=config.TASKS_LIST)
 celery_app.config_from_object(config)
 
 
-def create_celery(instance_configuration=None):
+def create_celery(instance_configuration: Optional[Dict[str, Any]] = None) -> Celery:
     '''Create a new celery application instance'''
+    # Both the web process, which publishes tasks, and the worker call this.
+    connect_celery_logging()
     instance_configuration = (
         instance_configuration or load_instance_configuration_from_file()
     )

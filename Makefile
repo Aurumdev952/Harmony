@@ -68,9 +68,8 @@ minio-server-up: # Start the minio server container.
 minio-server-down: # Stop the minio server container.
 	DOCKER_HOST=$(DOCKER_HOST) docker compose --env-file $(ENV_FILE) -f docker-compose.minio.yaml down
 
-mypy: # Run mypy using `mypy --config-file mypy.ini`
-	source venv/bin/activate;
-	mypy --config-file mypy.ini;
+mypy: # Type-check with the [tool.mypy] settings in pyproject.toml.
+	uv run --locked mypy
 
 postgres-psql:
 	$(COMPOSE_COMMAND) exec postgres psql -h ${POSTGRES_HOST} -U ${POSTGRES_USER} ${POSTGRES_DB}

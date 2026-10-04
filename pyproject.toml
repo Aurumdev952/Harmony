@@ -197,6 +197,62 @@ select = ["E4", "E7", "E9", "F"]
 "scripts/druid/druid_task_memory_stats.py" = ["F821"]
 "util/unix.py" = ["F821"]
 
+[tool.mypy]
+files = ["web/server", "models", "db"]
+plugins = ["sqlmypy"]
+ignore_missing_imports = false
+show_error_codes = true
+namespace_packages = true
+explicit_package_bases = true
+# Always on under the mypy daemon, so on here too for the same results.
+local_partial_types = true
+
+[[tool.mypy.overrides]]
+module = ["models.python.dashboard.*", "web.server.migrations.*"]
+ignore_errors = true
+
+[[tool.mypy.overrides]]
+# config.* is loaded dynamically per deployment; the rest ship no type information.
+module = [
+    "config.*",
+    "flask_potion.*",
+    "flask_user.*",
+    "flask_principal.*",
+    "flask_login.*",
+    "flask_migrate.*",
+    "flask_sqlalchemy.*",
+    "flask_admin.*",
+    "flask_graphql.*",
+    "related.*",
+    "slugify.*",
+    "pydruid.*",
+    "alembic.*",
+    "pylib.*",
+    "past.*",
+    "future.*",
+    "hvac.*",
+    "toposort.*",
+    "stringcase.*",
+    "wtforms.*",
+    "celery.*",
+    "twilio.*",
+    "ethiopian_date.*",
+    "scipy.*",
+    "psycopg2.*",
+    "pandas.*",
+    "_pypyjson.*",
+    "factory.*",
+    "alchemy_mock.*",
+    "graphene.*",
+    "graphene_sqlalchemy.*",
+    "ijson.*",
+    "rapidjson.*",
+    "flask_jwt_extended.*",
+    "graphql_relay.*",
+    "boto3.*",
+]
+ignore_missing_imports = true
+
 [tool.pytest.ini_options]
 pythonpath = ["."]
 testpaths = ["tests"]

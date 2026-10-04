@@ -140,7 +140,7 @@ None.
   ```
 
   Also consider asserting `HASURA_GRAPHQL_ENABLED_APIS == 'graphql,metadata'` in that test. I verified the exact values on the CE image (Evidence 10): relay, `/v1/graphql` and metadata apply all work, and `/v1/config`, `/v2/query`, pg_dump, `/dev/*`, `/v1/metrics` and `/console` return 404. The parity replay passes with them. `start_hasura.sh` (dev, mine) already uses the CE digest.
-- [ ] frontend-platform: regenerate six Relay artifacts against the new `graphql/schema.graphql` (role `user`):
+- [ ] frontend-platform: regenerate six Relay artifacts against the new `graphql/schema.graphql` (role `user`): **Verified by frontend-platform-2 on `mig/WP-0a-lock-down-hasura-frontend`, not committed: the six artifacts are under `web/client/components/**`, which SPEC section 6 assigns to frontend-design. Moved to the frontend-design request below.**
   - `useBatchParentCategoryChangeMutation`
   - `CreateCalculationIndicatorViewMutation`
   - `UpdateCategoryActionMutation`
@@ -149,6 +149,7 @@ None.
   - `BatchPublishModalMutation`
   
   Only their Flow input-type declarations change: nested-insert paths into tables `user` cannot write are removed, and v2.45 adds aggregate filters. The operation text, AST, `cacheID` and runtime behaviour are identical (Evidence 11). Nothing breaks meanwhile: no CI step runs `relay-compiler`, and the build reads the committed artifacts. This does not block review.
+- [ ] frontend-design: in your own branch, run `./node_modules/.bin/relay-compiler` once (no `--watch`; Relay 10.1.0, schema from `relay.config.js`) after `yarn install --frozen-lockfile --ignore-scripts` on Node 24, and commit the result as `WP-0a: regenerate Relay artifacts against the user-role schema`. Expected output: `Updated:` exactly the six artifacts above, `Unchanged: 102 files`; diff stat 6 files, 654 insertions, 1914 deletions. frontend-platform-2 verified this output (log line below). The regeneration is deterministic, so no patch needs handing over. Does not block review.
 - [ ] human: accept the deliberate INV-3 change in the "Invariant impact" table. Signed-in users lose GraphQL access to 28 tables the UI never uses, and signed-out visitors lose the smuggled-operation path. Security asked for this acceptance to be recorded.
 - [ ] lead (for routing, outside this WP):
   - The base Compose file also publishes `web` on 5000 (SEC-1). WP-0b's list covers redis, worker and postgres only.
@@ -169,6 +170,7 @@ None.
   - Parity replay: 57 steps, 0 failures, 0 differences on both versions.
   - `test_compose_hasura.py`: 17 passed.
   - Relay compiler 10.1.0: validates every operation against the `user` schema.
+- 2026-10-04 frontend-platform-2: verified the Relay regeneration on `mig/WP-0a-lock-down-hasura-frontend` (from `c8dcfd6`) but did not commit it, because the artifacts are frontend-design paths; check: Node 24.12 `yarn install --frozen-lockfile --ignore-scripts` exit 0; `relay-compiler` 10.1.0 exit 0, `Updated:` exactly the six named artifacts, `Unchanged: 102 files`; diff stat 6 files, +654 -1914; in every file the last changed line is above `const node` (for example BatchPublishModalMutation: last change at line 543, `const node` at line 639), and no changed line contains `cacheID`, `text`, `kind`, `concreteType`, `selections` or `@relayHash`; the changes are Flow type declarations only: nested-insert input types for tables `user` cannot write (`dimension*`, `dataprep_job`, `*_dimension_mapping`, ...) are removed, `*_aggregate` filters and `*_select_column` enums are added, and update-column enums for tables `user` cannot update become `"_PLACEHOLDER"`; `flow check` output identical to before (19 errors); eslint on the six files (`--no-ignore`) exit 0. Files restored; frontend-design request added.
 
 ## Evidence
 

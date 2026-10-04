@@ -1,12 +1,13 @@
 ---
 wp: "0d"
 title: "Delete dead backend code and dependencies"
-status: building
+status: review
 owner_role: "core"
 instances:
   - name: "core-2"
     files:
       - docs/modernisation/work/WP-0d.md
+      - docs/modernisation/work/WP-0d-evidence/**
 branch: "mig/WP-0d-dead-backend-code"
 requirements: []
 contracts_consumed: []
@@ -48,6 +49,10 @@ No core-owned file (`config/`, `data/query/`, `db/` outside `db/druid/indexing/`
 - **The Hadoop templates cannot be deleted on their own.** `db/druid/indexing/legacy_task_builder.py:17-22,64-66` reads `task_templates/index_hadoop.json.tmpl` and `tuning_configs/on_prem.json` into class attributes at import time. Its only importer is `db/druid/indexing/scripts/run_indexing.py`, and nothing imports or runs that script. All four go together.
 - **`zen_environment.js` is deleted, not repointed.** Its only consumer is the re-export in `web/client/util/graphql/index.jsx`, and nothing imports `zenEnvironment`. Hasura already has its own environment (`util/graphql/environment.js`, which posts to `/api/graphql`).
 
+## Branch note
+
+At the lead's instruction on 2026-10-04, this branch merges `mig/decisions-0001-ownership` (merge commit `35e9d62`). The diff against `main` therefore includes that branch's `docs/modernisation/SPEC.md` and `docs/modernisation/decisions/0001-*.md` changes. They are not WP-0d edits, and they drop out once the decision branch lands on `main`. `task_gate.py` flags `SPEC.md` (owner: lead) for this reason only.
+
 ## Contract changes
 
 None.
@@ -74,6 +79,10 @@ Each request is the exact change verified in unit 4. The combined diff was appli
 - [ ] **infra (found during verification; already broken on `main`, not caused by this WP)**: the `etl-pipeline` image does not build.
   - `docker/pipeline/Dockerfile:29-36` downloads the MinIO client from `https://dl.minio.io/client/mc/release/linux-*/mc`. That URL now returns `HTTP 410 Gone`, so the `downloader` stage fails with `wget` exit 8. This breaks INV-1 for the pipeline image.
   - Suggested fix: pin a versioned `mc` release URL with a SHA-256 check (SEC-9), or copy it from a pinned `minio/mc` image. WP-0b may be the natural home.
+  - **Second, independent failure.** Once `mc` is stubbed, the PyPy step fails (`docker/pipeline/Dockerfile:153-159`).
+    - `pypy -m pip install --no-build-isolation -r requirements.txt -r requirements-pipeline.txt` resolves `cryptography>=38.0.3` to the `cryptography-47.0.0` sdist. There is no PyPy 3.8 wheel for it, and building it needs `maturin`, which is absent under `--no-build-isolation`.
+    - Result: `ModuleNotFoundError: No module named 'maturin'`.
+    - Baseline and trimmed builds fail identically. Suggested fix: pin `cryptography` to a version that has a `pp38` wheel in the PyPy install, or drop PyPy as WP-3b plans.
 - [ ] **lead**: edit `docs/modernisation/phase-0-security-and-subtraction.md` section 0d.
   - Drop "Delete the unused `/api/timeout` route".
   - Replace "Point `zen_environment.js` at the Hasura environment, or delete it" with "Delete it".
@@ -85,6 +94,7 @@ Each request is the exact change verified in unit 4. The combined diff was appli
 - 2026-10-04 core-2 unit 1: claimed WP, recorded path ownership; check: `uv run python scripts/agents/ownership.py who <paths>` (table above).
 - 2026-10-04 core-2 unit 2: proved targets dead, found `/api/timeout` live; check: `/tmp/wp0d_dead.sh` transcript under Evidence.
 - 2026-10-04 core-2 unit 3: wrote per-owner requests; check: each names files, lines and scope.
+- 2026-10-04 core-2 unit 4: verified combined change in scratch copy; check: web-server base/trim build exit 0, sweep diff = deleted modules only, URL map diff = `/graphql` only (Potion 247/247); pipeline CPython install passes base and trim, trimmed sweep 0 removed-package errors; pipeline image itself broken on `main` (mc 410, PyPy maturin), reported to infra.
 
 ## Evidence
 
@@ -143,7 +153,28 @@ Command: a grep over the repo, excluding `docs/`, `.claude/` and `node_modules`.
 - Base has 316 rules and trim has 315. The 247 Potion `/api2` rules are identical.
 - [`diff`](WP-0d-evidence/routes-base.tsv) shows that the only change is the removal of `/graphql  graphql.graphql  DELETE,GET,POST,PUT`. `/api/timeout  api.timeout_session  POST` is still present in [trim](WP-0d-evidence/routes-trim.tsv).
 
-**`etl-pipeline` image.** See the next update.
+**`etl-pipeline` image.** It cannot build on `main` today, for two pre-existing reasons recorded under Requests (infra).
+- To verify around them, the scratch copy changes only harness lines, and the requirement lines are untouched. See [`pipeline-harness-only.diff`](WP-0d-evidence/pipeline-harness-only.diff):
+  - the dead `mc` download is stubbed;
+  - `PIP_DEFAULT_TIMEOUT=300` is set, after one transient download timeout on `savReaderWriter`;
+  - the CPython-only variant also drops the PyPy venv.
+- Results:
+
+| Build | CPython venv: `requirements.txt` + `requirements-pipeline.txt` | PyPy venv |
+|---|---|---|
+| base, harness only | `#15 DONE 507.2s` | fails: `No module named 'maturin'` (cryptography 47 sdist) |
+| trim, harness only | `#15 DONE 465.5s` | fails identically |
+| trim, CPython-only variant | image built (exit 0) | not built |
+
+- **Import sweep** in the CPython-only trimmed image (`/zenysis/venv/bin/python import_sweep.py pipeline data util db config models log`, `--network none`, dummy environment):
+  - 398 modules: 393 OK, and none failed because of a removed package. Output: [`sweep-pipeline-trim.tsv`](WP-0d-evidence/sweep-pipeline-trim.tsv).
+  - The 5 failures have nothing to do with this WP. Four modules call Druid at import time and get `ConnectionError` to `druid.invalid`: `config/harmony_demo/database.py`, `config/template/database.py`, `data/pydruid_query/pydruid_query.py` and `data/validation/scripts/validate_pivoted_csv.py`. That is a BE-2 item for WP-4a. The fifth is a mapper ordering error in `data.query.models.query_selections`.
+- **Limit.** PyPy resolution of the trimmed files cannot be shown while the pre-existing `cryptography`/`maturin` failure stands. The risk is low: the change only removes requirement lines, and no Python file in the repo imports `fuzzywuzzy`, `jellyfish` or `editdistance` (unit 2).
+
+**Not run.**
+- The end-to-end smoke list from `testing.md` (`e2e/`) does not exist yet (WP-2e). In its place: the URL-map diff and the import sweeps above.
+- The front-end half (`zen_environment.js`) was not built with `yarn build`. That change is owned by frontend-platform, and WP-0e verifies it.
+- Lint and type checks: this branch changes no Python, so ruff and mypy have nothing to check.
 
 ## Verdicts
 

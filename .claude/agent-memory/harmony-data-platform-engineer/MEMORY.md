@@ -1,0 +1,1 @@
+- [Running db/druid Python checks](running_druid_python_checks.md): mount worktree at /src in the pipeline image, set dummy env vars, pip install pytest in the container; guard traps

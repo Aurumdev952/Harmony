@@ -84,7 +84,9 @@ Each request is the exact change verified in unit 4. The combined diff was appli
   - In `web/server/app.py` `_register_routes`, delete three lines: `from web.server.routes.graphql_api import GraphqlPageRouter`, `graphql_api_router = GraphqlPageRouter()` and `app.register_blueprint(graphql_api_router.generate_blueprint())`.
   - Leave `/api/timeout` in place (see Phase-file corrections).
   - This WP does not touch `web/server/routes/api.py` (WP-0a and WP-0c).
-- [ ] **data-platform**: delete the Hadoop ingestion path as one change: `db/druid/indexing/resources/task_templates/`, `db/druid/indexing/resources/tuning_configs/on_prem.json` (the directory's only file), `db/druid/indexing/legacy_task_builder.py` and `db/druid/indexing/scripts/run_indexing.py`. `run_native_indexing.py` and `task_runner_util.py` do not depend on them.
+- [x] **data-platform**: delete the Hadoop ingestion path as one change: `db/druid/indexing/resources/task_templates/`, `db/druid/indexing/resources/tuning_configs/on_prem.json` (the directory's only file), `db/druid/indexing/legacy_task_builder.py` and `db/druid/indexing/scripts/run_indexing.py`. `run_native_indexing.py` and `task_runner_util.py` do not depend on them.
+  - Done on `mig/WP-0d-dead-backend-code-druid` (data-platform-2).
+  - Also deleted `db/druid/indexing/resources/metrics_spec.json`. Only `legacy_task_builder.py` read it, and it duplicates the inline `metricsSpec` in `db/druid/indexing/common.py:35-40`. `db/druid/indexing/resources/` is now gone.
 - [ ] **frontend-platform**: delete `web/client/util/graphql/zen_environment.js`. In `web/client/util/graphql/index.jsx`, delete the line `import zenEnvironment from 'util/graphql/zen_environment';` and the `zenEnvironment,` export entry. This can land in WP-0e.
 - [x] **infra (found during verification; already broken on `main`, not caused by this WP)**: the `etl-pipeline` image does not build. infra-5 on `mig/WP-0d-dead-backend-code-infra`: PyPy failure fixed with `cryptography==41.0.7 ; platform_python_implementation == 'PyPy'` in `requirements-pipeline.txt`. The MinIO 410 is fixed on WP-0b's branch (`mig/WP-0b-ports-secrets-pins`) and is not duplicated here, so this branch's own pipeline build still stops at the `mc` download until WP-0b lands.
   - `docker/pipeline/Dockerfile:29-36` downloads the MinIO client from `https://dl.minio.io/client/mc/release/linux-*/mc`. That URL now returns `HTTP 410 Gone`, so the `downloader` stage fails with `wget` exit 8. This breaks INV-1 for the pipeline image.
@@ -108,6 +110,7 @@ Each request is the exact change verified in unit 4. The combined diff was appli
 - 2026-10-04 backend-5: deleted `web/server/routes/graphql_api.py`, the `web/server/graphql/` package and the three `_register_routes` lines in `web/server/app.py`. Added `tests/web/test_graphql_endpoint_removed.py`, plus `tests/web/conftest.py` byte-identical to WP-0c's. Check: the test failed before the deletion (`/graphql` in the rule set) and passes after, in a Python 3.8 env built from `requirements*.txt` minus graphene, Flask-GraphQL and Flask-Admin (none importable); `web.server.app` imports there; `route_map.py` gives 316 rules before and 315 after, the only diff is `/graphql graphql.graphql DELETE,GET,POST,PUT`, and both outputs match core-2's `routes-base.tsv` and `routes-trim.tsv` exactly (247 `/api2` rules; `/api/timeout api.timeout_session POST` present). `git grep` for `graphql_api`, `web.server.graphql`, `GraphqlPageRouter`, `flask_graphql` and `graphene` outside `docs/` finds only the infra-owned `requirements-web.txt` and `mypy.ini` lines.
 - 2026-10-04 infra-5 unit 1: trimmed the four requirements files, the 4 mypy sections and the `segment` logger (commit `WP-0d: drop requirements, mypy sections and logger for removed packages`); check: removed-package grep 0 importers outside the backend-deleted modules, web-server image built, sweep and URL map match core-2's trim once the backend deletion is overlaid.
 - 2026-10-04 infra-5 unit 2: pinned `cryptography==41.0.7` for PyPy in `requirements-pipeline.txt`; check: scratch pipeline build with WP-0b's Dockerfile exit 0, PyPy step installs the pp38 wheel, PyPy and CPython sweeps have 0 removed-package errors. Real-branch pipeline build stops at the `mc` 410, which WP-0b fixes.
+- 2026-10-04 data-platform-2: deleted the Hadoop ingestion path (`db/druid/indexing/resources/`, `legacy_task_builder.py`, `scripts/run_indexing.py`) on `mig/WP-0d-dead-backend-code-druid` and added `tests/druid/test_hadoop_ingestion_removed.py`; check: grep report has 0 references outside the deleted files, `db/druid` import sweep 41/41 OK, the new test passes on the branch and fails on the pre-deletion tree.
 
 ## Evidence
 
@@ -233,6 +236,33 @@ Command: a grep over the repo, excluding `docs/`, `.claude/` and `node_modules`.
 - The end-to-end smoke list from `testing.md` (`e2e/`) does not exist yet (WP-2e). In its place: the URL-map diff and the import sweeps above.
 - The front-end half (`zen_environment.js`) was not built with `yarn build`. That change is owned by frontend-platform, and WP-0e verifies it.
 - Lint and type checks: this branch changes no Python, so ruff and mypy have nothing to check.
+
+### data-platform-2: the Hadoop ingestion path is deleted
+
+Branch `mig/WP-0d-dead-backend-code-druid`. It was created from `mig/WP-0d-dead-backend-code` and merged with `mig/integration`.
+
+**Grep report.**
+- Script: [`dp2_hadoop_grep.sh`](WP-0d-evidence/dp2_hadoop_grep.sh). Output after the deletion: [`dp2_hadoop_grep.out`](WP-0d-evidence/dp2_hadoop_grep.out).
+- Pattern: `legacy_task_builder`, `run_indexing`, `task_templates`, `index_hadoop`, `on_prem.json`, `tuning_configs` and `DruidIndexingTaskBuilder`.
+- There are 0 hits in `pipeline`, `prod`, `docker`, `Makefile`, `scripts`, `.github`, `druid_setup`, `config`, `web`, `data`, `db`, `util`, `models` and `log`.
+- Across the whole repo (excluding `docs` and `.claude`), the only hits are the module names in the new test.
+- Nothing outside the deleted builder refers to `db/druid/indexing/resources/` or `metrics_spec.json`.
+- `task_runner_util.py` has its own `_validate_file_path` and still uses `BadIndexingPathException` from `db/druid/errors.py`.
+
+**Import sweep.**
+- Script: core-2's [`import_sweep.py`](WP-0d-evidence/import_sweep.py), run over `db/druid`.
+- Image: `local/wp0d-core2-trim/etl-pipeline-cpython:trim`, with the branch mounted at `/src`.
+- Run with `--network none`, `ZEN_ENV=harmony_demo`, `DRUID_HOST=http://druid.invalid` and a dummy `DEFAULT_SECRET_KEY`.
+- Result: 41 modules, all OK. These include `db.druid.indexing.{common,minio_task_builder,task_runner_util}` and `db.druid.indexing.scripts.{fetch_status,run_compaction,run_native_indexing}`.
+- Output: [`dp2_sweep-db-druid.tsv`](WP-0d-evidence/dp2_sweep-db-druid.tsv).
+
+**Test.** `tests/druid/test_hadoop_ingestion_removed.py` ran in the same image, with `pytest==8.3.5` installed into the throwaway container.
+- On the branch: 2 passed.
+- On the pre-deletion tree (a `git archive` of the branch before the deletion, plus the test):
+  - `test_hadoop_ingestion_modules_are_gone` fails on `find_spec('db.druid.indexing.legacy_task_builder')`;
+  - `test_native_indexing_imports_without_druid` passes.
+
+**Lint.** `uvx black --check -S` and `uvx ruff check` report no issues on the test.
 
 ## Verdicts
 

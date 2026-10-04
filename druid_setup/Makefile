@@ -1,5 +1,6 @@
 ENV_FILE=.env
 ENV_COMMON=environment/common.env
+CLUSTER_ENV=$(CURDIR)/cluster/cluster.env
 
 PROJECT_NAME=druid
 LOGS_ARGS ?= -f -n 1000
@@ -25,7 +26,27 @@ check_secrets:
 		exit 1; \
 	fi
 
-single_server_up: check_secrets
+# Druid has no authentication, so its ports must never listen on every
+# interface. $(1) is the address variable. Like Compose, take it from the
+# environment first and from the env file $(2) otherwise.
+define check_bind_address
+	@value="$${$(1)-$$(sed -n 's/^$(1)=//p' $(2) | tail -n 1)}"; \
+	case "$$(printf '%s' "$$value" | tr -d '[:space:]')" in \
+		''|0.0.0.0|::|'[::]') \
+			echo "$(1) is empty or a wildcard address; set it to this host's private IP, and firewall Druid's ports to the hosts that call them" >&2; \
+			exit 1;; \
+	esac
+endef
+
+check_single_bind_address:
+	$(call check_bind_address,DRUID_BIND_ADDRESS,/dev/null)
+
+check_cluster_bind_addresses:
+	$(call check_bind_address,DRUID_MASTER_HOST,$(CLUSTER_ENV))
+	$(call check_bind_address,DRUID_DATA_HOST,$(CLUSTER_ENV))
+	$(call check_bind_address,DRUID_QUERY_HOST,$(CLUSTER_ENV))
+
+single_server_up: check_secrets check_single_bind_address
 	@cd single && \
 		DOCKER_HOST=$(SINGLE_SERVER_DOCKER_HOST) \
 		docker compose --project-name $(PROJECT_NAME) \
@@ -43,36 +64,36 @@ single_server_logs:
 		docker compose --project-name $(PROJECT_NAME) \
 		--env-file environment/common.env logs $(LOGS_ARGS)
 
-cluster_server_up: check_secrets
+cluster_server_up: check_secrets check_cluster_bind_addresses
 	@cd cluster && \
 		DOCKER_HOST=$(CLUSTER_MASTER_SERVER_DOCKER_HOST) \
 		docker compose --project-name $(PROJECT_NAME) \
 		-f docker-compose-master.yml \
-		--env-file cluster.env up -d
+		--env-file $(CLUSTER_ENV) up -d
 	@cd cluster && \
 		DOCKER_HOST=$(CLUSTER_DATA_SERVER_DOCKER_HOST) \
 		docker compose --project-name $(PROJECT_NAME) \
 		-f docker-compose-data.yml \
-		--env-file cluster.env up -d
+		--env-file $(CLUSTER_ENV) up -d
 	@cd cluster && \
 		DOCKER_HOST=$(CLUSTER_QUERY_SERVER_DOCKER_HOST) \
 		docker compose --project-name $(PROJECT_NAME) \
 		-f docker-compose-query.yml \
-		--env-file cluster.env up -d
+		--env-file $(CLUSTER_ENV) up -d
 
 cluster_server_down:
 	@cd cluster && \
 		DOCKER_HOST=$(CLUSTER_MASTER_SERVER_DOCKER_HOST) \
 		docker compose --project-name $(PROJECT_NAME) \
 		-f docker-compose-master.yml \
-		--env-file cluster.env down
+		--env-file $(CLUSTER_ENV) down
 	@cd cluster && \
 		DOCKER_HOST=$(CLUSTER_DATA_SERVER_DOCKER_HOST) \
 		docker compose --project-name $(PROJECT_NAME) \
 		-f docker-compose-data.yml \
-		--env-file cluster.env down
+		--env-file $(CLUSTER_ENV) down
 	@cd cluster && \
 		DOCKER_HOST=$(CLUSTER_QUERY_SERVER_DOCKER_HOST) \
 		docker compose --project-name $(PROJECT_NAME) \
 		-f docker-compose-query.yml \
-		--env-file cluster.env down
+		--env-file $(CLUSTER_ENV) down

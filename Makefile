@@ -1,7 +1,7 @@
 ENV_FILE?=.env
 -include $(ENV_FILE)
 
-COMMIT?=master
+COMMIT?=main
 DOCKER_NAMESPACE?=zengineering
 DOCKER_TAG?=latest
 DOCKER_HOST?=ssh://$(WEB_REMOTE)
@@ -23,15 +23,15 @@ help: # Show help for each of the Makefile recipes.
 configure:	
 	scp ./prod/nginx/nginx_vhost_default_location $(WEB_REMOTE):${NGINX_VHOST}
 
-lint-python: # Lint only the python files that have changed on this branch, with respect to master. (You can run `make lint-python COMMIT=<my-commit>` e.g. `make lint-python COMMIT=HEAD~1` to lint the files that have changed on the last commit.)
+lint-python: # Lint only the python files that have changed on this branch, with respect to main. (You can run `make lint-python COMMIT=<my-commit>` e.g. `make lint-python COMMIT=HEAD~1` to lint the files that have changed on the last commit.)
 	COMMIT=$(COMMIT) ./scripts/lint_python.sh
 
-lint-js: # Lint only the js and jsx files that have changed on this branch, with respect to master. (You can run `make lint-js COMMIT=<my-commit>` e.g. `make lint-js COMMIT=my-other-branch` to lint the files that have changed with respect to my-other-branch.)
+lint-js: # Lint only the js and jsx files that have changed on this branch, with respect to main. (You can run `make lint-js COMMIT=<my-commit>` e.g. `make lint-js COMMIT=my-other-branch` to lint the files that have changed with respect to my-other-branch.)
 	COMMIT=$(COMMIT) ./scripts/lint_js.sh
 
-lint: lint-python lint-js # Lint only the python, js and jsx files that have changed on this branch, with respect to master. (You can run `make lint COMMIT=<my-commit>` e.g. `make lint COMMIT=HEAD~1` to lint the files that have changed on the last commit.)
+lint: lint-python lint-js # Lint only the python, js and jsx files that have changed on this branch, with respect to main. (You can run `make lint COMMIT=<my-commit>` e.g. `make lint COMMIT=HEAD~1` to lint the files that have changed on the last commit.)
 	
-black: # Run black on all python files that have changed on this branch, with respect to master. (You can run `make black COMMIT=<my-commit>` e.g. `make black COMMIT=origin/master` to lint the files that have changed with respect to origin/master.)
+black: # Run black on all python files that have changed on this branch, with respect to main. (You can run `make black COMMIT=<my-commit>` e.g. `make black COMMIT=origin/main` to lint the files that have changed with respect to origin/main.)
 	COMMIT=$(COMMIT) ./scripts/format_python.sh
 
 build: # Build docker images (for development and production) using docker compose.

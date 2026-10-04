@@ -76,6 +76,7 @@ None of these block WP-2c; each comes from a finding below or from the review.
 - 2026-10-05 qa-2 unit 6: review fixes (see Plan 6 and "Review fixes" below); merged `mig/integration` (WP-0a, WP-0c, decision 0003/0004; `.playwright-mcp` gone, `git ls-files .playwright-mcp` empty); re-recorded on the merged code: exactly three recordings changed, all from WP-0c (`auth.timeout` now clears the JWT and CSRF cookies, `field.info.unknown_id` 404, `field.info.over_cap` 400). History rewritten before any push: the mixed commit 501337e is now a harness commit followed by an inventory-and-recordings commit; the first review's verdict rows are carried in the WP file. Checks under Evidence.
 - 2026-10-05 qa-2: status review.
 - 2026-10-04 qa-3 unit 7: resumed after the host reboot lost qa-2's session and carried its uncommitted round-3 work over. Round-3 fixes R1-R7, plus the client's `%%` search pattern, a `next_run` seed, and findings F12 and F13; commits `787f6b9` and `dc935f5`. Check: ruff clean; offline `51 passed`; dry run `231 cases, 0 problems`; two recordings on fresh stacks, identical; replay `282 passed` twice on each of two fresh stacks; two broken recordings red; stack down. Status review.
+- 2026-10-04 backend-2c (supporting, F13): failing tests `tests/db/test_import_data_into_table.py` (3 failed, 1 passed at `00e5047`) and the proposed core patch `WP-2c-evidence/F13-db-postgres-utils.patch` (4 passed with it); handed to core through the lead.
 
 ## Review fixes
 
@@ -187,6 +188,30 @@ Found while recording. None is fixed here (QA never edits production code); each
   - Repro: stack up (the seed gives the unpublished field one category mapping and one datasource mapping), run `self_serve.export`, then `self_serve.import.exported_zip`, then count the rows in the two mapping tables.
   - Expected: 1 and 1. Actual: 0 and 0, while `pipeline_datasource` and `category` keep their rows.
   - Evidence: the F13 line under Evidence; `recordings/graphql.BatchPublishModalContentsQuery.json` (no publishable field).
+
+## Backend support: F12 and F13 (backend-2c)
+
+Branch `mig/WP-2c-api-contract-recordings-backend`, from `00e5047`.
+
+### F13: reproduction and proposed fix
+
+- **Failing tests** (shared paths): `tests/db/test_import_data_into_table.py`, run against a throwaway Postgres from `tests/throwaway_postgres.py`. That is the stack's pinned `postgres:15.2-alpine` image on a random loopback port, or `HARMONY_TEST_POSTGRES_URL`; the tests skip when neither is available. The tests build the catalogue schema from `models/alchemy/{query,data_upload}`, seed every imported table plus one row in each of the 7 dependent tables, then call `export_tables_to_zip` and `import_data_into_table` with the table lists the route's scripts use. Run: `ZEN_ENV=harmony_demo uv run pytest tests/db -q`.
+  1. `test_reimporting_an_unchanged_export_keeps_rows_in_tables_it_does_not_carry`. On `00e5047` it fails: all 7 dependent tables come back empty.
+  2. `test_an_import_makes_the_catalogue_tables_match_the_export`. A renamed category is restored, and a category added after the export is removed together with its dependent mapping (ON DELETE CASCADE), while the mapping of a category the export carries survives. Fails on `00e5047`.
+  3. `test_mapping_rows_whose_ids_differ_from_the_export_are_replaced`. Mapping ids drifted between instances, so each id holds the other row's `(dimension_id, category_id)` pair. Passes on `00e5047`; it guards the fix against unique-constraint collisions.
+  4. `test_a_failed_import_changes_nothing`. The export's `category` lacks a row that `field_category_mapping` references. On `00e5047` the import raises after it has already replaced earlier tables, because it ran in autocommit.
+- **Result on `00e5047`**: 3 failed, 1 passed.
+- **Proposed fix** (core owns `db/postgres/utils.py`, routed through the lead): `WP-2c-evidence/F13-db-postgres-utils.patch`. With the patch loaded through a pytest plugin and no edit to the repo: 4 passed. A mutation that drops the leaf-table rule turns test 3 red. What the patch does:
+  1. Runs the import in one transaction.
+  2. COPYs each table into a temporary staging table.
+  3. Children first, deletes the rows whose primary key the export does not carry. A table that no foreign key references is emptied instead.
+  4. Parents first, runs `INSERT ... SELECT ... ON CONFLICT (pk) DO UPDATE`.
+  5. Drops `TRUNCATE ... CASCADE`.
+- **Behaviour before and after** (INV-2-relevant; for the human acceptance list):
+  - Before: an import emptied the 7 dependent tables (`unpublished_field_{category,pipeline_datasource,dimension}_mapping`, `geo_dimension_metadata`, `hierarchical_dimension_metadata`, `non_hierarchical_dimension`, `source_config`), and a failed import left some catalogue tables replaced.
+  - After: the imported tables hold exactly the export's rows, as before. Dependent rows survive while the export carries the row they reference, and are deleted with it otherwise. A failed import changes nothing.
+  - Rows are matched on primary keys. The catalogue's parents use string ids, which are stable across instances. `source_config` references `self_serve_source` by serial id, so on a cross-instance import a surviving `source_config` row follows whichever source holds that id in the export.
+  - Known limit: a referenced table whose secondary unique value moves between two surviving rows (`dataprep_flow.recipe_id`) makes the import fail and roll back rather than succeed.
 
 ## Verdicts
 

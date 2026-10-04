@@ -1,1 +1,4 @@
 - [CI review facts](ci_review_facts.md): buildx cache-from CSV, default Actions shell, jq null, registries, Makefile export, IMAGE_PREFIX mismatch, worktree-guard review recipe
+- [Review traps](review_traps.md): ignored fixtures, worktree-guard git limits, ownership.py via uv, zsh quirks
+- [Gate arithmetic](review_gate_arithmetic.md): probe threshold verdicts at the boundary and with empty input
+- [Frontend review recipe](frontend_review_recipe.md): gate fails when SPEC row lacks side-branch roles; reproduce yarn/webpack/Flow/CSS/Jinja evidence

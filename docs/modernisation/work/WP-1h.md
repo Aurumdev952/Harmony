@@ -26,6 +26,17 @@ instances:
     files:
       - config/settings.py
       - tests/core/test_settings_render.py
+  - name: "infra"
+    files:
+      - .github/workflows/renderer.yml
+      - Makefile
+      - docker-compose.yaml
+      - docker-compose.build.yaml
+      - docker-compose.dev.yaml
+      - docker-compose.prod.yaml
+      - docker/build.sh
+      - docker/renderer/**
+      - tests/infra/test_renderer.py
 branch: "mig/WP-1h-export-renderer"
 requirements: [SEC-7, SEC-9, SEC-10]
 contracts_consumed: []
@@ -70,14 +81,15 @@ The token is safe where the web app sends it. The web app builds the URL from `R
 | Connections that never become a routed HTTP request: WebSockets, `preconnect`, DNS prefetch, WebRTC | `context.route_web_socket` refuses every WebSocket. Layer 2: Chromium runs with `--proxy-server` set to an unresolvable proxy and a bypass list of `<-loopback>` plus the one origin, so the only direct connection it can open is to that origin; WebRTC is limited to proxied UDP and DNS prefetch is off. | `test_every_other_destination_is_blocked_and_recorded` (the second origin sees zero TCP connections), `test_the_proxy_fence_holds_even_if_the_request_guard_lets_everything_through` |
 | A redirect from the origin to elsewhere, or the page navigating itself away | The route aborts the off-origin hop. `goto` errors become `PageFailed`. After load and again after the ready signal, the page must still be on the origin and the requested path. | `test_a_redirect_to_another_origin_fails_and_never_reaches_it`, `test_the_page_cannot_navigate_itself_to_another_origin` |
 | Network egress if every in-browser control failed | Layer 3: the Compose `render` network is `internal: true`. The renderer is on that network only, and web is the only other service on it. | Unit 5 container check |
-| A Chromium exploit from page content | Chromium keeps its sandbox (`chromium_sandbox=True`; Playwright's default would add `--no-sandbox`). The process runs as `pwuser` (uid 1001) with all capabilities dropped, `no-new-privileges`, a read-only root filesystem and Playwright's v1.63.0 seccomp profile. That profile is Docker's default plus `clone`, `setns` and `unshare`, which the namespace sandbox needs. Without the profile Chromium refuses to start, and the code has no `--no-sandbox` fallback. | `test_chromium_runs_with_its_sandbox` (it reads every Chromium process's flags from `/proc` during the render), plus the same test failing without the profile |
+| A Chromium exploit from page content | Chromium keeps its sandbox (`chromium_sandbox=True`; Playwright's default would add `--no-sandbox`). The process runs as `pwuser` (uid 1001) with all capabilities dropped except `SYS_CHROOT`, `no-new-privileges`, a read-only root filesystem and Playwright's v1.63.0 seccomp profile. `SYS_CHROOT` stays only in the bounding set, so the zygote can chroot inside its own user namespace. The process itself holds no capability: `CapPrm` and `CapEff` are 0 and `CapBnd` is `0x40000`, read from `/proc/1/status` on the stack. Without it, Chromium's sandbox cannot start and renders fail. That profile is Docker's default plus `clone`, `setns` and `unshare`, which the namespace sandbox needs. Without the profile Chromium refuses to start, and the code has no `--no-sandbox` fallback. | `test_chromium_runs_with_its_sandbox` (it reads every Chromium process's flags from `/proc` during the render), plus the same test failing without the profile |
 | One user's state leaking into the next render | A fresh browser per render, closed in `finally`. Service workers and downloads are blocked. | `test_nothing_from_one_render_survives_into_the_next` |
 | The token in logs or error bodies | The sidecar logs one JSON line without the URL or token. Unexpected errors log only the exception type. Error bodies are a fixed code. The web side logs status, content type and size only. | `test_render_server.py::test_render_is_logged_as_one_json_line_without_the_token`, `::test_an_unexpected_failure_is_a_500_without_details`, `test_export_renderer.py::test_a_failed_render_is_logged_without_the_token` |
-| Resource exhaustion | 16 KiB body cap, deadline, concurrency slots, output cap, page-height clip, and Compose `mem_limit` and `pids_limit`. | `test_render_server.py`, `test_render_browser.py` |
+| Resource exhaustion | 16 KiB body cap, deadline (also Playwright's per-action default, so a slow page gets the whole deadline and no more), concurrency slots, output cap, page-height clip, Compose `init: true` (it reaps Chromium's orphaned helpers, which would otherwise pile up toward `pids_limit`), and Compose `mem_limit` and `pids_limit`. | `test_render_server.py`, `test_render_browser.py` |
 | Token replay after the render | `render` claim liveness and a lifetime of deadline + 15 s (see Render token). | `test_render_tokens.py` |
 
 Residual risks:
 - The token is valid for any same-origin page while its render runs. It grants only `view_resource` on one dashboard under the user's own policy, so a hijacked page sees no more than the user could.
+- Rootful Docker hosts that confine containers with AppArmor and restrict unprivileged user namespaces (such as Ubuntu 24.04 with `kernel.apparmor_restrict_unprivileged_userns=1`) are untested. If the sandbox cannot start there, Chromium refuses to launch and renders fail with a 500. They never fall back to `--no-sandbox`, so the failure is safe but visible.
 - DNS rebinding of the origin host is out of scope: `web` resolves through Docker's embedded DNS on the internal network.
 
 ## Plan
@@ -101,7 +113,7 @@ C-5 (session and JWT format, owned by backend). Old: a render token was a plain 
 - [x] core: remove `URLBOX_API_KEY` and `RENDERBOT_EMAIL` from `config/settings.py` once this lands; nothing reads them after unit 3 (blocks nothing). Done on `mig/WP-1h-export-renderer-core`; see the 2026-10-04 core log line.
 - [x] infra: also remove `RENDERBOT_EMAIL` from `docker-compose.yaml:143,178` and `.env.example:27` (the infra line above names only `URLBOX_API_KEY`; same as WP-0i's open infra request). No code reads either variable after the core change (blocks nothing). Done in `docker-compose.yaml`; for `.env.example` see the next line.
 - [ ] human: remove the `URLBOX_API_KEY` and `RENDERBOT_EMAIL` lines from `.env.example`. Settings deny agents any read or edit of that file, including `grep` and `sed` (blocks nothing).
-- [ ] backend: in "Renderer threat model", change the Chromium row from "all capabilities dropped" to "all capabilities dropped except `SYS_CHROOT`", and add `init` to the resource-exhaustion row. Reasons and proof are in `WP-1h-evidence/infra-renderer-image.md` (blocks nothing).
+- [x] backend: in "Renderer threat model", change the Chromium row from "all capabilities dropped" to "all capabilities dropped except `SYS_CHROOT`", and add `init` to the resource-exhaustion row. Reasons and proof are in `WP-1h-evidence/infra-renderer-image.md` (blocks nothing).
 
 ## Log
 
@@ -113,6 +125,7 @@ C-5 (session and JWT format, owned by backend). Old: a render token was a plain 
 - 2026-10-04 backend-8 unit 4a (automated security review: egress bypass, SSRF, sandbox disabled): failing tests first. A WebSocket from the page reached another port on the origin host carrying the token (cookies ignore ports). A redirect raised a raw Playwright error. `render()` trusted its spec. Chromium ran with Playwright's default `--no-sandbox`. Fixes: `route_web_socket` refusal, a black-hole proxy with the origin as the only bypass, origin and path checks after load and after the ready signal, a pre-launch origin check, navigation errors as `PageFailed`, and `chromium_sandbox=True` with Playwright's seccomp profile. The threat model is recorded above. check: 7 new browser tests red, then 110 passed in the image (`--network none`, seccomp profile); without the profile Chromium refuses to start (sandbox test fails, no fallback); host 289 passed, 1 skipped, 1 pre-existing failure; black, ruff and mypy clean.
 - 2026-10-04 backend-8 unit 5: infra request prepared (`infra-request/Dockerfile`, `compose.renderer.yaml`, `seccomp_profile.json`). check: the image builds from the pinned digest, runs as uid 1001 on a read-only root with the image HEALTHCHECK `healthy`, `/healthz` answers 200 from a peer, an off-origin render gets 400, and egress by IP and by name fails on an `--internal` network.
 - 2026-10-04 infra (supporting, branch `mig/WP-1h-export-renderer-infra`, d6ef751 on e79b325): added `docker/renderer/{Dockerfile,Dockerfile.dockerignore,seccomp_profile.json}`, the `renderer` service on the internal `render` network, web's `RENDERER_URL`/`RENDER_WEB_ORIGIN`/networks, prod `restart`, a dev `build:`, the build overlay, `build.sh`, `make push` and `.github/workflows/renderer.yml`. `URLBOX_API_KEY` and `RENDERBOT_EMAIL` are removed from web and worker. Two changes from the proposal. First, `cap_add: [SYS_CHROOT]`: with `cap_drop: [ALL]` alone, Docker's rendering of the seccomp profile denies `chroot`, and every browser test fails at launch (13 failed). With the capability, 110 passed. Second, `init: true`: 6 zombies after 3 renders without it, 0 with it. The seccomp profile is byte-identical to Playwright v1.63.0 upstream. check: `tests/infra/test_renderer.py` 26 red on e79b325, then `tests/infra` 121 passed. A trial merge with `mig/integration` merged the infra files without conflicts, and its `tests/infra` gave 187 passed, including the WP-0b `test_compose.py` and `test_dockerfiles.py`. `docker compose config`, `docker build --check`, ruff, black and actionlint are clean. The image was built and run through Compose: healthy, uid 1001, `CapEff 0`, `/healthz` 200, off-origin 400, no egress, and a sandboxed Chromium printed a PDF. `.env.example` is left to the human because settings deny agent edits.
+- 2026-10-04 backend-8 unit 6: end to end on the WP-2c stack with the renderer, a recording tap and a prebuilt client. Real PDF (A4, 1 page, 8,117 B), JPEG (1280x1024, 34,164 B) and PNG thumbnail (1280x1024, 15,486 B) came through the Flask routes in about 3 s each. The last token, reused after its render, gives 302 to login and a 401 from the API. A non-viewer gets 403 and an anonymous request gets 401, with no renderer call either way. The run found Playwright's 30 s per-action default cutting the 120 s deadline short; fixed test-first in 460b7f4 (111 passed in the image under the full Compose hardening). check: `WP-1h-evidence/unit-6-end-to-end.md`. Infra's branch is merged and the threat model is updated for SYS_CHROOT, `init` and untested AppArmor hosts.
 
 ## Evidence
 
@@ -120,6 +133,7 @@ C-5 (session and JWT format, owned by backend). Old: a render token was a plain 
 - Security review follow-up (unit 4a): [WP-1h-evidence/unit-4a-egress-and-sandbox.md](WP-1h-evidence/unit-4a-egress-and-sandbox.md)
 - Unit 5: [WP-1h-evidence/unit-5-container-check.md](WP-1h-evidence/unit-5-container-check.md)
 - Infra request (renderer image and Compose service): [WP-1h-evidence/infra-renderer-image.md](WP-1h-evidence/infra-renderer-image.md)
+- Unit 6: [WP-1h-evidence/unit-6-end-to-end.md](WP-1h-evidence/unit-6-end-to-end.md), with outputs and harness in `WP-1h-evidence/e2e/`
 
 ## Verdicts
 

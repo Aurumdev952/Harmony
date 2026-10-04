@@ -1,0 +1,105 @@
+# Local-only stack for recording and replaying API contract cases (WP-2c).
+# Only the web port is published, on loopback. Credentials here are throwaway
+# values for a disposable tmpfs database; never point this file at real data.
+name: ${CONTRACT_PROJECT:-harmony-wp2c-contract}
+
+x-web-env: &web-env
+  ZEN_ENV: harmony_demo
+  ZEN_OFFLINE: "1"
+  ZEN_HOME: /zenysis
+  PYTHONPATH: /zenysis
+  PYTHONDONTWRITEBYTECODE: "1"
+  DATABASE_URL: postgresql://postgres:contract-local-only@postgres:5432/harmony_demo-local
+  SQLALCHEMY_DATABASE_URI: postgresql://postgres:contract-local-only@postgres:5432/harmony_demo-local
+  POSTGRES_HOST: postgres
+  POSTGRES_USER: postgres
+  POSTGRES_PASSWORD: contract-local-only
+  REDIS_HOST: redis
+  HASURA_HOST: http://hasura:8080
+  DRUID_HOST: http://druid-stub
+  DEFAULT_SECRET_KEY: contract-local-only-not-a-secret
+  # Mail goes to the mailpit sink; the default host is smtp.mailgun.org.
+  EMAIL_HOST: mailpit
+  EMAIL_PORT: "1025"
+  EMAIL_HOST_USER: contract-mailer
+  EMAIL_HOST_PASSWORD: contract-local-only
+  EMAIL_USE_ENCRYPTION: none
+
+services:
+  postgres:
+    image: postgres:15.2-alpine
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: contract-local-only
+      POSTGRES_DB: harmony_demo-local
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres -d harmony_demo-local"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+    tmpfs:
+      - /var/lib/postgresql/data
+
+  redis:
+    image: redis:7-alpine
+
+  mailpit:
+    image: axllent/mailpit:v1.31.0
+    environment:
+      MP_SMTP_AUTH_ACCEPT_ANY: "1"
+      MP_SMTP_AUTH_ALLOW_INSECURE: "1"
+
+  druid-stub:
+    image: python:3.12-slim
+    volumes:
+      - ./druid_stub.py:/stub/druid_stub.py:ro
+    command: ["python", "-u", "/stub/druid_stub.py"]
+
+  web-init:
+    image: harmony-wp2c-web-server:local
+    build:
+      context: .
+      dockerfile: Dockerfile
+    working_dir: /zenysis
+    volumes:
+      - ../../..:/zenysis:ro
+    environment:
+      <<: *web-env
+      CONTRACT_USERNAME: ${CONTRACT_USERNAME:-contract-admin@harmony.invalid}
+      CONTRACT_PASSWORD: ${CONTRACT_PASSWORD:-}
+    command: ["/bin/bash", "/zenysis/tests/contract/stack/init.sh"]
+    depends_on:
+      postgres:
+        condition: service_healthy
+      druid-stub:
+        condition: service_started
+
+  hasura:
+    image: hasura/graphql-engine:v2.11.3.cli-migrations-v2
+    environment:
+      HASURA_GRAPHQL_ENABLE_TELEMETRY: "false"
+      HASURA_GRAPHQL_DATABASE_URL: postgresql://postgres:contract-local-only@postgres:5432/harmony_demo-local
+    depends_on:
+      web-init:
+        condition: service_completed_successfully
+
+  web:
+    image: harmony-wp2c-web-server:local
+    working_dir: /zenysis
+    volumes:
+      - ../../..:/zenysis:ro
+    environment:
+      <<: *web-env
+      ZEN_GUNICORN_WORKER_THREADS: "2"
+    command: ["python", "web/gunicorn_server.py", "--timeout=600"]
+    ports:
+      - 127.0.0.1:${CONTRACT_WEB_PORT:-58650}:5000
+    depends_on:
+      web-init:
+        condition: service_completed_successfully
+      redis:
+        condition: service_started
+      mailpit:
+        condition: service_started
+      hasura:
+        condition: service_started

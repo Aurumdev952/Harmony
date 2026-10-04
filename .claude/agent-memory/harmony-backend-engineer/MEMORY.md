@@ -1,1 +1,2 @@
 - [Template render diff](template_render_diff.md) — prove Jinja template edits without a running app; known baseline failures
+- [Flask web tests](flask_web_tests.md) — run tests/web on py3.8, call handlers directly, worktree-guard and auth/policy traps

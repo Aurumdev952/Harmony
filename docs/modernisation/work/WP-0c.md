@@ -1,7 +1,7 @@
 ---
 wp: "0c"
 title: "Fix the pure-mistake bugs"
-status: building          # backend-2 builds on mig/WP-0c-pure-mistake-bugs-backend (decision 0001). core-1 wrote the tests, the patches and the SEC-4 decision.
+status: review            # backend-2 on mig/WP-0c-pure-mistake-bugs-backend (decision 0001). Open items listed under "Open SEC-4 items" and Requests.
 owner_role: "backend"
 instances:
   - name: "core-1"
@@ -26,6 +26,7 @@ instances:
       - tests/web/test_timeout_route.py
       - tests/web/test_field_info_route.py
       - tests/web/test_no_raw_queries_from_routes.py
+      - tests/web/test_query_policy_filter.py
       - docs/modernisation/work/WP-0c.md
 branch: "mig/WP-0c-pure-mistake-bugs"
 requirements: [SEC-4, QA-1]
@@ -67,9 +68,9 @@ PYTHONPATH=$PWD uv run --no-project -p 3.8 --with-requirements /tmp/reqs.txt --w
 | 4 | SEC-4: delete `AuthorizedQueryClient.run_raw_query` and make the wrapped client private (`_query_client`). | backend | `tests/web/test_authorized_query_client.py` | done (`0cc1c6a`) |
 | 5 | Delete `/api/dimension/<name>/<value>`, which returns 500 on every call because it calls a method that never existed. Also delete its empty `views/dimension.py` and the unused `get_dimension_time_boundary`. | backend (route); core (time_boundary) | `tests/web/test_api_routes.py` | done: core `bd71d45`, route `abf1fa9` |
 | 6 | `/api/timeout` ends the session for real: unset the JWT cookies and log out of Flask-Login. Before, it only called `logout_user()`, and the next request signed the user back in from the 365-day `accessKey`. | backend | `tests/web/test_timeout_route.py` (4 cases) | done: test `a076b1a`, fix `a010c1c` |
-| 7 | SEC-4 open item 1: `/api/field/<ids>` validates ids, caps their number, and stops returning whole-datasource numbers to restricted users. | backend (route); core (lookups, by request) | `tests/web/test_field_info_route.py` | planned |
-| 9 | `restrict_query_filter_to_user_permissions` built `{"type": "and", "fields": [null, <policy>]}` when the request filter was `EmptyFilter` (Druid rejects it), and crashed at build time when it was `None`. Now `query_filter & policy` (`EmptyFilter.__and__` returns the policy), or the policy alone for `None`. Found by WP-2a (golden case `policy_include_all_all_time`). | backend | `tests/web/test_query_policy_filter.py` (3 cases; the non-empty case pins the unchanged AND shape) | done: test `70ecd0e`, fix `64dc60e` |
-| 8 | Structural guard: routes and Potion APIs do not reach the system query client, `run_raw_query` or `druid_context` lookups outside a justified allowlist. | backend | `tests/web/test_no_raw_queries_from_routes.py` | planned |
+| 7 | SEC-4 open item 1: `/api/field/<ids>` validates ids (404) and caps them at 20 (400), ANDs the caller's policy into both lookups, keeps the shared row-count cache for callers without a policy only, never runs a lookup with an empty field filter, and returns the formula whatever the count. All backend-side; no core edit needed. See "Decision: `/api/field`". | backend | `tests/web/test_field_info_route.py` (9 cases, real `RowCountLookup`, `DataTimeBoundary`, policy builder and auth decorator over a fake Druid) | done: red test `f99d24d`, fix and final tests `1a72037` |
+| 9 | The policy AND built `{"type": "and", "fields": [null, <policy>]}` when the request filter was `EmptyFilter` (Druid rejects it), and crashed at build time when it was `None`. Now `and_policy_filter`: the policy alone for `None`/`EmptyFilter`, otherwise `Filter(and, [query_filter, policy])` exactly as before. The first fix (`64dc60e`) used pydruid's `&`, which appends into an existing `and` in place (flattening the request and mutating a shared filter); the unit 7 interrogate caught it and `a89c55d` replaced it. Found by WP-2a (golden case `policy_include_all_all_time`). | backend | `tests/web/test_query_policy_filter.py` (6 cases through `AuthorizedQueryClient.run_query`; pins the unchanged shape for selector and `and` filters, no mutation, and no policy for superusers or an empty policy) | done: `70ecd0e`, `64dc60e`, `3681cb7`, `a89c55d` |
+| 8 | Structural guard: an AST scan of `web/server/routes` and `web/server/api` fails on `system_query_client`, `run_raw_query`, `AuthorizedQueryClient._query_client` from outside, and any `druid_context` access (aliases included) other than `available_datasources`, `current_datasource`, `current_db_datasource` and `datasource_config`, unless allowlisted with a reason. A stale-entry test keeps the allowlist honest. | backend | `tests/web/test_no_raw_queries_from_routes.py` (13 cases) | done (`34c7e7b`) |
 
 ### Unit 3 design
 
@@ -108,7 +109,7 @@ PYTHONPATH=$PWD uv run --no-project -p 3.8 --with-requirements /tmp/reqs.txt --w
 
 ### Open SEC-4 items (not fixed here; routed to the lead)
 
-1. **`GET /api/field/<field_ids>`, which the frontend uses (`web/client/services/FieldInfoService.js`). Critical (A, B and C).**
+1. **Fixed in unit 7 (`1a72037`).** `GET /api/field/<field_ids>`, which the frontend uses (`web/client/services/FieldInfoService.js`). Critical (A, B and C).
    - **Path:** `api.py api_field_info`, then `views/field.py get_field_summary`, then `druid_context.row_count_lookup.get_row_count` and `data_time_boundary.get_field_time_boundary`, then the system client's `run_raw_query`.
    - **No policy is applied.** A user whose policy limits them to one district gets national row counts and first and last data dates for any field. Unknown ids give an empty filter, which returns the whole datasource's count and range.
    - **The caches leak across users.** `row_count_cache` and `time_boundary_cache` are process-wide, keyed by the raw `field_id`, shared across users and never evicted. Just applying the policy would make them leak one user's filtered numbers to the next.
@@ -122,8 +123,10 @@ PYTHONPATH=$PWD uv run --no-project -p 3.8 --with-requirements /tmp/reqs.txt --w
    - `TemplateRenderer.build_ui_params` sends `minDataDate`, `maxDataDate` and `lastDataUpdate` from unfiltered time boundary and status data on every page.
    - `SourceStatus.load_ranges_from_druid` (`web/server/data/status.py:93`) calls `run_query` on the system client.
    - Neither takes user input, so both are datasource-wide metadata rather than injection paths. WP-4e still has to decide whether dates are policy-scoped.
-3. **Structural guard (C).** Add a test that fails when `web/server/routes/**` or `web/server/api/**` reach `system_query_client`, `run_raw_query` or `druid_context.<lookup>.get_*` outside an allowlist. It would be red today because of item 1, so it belongs with WP-4e.
-4. **Policy test on `run_query`.** Nothing yet tests that a non-superuser's `run_query` is ANDed with their policy filter (B). It belongs to the authz suite: request to qa for WP-2b.
+3. **Done in unit 8 (`34c7e7b`).** Structural guard (C). It was red on the pre-unit-7 code (3 findings: `field.py` x2, `api.py` x1). Its allowlist now records item 2's `data_status_information` use in `data_upload_summary.py` and the health check.
+4. **Policy test on `run_query`.** `tests/web/test_query_policy_filter.py` now drives `AuthorizedQueryClient.run_query` (policy builder mocked), and `tests/web/test_field_info_route.py` uses the real `_construct_authorization_filter` with real `QueryNeed`s. The authz suite case is still wanted: request to qa for WP-2b.
+5. **Admin API tokens ignore their own `query_needs` (A, B, C; pre-existing, consider: security).** A token issued to a site administrator with `needs: ['*']` keeps `RoleNeed(admin)` (`_compute_token_item_needs`), so `SuperUserPermission().can()` is true and the token's `query_needs` never narrow it, in `run_query` and now in `/api/field` alike. `_compute_token_query_needs` has a superuser branch, which suggests tokens were meant to narrow admins. Unchanged here (INV-3); `caller_policy_filter`'s docstring states it. Needs a security decision (WP-5d or WP-4e).
+6. **Restricted callers get no row-count cache (A, B, C; performance).** Up to 20 ids x 2 uncached raw Druid queries per request for users with a non-empty policy. Callers whose policy reduces to nothing now share the cache (same filter). A bounded, policy-keyed cache needs core's `RowCountLookup` (C-9 rule): request to core. The only live caller sends one id per request.
 
 ### Other findings from the review
 
@@ -134,11 +137,54 @@ PYTHONPATH=$PWD uv run --no-project -p 3.8 --with-requirements /tmp/reqs.txt --w
 | A second, divergent token decode: read the cookie although headers take precedence, and hard-coded `user_claims` | A, B, C | act on | Fixed. Uses `verify_jwt_in_request_optional()` and `get_jwt_claims()`. Test `test_bearer_token_without_the_claim_wins_over_a_remembered_cookie` covers the header case. |
 | `POSTGRES_DB_URI` is read by nothing, so "fixing" its syntax has no effect | A, B, C | act on | Line and comment deleted. infra should also drop the `.env.example` entry (I did not read that file; settings deny it). |
 | `/api/dimension/...` always returns 500 and would become an unfiltered lookup if repaired | A, B, C | act on | Route, empty view module and `get_dimension_time_boundary` deleted. |
-| `/api/timeout` calls Flask-Login `logout_user()` but never clears the `accessKey` cookie, so the next request signs the user back in from the 365-day JWT. The inactivity timeout is only a client-side redirect. | A | consider: security | Pre-existing gap in a security control. Out of scope for "pure mistakes". Request to the lead: route to security for WP-5d, or a follow-up backend fix that deletes the cookie in `timeout_user_session`. |
+| `/api/timeout` calls Flask-Login `logout_user()` but never clears the `accessKey` cookie, so the next request signs the user back in from the 365-day JWT. The inactivity timeout is only a client-side redirect. | A | consider: security | Fixed in unit 6 (`a010c1c`) at the lead's request: `unset_jwt_cookies` on the timeout response. The token itself stays valid until expiry if copied elsewhere (stateless JWT); revocation is WP-5d. |
 | The cookie name has four definitions: `page_renderer.py:103`, `flask_user_views.py:41`, the config, and login | A, B | noted | Login now writes from config. The remaining literals belong to backend and are left for WP-5d (C-5). |
 | `create_auth_response` has a redundant `remember_me` parameter | C | dismissed | It sets the cookie's `max_age`, so it is needed. |
 | `conftest` sets environment variables at import time | C | noted | Needed because the modules read them at import, and `setdefault` keeps any real value. |
 | Grep-driven test that every `url_for('<bp>.<name>')` literal resolves | B | consider | A cheap guard against the next dangling endpoint. Suggested to qa or backend as a follow-up, not added here. |
+
+## Decision: `/api/field` (unit 7, SEC-4 open item 1)
+
+**Decision: fix it in the backend view, without core edits.** `RowCountLookup.get_row_count(filter, cache_key)` and `DataTimeBoundary.get_filtered_time_boundary(filter)` already take a caller-built filter and an optional cache key. `views/field.py` therefore builds the filter (field filter AND caller policy) and chooses the cache key itself. The lookups still run on the system client as `timeseries` and `timeBoundary` queries. For these two query types a top-level filter is complete (core-1's review, reviewer A), so no nested `dataSource` or aggregator escapes the policy.
+
+**Rules now in force** (`web/server/routes/views/field.py`, `web/server/routes/views/query_policy.py`):
+- **Validation before any Druid work.**
+  - More than `MAX_FIELD_IDS_PER_REQUEST` (20) ids returns 400.
+  - An id outside `zen_config.indicators.ID_LOOKUP` returns 404. That is the table `get_indicator_by_id` reads, so an accepted id can never crash the formula lookup.
+- **One policy decision per request.** `caller_policy_filter()` returns `None` for site administrators, for unregistered users under public access, and when the policy builds to nothing. Otherwise it returns the policy filter. `AuthorizedQueryClient.run_query`'s decorator uses the same function, so the field view and every other query share one rule (A, B, C asked for this).
+- **Cache.** With no policy, the query and the row-count cache key (the field id) are byte-for-byte what they were. With a policy, the filter is `and_policy_filter(field_filter, policy)` and the shared cache is bypassed (`cache_key=None`). The process-wide `row_count_cache` therefore only ever holds numbers for callers who see the whole datasource.
+- **The time boundary no longer passes a cache key.** In the web app, `druid_context.data_time_boundary` builds a new `DataTimeBoundary` per access, so the old `field__<id>` key never outlived a request. `PopulatingDruidApplicationContext` caches the property, but only scripts use that class (A, B).
+- **No lookup without a field filter.** A configured field whose filter is empty, because its constituents are missing (`INCOMPLETE_CALCULATED_INDICATORS`) or because of an unfiltered aggregation (a theta sketch with no `filter_field`, `HyperUniqueCount`), would count every row the caller can see. It now reports `count: 0` and runs no query (A, B, C).
+- **The formula is configuration** and is returned whatever the count (A, B, C, answering the open question). Only `count`, `startDate` and `endDate` depend on the caller's slice. When the slice has no time boundary, the row-count query is skipped.
+
+**Intended differences for callers who already saw everything (INV-2; reviewer to accept):**
+
+| Case | Before | After |
+|---|---|---|
+| Field with rows | count, dates, formula | identical: same Druid queries, same cache key |
+| Field with no rows | `count: 0`, `formula: null` | `count: 0`, formula returned |
+| Configured field with an empty filter | whole-datasource count and dates (not the field's rows) | `count: 0`, no Druid query, formula returned |
+| Id not in the indicator config (garbage, or a data-catalog-only field) | 500 (`get_indicator_by_id` dereferenced `None`) once the datasource had rows | 404 before any Druid work |
+| More than 20 ids | every id queried | 400 |
+
+Restricted callers now see only their slice. That is the intended INV-3 change and SEC-4.
+
+**Interrogate.** Three reviewers ran on the first version of the fix: A on opus, B on fable, and C on sonnet (C's report came through the lead). All three found no path where a restricted caller gets unfiltered numbers or another user's numbers. All three also found that callers with no policy get unchanged queries and cache keys.
+
+| Finding | Raised by | Category | Outcome |
+|---|---|---|---|
+| "No aggregations" was a proxy for "unknown id". It 404'd configured calculated indicators with missing constituents, and it missed configured fields whose filter is empty anyway. | A, B, C | act on | Known now means `ID_LOOKUP` membership. An empty field filter is a separate, explicit outcome (count 0, no query). |
+| The policy decision was re-evaluated per id: a config DB read and a policy build each time. The policy branch was copied into the view. | A, B, C | act on | `caller_policy_filter()` runs once per request and is shared with the `run_query` decorator. `_FieldRows` holds the lookups and interval for the request. |
+| Return the formula regardless of count | A, B, C | act on | Done; pinned by `test_empty_slice_has_no_numbers_but_keeps_the_formula`. |
+| The tests mocked the authorisation inputs and the cache | A, B, C | act on | The tests now use the real `RowCountLookup`, `DataTimeBoundary`, `_construct_authorization_filter` with `QueryNeed`s, and the `authentication_required` decorator. Users are run in turn (admin, restricted, admin) against one cache. |
+| Dead code: `FieldsApi(row_count_lookup)` and `ApiRouter` plumbing; `DataTimeBoundary.get_field_time_boundary` has no callers | B, C (A for the core method) | act on | Backend plumbing deleted. The core method is a request to core. |
+| `pydruid` `&` appends into an existing `and` filter in place | A (in passing) | act on | This exposed a regression in my unit 9 fix: and-shaped request filters were flattened and mutated. Fixed (`3681cb7`, `a89c55d`) with `and_policy_filter`, which always builds a new filter. |
+| Admin API tokens ignore their own `query_needs` | A, B, C | consider: security | Pre-existing parity with `run_query`. Open item 5; docstring states it. |
+| Restricted callers have no row-count cache | A, C | consider | Open item 6; request to core for a bounded, policy-keyed cache. The row count is skipped when the slice has no time boundary. |
+| 400/404 return werkzeug HTML and are logged at ERROR with a traceback | B, C | noted | Every `/api` 4xx in this app does the same (`error_handlers.py`). The old behaviour for these ids was a logged 500. The JSON envelope is C-10, landing in the FastAPI port. |
+| `ZenClient.request` (`$.getJSON`, success callback only) never settles on a 4xx, and `LegacyIndicatorAboutPanel` asks `/api/field` about data-catalog-only fields | B, C | noted | Same visible result as the old 500: no formula. Request to frontend-platform. |
+| `hide_constituents` indicators expose their formula | A | noted | Pre-existing: formulas were already returned whenever count > 0. The constituent names are visible through `/api2/query/fields`. |
+| `is_unrestricted_query_caller` may return a non-bool | C | dismissed | The function was replaced by `caller_policy_filter`, which returns `None` or a filter. |
 
 ## Contract changes
 
@@ -150,9 +196,14 @@ C-5's token claims gain `user_claims.remember_me: bool`. The change is additive,
 
 - [x] **backend (backend-2):** apply `docs/modernisation/work/WP-0c/backend.patch`, commit per unit. Done 2026-10-04 (units 2-5). Note that WP-0a (backend-0a) edits the Hasura proxy in `api.py`; this branch touches `api.py` at its imports, the dimension handler and route, `timeout_user_session` and `api_field_info`.
 - [x] **infra (moved to WP-0b by the lead):** delete `docker-compose.pipeline.yaml` lines 16-17 and drop `POSTGRES_DB_URI` from `.env.example` if nothing else documents it. The regression test `tests/infra/test_compose_environment_names.py` and `infra.patch` are no longer on this branch; infra-0b can take them from `32dca82` (`git show 32dca82:tests/infra/test_compose_environment_names.py`, `git show 32dca82:docs/modernisation/work/WP-0c/infra.patch`).
-- [ ] **lead:** route the "Open SEC-4 items" above (item 1 is critical) and the `/api/timeout` cookie gap.
+- [x] **lead:** route the "Open SEC-4 items" above and the `/api/timeout` cookie gap. Item 1 and the cookie gap were routed back to this WP and are fixed (units 7 and 6); item 3 is unit 8.
+- [ ] **lead:** route open SEC-4 items 2 (datasource-wide dates in page bootstrap and `data_upload_summary`), 5 (admin API tokens ignore their `query_needs`; security decision) and 6 (row-count cache for restricted callers) to WP-4e / WP-5d.
+- [ ] **core:** delete `DataTimeBoundary.get_field_time_boundary` (`web/server/data/time_boundary.py`). Its only caller was `views/field.py`, which now calls `get_filtered_time_boundary`. Its `field__<id>` key would leak restricted users' dates in `PopulatingDruidApplicationContext`, which caches `data_time_boundary`. Blocks nothing.
+- [ ] **core (WP-1b or WP-4e):** give `RowCountLookup` a bounded cache keyed on (field filter, policy filter digest) so restricted callers can share cached counts safely (open item 6). Today `row_count_cache` is an unbounded `defaultdict`. Blocks nothing.
+- [ ] **frontend-platform:** `ZenClient.request` (`web/client/util/ZenClient.js`) uses `$.getJSON` with only a success callback, so a 4xx or 5xx never settles the promise. `/api/field` now answers 404 for ids outside the indicator config. That is the case for data-catalog-only fields that `LegacyIndicatorAboutPanel` asks about; they were a 500 before. Reject on error, and only ask `FieldInfoService` about config fields, or retire it when this domain moves to FastAPI. Blocks nothing.
+- [ ] **qa (WP-2c):** record the `/api/field` contract changes from the table under "Decision: `/api/field`": 404, 400, and formula with count 0.
 - [ ] **lead:** the phase docs say "Alembic uses POSTGRES_DB_URI" (`phase-0-security-and-subtraction.md` 0c). That is wrong and should become "delete the unused variable".
-- [ ] **qa (WP-2a):** regenerate golden case `policy_include_all_all_time` in `tests/golden` after unit 9 lands. **INV-2 note:** the recorded Druid request changes from `{"type": "and", "fields": [null, <policy>]}` to `<policy>` alone. This is an intended difference: a real Druid rejected the old request, so no user ever received results from it. Requests whose request filter is non-empty are unchanged (pinned by `test_policy_is_anded_with_the_query_filter`). backend-2 did not edit `tests/golden`.
+- [ ] **qa (WP-2a):** regenerate golden case `policy_include_all_all_time` in `tests/golden` after unit 9 lands. **INV-2 note:** the recorded Druid request changes from `{"type": "and", "fields": [null, <policy>]}` to `<policy>` alone. This is an intended difference: a real Druid rejected the old request, so no user ever received results from it. Requests whose request filter is non-empty are unchanged, byte for byte, including `and`-shaped ones (pinned by `test_policy_is_anded_with_the_query_filter` and `test_an_and_query_filter_is_wrapped_not_mutated`). If any golden case was regenerated while `64dc60e` alone was on the branch, regenerate it again: that commit flattened `and` filters, and `a89c55d` restores the original shape. backend-2 did not edit `tests/golden`.
 - [ ] **qa:** for WP-2b, add an authz case showing a non-superuser's `run_query` carries their policy filter.
 - [x] **lead:** keep `/api/timeout` out of WP-0d. Done 2026-10-04.
 
@@ -168,6 +219,12 @@ C-5's token claims gain `user_claims.remember_me: bool`. The change is additive,
 - 2026-10-04 backend-2, unit 1: moved to WP-0b by the lead. Removed `tests/infra/test_compose_environment_names.py` and `WP-0c/infra.patch` from this branch; both stay recoverable from `32dca82`.
 - 2026-10-04 backend-2, unit 6 (`a076b1a` test, `a010c1c` fix): `/api/timeout` now calls `unset_jwt_cookies` on the timeout response. Check: before the fix 1 failed and 3 passed (`assert 'accessKey' in set()`); after, `pytest tests/web` 18 passed.
 - 2026-10-04 backend-2, unit 9 (lead request from WP-2a; `70ecd0e` test, `64dc60e` fix): null AND operand in the policy filter. Check: before the fix 2 failed (`fields: [None, ...]` and `AttributeError: 'NoneType' object has no attribute 'filter'`); after, `pytest tests/web` 21 passed. Golden regeneration is requested from qa (see Requests).
+- 2026-10-04 backend-2, unit 7 red (`f99d24d`): `/api/field` tests. Check on the old view: 4 failed (restricted count, unknown id x2, cap), 2 parity cases passed.
+- 2026-10-04 backend-2, unit 7 interrogate: A on opus, B on fable, C on sonnet (C via the lead). Synthesis and outcomes under "Decision: `/api/field`".
+- 2026-10-04 backend-2, unit 9 follow-up (`3681cb7` red, `a89c55d` fix): `and_policy_filter` builds a new `and` instead of using pydruid's in-place `&`. Check: the new case failed with the flattened shape before the fix; 4 passed after.
+- 2026-10-04 backend-2, unit 7 (`1a72037`): reworked after the interrogate. Check: on the pre-unit-7 view, the final tests give 6 failed and 2 passed. The restricted user got `42` (whole datasource) instead of `7`, and unknown ids raised `AttributeError` (a 500). After the fix, `pytest tests/web` gives 46 passed, the Flask app imports, and lint shows only `main`'s findings.
+- 2026-10-04 backend-2, unit 8 (`34c7e7b`): structural guard. Check: the scanner reports 3 unallowlisted findings on the pre-unit-7 `field.py` and `api.py`, and 0 now; 13 cases pass. It catches aliases (`ctx = current_app.druid_context`).
+- 2026-10-04 backend-2: status `review`.
 
 ## Evidence
 
@@ -186,12 +243,17 @@ C-5's token claims gain `user_claims.remember_me: bool`. The change is additive,
 
 **Lint.** `ruff check tests` is clean, and `black --skip-string-normalization -t py38` is clean on the tests and on `time_boundary.py`. On the patched production files, `ruff --select F` and black report only findings that are already on `main`: F401 in `api.py` and `template_renderer.py`, black on `api.py`, and black on `query_policy.py`. The patch adds none.
 
-**Not yet run, for backend-2:**
-- `verify` in the running app:
-  - a user without view permission on a dashboard lands on `/<locale>/unauthorized`;
-  - a "Remember me" login is not redirected by the inactivity timeout, and a normal login is;
-  - the field-info tooltip still loads.
-- The golden and authz suites, which do not exist yet (WP-2a, WP-2b).
+**backend-2, final branch head.** `PYTHONPATH=$PWD uv run --no-project -p 3.8 --with-requirements /tmp/reqs.txt --with 'pytest<8' python -m pytest tests/web -q` gives `46 passed`. The files are `test_api_routes` 1, `test_authorized_query_client` 1, `test_dashboard_unauthorized_redirect` 4, `test_session_persistence` 8, `test_timeout_route` 4, `test_query_policy_filter` 6, `test_field_info_route` 9 and `test_no_raw_queries_from_routes` 13.
+- `import web.server.app, web.server.routes.api, web.server.routes.views.field` succeeds with placeholder environment variables.
+- `ruff check tests/web` is clean. `black -S -t py38` is clean on all new and changed test files and on `field.py`, `query_policy.py`, `authentication.py` and `dashboard.py`. `ruff --select F` and black on `api.py` and `template_renderer.py` report only what is already on `main` (F401 `ROOT_SITE_RESOURCE_ID`, F401 `get_configuration`, and black's tuple unpack in `import_self_serve`).
+- Red-before-fix evidence for each unit is in the Log.
+
+**Runtime `verify`: deferred to the QA harness.** The app needs Druid with data, which is not available here. Steps:
+1. **Dashboard redirect.** Sign in as a user with no `view_resource` on a dashboard and open `/fr/dashboard/<name>?_external=1&_scheme=https://evil.example/x?`. Expect a 302 to `/fr/unauthorized` on the same host. Opening it signed out should give the login redirect.
+2. **Remember me, then timeout.** Sign in with "Remember me" ticked, set the inactivity cookie to expire (or wait `ui.sessionTimeout`), and expect no redirect and `/api/timeout` returning `{"timeout": false}`. Sign in without it and expect `{"timeout": true}`, a `Set-Cookie: accessKey=; Expires=Thu, 01 Jan 1970`, a redirect to `/login?timeout=1`, and the next `GET /api/...` returning 401 (before the fix it returned data). Needs `AUTOMATIC_SIGN_OUT` on.
+3. **`/api/field` as a restricted user.** Give a user a query policy for one district, open an indicator's About tab, and compare `GET /api/field/<id>` with an admin's: counts and dates match a district-filtered query, the formula is present, and the admin's numbers are unchanged before and after the restricted request (shared cache). Also check `GET /api/field/not_a_field` returns 404 and 21 ids return 400. Check one data-catalog-only field's About tab: no formula, as before.
+4. **Queries for a restricted user with no request filter.** Run a query with no filters as a policy user and expect results, not a Druid error (unit 9).
+- The golden and authz suites will judge INV-2 and INV-3 once they land (WP-2a, WP-2b). See the qa requests.
 
 ## Verdicts
 

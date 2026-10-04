@@ -60,6 +60,7 @@ None.
 - 2026-10-04 infra-1 unit 2: `POSTGRES_DB_URI:=` becomes `POSTGRES_DB_URI=` in `docker-compose.pipeline.yaml` (handed over from WP-0c); check: `uv run --no-project --with pytest pytest tests/infra` failed before (env key was `POSTGRES_DB_URI:`), 1 passed after.
 - 2026-10-04 infra-1 unit 3: base file publishes only nginx (redis, web, worker ports removed); dev binds postgres, redis, web to 127.0.0.1; db/minio files require an explicit bind address; check: `pytest tests/infra` 6 new tests failed before, 7 passed after; port summary under Evidence.
 - 2026-10-04 infra-1 unit 4: `:-changeme` fallbacks removed; `DEFAULT_SECRET_KEY`, `JWT_SECRET_KEY` (web, worker), `POSTGRES_PASSWORD`, `MINIO_ROOT_USER`/`MINIO_ROOT_PASSWORD` are `${VAR:?message}`; check: `pytest tests/infra` 14 new cases failed before, 27 passed after.
+- 2026-10-04 infra-1 unit 5: Redis runs with `--requirepass ${REDIS_PASSWORD:?}`; `REDISCLI_AUTH` for the healthcheck, which now matches `PONG`; web and worker get `REDIS_PASSWORD`, worker `BROKER_URL` carries it; check: `pytest tests/infra` 3 new cases failed before, 30 passed after; throwaway Redis rejects unauthenticated clients (Evidence). Merge-blocked on R2.
 
 ## Evidence
 
@@ -97,6 +98,23 @@ exit=1
 ```
 
 `tests/infra/test_compose.py::test_refuses_to_render_without_secret` covers unset and empty values for every required secret in every Compose file (14 cases); `test_no_default_secret_in_rendered_config` asserts `changeme` appears in no rendered file. An explicit `DEFAULT_SECRET_KEY=changeme` still renders; R1 makes the process refuse it.
+
+### Unit 5: Redis `requirepass`
+
+Throwaway project `wp0b-redis-check`, the base file's `redis` service plus an overlay that resets its volume (no data written), random test password:
+
+```
+up -d --wait redis                       -> Healthy
+redis-cli ping (no password)             -> NOAUTH Authentication required.
+redis-cli ping (wrong password)          -> WRONGPASS invalid username-password pair
+redis-cli ping (REDISCLI_AUTH from env)  -> PONG
+redis-cli -u redis://:<pw>@localhost:6379/0 ping (worker BROKER_URL form) -> PONG
+ps -o user,args                          -> redis    redis-server *:6379   (password not in the process title; runs as the redis user)
+healthcheck with wrong password          -> exit 1 (old `redis-cli incr ping` exited 0 on NOAUTH, so it could not detect a bad password)
+down                                     -> container and network removed, no volumes created
+```
+
+Not yet exercised: the web container against the password-protected Redis. That needs R2 and a built web image; QA should run it once R2 lands.
 
 ## Verdicts
 

@@ -33,6 +33,7 @@ BASE_ENV = {
     'MINIO_ROOT_USER': 'test-minio-user',
     'MINIO_ROOT_PASSWORD': 'test-minio-password',
     'MINIO_BIND_ADDRESS': '127.0.0.1',
+    'REDIS_PASSWORD': 'testredispassword',
 }
 
 
@@ -123,12 +124,27 @@ def test_standalone_servers_need_an_explicit_bind_address(
 REQUIRED_SECRETS = [
     (['docker-compose.yaml'], 'DEFAULT_SECRET_KEY'),
     (['docker-compose.yaml'], 'JWT_SECRET_KEY'),
+    (['docker-compose.yaml'], 'REDIS_PASSWORD'),
     (['docker-compose.yaml', 'docker-compose.dev.yaml'], 'DEFAULT_SECRET_KEY'),
     (['docker-compose.pipeline.yaml'], 'DEFAULT_SECRET_KEY'),
     (['docker-compose.db.yaml'], 'POSTGRES_PASSWORD'),
     (['docker-compose.minio.yaml'], 'MINIO_ROOT_USER'),
     (['docker-compose.minio.yaml'], 'MINIO_ROOT_PASSWORD'),
 ]
+
+
+def test_redis_requires_auth_and_clients_carry_the_password(tmp_path):
+    services = config(tmp_path, ['docker-compose.yaml'])['services']
+    password = BASE_ENV['REDIS_PASSWORD']
+
+    redis = services['redis']
+    assert redis['command'] == ['redis-server', '--requirepass', password]
+    assert redis['environment']['REDISCLI_AUTH'] == password
+
+    assert services['web']['environment']['REDIS_PASSWORD'] == password
+    worker_env = services['worker']['environment']
+    assert worker_env['REDIS_PASSWORD'] == password
+    assert worker_env['BROKER_URL'] == f'redis://:{password}@redis:6379/0'
 
 
 @pytest.mark.parametrize(('files', 'variable'), REQUIRED_SECRETS)

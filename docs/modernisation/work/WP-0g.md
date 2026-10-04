@@ -78,5 +78,5 @@ None.
 | Role | Verdict | Notes |
 |---|---|---|
 | qa | changes-requested | 2026-10-04 qa-0g: fixture gitignored so 6/49 tests fail on a clean checkout; 0-session run reports gate pass; unbounded int() on UA digits crashes; Edge iOS Version/ token misclassifies; 'bot' matches CUBOT; quadratic regex on long non-matching lines. Findings consolidated by the lead. |
-| reviewer | pending | |
+| reviewer | changes-requested | 2026-10-04 rev-0g: fixture not committed (gitignored *.log); gate compares a rounded share (5.04% passes) and passes with 0 sessions; runbook copies raw access log to /tmp; bot pattern too broad; deployment inference from folder; UC Browser labelled Chrome. Consolidated findings sent to the builder. |
 | security | n/a | |

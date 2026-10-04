@@ -34,7 +34,13 @@ Units, in order. Each line names the change and the check that ends it.
 2. The Flask proxy sends the admin secret, `X-Hasura-Role` and `X-Hasura-User-Id` derived from `current_user`, and refuses to call Hasura without a configured secret. Check: `tests/web/server/test_hasura_proxy.py` (red on main, green here), then `scripts/db/hasura/replay_relay_operations.py` through the real Flask app.
 3. `apply_metadata_snapshot.py` takes the secret from the environment (never argv), uses `/v1/metadata`, waits for Hasura, and exits non-zero on failure. Check: runs against v2.45.8 with no, wrong and right secret.
 4. Local dev Hasura (`start_hasura.sh`, `runserver.py`, `sync_graphql_schema.sh`) runs v2.45.8 pinned by digest, bound to 127.0.0.1, with an admin secret. Check: script runs with and without a secret, rerun and rotation.
-5. Compose changes for infra recorded under Requests, verified on a throwaway Compose project built from a scratch copy of `docker-compose.yaml`. Check: no published Hasura port, `docker compose config` refuses a missing secret, Hasura refuses requests without the secret.
+5. Compose changes for infra recorded under Requests, verified on a throwaway Compose project built from a scratch copy of `docker-compose.yaml`. Check: no published Hasura port; `docker compose config` refuses a missing secret; Hasura refuses requests without the secret.
+
+**How "fails without the secret" shows up.** The host cannot connect at all: no port is published. Inside the network, the response depends on the endpoint:
+- GraphQL endpoints (`/v1/graphql`, `/v1beta1/relay`) answer HTTP 200 with an `access-denied` GraphQL error and no `data`. That is Hasura's behaviour, not a pass.
+- `/v1/metadata` answers HTTP 401 `access-denied`.
+
+Checks must therefore assert the `access-denied` error code, not the HTTP status.
 
 All five units are done.
 
@@ -95,6 +101,8 @@ None.
 - 2026-10-04 backend-1 unit 5: compose request verified on scratch copy; check: config refuses missing secret, Hasura publishes no port, host curl to 8088 fails, in-network requests without or with a wrong secret are refused, with the secret answer.
 - 2026-10-04 infra-4 compose request applied to `docker-compose.yaml` on `mig/WP-0a-lock-down-hasura-infra`; check: `tests/infra/test_compose_hasura.py` 17 passed (17 failed before the change), real bring-up of hasura plus a throwaway Postgres refused requests without the secret.
 
+- 2026-10-04 backend-1 merged `mig/WP-0a-lock-down-hasura-infra` (fast-forward to e01ab9b, no conflict); check: `pytest tests/web/server/test_hasura_proxy.py` 5 passed, `pytest tests/infra/test_compose_hasura.py` 17 passed.
+
 ## Evidence
 
 Environment: throwaway Postgres 16 with all 142 Alembic revisions applied (`flask db upgrade` against a Druid stub), Hasura v2.11.3 and v2.45.8 containers on a private network and 127.0.0.1-only ports, and the web requirements in a Python 3.8 venv matching `Dockerfile_web-server`. Everything was torn down after the run. No real secrets were used. The admin secret was random, held in a 0600 file outside the repo.
@@ -102,7 +110,7 @@ Environment: throwaway Postgres 16 with all 142 Alembic revisions applied (`flas
 1. **Unit tests** (`tests/web/server/test_hasura_proxy.py`): on the branch, `5 passed`. With main's `web/server/routes/api.py` swapped in: `4 failed, 1 passed`. The one that passes guards the unchanged 401 for signed-out users without public access.
 2. **Role coverage** (`scripts/db/hasura/check_role_permissions.py`): `51 operations checked, 0 failures` on v2.11.3, on v2.45.8, on v2.45.8 loading metadata through the dev Compose mount (`/hasura-metadata`), and after an in-place v2.11 to v2.45 upgrade. With main's metadata: `52 failures`.
 3. **Hasura enforcement on v2.45.8** (direct requests):
-   - no secret: `access-denied` ("x-hasura-admin-secret required, but not found");
+   - no secret on `/v1beta1/relay`: HTTP 200 with an `access-denied` error and no `data` ("x-hasura-admin-secret required, but not found");
    - `anonymous` reading `category_connection`: `field 'category_connection' not found in type: 'query_root'`;
    - `anonymous` running a mutation: `no mutations exist`;
    - `user` reading `dashboard_connection`: not found;
@@ -121,7 +129,7 @@ Environment: throwaway Postgres 16 with all 142 Alembic revisions applied (`flas
    - `docker compose config` without the secret: `required variable HASURA_ADMIN_SECRET is missing a value`, exit 1.
    - With the secret, published ports: `hasura: []` (nginx 80/443, redis 6379, web 5000 and worker 61234 are unchanged and outside this WP).
    - `docker compose port hasura 8080`: `no port`. Host `curl 127.0.0.1:8088`: connection failed.
-   - In-network: no secret is `access-denied`; a wrong secret is `invalid x-hasura-admin-secret`; the right secret returns `{"data":{"__typename":"query_root"}}`; `/v1/version` returns `v2.45.8`.
+   - In-network on `/v1beta1/relay`, where both refusals are HTTP 200 GraphQL errors: no secret is `access-denied`; a wrong secret is `invalid x-hasura-admin-secret`; the right secret returns `{"data":{"__typename":"query_root"}}`; `/v1/version` returns `v2.45.8`.
 7. **Metadata script**: no secret gives `HASURA_ADMIN_SECRET must be set`, exit 1. A wrong secret gives `status code 401 ... access-denied`, exit 1. The right secret gives `Successfully applied metadata to .../v1/metadata`, exit 0, and `get_inconsistent_metadata` returns `is_consistent: true` on both versions.
 8. **Lint**: black (`-S`) clean. pylint 10.00 on `web/server/util/hasura.py`, `apply_metadata_snapshot.py`, `replay_relay_operations.py`, `runserver.py` and the test. The remaining pylint findings in `api.py` (lines 242, 254, and the unused `ROOT_SITE_RESOURCE_ID`) predate this branch. ruff is clean on the new files. mypy could not run locally: `mypy.ini` loads the `sqlmypy` plugin, which is not installed.
 9. **Compose, applied** (infra-4, `docker-compose.yaml` on `mig/WP-0a-lock-down-hasura-infra`, dummy env only, `--env-file /dev/null` so no `.env` is read):

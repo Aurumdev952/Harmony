@@ -34,3 +34,19 @@ def test_policy_is_anded_with_the_query_filter():
         'type': 'and',
         'fields': [selector, POLICY],
     }
+
+
+def test_an_and_query_filter_is_wrapped_not_mutated():
+    # pydruid's & appends into an existing "and" in place: that would change the
+    # request shape (INV-2) and edit a filter other queries may share.
+    selectors = [
+        {'type': 'selector', 'dimension': 'field', 'value': 'x'},
+        {'type': 'selector', 'dimension': 'region', 'value': 'r'},
+    ]
+    query_filter = (Dimension('field') == 'x') & (Dimension('region') == 'r')
+
+    assert _restricted_filter(query_filter) == {
+        'type': 'and',
+        'fields': [{'type': 'and', 'fields': selectors}, POLICY],
+    }
+    assert Filter.build_filter(query_filter) == {'type': 'and', 'fields': selectors}

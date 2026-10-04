@@ -167,6 +167,6 @@ All commands below ran on the branch after merging `mig/integration` at `e0c8228
 
 | Role | Verdict | Notes |
 |---|---|---|
-| qa | pending | |
+| qa | approved | 2026-10-04 qa-2f at 7b2f9b6: lock, cold uv sync (231 pkgs), CI run blocks replayed on a simulated PR merge commit, mypy parity with mypy.ini, requirements drift test, broken-case exit codes, actionlint 0 and WP-0f policy, new SHAs match tags. Follow-ups: hypothesis (and 2c/2d deps) in the dev group; make format-python stops on unfixable errors; druid_task_memory_stats dead code (delete); .vscode points at black (lead). |
 | reviewer | pending | |
 | security | pending | |

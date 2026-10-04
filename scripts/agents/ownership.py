@@ -8,6 +8,7 @@ Modes:
   ownership.py hook                        PreToolUse hook: read the event JSON on stdin and
                                            block Edit/Write by a harmony-* agent outside its paths
 """
+
 from __future__ import annotations
 
 import argparse

@@ -36,8 +36,7 @@ def _convert_to_mb(raw_size):
         return str(float(value) * 1000)
     if unit == 'B':
         return '0'
-    assert False, f'Unknown unit type: {unit}'
-    return 'ERR'
+    raise ValueError(f'Unknown unit type: {unit}')
 
 
 def build_row(log_row, timestamp):
@@ -50,14 +49,6 @@ def build_row(log_row, timestamp):
 
 def build_timestamp(log_row):
     return log_row[:19].replace('T', ' ')
-    return '%s-%s-%s %s:%s:%s' % (
-        raw_timestamp[:4],
-        raw_timestamp[4:6],
-        raw_timestamp[6:8],
-        raw_timestamp[9:11],
-        raw_timestamp[11:13],
-        raw_timestamp[13:15],
-    )
 
 
 def main():

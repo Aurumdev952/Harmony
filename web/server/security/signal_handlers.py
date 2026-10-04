@@ -18,7 +18,7 @@ from flask_principal import (
     identity_changed,
     identity_loaded,
 )
-from jwt import ExpiredSignatureError
+from jwt import ExpiredSignatureError, InvalidSignatureError
 from werkzeug.exceptions import BadRequest
 
 from log import LOG
@@ -301,10 +301,12 @@ def install_login_manager_signal_handlers(app, login_manager):
 
         try:
             verify_jwt_in_request_optional()
-        except ExpiredSignatureError:
-            # bypass jwt-extended's expiration callback for now, our own
+        except (ExpiredSignatureError, InvalidSignatureError):
+            # bypass jwt-extended's error callbacks for now, our own
             # `auth_decorator` will return JSON for API calls and redirects
-            # otherwise, and it's not really feasible with the callback
+            # otherwise, and it's not really feasible with the callback.
+            # A bad signature (a token signed with a previous JWT_SECRET_KEY, or a
+            # forged one) makes the request anonymous, like an expired token.
             pass
 
         auth_email = get_jwt_identity()

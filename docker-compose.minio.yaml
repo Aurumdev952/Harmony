@@ -3,13 +3,13 @@ services:
     image: minio/minio:latest
     restart: always
     ports:
-      - 9000:9000
-      - 9090:9090
+      - "${MINIO_BIND_ADDRESS:?set MINIO_BIND_ADDRESS to 127.0.0.1, or to this host's private IP when web or the pipeline runs elsewhere}:9000:9000"
+      - "${MINIO_BIND_ADDRESS:?}:9090:9090"
     volumes:
       - ${MINIO_DATA_FOLDER:-/localdisk/data}:/data
     environment:
-      - MINIO_ROOT_USER=${MINIO_ROOT_USER}
-      - MINIO_ROOT_PASSWORD=${MINIO_ROOT_PASSWORD}
+      - MINIO_ROOT_USER=${MINIO_ROOT_USER:?set MINIO_ROOT_USER}
+      - MINIO_ROOT_PASSWORD=${MINIO_ROOT_PASSWORD:?set MINIO_ROOT_PASSWORD to a random value of at least 8 characters}
     command:
       [
         "server",

@@ -16,7 +16,6 @@ instances:
       - docs/modernisation/work/WP-0d-evidence/sweep-web-summary.txt
       - docs/modernisation/work/WP-0d-evidence/routes-summary.txt
       - docs/modernisation/work/WP-0d-evidence/sweep-pipeline-trim-summary.txt
-      - tests/druid/test_hadoop_ingestion_removed.py
       - .claude/agent-memory/harmony-core-engineer/**
   - name: "backend-5"
     branch: "mig/WP-0d-dead-backend-code-backend"
@@ -24,6 +23,9 @@ instances:
       - web/server/app.py
       - web/server/routes/graphql_api.py
       - web/server/graphql/**
+      - scripts/db/graphql/**
+      - graphql/v2/**
+      - package.json
       - tests/web/conftest.py
       - tests/web/test_graphql_endpoint_removed.py
       - .claude/agent-memory/harmony-backend-engineer/**
@@ -110,7 +112,7 @@ At the lead's instruction on 2026-10-04, this branch merges `mig/decisions-0001-
   6. After review: backend `d0c8f78` (`/graphql` tool chain), then infra `318cd18`, which fast-forwards (gspread PyPy marker, cryptography pin dropped, `[mypy-graphql_relay.*]` removed), then `mig/integration` again (2026-10-05). `git ls-files .playwright-mcp` is empty.
 - The infra trim must never land without the backend deletion. Without it, `_register_routes` fails with `No module named 'flask_graphql'`.
 - The `etl-pipeline` image builds only once WP-0b's MinIO fix (`mig/WP-0b-ports-secrets-pins`) is merged. Until then, it stops at the `mc` download with HTTP 410, the same as on `main`. With WP-0b's Dockerfile, infra-5 built it with exit 0. The PyPy step skips `gspread`, so it installs no `cryptography` at all. Merge WP-0b before, or together with, WP-0d.
-- **Hand-off to WP-2f (`mig/WP-2f-uv-ruff-mypy-ci`, checked at `e07f929`).**
+- **Hand-off to WP-2f (`mig/WP-2f-uv-ruff-mypy-ci`, checked at `c671637`).** Rechecked on 2026-10-05 against the branch head `6ae5d9e`. Between them, `pyproject.toml` changes in no line this hand-off names: the removed packages, the five mypy overrides, the `gspread` line, the `requirements` target, and `mypy.ini` being absent.
   - WP-2f makes `pyproject.toml` the source of `requirements*.txt` (`make requirements` runs `uv run docker/export_requirements.py`), and it deletes `mypy.ini`. A trial merge of the two branches conflicts in all four `requirements*.txt` and in `mypy.ini`.
   - Whichever of WP-0d and WP-2f lands second must, in that WP:
     1. Remove the WP-0d packages from WP-2f's `pyproject.toml`:
@@ -159,11 +161,16 @@ Each request is the exact change verified in unit 4. The combined diff was appli
     - `pypy -m pip install --no-build-isolation -r requirements.txt -r requirements-pipeline.txt` resolves `cryptography>=38.0.3` to the `cryptography-47.0.0` sdist. There is no PyPy 3.8 wheel for it, and building it needs `maturin`, which is absent under `--no-build-isolation`.
     - Result: `ModuleNotFoundError: No module named 'maturin'`.
     - Baseline and trimmed builds fail identically. Suggested fix: pin `cryptography` to a version that has a `pp38` wheel in the PyPy install, or drop PyPy as WP-3b plans.
+- [ ] **infra (WP-2f)**: bring WP-2f.md's WP-0d hand-off in line with step 3 of this WP's hand-off (under Merge order). The reviewer cites WP-2f.md:83-85 at `c671637`; on the branch head `6ae5d9e` the same block is at WP-2f.md:114-117.
+  - Today the block still says to port "the PyPy `cryptography==41.0.7` marker line". infra-5 dropped that pin.
+  - Replace that bullet with: carry the PyPy marker onto `gspread` in `[project].dependencies` (`gspread>=5.4.0 ; platform_python_implementation != 'PyPy'`, with infra-5's comment), with no `cryptography` pin.
+  - In the mypy bullet, add `graphql_relay` as the fifth override to remove.
+  - This does not block WP-0d. It needs to be in place before whichever of the two merges second.
 - [x] **lead**: edit `docs/modernisation/phase-0-security-and-subtraction.md` section 0d. Done on `mig/integration`, and this branch picks it up when it next merges `mig/integration`.
   - [x] Drop "Delete the unused `/api/timeout` route". Section 0d now says to keep it.
   - [x] Replace "Point `zen_environment.js` at the Hasura environment, or delete it" with "Delete it".
   - [x] Note that the Hadoop deletion includes `legacy_task_builder.py` and `scripts/run_indexing.py`.
-  - [x] Optional: remove the `#Dask` / `dask-worker-space/` lines from `.gitignore`. `7d6c4ad` removed `dask-worker-space/`. The orphaned `#Dask` comment is still at `.gitignore:216` on `mig/integration`, as a one-line lead follow-up.
+  - [x] Optional: remove the `#Dask` / `dask-worker-space/` lines from `.gitignore`. `7d6c4ad` removed `dask-worker-space/`, and `b06c4bb` ("gitignore: drop the orphaned Dask heading") removed the `#Dask` comment. `mig/integration`'s `.gitignore` no longer matches `dask`.
 
 ## Log
 
@@ -181,6 +188,13 @@ Each request is the exact change verified in unit 4. The combined diff was appli
 - 2026-10-05 backend-5, reviewer fix: deleted the tool chain for the removed `/graphql` endpoint. That is `scripts/db/graphql/sync_schema.sh`, which introspected `http://0.0.0.0:5000/graphql` into `graphql/v2/schema.graphql`, the `graphql/v2/` snapshot of the graphene schema, and the `relay-web` npm script in `package.json`. `relay.config.js` and the `relay` script use `graphql/schema.graphql`, which stays. `graphqurl` stays, because `scripts/db/hasura/dev/sync_graphql_schema.sh` still runs `gq`. Check: `git grep -E "relay-web|graphql/v2|sync_schema\.sh|scripts/db/graphql"` over every tracked file (including Makefile, docs, `package.json` and CI) matches nothing outside this WP file; `package.json` parses as JSON.
 - 2026-10-05 core-2 unit 6 (review fixes 5-9): merged backend `d0c8f78`. Corrected the `/graphql` reference claim. Recorded the aniso8601 change. Replaced the bulky TSVs with summaries and reran the web sweep with `DRUID_HOST`. Removed the layout-asserting druid test, because WP-8b may add files under `resources/`; the native-indexing import test is kept. Ticked the lead request. Check: rerun web sweep with `DRUID_HOST` gives base 759/690 OK and merged 752/683 OK, 0 removed-package errors, diff = 7 deleted modules; `tests/web` + `tests/druid` 2 passed; ruff and black clean on the edited test.
 - 2026-10-05 core-2 unit 7: merged infra `318cd18` (fast-forward), then `mig/integration` (`.playwright-mcp` not tracked). Recorded the WP-2f hand-off under Merge order. Check: the web-server image rebuilt from the final tree builds (exit 0); the `DRUID_HOST` sweep gives 752 modules, 683 OK, 0 removed-package errors, identical to unit 6; the URL map gives 315 rules, identical to unit 5; `tests/web` + `tests/druid` 2 passed (uv, Python 3.8); `tests/infra` 79 passed (uv, Python 3.13); `tests/golden` 269 passed (`uv run pytest`, project env).
+- 2026-10-05 core-2 unit 8 (re-review edits, WP file only):
+  - The front matter now lists `tests/druid/test_hadoop_ingestion_removed.py` under data-platform-2 only. Core-2's unit 6 edit to it is logged above.
+  - backend-5 now claims `scripts/db/graphql/**`, `graphql/v2/**` and `package.json`.
+  - Added the infra (WP-2f) request for hand-off step 3. The hand-off is now cited at `c671637`, rechecked at `6ae5d9e`.
+  - Corrected the `#Dask` status (removed in `b06c4bb`) and the PyPy Limit note (infra-5 built the PyPy venv; the change adds the `gspread` marker).
+  - Merged `mig/integration`.
+  - Check: no code changed; `git grep gspread -- '*.py'` finds 0 importers.
 
 ## Evidence
 
@@ -314,7 +328,9 @@ Command: a grep over the repo, excluding `docs/`, `.claude/` and `node_modules`.
 - **Import sweep** in the CPython-only trimmed image (`/zenysis/venv/bin/python import_sweep.py pipeline data util db config models log`, `--network none`, dummy environment):
   - 398 modules: 393 OK, and none failed because of a removed package. Counts and every non-OK module: [`sweep-pipeline-trim-summary.txt`](WP-0d-evidence/sweep-pipeline-trim-summary.txt).
   - The 5 failures have nothing to do with this WP. Four modules call Druid at import time and get `ConnectionError` to `druid.invalid`: `config/harmony_demo/database.py`, `config/template/database.py`, `data/pydruid_query/pydruid_query.py` and `data/validation/scripts/validate_pivoted_csv.py`. That is a BE-2 item for WP-4a. The fifth is a mapper ordering error in `data.query.models.query_selections`.
-- **Limit.** PyPy resolution of the trimmed files cannot be shown while the pre-existing `cryptography`/`maturin` failure stands. The risk is low: the change only removes requirement lines, and no Python file in the repo imports `fuzzywuzzy`, `jellyfish` or `editdistance` (unit 2).
+- **Limit of core-2's unit 4 run.** I could not show PyPy resolution here, because of the pre-existing `cryptography`/`maturin` failure.
+  - *Superseded 2026-10-05:* infra-5 did build the PyPy venv, using WP-0b's Dockerfile in a scratch copy (see the infra-5 Evidence and log).
+  - The final change also does more than remove lines. It adds `; platform_python_implementation != 'PyPy'` to `gspread>=5.4.0` in `requirements.txt`, so PyPy installs no `gspread` and no `cryptography`. Nothing in the repo imports `gspread`.
 
 **Not run.**
 - The end-to-end smoke list from `testing.md` (`e2e/`) does not exist yet (WP-2e). In its place: the URL-map diff and the import sweeps above.
@@ -359,7 +375,7 @@ This was run on the merged head, which holds all four side branches plus `mig/in
 - **Item 8, druid test.** Removed `test_hadoop_ingestion_modules_are_gone` from `tests/druid/test_hadoop_ingestion_removed.py`. It asserted repository layout: `db/druid/indexing/resources/` must not exist, and two module names must not resolve. WP-8b may legitimately add files under `resources/`, and the import sweep already proves the modules are gone.
   - `test_native_indexing_imports_without_druid` stays.
   - Check: `uvx ruff check` and `black==22.6.0 -S --check` are clean. `tests/web` and `tests/druid` give **2 passed** (uv, Python 3.8, merged requirements).
-- **Item 9.** The lead request is ticked. The phase 0d text and the `.gitignore` edit are on `mig/integration`, and the orphaned `#Dask` comment is noted.
+- **Item 9.** The lead request is ticked. The phase 0d text and the `.gitignore` edit are on `mig/integration`, and the orphaned `#Dask` comment was later removed in `b06c4bb`.
 
 ### core-2 unit 7: the final integrated tree
 

@@ -35,8 +35,6 @@ services:
       context: ../extensions
     volumes:
       - zen_extensions:/druid/extensions
-    environment:
-      - ZEN_DRUID_VERSION=${DRUID_VERSION}
     logging: *default-logging
 
   broker:

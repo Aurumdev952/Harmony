@@ -32,9 +32,13 @@ def new_request_id() -> str:
     return uuid.uuid4().hex
 
 
+def is_well_formed_request_id(value: object) -> bool:
+    return isinstance(value, str) and bool(_WELL_FORMED_REQUEST_ID.fullmatch(value))
+
+
 def accept_request_id(value: Optional[str]) -> str:
     '''`value` when it is a well-formed request id, otherwise a new one.'''
-    if value and _WELL_FORMED_REQUEST_ID.fullmatch(value):
+    if value is not None and is_well_formed_request_id(value):
         return value
     return new_request_id()
 

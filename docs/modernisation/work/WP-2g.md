@@ -70,6 +70,7 @@ None.
 
 - 2026-10-04 infra-6 unit 1: claimed WP-2g and wrote the plan; check: `ownership.py who` on every planned path, all infra or shared.
 - 2026-10-04 infra-6 unit 2: `log/config.py` and `log/context.py` (JSON and text formatters, redaction, `LOG_FORMAT`/`LOG_STREAM`/`LOG_LEVEL`, excepthook), rotating files removed, `log` no longer imports `web`; check: `tests/infra/test_log_format.py` 39 passed on 3.9 and 3.8, `tests/web` 68 passed, ruff E/F/W/I/B clean, mypy --strict clean (3.13 and --python-version 3.8).
+- 2026-10-04 infra-6 unit 3: `log/request_id.py` (WSGI middleware), `log/flask_request.py` (install plus loaded-user id), `log/celery_signals.py` (keep logging config, `request_id` task header, task context), warnings captured into logging; check: `tests/web/test_request_id_logging.py` 16 passed on the 3.8 web env (startup test skips on the host env, which lacks flask_migrate), whole `tests/web` plus `tests/infra/test_log_format.py` 122 passed on the host env; a mutation that drops the header fails the published-task test; ruff and mypy --strict clean; a request through the real `create_app()` test client shown in [unit3_real_app_request.jsonl](WP-2g-evidence/unit3_real_app_request.jsonl).
 ## Evidence
 
 ## Verdicts

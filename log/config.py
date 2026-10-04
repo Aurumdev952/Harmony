@@ -249,7 +249,8 @@ def _log_uncaught_in_thread(args: Any) -> None:
 
 
 def configure_logging() -> None:
-    '''Apply `logging_config()` and log uncaught exceptions through it.'''
+    '''Apply `logging_config()`, and route warnings and uncaught exceptions to it.'''
     logging.config.dictConfig(logging_config())
+    logging.captureWarnings(True)
     sys.excepthook = _log_uncaught
     threading.excepthook = _log_uncaught_in_thread

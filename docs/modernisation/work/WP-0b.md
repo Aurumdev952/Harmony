@@ -74,6 +74,7 @@ None.
 - 2026-10-04 infra-1 unit 8: dev overlay runtime check; check: postgres 15.19 and redis 8.10.2 healthy, published on 127.0.0.1 only, Redis refuses unauthenticated clients from the host; torn down.
 - 2026-10-04 data-platform-1 R4.1: `FoolishPassword` removed from `druid_setup`; Compose requires `DRUID_POSTGRES_PASSWORD` (`${VAR:?}`) for postgres and the coordinator, Druid reads it through the `environment` password provider (in 0.23: `core/.../PasswordProvider.java` registers `environment`), the Makefile exports it from `druid_setup/.env`; check: `pytest tests/druid_setup` 9 failed before, 9 passed after.
 - 2026-10-04 data-platform-1 R4.2: single mode publishes no ZooKeeper, memcached or Postgres port; cluster master drops memcached and binds ZooKeeper and Postgres to `${DRUID_MASTER_HOST}`; check: port test failed for single and master before, 13 passed after; port summary under Evidence.
+- 2026-10-04 data-platform-1 R4.3: Druid 0.23.0, ZooKeeper 3.8.6, memcached 1.6.45 and Postgres 17.11-bookworm pinned by tag and digest; `DRUID_POSTGRES_IMAGE` selects a pinned 14/15/16 image for hosts whose metadata volume predates 17; `ZOOKEEPER_VERSION` removed; check: pin test failed for all four files before, 17 passed after; every tag re-resolved with `docker buildx imagetools inspect`.
 
 ## Evidence
 

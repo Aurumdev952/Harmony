@@ -4,6 +4,7 @@ Run with: uv run --no-project --with pytest pytest tests/druid_setup
 """
 
 import json
+import re
 import shutil
 import subprocess
 from pathlib import Path
@@ -154,3 +155,18 @@ def test_only_druid_processes_publish_on_all_interfaces(tmp_path, setup):
                 )
             else:
                 pytest.fail(f'{setup_id(setup)}: {name} publishes {port}')
+
+
+PINNED_IMAGE = re.compile(r'[\w./-]+:(?!latest@)[\w.-]*\d[\w.-]*@sha256:[0-9a-f]{64}')
+
+
+@needs_docker
+@pytest.mark.parametrize('setup', SETUPS, ids=setup_id)
+def test_images_are_pinned_by_version_and_digest(tmp_path, setup):
+    services = config(tmp_path, setup)['services']
+    unpinned = {
+        name: service['image']
+        for name, service in services.items()
+        if 'build' not in service and not PINNED_IMAGE.fullmatch(service['image'])
+    }
+    assert unpinned == {}

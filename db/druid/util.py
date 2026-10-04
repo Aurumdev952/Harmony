@@ -27,8 +27,39 @@ def _build_filter_workaround(filter_obj):
             _build_filter_workaround(f) for f in raw_filter['fields']
         ]
     elif filter_type in ['not']:
-        raw_filter['field'] = Filter.build_filter(raw_filter['field'])
+        raw_filter['field'] = _false_on_null(Filter.build_filter(raw_filter['field']))
     return raw_filter
+
+
+def _false_on_null(raw_filter):
+    '''Make each value comparison in a built filter false, not unknown, on a row
+    whose dimension is null: `leaf AND NOT dimension IS NULL`.
+
+    Druid 28 and later evaluate native filters with three-valued logic, so
+    `NOT Sex = F` drops rows with no Sex; legacy Druid kept them, and so does
+    this form. It is the bare leaf on legacy Druid. Leaves that test for null or
+    '' (one value on legacy Druid) are left alone, and nested `not` filters were
+    already rewritten when they were built.
+    '''
+    filter_type = raw_filter.get('type')
+    if filter_type in ('and', 'or'):
+        return {
+            **raw_filter,
+            'fields': [_false_on_null(field) for field in raw_filter['fields']],
+        }
+    if filter_type == 'selector':
+        values = [raw_filter['value']]
+    elif filter_type == 'in':
+        values = raw_filter['values']
+    else:
+        return raw_filter
+    if any(value in (None, '') for value in values):
+        return raw_filter
+
+    is_null = {'type': 'selector', 'dimension': raw_filter['dimension'], 'value': None}
+    if 'extractionFn' in raw_filter:
+        is_null['extractionFn'] = raw_filter['extractionFn']
+    return {'type': 'and', 'fields': [raw_filter, {'type': 'not', 'field': is_null}]}
 
 
 Filter.build_filter = _build_filter_workaround

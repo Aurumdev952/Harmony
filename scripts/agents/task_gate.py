@@ -115,8 +115,8 @@ def claim_problems(root: Path, text: str, base: str, branch: str) -> list[str]:
     from ownership import glob_to_regex  # noqa: PLC0415
 
     claims = instance_claims(text)
-    if not claims:
-        return []
+    if not claims or not any(claims.values()):
+        return ['no instance declares files: in the front matter (SPEC 7.2)']
     patterns = {
         name: [glob_to_regex(g) for g in globs] for name, globs in claims.items()
     }

@@ -36,6 +36,13 @@ def test_the_dashboards_own_origin_and_inline_urls_are_allowed(url):
         'file:///etc/passwd',
         'blob:https://attacker.invalid/1',
         'http://169.254.169.254/latest/meta-data/',
+        'http://[::1]:5000/',
+        'http://[fd00:ec2::254]/latest/meta-data/',
+        'http://[::ffff:169.254.169.254]/',
+        'http://web:5000@attacker.invalid/',
+        'http://attacker.invalid@web:5000/',
+        'wss://web:5000/socket',
+        'ftp://web:5000/',
         '',
     ],
 )

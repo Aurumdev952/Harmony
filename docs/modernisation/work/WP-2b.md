@@ -33,20 +33,22 @@ The suite records what the Flask path decides today. Later it is pointed at `har
 ### How to run
 
 ```bash
-tests/authz/run.sh                     # pure layer: uv, Python 3.8, the pinned web requirements
-tests/authz/stack.sh up                # private copy of the WP-2c stack (project harmony-wp2b-authz, port 58660)
+tests/authz/run.sh                     # pure layer, on the root uv project
+tests/authz/stack.sh up                # private instance of the WP-2c stack (project harmony-wp2b-authz, port 58660)
 eval "$(tests/authz/stack.sh env)"
 tests/authz/run.sh -m authz_http       # live-stack layer
 tests/authz/stack.sh down
 ```
 
-`run.sh` rewrites the `-e git+...` lines in `requirements*.txt` into direct references, because `uv run --with-requirements` rejects editable lines, then runs `uv run --no-project -p 3.8 --with-requirements <rewritten> --with 'pytest<8' --with pyyaml --with requests python -m pytest tests/authz`. The web stack pins Python 3.8, so this does not use Python 3.13. `stack.sh` needs `tests/contract/stack/` from WP-2c.
+`run.sh` is `uv run --with pyyaml --with hypothesis pytest tests/authz` on the root uv project (`pyproject.toml`, from WP-2a). That project pins the legacy web stack (Flask 1.0.1, the Flask-Potion fork) on Python 3.9, so this does not use Python 3.13. PyYAML and Hypothesis are added for the run until WP-2f folds the suites' extra needs into the dev group. `stack.sh` is a thin wrapper around `tests/contract/stack/stack.sh` (WP-2c): it sets `CONTRACT_PROJECT`, `CONTRACT_WEB_PORT` and `CONTRACT_USERNAME` and re-exports the env under `AUTHZ_*`.
 
 ## Contract changes
 
 None. The suite is written against today's Flask path and later re-pointed at `harmony.core.authz.can()` (C-2), which must agree case for case.
 
 ## Requests
+
+- [ ] lead: merge after WP-2c. The live layer (`tests/authz/http/`) runs the WP-2c stack through `tests/contract/stack/`, which does not exist on `mig/integration` yet. The pure layer has no such dependency. (blocks the live layer only)
 
 ## Log
 
@@ -70,11 +72,12 @@ None. The suite is written against today's Flask path and later re-pointed at `h
 
   Check: fresh stack (`stack.sh down && up`), then the whole suite gives 3085 passed. Running the live-stack layer twice more gives 569 passed each time, so provisioning is idempotent.
 - 2026-10-04 qa-3 unit 6: lead requests. Added `token_state_exclusion_is_dropped_leaving_no_filter` (Q8, reported by the WP-2a reviewer), and noted the admin-role convention and the WP-0h hand-off under H. Check: `tests/authz/run.sh -k token_` gives 14 passed. The full pure layer is re-run below.
+- 2026-10-05 qa-3 unit 7: review fixes (qa, reviewer and security all changes-requested). Merged `mig/integration` (root uv project from WP-2a). Potion: split reads (list/item GET go through `identity_get_item_needs` and the SQL list filter) from writes (`can(item)`), gave stand-ins distinct id columns, pinned the alert-notification `read_via` divergence (item check reads the parent PK, never reached over HTTP) and the SQL list-filter column separately, and added a coverage test so every Potion `(operation, type)` pair has a decision row (41 added, mostly `allow: [tag:superuser]`). Rebuilt P3 through a real admin JWT. Escalations: pinned N3 (role_moderator PATCHes its own role), N4 (role create/update attaches all-values policies and dataExport via the `find_by_id` bypass), N5 (group attaches a policy-carrying role), N6 (role `/users` grants to others), and recorded that the `/users` self-add is a 404 from the owner filter, not a refusal. Added the superuser-token-with-query_needs cases, the render routes (N1/N2, outbound renderer mocked), and API-token and admin-via-group token principals. Live layer now wraps the WP-2c stack, refuses a non-loopback base URL, and deletes every user and group it creates. `run.sh` dropped `exec` so the temp files it no longer writes cannot leak; it runs on the root project. Labelled every pinned defect with its finding id and the WP that flips it. Fixed the pylint E1111 (`principals.py` now uses a transient `QueryPolicy`). Check: pure layer `tests/authz/run.sh` gives 4672 passed, 575 skipped; `pylint tests/authz/principals.py` 10.00/10; live layer below.
 
 ## Evidence
 
-- `docs/modernisation/work/WP-2b-evidence/fresh-stack-run.txt`: output of `tests/authz/evidence_run.sh`. It recreates the stack, runs the whole suite with the stack env set (3085 passed), then runs `-m authz_http` twice (569 passed, then 569 passed).
-- Mutation checks for units 1 to 4 are in the log above. Every changed expectation failed exactly its own rows and nothing else.
+- `docs/modernisation/work/WP-2b-evidence/fresh-stack-run.txt`: output of `tests/authz/evidence_run.sh`. It recreates the stack, runs the whole suite with the stack env set, then runs `-m authz_http` twice (the second run shows the live provisioning is idempotent and the cleanup leaves the stack reusable). Counts are in the file header.
+- Mutation checks for units 1 to 4 and 7 are in the log above. Every changed expectation failed exactly its own rows and nothing else.
 - Hash-seed independence: the pure layer passes under PYTHONHASHSEED 0 to 5 and 123 (unit 2).
 - Phase 2b exit check ("every role type in the seed scripts has at least one allow case and one deny case"):
   - `test_every_seeded_role_has_an_allow_and_a_deny` covers the 23 non-admin roles in the pure table.
@@ -87,7 +90,7 @@ None. The suite is written against today's Flask path and later re-pointed at `h
   - The `query`, `query/granularities` and `query/dimension_values` Potion resources: they need Druid metadata to register.
   - Dashboard, alert and share HTTP flows: decided by `is_authorized`, which the pure table covers.
   - `public_access` on in the live stack: the pure layer covers the identity side (Q2, `anonymous_public`).
-- Property-based testing: `QueryNeed` intersection has a natural invariant, `(a & b) in a and (a & b) in b` for include-only needs. Hypothesis is not a project dependency, so adding it is left to the lead.
+- Property-based testing (`test_needs.py`, Hypothesis, already used by WP-2c and WP-2d): a set-model oracle over single-dimension, include-only needs. `&` is set intersection and `required in held` is "held is a superset". A property over the *full* domain (all-values and excludes) would have caught Q3, Q8 and the inverted `CONTAINMENT` row, but it fails on today's `DimensionFilter` algebra, so it is scoped to the well-behaved region and WP-4e, which fixes the algebra, owns widening it.
 
 ## Findings for security
 
@@ -130,11 +133,67 @@ The admin role is `/api2/role/1` by convention: the migrations seed it first, wi
 
 - **H1. A `group_admin` can make themselves site admin. (Critical.)** Run `POST /api2/group {"$uri": "", "name": "x", "roles": ["/api2/role/1"], "users": [], "acls": []}`. A non-superuser creator is added as the group's only member, so they inherit `RoleNeed('admin')`. `GET /admin` then renders the admin page. The cause is that `build_group` resolves role URIs with `Transaction.find_by_id`, which bypasses the `RoleResourceManager` filter, and nothing refuses the admin role. Pinned by `test_group_admin_becomes_site_admin_by_creating_a_group_with_the_admin_role`.
 - **H2. A `group_moderator` who belongs to any group can make themselves site admin. (Critical.)** `PATCH /api2/group/<id>` with `roles: [admin]` only needs sitewide `edit_resource` on group. Pinned by `test_group_moderator_becomes_site_admin_through_a_group_it_belongs_to`.
-- **H3. A `role_administrator` can grant themselves any permission except `RoleNeed('admin')`. (High.)** `POST /api2/role` accepts any `permissions`, `dashboardResourceRoleName`, `alertResourceRoleName`, `queryPolicies` and `dataExport`, and `add_current_user_to_role` adds the creator. This bypasses the `update_permissions` gate. By reading the code, `PATCH /api2/role/<id>` (`update_role`) goes through the same `build_role`; that path is not pinned. The unique constraint on `role.name` is the only thing that stops this from reaching `RoleNeed('admin')`. `_build_role_needs` grants superuser to any role whose *name* is `admin`, and `create_role` derives the name from the label (`label.lower().replace(' ', '_')`), so the label `Admin` collides with the seeded row. Pinned by `test_role_administrator_grants_itself_any_permission_through_a_new_role`.
+- **H3. A `role_administrator` can grant themselves any permission except `RoleNeed('admin')`. (High.)** `POST /api2/role` accepts any `permissions`, `dashboardResourceRoleName`, `alertResourceRoleName`, `queryPolicies` and `dataExport`, and `add_current_user_to_role` adds the creator. This bypasses the `update_permissions` gate. `PATCH /api2/role/<id>` (`update_role`) goes through the same `build_role`; that path is pinned as N3. The unique constraint on `role.name` is the only thing that stops this from reaching `RoleNeed('admin')`. `_build_role_needs` grants superuser to any role whose *name* is `admin`, and `create_role` derives the name from the label (`label.lower().replace(' ', '_')`), so the label `Admin` collides with the seeded row. Pinned by `test_role_administrator_grants_itself_any_permission_through_a_new_role`.
 - **H4. Saved queries have no owner check.** Any signed-in user reads any `/api2/user_query_session/<uuid>` (all 24 seeded roles get 200, anonymous gets 401). `POST /api2/user_query_session/generate_link` stores whatever `userId` the client sends. Pinned by `test_saved_queries.py`.
 - **H5. The user list hides only users who hold the admin role directly.** `UserResourceManager` filters on `user.roles`, so a user who is admin through a group shows up in non-admins' lists. Seen while running H1; not pinned, because a fixture admin-through-group user would also hit H1.
 - **H6. Not authorisation, but these block testing.** `GET /api2/user_query_session` and `GET /api2/dashboard_session` return 500 for everyone (`'Pagination' object is not iterable`). `POST /api2/user/<id>/roles` returns 500 (`role.permissions[0]` on a missing role). The suite reads saved queries item by item and assigns roles through `PATCH /api2/user/<id>`.
 - **Admin's deny case** (phase 2b exit check): `test_admin_cannot_delete_their_own_account` gives 400. A `user_admin` cannot change roles through the user form, because that needs SITE `edit_user`, so the response is 401 (`test_user_admin_cannot_change_roles_through_the_user_form`).
+
+### New findings from the security review (N1 to N6; decision 0004)
+
+Added in unit 7, pinned as today's behaviour.
+
+- **N1. Unauthenticated dashboard thumbnail render.** `/dashboard/<slug>/png/thumbnail` (`web/server/routes/page_renderer.py`) has no authentication or authorisation. The server mints a render-bot JWT (the render bot is a site admin) and renders the dashboard for an anonymous caller. The PDF and JPEG routes do require `view_resource`. Owner WP-0i. Pinned by `test_render_routes.py` (the outbound renderer is mocked; urlbox is never called).
+- **N2. Render-bot thumbnails served to policy-restricted viewers.** `/api2/storage/retrieve` renders the thumbnail under the render bot's token with every query need and caches it on the slug alone, so a viewer whose policy restricts them gets the same image. Owner WP-0i, then WP-1h. Pinned by `test_stored_thumbnail_is_rendered_by_the_render_bot_and_shared`.
+- **N3. `role_moderator` adds any permission to a role it holds.** `PATCH /api2/role/<id>` on a held role, via `build_role`. Owner WP-0h. Pinned by `test_role_moderator_adds_a_permission_to_a_role_it_holds`.
+- **N4. Role create/update attaches all-values query policies and `dataExport`.** `build_role` resolves query-policy URIs with `find_by_id`, bypassing `QueryPolicyResourceManager`, so a `role_administrator` can attach `/api2/query_policy/1` and `/2` and lift its own row-level filter. Owner WP-0h. Pinned by `test_role_administrator_attaches_all_values_policies_and_data_export`.
+- **N5. A group attaches a policy-carrying role.** A `group_moderator` can attach `_default_role` (all-values policies) to its group and gain them. Owner WP-0h. Pinned by `test_group_moderator_gains_all_values_policies_by_attaching_a_role`.
+- **N6. `PATCH /api2/role/<id>/users` grants a held role to others.** A `role_moderator` can add any user to a role it holds. Owner WP-0h. Pinned by `test_role_moderator_grants_a_role_it_holds_to_another_user`; verified through the admin view because the grantee's identity is cached for up to 10 minutes.
+- The `/users` self-add that decision 0004 lists is **not reachable**: the group item routes resolve through `GroupResourceManager._query` (own groups only), so a non-member moderator gets 404 before the sitewide check. The reachable group_moderator path is a member editing its group's roles (H2 / N5). Pinned by `test_group_moderator_cannot_reach_a_group_it_is_not_a_member_of`.
+
+Two more, found by calling the production functions, pinned as today:
+
+- **Alert `read_via`.** `AlertNotificationResource` read: the SQL list filter joins on the parent alert definition's `authorization_resource_id` (correct), but the item-level check (`HybridRelationshipNeed.__call__`) reads the parent's own primary key. No HTTP path evaluates the item check today. Owner accept until WP-5f; WP-4e's `can()` models it as the parent alert's resource. Pinned by `test_alert_notification_item_check_uses_the_parent_primary_key`.
+- **Superuser tokens ignore their own `query_needs`.** A `needs: ['*']` token keeps `RoleNeed('admin')`, so its `query_needs` never reach the filter and the query is unfiltered. Owner WP-4e; issuance WP-5d. Pinned by `superuser_token_ignores_its_own_query_needs` and `..._via_group_...`.
+
+### Security triage (from the WP-2b security review, 2026-10-05)
+
+Owners are the WPs that resolve each finding; "accept until phase N" means recorded and carried, no change in this WP.
+
+| ID | Severity | Owner | Note |
+|---|---|---|---|
+| Q1 | High | 0c | `/api/field` counts and dates outside the policy; fixed on WP-0c; suite pins once 0c merges |
+| Q2 | Medium | 4e | Public access gives any-Referer anonymous callers the whole datasource; human decides; public principal needs an explicit scope |
+| Q3 | Low | 4e | Token excludes lost, fails closed; no issuer |
+| Q4 | Low | 4e | Docstring and code disagree on claim keys; needs a claim schema rejecting unknown keys |
+| Q5 | Low | 4e | Narrows in the intended direction; define in token_scopes |
+| Q6 | Low | 4e | Hash-seed-dependent order; only admin explicit-needs token |
+| Q7 | Low | 4e | Dead code; do not port |
+| Q8 | Low | 4e | Wrong AND algebra; bounded by the account; 4e fixes the algebra |
+| I1 | Medium | 5d | Every signed-in user sees all users' emails, phones, ACLs, token ids; phase-0 strip optional |
+| I2 | Low | accept until 5f | Alert roles never reach `alert_definitions`; fails closed |
+| I3 | Low | 5d | Permissions seeded on the wrong resource type; fails closed |
+| I4 | Low | 4e | Correct narrowing; keep the pin |
+| I5 | Low | 4e | Id 0 becomes a sitewide check; unreachable; use typed ids |
+| P1 | Medium | accept until 5f/5b | No item permission on six resources; `POST /api2/share/email` is an open mail relay |
+| P2 | Low | 5d | Meta permission overrides have no effect; Potion goes in 5d |
+| P3 | Low | 4e | 3-dimension `QueryNeed` makes list filtering raise; no issuer |
+| P4 | Low | accept until 5h | Page denials return 200 |
+| H1 | High | 0h | `group_admin` becomes site admin (reproduced) |
+| H2 | High | 0h | `group_moderator` becomes site admin (reproduced) |
+| H3 | High | 0h | `role_administrator`; scope adds the PATCH path and policies/dataExport (N3, N4) |
+| H4 | Low | accept until 5b | Saved queries readable, attribution forgeable |
+| H5 | Low | 5d | Admins-via-group appear in non-admins' user lists (part of I1) |
+| H6 | Low | accept until phase 5 | 500s; trap: fixing list endpoints without an owner filter exposes every saved query and session |
+| Alert read_via | Low | accept until 5f | Item check uses the parent PK, never called; HTTP reads use the correct column |
+| Notification values | Medium | accept until 5f | Not filtered by the reader's query policy (`alerts_api_models.py:236-238`) |
+| N1 | High | 0i | Unauthenticated thumbnail render with render-bot admin scope |
+| N2 | High | 0i, then 1h | Render-bot thumbnails served to policy-restricted viewers |
+| N3 | High | 0h | `role_moderator` PATCHes its own role to any permission (reproduced) |
+| N4 | High | 0h | Role create/update attaches all-values policies via the `find_by_id` bypass; `dataExport` too (reproduced) |
+| N5 | High | 0h | Group attaches a policy-carrying role (reproduced) |
+| N6 | Medium | 0h | `PATCH /api2/role/<id>/users` grants a held role to others (reproduced) |
+| Superuser token | Low | 4e (issuance 5d) | `needs: ['*']` tokens ignore their own `query_needs` |
 
 ## Verdicts
 

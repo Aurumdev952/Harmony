@@ -14,6 +14,8 @@ from types import SimpleNamespace
 import pytest
 from flask import g
 from flask_principal import ItemNeed, RoleNeed
+from hypothesis import given
+from hypothesis import strategies as st
 
 from models.python.permissions import DimensionFilter, QueryNeed
 from tests.authz.principals import load_identity, principal_specs
@@ -36,13 +38,22 @@ def need(**dimensions):
 
 
 # (required, held, held covers required)
+# `{S1} in {all except S9}` is False even though an all-but-S9 holder clearly
+# covers S1: DimensionFilter.__contains__ (models/python/permissions.py:261-263)
+# only compares excludes as subsets and never widens an all-values holder to the
+# concrete value. An inverted containment: recorded as today (finding Q8-adjacent,
+# owner WP-4e), not a test bug.
 CONTAINMENT = [
     (need(source=['S1']), need(source=['S1', 'S2']), True),
     (need(source=['S1', 'S2']), need(source=['S1']), False),
     (need(source=['S1']), need(source=ALL), True),
     (need(source=ALL), need(source=['S1']), False),
     (need(source=ALL), need(source=ALL), True),
-    (need(source=['S1']), need(source=('all_except', ['S9'])), False),
+    (
+        need(source=['S1']),
+        need(source=('all_except', ['S9'])),
+        False,
+    ),  # inverted; see above
     (need(source=['S9']), need(source=('all_except', ['S9'])), False),
     (need(source=['S1']), need(source=['S1'], StateName=['A']), True),
     (need(source=['S1'], StateName=['A']), need(source=ALL), False),
@@ -55,6 +66,38 @@ CONTAINMENT = [
 @pytest.mark.parametrize('required,held,expected', CONTAINMENT)
 def test_query_need_containment(required, held, expected):
     assert (required in held) is expected
+
+
+# Property oracle for the well-behaved region only: single-dimension,
+# include-only needs, where a QueryNeed models a set of allowed values. `&` is
+# intersection and `required in held` is "held's set is a superset". The
+# all-values and exclude regions are deliberately excluded: that is where the
+# algebra diverges (Q3, Q8, the inverted CONTAINMENT row), and a property over
+# the full domain would fail on today's code. WP-4e, which fixes the algebra,
+# owns widening this oracle.
+_value_sets = st.lists(st.sampled_from('ABCDE'), min_size=1, max_size=5).map(set)
+
+
+@given(a=_value_sets, b=_value_sets)
+def test_include_only_intersection_matches_the_set_model(a, b):
+    combined = need(d=sorted(a)) & need(d=sorted(b))
+    expected = a & b
+    if expected:
+        (dim_filter,) = combined.dimension_filters
+        assert dim_filter.include_values == expected
+    else:
+        # No overlap collapses to an empty include set (deny), which carries no
+        # dimension filter in the resulting QueryNeed.
+        assert combined.dimension_filters == [] or not any(
+            f.include_values for f in combined.dimension_filters
+        )
+
+
+@given(required=_value_sets, held=_value_sets)
+def test_include_only_containment_matches_superset(required, held):
+    assert (need(d=sorted(required)) in need(d=sorted(held))) is held.issuperset(
+        required
+    )
 
 
 # (token need, account need, intersection)

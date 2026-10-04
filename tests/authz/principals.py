@@ -98,10 +98,10 @@ def resource_role(name: str) -> SimpleNamespace:
     )
 
 
-def query_policy(dimension: str, value: str | None) -> SimpleNamespace:
-    row = SimpleNamespace(dimension=dimension, dimension_value=value)
-    row.dimension_filters = QueryPolicy.dimension_filters.fget(row)
-    return row
+def query_policy(dimension: str, value: str | None) -> QueryPolicy:
+    # A transient model instance, never flushed: its `dimension_filters`
+    # property is the production one, so no reimplementation here.
+    return QueryPolicy(dimension=dimension, dimension_value=value)
 
 
 def role(name: str) -> SimpleNamespace:

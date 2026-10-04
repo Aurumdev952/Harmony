@@ -1,0 +1,5 @@
+{
+  "description": "TIME with only a granularity group: the key column is empty.",
+  "endpoint": "line_graph",
+  "policy": null
+}

@@ -1,0 +1,8 @@
+{
+  "description": "FORMULA whose Druid result carries NaN, Infinity, -Infinity and null post-aggregator values.",
+  "endpoint": "bar_graph",
+  "policy": null,
+  "druid": {
+    "special_values": true
+  }
+}

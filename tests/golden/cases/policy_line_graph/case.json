@@ -1,0 +1,16 @@
+{
+  "description": "Policy applied to both line graph queries (main and totals).",
+  "endpoint": "line_graph",
+  "policy": {
+    "query_policies": [
+      {
+        "dimension": "StateName",
+        "dimension_value": "Pará"
+      },
+      {
+        "dimension": "source",
+        "dimension_value": null
+      }
+    ]
+  }
+}

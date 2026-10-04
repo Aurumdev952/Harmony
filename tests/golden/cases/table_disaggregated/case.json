@@ -1,0 +1,5 @@
+{
+  "description": "TABLE raw download (serializeForDisaggregatedQuery groups: non-geo dimensions, day, every geo level with nulls); rows with every field null are dropped.",
+  "endpoint": "table/disaggregated",
+  "policy": null
+}

@@ -1,0 +1,8 @@
+{
+  "description": "hierarchy when Druid returns no rows.",
+  "endpoint": "hierarchy",
+  "policy": null,
+  "druid": {
+    "empty": true
+  }
+}

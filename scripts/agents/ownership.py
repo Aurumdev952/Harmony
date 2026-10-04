@@ -42,7 +42,9 @@ def repo_root(start: Path) -> Path:
         probe = probe.parent
     out = subprocess.run(
         ['git', '-C', str(probe), 'rev-parse', '--show-toplevel'],
-        capture_output=True, text=True, check=True,
+        capture_output=True,
+        text=True,
+        check=True,
     )
     return Path(out.stdout.strip())
 
@@ -76,7 +78,9 @@ def load_rules(root: Path) -> tuple[tuple[str, str, re.Pattern[str]], ...]:
     if not spec.exists():
         spec = Path(__file__).resolve().parents[2] / SPEC
     text = spec.read_text()
-    block = text.split('<!-- ownership:start -->', 1)[1].split('<!-- ownership:end -->', 1)[0]
+    block = text.split('<!-- ownership:start -->', 1)[1].split(
+        '<!-- ownership:end -->', 1
+    )[0]
     rules = []
     for line in block.splitlines():
         cells = [c.strip() for c in line.strip().strip('|').split('|')]
@@ -90,18 +94,18 @@ def load_rules(root: Path) -> tuple[tuple[str, str, re.Pattern[str]], ...]:
 
 
 def owner_of(root: Path, rel: str) -> str | None:
-    best: tuple[int, str] | None = None
+    best_score, best_role = -1, None
     for role, glob, regex in load_rules(root):
-        if role == SHARED or not regex.match(rel):
+        if not regex.match(rel):
             continue
         score = literal_prefix_len(glob)
-        if best is None or score > best[0]:
-            best = (score, role)
-    return best[1] if best else None
+        if score > best_score:
+            best_score, best_role = score, role
+    return best_role
 
 
 def is_shared(root: Path, rel: str) -> bool:
-    return any(role == SHARED and regex.match(rel) for role, _, regex in load_rules(root))
+    return owner_of(root, rel) == SHARED
 
 
 def may_edit(root: Path, role: str, rel: str) -> tuple[bool, str | None]:
@@ -116,21 +120,32 @@ def cmd_who(paths: list[str]) -> int:
         path = Path(raw).resolve()
         root = repo_root(path)
         rel = path.relative_to(root).as_posix()
-        print(f'{rel}\t{"shared" if is_shared(root, rel) else owner_of(root, rel) or "lead (unowned)"}')
+        print(
+            f'{rel}\t{"shared" if is_shared(root, rel) else owner_of(root, rel) or "lead (unowned)"}'
+        )
     return 0
 
 
-def cmd_check(role: str, base: str, head: str) -> int:
+def default_base() -> str:
+    probe = subprocess.run(
+        ['git', 'rev-parse', '--verify', '-q', 'mig/integration'], capture_output=True
+    )
+    return 'mig/integration' if probe.returncode == 0 else 'main'
+
+
+def cmd_check(roles: list[str], base: str, head: str) -> int:
     root = repo_root(Path.cwd())
     out = subprocess.run(
         ['git', '-C', str(root), 'diff', '--name-only', f'{base}...{head}'],
-        capture_output=True, text=True, check=True,
+        capture_output=True,
+        text=True,
+        check=True,
     )
     violations = []
     for rel in filter(None, out.stdout.splitlines()):
-        ok, owner = may_edit(root, role, rel)
-        if not ok:
-            violations.append(f'{rel} (owner: {owner or "lead"})')
+        verdicts = [may_edit(root, role, rel) for role in roles]
+        if not any(ok for ok, _ in verdicts):
+            violations.append(f'{rel} (owner: {verdicts[0][1] or "lead"})')
     for v in violations:
         print(v)
     return 1 if violations else 0
@@ -167,20 +182,35 @@ def cmd_hook() -> int:
 
 
 def main() -> int:
-    parser = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
+    parser = argparse.ArgumentParser(
+        description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter
+    )
     sub = parser.add_subparsers(dest='mode', required=True)
     who = sub.add_parser('who')
     who.add_argument('paths', nargs='+')
     check = sub.add_parser('check')
-    check.add_argument('--role', required=True)
-    check.add_argument('--base', default='main')
+    check.add_argument(
+        '--role',
+        required=True,
+        action='append',
+        help='repeat for a WP with supporting roles; a file passes if any listed role owns it',
+    )
+    check.add_argument(
+        '--base',
+        default=None,
+        help='defaults to mig/integration when it exists, else main',
+    )
     check.add_argument('--head', default='HEAD')
     sub.add_parser('hook')
+    sub.add_parser('base', help='print the default base ref for checks')
     args = parser.parse_args()
     if args.mode == 'who':
         return cmd_who(args.paths)
     if args.mode == 'check':
-        return cmd_check(args.role, args.base, args.head)
+        return cmd_check(args.role, args.base or default_base(), args.head)
+    if args.mode == 'base':
+        print(default_base())
+        return 0
     return cmd_hook()
 
 

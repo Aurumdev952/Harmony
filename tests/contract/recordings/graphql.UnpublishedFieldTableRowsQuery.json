@@ -1,0 +1,52 @@
+{
+  "content_type": "text/html",
+  "headers": [],
+  "id": "graphql.UnpublishedFieldTableRowsQuery",
+  "pinned": {},
+  "response_schema": {
+    "properties": {
+      "data": {
+        "properties": {
+          "unpublishedFieldConnection": {
+            "properties": {
+              "edges": {
+                "maxItems": 0,
+                "type": "array"
+              },
+              "pageInfo": {
+                "properties": {
+                  "endCursor": {
+                    "type": "null"
+                  },
+                  "hasNextPage": {
+                    "type": "boolean"
+                  }
+                },
+                "required": [
+                  "endCursor",
+                  "hasNextPage"
+                ],
+                "type": "object"
+              }
+            },
+            "required": [
+              "edges",
+              "pageInfo"
+            ],
+            "type": "object"
+          }
+        },
+        "required": [
+          "unpublishedFieldConnection"
+        ],
+        "type": "object"
+      }
+    },
+    "required": [
+      "data"
+    ],
+    "type": "object"
+  },
+  "route": "POST /api/graphql",
+  "status": 200
+}

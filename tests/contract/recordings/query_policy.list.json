@@ -1,0 +1,48 @@
+{
+  "content_type": "application/json",
+  "headers": [
+    "link",
+    "x-total-count"
+  ],
+  "id": "query_policy.list",
+  "pinned": {
+    "/[]/queryPolicyTypeId": [
+      1,
+      2
+    ]
+  },
+  "response_schema": {
+    "items": {
+      "properties": {
+        "$uri": {
+          "type": "string",
+          "x-format": "api-uri"
+        },
+        "dimension": {
+          "type": "string"
+        },
+        "dimensionValue": {
+          "type": "null"
+        },
+        "queryPolicyTypeId": {
+          "type": "integer"
+        },
+        "resource": {
+          "type": "string",
+          "x-format": "api-uri"
+        }
+      },
+      "required": [
+        "$uri",
+        "dimension",
+        "dimensionValue",
+        "queryPolicyTypeId",
+        "resource"
+      ],
+      "type": "object"
+    },
+    "type": "array"
+  },
+  "route": "GET /api2/query_policy",
+  "status": 200
+}

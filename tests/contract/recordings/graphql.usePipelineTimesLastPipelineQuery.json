@@ -1,0 +1,36 @@
+{
+  "content_type": "text/html",
+  "headers": [],
+  "id": "graphql.usePipelineTimesLastPipelineQuery",
+  "pinned": {},
+  "response_schema": {
+    "properties": {
+      "data": {
+        "properties": {
+          "pipelineRunMetadataConnection": {
+            "properties": {
+              "edges": {
+                "maxItems": 0,
+                "type": "array"
+              }
+            },
+            "required": [
+              "edges"
+            ],
+            "type": "object"
+          }
+        },
+        "required": [
+          "pipelineRunMetadataConnection"
+        ],
+        "type": "object"
+      }
+    },
+    "required": [
+      "data"
+    ],
+    "type": "object"
+  },
+  "route": "POST /api/graphql",
+  "status": 200
+}

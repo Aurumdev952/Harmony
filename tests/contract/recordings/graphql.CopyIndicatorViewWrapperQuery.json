@@ -1,0 +1,68 @@
+{
+  "content_type": "text/html",
+  "headers": [],
+  "id": "graphql.CopyIndicatorViewWrapperQuery",
+  "pinned": {},
+  "response_schema": {
+    "properties": {
+      "data": {
+        "properties": {
+          "dimensionConnection": {
+            "properties": {
+              "edges": {
+                "maxItems": 0,
+                "type": "array"
+              }
+            },
+            "required": [
+              "edges"
+            ],
+            "type": "object"
+          },
+          "node": {
+            "properties": {
+              "__typename": {
+                "type": "string"
+              },
+              "id": {
+                "type": "string"
+              },
+              "name": {
+                "type": "string"
+              },
+              "serializedCalculation": {
+                "properties": {
+                  "type": {
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "type"
+                ],
+                "type": "object"
+              }
+            },
+            "required": [
+              "__typename",
+              "id",
+              "name",
+              "serializedCalculation"
+            ],
+            "type": "object"
+          }
+        },
+        "required": [
+          "dimensionConnection",
+          "node"
+        ],
+        "type": "object"
+      }
+    },
+    "required": [
+      "data"
+    ],
+    "type": "object"
+  },
+  "route": "POST /api/graphql",
+  "status": 200
+}

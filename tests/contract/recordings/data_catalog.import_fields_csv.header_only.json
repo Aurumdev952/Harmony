@@ -1,0 +1,24 @@
+{
+  "content_type": "application/json",
+  "headers": [],
+  "id": "data_catalog.import_fields_csv.header_only",
+  "pinned": {},
+  "response_schema": {
+    "properties": {
+      "errorLogs": {
+        "maxItems": 0,
+        "type": "array"
+      },
+      "outputStats": {
+        "type": "string"
+      }
+    },
+    "required": [
+      "errorLogs",
+      "outputStats"
+    ],
+    "type": "object"
+  },
+  "route": "POST /api/import_data_catalog_fields_csv",
+  "status": 200
+}

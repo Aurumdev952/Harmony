@@ -1,0 +1,15 @@
+{
+  "content_type": "application/json",
+  "headers": [],
+  "id": "dashboard.cannot_view",
+  "pinned": {},
+  "response_schema": {
+    "items": {
+      "type": "string",
+      "x-format": "email"
+    },
+    "type": "array"
+  },
+  "route": "POST /api2/dashboard/<id>/cannot_view",
+  "status": 200
+}

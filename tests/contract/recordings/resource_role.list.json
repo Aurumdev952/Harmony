@@ -1,0 +1,57 @@
+{
+  "content_type": "application/json",
+  "headers": [
+    "link",
+    "x-total-count"
+  ],
+  "id": "resource_role.list",
+  "pinned": {},
+  "response_schema": {
+    "items": {
+      "properties": {
+        "$uri": {
+          "type": "string",
+          "x-format": "api-uri"
+        },
+        "name": {
+          "type": "string"
+        },
+        "permissions": {
+          "items": {
+            "properties": {
+              "id": {
+                "type": "integer"
+              },
+              "permission": {
+                "type": "string"
+              },
+              "resource_type_id": {
+                "type": "integer"
+              }
+            },
+            "required": [
+              "id",
+              "permission",
+              "resource_type_id"
+            ],
+            "type": "object"
+          },
+          "type": "array"
+        },
+        "resourceType": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "$uri",
+        "name",
+        "permissions",
+        "resourceType"
+      ],
+      "type": "object"
+    },
+    "type": "array"
+  },
+  "route": "GET /api2/resource_role",
+  "status": 200
+}

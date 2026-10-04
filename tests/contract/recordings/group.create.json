@@ -1,0 +1,39 @@
+{
+  "content_type": "application/json",
+  "headers": [],
+  "id": "group.create",
+  "pinned": {},
+  "response_schema": {
+    "properties": {
+      "$uri": {
+        "type": "string",
+        "x-format": "api-uri"
+      },
+      "acls": {
+        "maxItems": 0,
+        "type": "array"
+      },
+      "name": {
+        "type": "null"
+      },
+      "roles": {
+        "maxItems": 0,
+        "type": "array"
+      },
+      "users": {
+        "maxItems": 0,
+        "type": "array"
+      }
+    },
+    "required": [
+      "$uri",
+      "acls",
+      "name",
+      "roles",
+      "users"
+    ],
+    "type": "object"
+  },
+  "route": "POST /api2/group",
+  "status": 200
+}

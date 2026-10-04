@@ -1,0 +1,49 @@
+{
+  "content_type": "application/json",
+  "headers": [],
+  "id": "query.outliers_table",
+  "pinned": {},
+  "response_schema": {
+    "properties": {
+      "data": {
+        "items": {
+          "properties": {
+            "StateName": {
+              "type": "string"
+            },
+            "num_outliers": {
+              "type": "integer"
+            },
+            "num_values": {
+              "type": "integer"
+            },
+            "percentage_outliers": {
+              "type": "number"
+            }
+          },
+          "required": [
+            "StateName",
+            "num_outliers",
+            "num_values",
+            "percentage_outliers"
+          ],
+          "type": "object"
+        },
+        "type": "array"
+      },
+      "dimensions": {
+        "items": {
+          "type": "string"
+        },
+        "type": "array"
+      }
+    },
+    "required": [
+      "data",
+      "dimensions"
+    ],
+    "type": "object"
+  },
+  "route": "POST /api2/query/outliers_table",
+  "status": 200
+}

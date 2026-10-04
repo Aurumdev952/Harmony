@@ -1,0 +1,13 @@
+{
+  "content_type": "application/json",
+  "headers": [],
+  "id": "data_upload.sources_date_ranges",
+  "pinned": {},
+  "response_schema": {
+    "properties": {},
+    "required": [],
+    "type": "object"
+  },
+  "route": "GET /api2/data_upload_file_summary/get_sources_date_ranges",
+  "status": 200
+}

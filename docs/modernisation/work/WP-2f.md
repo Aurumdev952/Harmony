@@ -246,6 +246,19 @@ None of these blocks this WP.
   - actionlint 1.7.12 with shellcheck 0.11.0 exits 0, and a mutated `cancel-in-progress` expression is flagged;
   - zizmor 1.30.1 `--offline`: "No findings to report";
   - the re-created WP-0f policy: `policy OK`.
+- 2026-10-04 infra-2: pushed `de2e660` and opened PR #12 against `main`. First GitHub run, `37234169035`:
+  - python-313: success in 22 s (160 passed, strict mypy clean);
+  - JS lint: success;
+  - Python 3.9 job: cold `uv sync --locked` took 97 s, the lock check and pipeline tools passed, mypy was clean (517 files), and `ci/pytest_suites.sh` printed "all 8 suites passed".
+  - **Ruff failed, as the ratchet predicts for this base.** A PR into `main` carries all of `mig/integration`, so `HEAD^1` is `main` and the changed-file set is 80 files from other WPs. The result is 25 findings (F401 ×11, S105 ×4, S101 ×2, S310 ×2, S605 ×2, E711, S104, S506, S604) and 19 files to reformat. `ci/lint_python.sh main` reproduces the same findings locally. Against `mig/integration` (WP-2f's own 8 files) it exits 0.
+  - None of the failing files is infra's. Owners:
+    - core: `config/__init__.py`, `config/settings.py`, `web/server/data/time_boundary.py`;
+    - backend: `web/runserver.py`, `web/server/{app,routes/api,configuration/flask,util/template_renderer,util/util}.py` and `scripts/db/hasura/*`. S506 (`yaml.load` with `Loader`) and S310 (`urlopen`) are for security to look at;
+    - qa: `tests/golden/*`, `tests/pipeline/pipeline_cases.py`;
+    - lead: `scripts/create_user.py`, `scripts/agents/*`, `docs/modernisation/work/WP-0d-evidence/*`;
+    - shared: tests under `tests/web` and `tests/graphql`.
+  - setup-uv's post step (cache save) was skipped because the job failed, so the uv cache fills only on a green run.
+  - Lead's call: retarget PR #12 to `mig/integration`, where its own diff is lint-clean, or have the owners clean those files before `mig/integration` goes to `main` (Merge-order items, in-flight branches).
 
 ## Decisions
 
@@ -364,12 +377,16 @@ These ran after merging `mig/integration` at `2988d85`. `git ls-files .playwrigh
   - WP-0f policy script: `policy OK`;
   - zizmor 1.30.1 `--offline`: "No findings to report". Its 12 suppressed items are pedantic-persona notes: 6 anonymous definitions, 4 undocumented permissions, and 2 concurrency-limit notes on the push-only image workflows (`web.yml`, `pipeline.yml`);
   - `check-jsonschema --builtin-schema vendor.dependabot`: ok.
-- **Not verified.** No GitHub run yet: the lead asked not to push before the gates pass. The first PR run will show:
-  - how long `uv sync` takes cold on the runner (about 4.5 minutes locally, most of it building sdists);
-  - that `setup-uv` restores the cache;
-  - the timing of the python-313 job.
+- **GitHub run** (PR #12, run `37234169035`; Log, 2026-10-04):
+  - cold `uv sync --locked` took 97 s on the runner (about 4.5 minutes locally);
+  - the python-313 job took 22 s.
 
-  Dependabot only runs after merge to the default branch.
+  Still not verified:
+  - that `setup-uv` restores the cache. It saves only after a green job;
+  - the push-to-`main` run;
+  - Dependabot.
+
+  The last two need a merge to the default branch.
 
 ## Verdicts
 

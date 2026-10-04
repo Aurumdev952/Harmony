@@ -24,7 +24,8 @@ def pinned(name):
 @pytest.mark.skipif(shutil.which('uv') is None, reason='uv not available')
 def test_passlib_can_hash_with_the_installed_bcrypt():
     # scripts/create_user.py and Flask-User hash through passlib 1.7.4, which
-    # breaks on bcrypt >= 4.1. Without a pin, pip resolves the newest bcrypt.
+    # raises on bcrypt >= 5.0 (4.1 to 4.3 only log a version warning). Without
+    # a pin, pip resolves the newest bcrypt.
     bcrypt = pinned('bcrypt')
     assert bcrypt, 'bcrypt is not pinned in requirements.txt'
     script = (

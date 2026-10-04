@@ -118,6 +118,6 @@ Logs are under `/tmp/wp3a/` on the build host. Reviewers should rerun the comman
 
 | Role | Verdict | Notes |
 |---|---|---|
-| qa | pending | |
+| qa | approved | 2026-10-05 qa-3a at 8deaa9f: 16 tests pass on 3.8, 3.9, 3.11, 3.12, 3.13 and PyPy 3.9; 8 fail on 3.13 with the old hook; golden 269 with 0 drift; WP-2d suite (now 130) unchanged on 3.9 and PyPy and passes on 3.13 once future==1.0.0 is substituted; every harmony_demo module resolves identically on 3.9 and 3.13; DATASOURCE lookup lazy (import opens no socket; first read raises the same error); reload semantics kept; web app imports on 3.8. Note: builder's closed-port probe used :9 which never connects (InvalidURL). |
 | reviewer | pending | |
 | security | n/a | |

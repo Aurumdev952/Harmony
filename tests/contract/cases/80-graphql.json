@@ -102,6 +102,28 @@
       }
     },
     {
+      "id": "graphql.FieldAboutPanelQuery.seeded_field",
+      "route": "POST /api/graphql",
+      "body": {
+        "query": "relay:web/client/components/AdvancedQueryApp/QueryFormPanel/QueryBuilder/FieldCustomizationModule/FieldAboutPanel/__generated__/FieldAboutPanelQuery.graphql.js",
+        "variables": {
+          "id": "WzEsICJwdWJsaWMiLCAiZmllbGQiLCAiY29udHJhY3Rfc2VlZGVkX2ZpZWxkIl0="
+        }
+      },
+      "note": "Reads the field stack/seed_catalog.py seeds with a datasource mapping and a dimension mapping, so their item shapes are pinned. The id is Hasura's Relay node id for field contract_seeded_field."
+    },
+    {
+      "id": "graphql.FieldDetailsPageQuery.seeded_field",
+      "route": "POST /api/graphql",
+      "body": {
+        "query": "relay:web/client/components/DataCatalogApp/FieldDetailsPage/__generated__/FieldDetailsPageQuery.graphql.js",
+        "variables": {
+          "id": "WzEsICJwdWJsaWMiLCAiZmllbGQiLCAiY29udHJhY3Rfc2VlZGVkX2ZpZWxkIl0="
+        }
+      },
+      "note": "Reads the field stack/seed_catalog.py seeds with a datasource mapping and a dimension mapping, so their item shapes are pinned. The id is Hasura's Relay node id for field contract_seeded_field."
+    },
+    {
       "id": "graphql.CopyIndicatorViewWrapperQuery",
       "route": "POST /api/graphql",
       "body": {
@@ -120,6 +142,17 @@
           "id": "{category_node}"
         }
       }
+    },
+    {
+      "id": "graphql.DirectoryTableContainerQuery.root",
+      "route": "POST /api/graphql",
+      "body": {
+        "query": "relay:web/client/components/DataCatalogApp/DirectoryPage/DirectoryTableContainer/__generated__/DirectoryTableContainerQuery.graphql.js",
+        "variables": {
+          "id": "WzEsICJwdWJsaWMiLCAiY2F0ZWdvcnkiLCAicm9vdCJd"
+        }
+      },
+      "note": "Opens the root category, which holds contract_category and the seeded field with its datasource mapping. The id is Hasura's Relay node id for category root."
     },
     {
       "id": "graphql.BreadcrumbLeafItemQuery",
@@ -212,7 +245,7 @@
         "query": "relay:web/client/components/FieldSetupApp/FieldSetupPageHeaderActions/BatchPublishAction/__generated__/BatchPublishModalContentsQuery.graphql.js",
         "variables": {}
       },
-      "note": "Records no publishable field: a field is publishable only with a datasource mapping, and self_serve.import.exported_zip deletes the seeded one (WP-2c finding F13). The node shape is pinned by UnpublishedFieldTableRowsQuery."
+      "note": "Records an empty connection: a field is publishable only with a datasource mapping, and self_serve.import.exported_zip deletes the seeded one (WP-2c finding F13). Until F13 is fixed no recording pins the unpublished-field datasource-mapping item shape."
     },
     {
       "id": "graphql.EditableCalculationQuery",
@@ -282,31 +315,6 @@
           }
         }
       }
-    },
-    {
-      "id": "graphql.UnpublishedFieldTableRowsQuery",
-      "route": "POST /api/graphql",
-      "body": {
-        "query": "relay:web/client/components/FieldSetupApp/UnpublishedFieldsTable/UnpublishedFieldTableRows/__generated__/UnpublishedFieldTableRowsQuery.graphql.js",
-        "variables": {
-          "pageSize": 10,
-          "searchText": "%%"
-        }
-      },
-      "note": "The table wraps the search box text in % (UnpublishedFieldTableRows/index.jsx:35), so an empty box sends %%."
-    },
-    {
-      "id": "graphql.UnpublishedFieldTableRowsPaginationQuery",
-      "route": "POST /api/graphql",
-      "body": {
-        "query": "relay:web/client/components/FieldSetupApp/UnpublishedFieldsTable/UnpublishedFieldTableRows/__generated__/UnpublishedFieldTableRowsPaginationQuery.graphql.js",
-        "variables": {
-          "first": 10,
-          "searchText": "%%",
-          "after": null
-        }
-      },
-      "note": "The table wraps the search box text in % (UnpublishedFieldTableRows/index.jsx:35), so an empty box sends %%."
     },
     {
       "id": "graphql.NameRowMutation",
@@ -551,6 +559,31 @@
           ]
         }
       }
+    },
+    {
+      "id": "graphql.UnpublishedFieldTableRowsQuery",
+      "route": "POST /api/graphql",
+      "body": {
+        "query": "relay:web/client/components/FieldSetupApp/UnpublishedFieldsTable/UnpublishedFieldTableRows/__generated__/UnpublishedFieldTableRowsQuery.graphql.js",
+        "variables": {
+          "pageSize": 10,
+          "searchText": "%%"
+        }
+      },
+      "note": "The table wraps the search box text in % (UnpublishedFieldTableRows/index.jsx:35), so an empty box sends %%. Runs after CategoryInputMutation, which restores the category mapping that self_serve.import.exported_zip deletes (F13), so the mapping item shape is pinned."
+    },
+    {
+      "id": "graphql.UnpublishedFieldTableRowsPaginationQuery",
+      "route": "POST /api/graphql",
+      "body": {
+        "query": "relay:web/client/components/FieldSetupApp/UnpublishedFieldsTable/UnpublishedFieldTableRows/__generated__/UnpublishedFieldTableRowsPaginationQuery.graphql.js",
+        "variables": {
+          "first": 10,
+          "searchText": "%%",
+          "after": null
+        }
+      },
+      "note": "The table wraps the search box text in % (UnpublishedFieldTableRows/index.jsx:35), so an empty box sends %%. Runs after CategoryInputMutation, which restores the category mapping that self_serve.import.exported_zip deletes (F13), so the mapping item shape is pinned."
     },
     {
       "id": "graphql.UnpublishedFieldRowMutation",

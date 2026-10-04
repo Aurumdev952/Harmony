@@ -163,7 +163,29 @@
                           "type": "array"
                         },
                         "fieldDimensionMappings": {
-                          "maxItems": 0,
+                          "items": {
+                            "properties": {
+                              "dimension": {
+                                "properties": {
+                                  "id": {
+                                    "type": "string"
+                                  }
+                                },
+                                "required": [
+                                  "id"
+                                ],
+                                "type": "object"
+                              },
+                              "id": {
+                                "type": "string"
+                              }
+                            },
+                            "required": [
+                              "dimension",
+                              "id"
+                            ],
+                            "type": "object"
+                          },
                           "type": "array"
                         },
                         "id": {

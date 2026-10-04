@@ -13,12 +13,10 @@ Every HTTP endpoint that `web/client/` or `web/python_client/` calls, the Flask 
 ```bash
 tests/contract/stack/stack.sh up      # builds the image, generates secrets, starts the stack
 eval "$(tests/contract/stack/stack.sh env)"
-uv run --no-project --with requests python -m tests.contract.record --dry-run   # no network
-uv run --no-project --with requests python -m tests.contract.record             # re-record
-uv run --no-project --with pytest --with hypothesis --with jsonschema --with requests \
-  pytest tests/contract -q -m "not stack"   # offline checks only
-uv run --no-project --with pytest --with hypothesis --with jsonschema --with requests \
-  pytest tests/contract -q -m stack         # replay against CONTRACT_BASE_URL
+uv run --locked python -m tests.contract.record --dry-run   # no network
+uv run --locked python -m tests.contract.record             # re-record
+uv run --locked pytest tests/contract -q -m "not stack"   # offline checks only (CI: ci/pytest_suites.sh)
+uv run --locked pytest tests/contract -q -m stack         # replay against CONTRACT_BASE_URL
 tests/contract/stack/stack.sh down
 ```
 
@@ -210,7 +208,7 @@ Sent as `{query, variables}` to `POST /api/graphql`. Cases load the text from th
 | mutation | useParentCategoryChangeForCategoryMutation | `web/client/components/DataCatalogApp/DirectoryPage/hooks/ParentCategoryChange/__generated__/useParentCategoryChangeForCategoryMutation.graphql.js` | recorded |
 | mutation | useParentCategoryChangeForFieldMutation | `web/client/components/DataCatalogApp/DirectoryPage/hooks/ParentCategoryChange/__generated__/useParentCategoryChangeForFieldMutation.graphql.js` | recorded |
 | mutation | useSelfServeMutation | `web/client/components/DataUploadApp/AddDataModal/__generated__/useSelfServeMutation.graphql.js` | recorded |
-| query | BatchPublishModalContentsQuery | `web/client/components/FieldSetupApp/FieldSetupPageHeaderActions/BatchPublishAction/__generated__/BatchPublishModalContentsQuery.graphql.js` | recorded |
+| query | BatchPublishModalContentsQuery | `web/client/components/FieldSetupApp/FieldSetupPageHeaderActions/BatchPublishAction/__generated__/BatchPublishModalContentsQuery.graphql.js` | recorded (empty connection, F13: the self-serve import deletes the seeded datasource mapping) |
 | query | BreadcrumbLeafItemQuery | `web/client/components/DataCatalogApp/DirectoryPage/BreadcrumbPath/__generated__/BreadcrumbLeafItemQuery.graphql.js` | recorded |
 | query | BreadcrumbPathQuery | `web/client/components/DataCatalogApp/DirectoryPage/BreadcrumbPath/__generated__/BreadcrumbPathQuery.graphql.js` | recorded |
 | query | CopyIndicatorViewWrapperQuery | `web/client/components/DataCatalogApp/common/CreateCalculationIndicatorView/__generated__/CopyIndicatorViewWrapperQuery.graphql.js` | recorded |

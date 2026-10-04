@@ -254,10 +254,12 @@
       "route": "POST /api2/user/<id>/generate_api_token",
       "body": {},
       "path": "{invitee}/generate_api_token",
-      "note": "Returns a signed token without storing it; it authenticates only once the admin app saves the user with it (user.update.persist_api_token, WP-2c finding F12).",
+      "note": "Stores the token it returns, so it authenticates at once (WP-2c finding F12, fixed by backend at 48ff9a3).",
       "capture": {
         "api_token_uri": "/$uri",
-        "api_token_id": "/id"
+        "api_token_id": "/id",
+        "api_token_created": "/created",
+        "api_token_revoked": "/revoked"
       }
     },
     {
@@ -277,20 +279,20 @@
             "$uri": "{api_token_uri}",
             "id": "{api_token_id}",
             "isRevoked": false,
-            "created": null,
-            "revoked": null
+            "created": "{api_token_created}",
+            "revoked": "{api_token_revoked}"
           }
         ],
         "roles": [],
         "groups": []
       },
-      "note": "How the admin app stores a generated token: it PATCHes the user with the token in apiTokens (User.serialize(), web/client/services/models/User/index.js:139), because generate_api_token itself stores nothing (WP-2c finding F12)."
+      "note": "The admin app's save after generating a token: it PATCHes the user with the token in apiTokens (User.serialize(), web/client/services/models/User/index.js:139). The route already stored the token, and this save keeps the one copy (update_user_api_tokens inserts on conflict do nothing). created and revoked are sent back as the server returned them, as APIToken.serialize() does (YYYY-MM-DD)."
     },
     {
       "id": "user.get.with_api_token",
       "route": "GET /api2/user/<id>",
       "path": "{invitee}",
-      "note": "Reads the token stored by user.update.persist_api_token, so the apiTokens item shape is pinned."
+      "note": "Reads the stored token after the admin app's save, so the apiTokens item shape is pinned."
     },
     {
       "id": "user.delete",

@@ -10,6 +10,8 @@
 # `allow` names the principals that pass; every other principal must be denied.
 # `tag:<name>` expands to the principals carrying that tag.
 # `id: null` is a sitewide check (no resource id).
+# `pin` names the finding (docs/modernisation/work/WP-2b.md) and the WP that
+# owns or flips it. A pinned row records behaviour as it is today.
 
 checks:
   # Site permissions (page routes and custom API routes)
@@ -89,7 +91,7 @@ checks:
      allow: [tag:superuser, alert_owner]}
 
   # Users (user 42 is the principal itself, 43 is someone else)
-  - {check: [view_resource, user, null], used_by: "Potion user list",
+  - {check: [view_resource, user, null], used_by: "Potion user list", pin: "I1: defect pinned as today; flips in WP-5d",
      allow: [tag:signed_in]}
   - {check: [view_resource, user, 43], used_by: "dashboard transfer target, lookup_author",
      allow: [tag:signed_in]}
@@ -133,7 +135,7 @@ checks:
      allow: [tag:signed_in]}
   - {check: [edit_resource, configuration, 1], used_by: "/api2/configuration/<key>/set, reset",
      allow: [tag:superuser]}
-  - {check: [view_resource, resource, null], used_by: "Potion resource list",
+  - {check: [view_resource, resource, null], used_by: "Potion resource list", pin: "I1: defect pinned as today; flips in WP-5d",
      allow: [tag:signed_in]}
   - {check: [view_resource, query_policy, null], used_by: "Potion query_policy list",
      allow: [tag:signed_in]}

@@ -24,7 +24,7 @@ The suite records what the Flask path decides today. Later it is pointed at `har
 - **Live stack.** Marked `authz_http`, skipped unless `AUTHZ_BASE_URL` is set. Covers what only HTTP can reach: Potion list filtering, manager filters, decorator status codes, and seed drift.
 
 1. Principal builder plus the `is_authorized` decision table: every seeded role and the special principals (anonymous, public, ACL holders, group members, browser sessions, render tokens) against every check the app makes. Check: `tests/authz/run.sh`.
-2. Query-policy filter table: `_construct_authorization_filter` and `restrict_query_filter_to_user_permissions` over harmony_demo plus synthetic hierarchical configs, and `AuthorizedQueryClient.run_query` for non-superusers, superusers and public users (WP-0c request). `run_raw_query` is deliberately not tested while WP-0c decides it. Check: `tests/authz/run.sh`.
+2. Query-policy filter table: `_construct_authorization_filter` and `restrict_query_filter_to_user_permissions` over harmony_demo plus synthetic hierarchical configs, and `AuthorizedQueryClient.run_query` for non-superusers, superusers and public users (WP-0c request). Since WP-0c, `run_query` takes the filter from `caller_policy_filter` and ANDs it in with `and_policy_filter`; the user-scoped client has no `run_raw_query`, and `/api/field` applies the same filter. Those two paths are tested next to their code (`tests/web/test_authorized_query_client.py`, `tests/web/test_field_info_route.py`). Check: `tests/authz/run.sh`.
 3. Need algebra and token narrowing: `QueryNeed` and `DimensionFilter` containment and intersection, `QueryPermission.allows`, `_compute_token_item_needs` and `_compute_token_query_needs`. Check: `tests/authz/run.sh`.
 4. Potion permission wiring: the effective needs `ZenysisPrincipalMixin` gives each Potion resource for read, create, update and delete. Check: `tests/authz/run.sh`.
 5. Live-stack layer (`tests/authz/http/`): seed drift, per-role users provisioned through the admin API, page and API status codes, Potion list filtering, and the admin self-delete guard. Check: `tests/authz/run.sh -m authz_http` against `tests/authz/stack.sh up`.
@@ -49,7 +49,6 @@ None. The suite is written against today's Flask path and later re-pointed at `h
 ## Requests
 
 - [ ] lead: merge after WP-2c. The live layer (`tests/authz/http/`) runs the WP-2c stack through `tests/contract/stack/`, which does not exist on `mig/integration` yet. The pure layer has no such dependency. (blocks the live layer only)
-- [ ] infra: add `.hypothesis/` to `.gitignore` (Hypothesis writes its example database there when the suite runs). Not committed here; `.gitignore` is infra-owned. (does not block)
 
 ## Log
 
@@ -87,7 +86,6 @@ None. The suite is written against today's Flask path and later re-pointed at `h
   - WP-0c: `one_source_all_states[header|session]` and `superuser_is_not_filtered`.
   - WP-2a reviewer: Q8, `token_state_exclusion_is_dropped_leaving_no_filter`.
 - Not covered, and why:
-  - `AuthorizedQueryClient.run_raw_query`: WP-0c is deciding it.
   - The `query`, `query/granularities` and `query/dimension_values` Potion resources: they need Druid metadata to register.
   - Dashboard, alert and share HTTP flows: decided by `is_authorized`, which the pure table covers.
   - `public_access` on in the live stack: the pure layer covers the identity side (Q2, `anonymous_public`).
@@ -99,7 +97,7 @@ Recorded as they behave today. None of them was changed (INV-3). Each names the 
 
 ### Query policy (row-level)
 
-- **Q1. `/api/field/<field_ids>` runs Druid queries with no query policy.** `FieldsApi.get_field_summary` (`web/server/routes/views/field.py:83-110`) calls `druid_context.data_time_boundary.get_field_time_boundary` and `row_count_lookup.get_row_count`, which run through the system client's `run_raw_query` (`web/server/data/time_boundary.py`, `web/server/data/row_count.py:25`). So any signed-in user gets row counts and time boundaries for any field, outside their policy. `/api/dimension_info` behaves the same way. WP-0c is fixing `/api/field`. This suite pins the fixed behaviour once WP-0c lands. Until then, `AuthorizedQueryClient.run_raw_query` is deliberately not tested.
+- **Q1. `/api/field/<field_ids>` ran Druid queries with no query policy. Fixed by WP-0c (on `mig/integration`).** `get_field_summaries` (`web/server/routes/views/field.py`) now ANDs `caller_policy_filter()` into each field's filter with `and_policy_filter` and stops sharing the process-wide row-count cache for restricted callers. `AuthorizedQueryClient` no longer has `run_raw_query`. Tested next to the code: `tests/web/test_field_info_route.py` (restricted callers count only their slice and never see another caller's cached counts) and `tests/web/test_authorized_query_client.py`.
 - **Q2. Public access lifts every row-level restriction.** With `public_access` on, an anonymous visitor's queries skip the policy filter entirely (`apply_authorization_filters`, `query_policy.py:63`). Case: `anonymous_with_public_access_is_not_filtered`.
 - **Q3. Token `exclude_values` are never enforced, and they cost the token every other dimension.** `{source: {exclude_values: [S9]}}` intersects with an all-values account need into plain all-values. `DimensionFilter.__and__` drops excludes, and `_construct_single_filter` skips excludes on all-values entries. The other authorizable dimensions are lost, so the result is deny-all. Case: `token_exclude_values_are_dropped_and_other_dimensions_lost`.
 - **Q4. The `_install_token_needs` docstring documents `included_values` and `excluded_values`, but the code reads `include_values` and `exclude_values`.** A token built from the docstring is read as all values. Case: `token_docstring_key_included_values_is_read_as_all_values`.
@@ -163,7 +161,7 @@ Owners are the WPs that resolve each finding; "accept until phase N" means recor
 
 | ID | Severity | Owner | Note |
 |---|---|---|---|
-| Q1 | High | 0c | `/api/field` counts and dates outside the policy; fixed on WP-0c; suite pins once 0c merges |
+| Q1 | High | 0c | `/api/field` counts and dates outside the policy; fixed by WP-0c (merged to integration); tested in `tests/web/test_field_info_route.py` |
 | Q2 | Medium | 4e | Public access gives any-Referer anonymous callers the whole datasource; human decides; public principal needs an explicit scope |
 | Q3 | Low | 4e | Token excludes lost, fails closed; no issuer |
 | Q4 | Low | 4e | Docstring and code disagree on claim keys; needs a claim schema rejecting unknown keys |

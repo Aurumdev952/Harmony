@@ -1,7 +1,10 @@
 '''Row-level authorisation: what AuthorizedQueryClient.run_query sends to Druid.
 
-`AuthorizedQueryClient.run_raw_query` is not covered: WP-0c is deciding whether
-it applies the policy (SEC-4), and its behaviour is pinned once that lands.
+The filter comes from `caller_policy_filter` and is ANDed in by
+`and_policy_filter`. The other policy-carrying paths WP-0c added are tested next
+to their code: `/api/field` in tests/web/test_field_info_route.py, and the
+absence of an unfiltered `run_raw_query` on the user-scoped client in
+tests/web/test_authorized_query_client.py.
 '''
 
 from __future__ import annotations

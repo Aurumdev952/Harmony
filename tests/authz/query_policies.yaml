@@ -21,6 +21,9 @@
 # Cases without `jwt` run under both and must give the same filter. Cases with
 # `jwt` run once, with those claims.
 #
+# `pin` names the finding (docs/modernisation/work/WP-2b.md) and the WP that
+# owns or flips it. A pinned row records behaviour as it is today.
+#
 # `config` picks AUTHORIZABLE_DIMENSIONS and HIERARCHICAL_DIMENSIONS (see
 # `configs` below); harmony_demo is the real deployment module.
 
@@ -86,6 +89,7 @@ cases:
     policies: [[source, S1], [StateName, A]]
     expect: null
   - name: anonymous_with_public_access_is_not_filtered
+    pin: "Q2: pinned as today; owner WP-4e (public principal scope)"
     principal: anonymous_public
     policies: []
     expect: null
@@ -100,6 +104,7 @@ cases:
 
   # Explicit-needs tokens drop RoleNeed('admin'), so the policy filter applies
   - name: render_token_for_admin_is_filtered_by_token_query_needs
+    pin: "Q5: pinned as today; owner WP-4e (token_scopes)"
     principal: render_token:admin
     policies: []
     expect: null
@@ -144,26 +149,30 @@ cases:
     jwt: {needs: ['*'], query_needs: [{source: {include_values: [S1]}, StateName: {include_values: [A]}}]}
     expect: {and: [{in: [source, [S1]]}, {in: [StateName, [A]]}]}
   - name: token_exclude_values_are_dropped_and_other_dimensions_lost
+    pin: "Q3: defect pinned as today; flips in WP-4e"
     policies: [[source, null], [StateName, null]]
     jwt: {needs: ['*'], query_needs: [{source: {exclude_values: [S9]}}]}
     expect: {eq: [StateName, __NO_VAL__]}
   - name: token_state_exclusion_is_dropped_leaving_no_filter
+    pin: "Q8: defect pinned as today; flips in WP-4e"
     policies: [[source, null], [StateName, null]]
     jwt: {needs: ['*'], query_needs: [{StateName: {exclude_values: [Pará]}, source: {}}]}
     expect: null
   - name: token_docstring_key_included_values_is_read_as_all_values
+    pin: "Q4: defect pinned as today; flips in WP-4e"
     policies: [[source, null], [StateName, null]]
     jwt: {needs: ['*'], query_needs: [{source: {included_values: [S1]}}]}
     expect: {eq: [StateName, __NO_VAL__]}
   # Superuser tokens with needs ['*'] keep RoleNeed('admin'), so their own
-  # query_needs never reach the filter. Defect pinned as today (WP-0c review,
-  # Low); owner WP-4e, issuance in WP-5d.
+  # query_needs never reach the filter (WP-0c review, Low).
   - name: superuser_token_ignores_its_own_query_needs
+    pin: "Superuser token: defect pinned as today; flips in WP-4e (issuance WP-5d)"
     principal: role:admin
     policies: []
     jwt: {needs: ['*'], query_needs: [{source: {include_values: [S1]}}]}
     expect: null
   - name: superuser_via_group_token_ignores_its_own_query_needs
+    pin: "Superuser token: defect pinned as today; flips in WP-4e (issuance WP-5d)"
     principal: admin_via_group
     policies: []
     jwt: {needs: ['*'], query_needs: [{StateName: {include_values: [A]}}]}

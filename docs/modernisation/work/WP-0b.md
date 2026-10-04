@@ -1,7 +1,7 @@
 ---
 wp: "0b"
 title: "Close published ports, refuse default secrets, pin images"
-status: building
+status: review
 owner_role: "infra"
 instances:
   - name: "infra-1"
@@ -174,6 +174,27 @@ down                                  -> containers and network removed
 ```
 
 Not run: `make up DEV=1` with web and the pipeline. The dev image takes a long time to build (it compiles CPython), web needs a reachable Druid, and web against the password-protected Redis needs R2. QA should run the full `make up DEV=1` plus the smoke list once R1 to R3 land.
+
+## Deployment notes (operator action at upgrade)
+
+- Set `DEFAULT_SECRET_KEY`, `JWT_SECRET_KEY` (different values) and `REDIS_PASSWORD` (hex, URL-safe) in the web host's `.env`, generated with `openssl rand -hex 32`. Until they are set, `make up` stops at config time and leaves running containers untouched.
+- The README's production `.env` sample never listed `DEFAULT_SECRET_KEY`, so most deployments run on `changeme`. Setting a real key, and the JWT split (R3), signs every user out once.
+- Separate Postgres host (`docker-compose.db.yaml`): set `POSTGRES_BIND_ADDRESS` to the private interface IP, or to `127.0.0.1` when web shares the host. The same applies to `MINIO_BIND_ADDRESS`.
+- Anything that reached web on host port 5000, Redis on 6379 or the worker on 61234 directly now has to go through nginx, or through `127.0.0.1` in dev.
+- Postgres moves from 15.2 to 15.19 (minor upgrade, no dump or restore) and Redis is pinned to 8.10.2.
+
+## Deferrals
+
+- `curl https://deb.nodesource.com/setup_14.x | bash` in `docker/dev/Dockerfile` stays unpinned. WP-6b replaces Node 14 with Node 24 and deletes it (FE-11).
+- Python requirements are not hash-locked. WP-2f moves them to `uv.lock`.
+- deadsnakes PPA and apt packages in the pipeline and dev images are not version-pinned. WP-3b rewrites these images.
+- The dev overlay keeps its fixed `postgres`/`zenysis` credentials with `trust` auth. They are dev-only, bound to loopback, and the dev web and pipeline hard-code the same URL.
+- Hasura (port 8088 and image) is WP-0a's (R7). MinIO server image and `mc` successor: R5.
+
+## Leftovers on the build host
+
+- Test images `wp0b-web-server:check` (2.4 GB), `wp0b-pipeline-downloader:check` and `wp0b-dev-downloader:check`, kept so reviewers can inspect them. Remove with `docker rmi` when done.
+- The throwaway projects were torn down with `docker compose down` (no `-v`). Postgres and Redis declare `VOLUME`, so a few anonymous volumes may remain (for example `385c87b4…`, created 2026-10-04 17:32). The host also holds anonymous volumes from other agents, so I did not remove any.
 
 ## Verdicts
 

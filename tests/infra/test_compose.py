@@ -121,18 +121,6 @@ def test_standalone_servers_need_an_explicit_bind_address(
         assert entry['host_ip'] == '10.0.0.5', entry
 
 
-REQUIRED_SECRETS = [
-    (['docker-compose.yaml'], 'DEFAULT_SECRET_KEY'),
-    (['docker-compose.yaml'], 'JWT_SECRET_KEY'),
-    (['docker-compose.yaml'], 'REDIS_PASSWORD'),
-    (['docker-compose.yaml', 'docker-compose.dev.yaml'], 'DEFAULT_SECRET_KEY'),
-    (['docker-compose.pipeline.yaml'], 'DEFAULT_SECRET_KEY'),
-    (['docker-compose.db.yaml'], 'POSTGRES_PASSWORD'),
-    (['docker-compose.minio.yaml'], 'MINIO_ROOT_USER'),
-    (['docker-compose.minio.yaml'], 'MINIO_ROOT_PASSWORD'),
-]
-
-
 def test_redis_requires_auth_and_clients_carry_the_password(tmp_path):
     services = config(tmp_path, ['docker-compose.yaml'])['services']
     password = BASE_ENV['REDIS_PASSWORD']
@@ -172,6 +160,18 @@ def test_third_party_images_are_pinned_by_digest(tmp_path, files):
         assert len(digest) == 64, f'{name}: {image} is not pinned by digest'
         tag = reference.rpartition(':')[2]
         assert any(ch.isdigit() for ch in tag), f'{name}: {image} has no version tag'
+
+
+REQUIRED_SECRETS = [
+    (['docker-compose.yaml'], 'DEFAULT_SECRET_KEY'),
+    (['docker-compose.yaml'], 'JWT_SECRET_KEY'),
+    (['docker-compose.yaml'], 'REDIS_PASSWORD'),
+    (['docker-compose.yaml', 'docker-compose.dev.yaml'], 'DEFAULT_SECRET_KEY'),
+    (['docker-compose.pipeline.yaml'], 'DEFAULT_SECRET_KEY'),
+    (['docker-compose.db.yaml'], 'POSTGRES_PASSWORD'),
+    (['docker-compose.minio.yaml'], 'MINIO_ROOT_USER'),
+    (['docker-compose.minio.yaml'], 'MINIO_ROOT_PASSWORD'),
+]
 
 
 @pytest.mark.parametrize(('files', 'variable'), REQUIRED_SECRETS)

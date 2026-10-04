@@ -213,7 +213,6 @@ scripts/druid/query/output/[^.]*
 #Local playground
 playground/
 
-#Dask
 
 #mypy
 .dmypy.*
@@ -223,3 +222,6 @@ playground/
 .claude/settings.local.json
 .claude/agent-memory-local/
 scripts/agents/__pycache__/
+
+# Playwright MCP snapshots written into the checkout by browser sessions
+.playwright-mcp/

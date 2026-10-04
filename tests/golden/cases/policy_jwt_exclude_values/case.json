@@ -1,0 +1,25 @@
+{
+  "description": "JWT sign-in whose query_needs claim excludes Pará; the account may see all states and sources. Today the token-account intersection keeps no source need and no Pará exclusion, so the posted filter is source == __NO_VAL__ and every row is removed.",
+  "endpoint": "table",
+  "policy": {
+    "jwt_query_needs": [
+      {
+        "StateName": {
+          "exclude_values": [
+            "Pará"
+          ]
+        }
+      }
+    ],
+    "query_policies": [
+      {
+        "dimension": "StateName",
+        "dimension_value": null
+      },
+      {
+        "dimension": "source",
+        "dimension_value": null
+      }
+    ]
+  }
+}

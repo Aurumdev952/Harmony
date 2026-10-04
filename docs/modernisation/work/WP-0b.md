@@ -61,6 +61,7 @@ None.
 - 2026-10-04 infra-1 unit 3: base file publishes only nginx (redis, web, worker ports removed); dev binds postgres, redis, web to 127.0.0.1; db/minio files require an explicit bind address; check: `pytest tests/infra` 6 new tests failed before, 7 passed after; port summary under Evidence.
 - 2026-10-04 infra-1 unit 4: `:-changeme` fallbacks removed; `DEFAULT_SECRET_KEY`, `JWT_SECRET_KEY` (web, worker), `POSTGRES_PASSWORD`, `MINIO_ROOT_USER`/`MINIO_ROOT_PASSWORD` are `${VAR:?message}`; check: `pytest tests/infra` 14 new cases failed before, 27 passed after.
 - 2026-10-04 infra-1 unit 5: Redis runs with `--requirepass ${REDIS_PASSWORD:?}`; `REDISCLI_AUTH` for the healthcheck, which now matches `PONG`; web and worker get `REDIS_PASSWORD`, worker `BROKER_URL` carries it; check: `pytest tests/infra` 3 new cases failed before, 30 passed after; throwaway Redis rejects unauthenticated clients (Evidence). Merge-blocked on R2.
+- 2026-10-04 infra-1 unit 6: nginx-proxy, acme-companion, redis and postgres pinned by version tag and digest; check: `pytest tests/infra` pin test failed for 3 file sets before, 34 passed after; each tag re-resolved to its digest with `docker buildx imagetools inspect`.
 
 ## Evidence
 
@@ -115,6 +116,19 @@ down                                     -> container and network removed, no vo
 ```
 
 Not yet exercised: the web container against the password-protected Redis. That needs R2 and a built web image; QA should run it once R2 lands.
+
+### Unit 6: Compose images pinned (`docker buildx imagetools inspect <tag>`, 2026-10-04)
+
+| Before | After | Note |
+|---|---|---|
+| `nginxproxy/nginx-proxy:alpine` | `1.11.6-alpine@sha256:99376e95…c03364` | latest release |
+| `nginxproxy/acme-companion` (no tag) | `2.8.2@sha256:e3c5fb08…6f34cbc1` | latest release; `latest` points at a newer untagged build |
+| `redis:alpine` | `8.10.2-alpine@sha256:38117873…0a0e5a0` | same digest `redis:alpine` resolves to today, so no RDB downgrade for hosts that pulled recently. A host still on Redis 7 upgrades in place (8 reads 7's RDB) |
+| `postgres:15.2-alpine` (dev, db) | `15.19-alpine@sha256:f7d23353…127bf81` | minor upgrade within 15: same on-disk format, no dump/restore; picks up 17 minor releases of fixes |
+| `hasura/graphql-engine:v2.11.3…` | unchanged | WP-0a upgrades and pins it |
+| `minio/minio:latest` | unchanged | image no longer published anywhere (R5) |
+
+Each tag resolved to the pinned digest at the time of writing. `test_third_party_images_are_pinned_by_digest` fails if a new third-party image arrives without a version tag and digest.
 
 ## Verdicts
 

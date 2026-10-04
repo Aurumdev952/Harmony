@@ -147,6 +147,33 @@ def test_redis_requires_auth_and_clients_carry_the_password(tmp_path):
     assert worker_env['BROKER_URL'] == f'redis://:{password}@redis:6379/0'
 
 
+# Hasura is upgraded and pinned by WP-0a. MinIO no longer publishes server
+# images, so its replacement waits on a human decision (WP-0b request R5).
+UNPINNED_UNTIL_DECIDED = {'hasura', 'minio'}
+OWN_IMAGE_PREFIXES = ('ghcr.io/zenysis/', 'harmony-dev-web:')
+
+
+@pytest.mark.parametrize(
+    'files',
+    [
+        ['docker-compose.yaml', 'docker-compose.prod.yaml'],
+        ['docker-compose.yaml', 'docker-compose.dev.yaml'],
+        ['docker-compose.db.yaml'],
+        ['docker-compose.minio.yaml'],
+    ],
+)
+def test_third_party_images_are_pinned_by_digest(tmp_path, files):
+    services = config(tmp_path, files)['services']
+    for name, service in services.items():
+        image = service['image']
+        if name in UNPINNED_UNTIL_DECIDED or image.startswith(OWN_IMAGE_PREFIXES):
+            continue
+        reference, _, digest = image.partition('@sha256:')
+        assert len(digest) == 64, f'{name}: {image} is not pinned by digest'
+        tag = reference.rpartition(':')[2]
+        assert any(ch.isdigit() for ch in tag), f'{name}: {image} has no version tag'
+
+
 @pytest.mark.parametrize(('files', 'variable'), REQUIRED_SECRETS)
 @pytest.mark.parametrize('value', [None, ''], ids=['unset', 'empty'])
 def test_refuses_to_render_without_secret(tmp_path, files, variable, value):

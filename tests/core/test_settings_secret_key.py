@@ -7,13 +7,14 @@ import os
 import subprocess
 import sys
 from pathlib import Path
+from typing import Optional
 
 import pytest
 
 REPO = Path(__file__).resolve().parents[2]
 
 
-def _import_settings(secret_key: str | None) -> subprocess.CompletedProcess[str]:
+def _import_settings(secret_key: Optional[str]) -> subprocess.CompletedProcess:
     env = {
         key: value
         for key, value in os.environ.items()

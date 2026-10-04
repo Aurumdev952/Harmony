@@ -1,22 +1,27 @@
 '''Replay every golden case against a real Druid and diff null semantics.
 
     AUDIT=scripts/druid/null_audit/run_audit.py
-    uv run python $AUDIT index  --port 58891
+    uv run python $AUDIT index  --port 58891 [--raw]
     uv run python $AUDIT replay --port 58891 --out OUT/legacy [--candidate] [CASE...]
     uv run python $AUDIT diff OUT/legacy OUT/sqlnull
-    uv run python $AUDIT parity --port 58891 --js
+    uv run python $AUDIT parity --port 58891 [--js]
+
+`index` loads make_dataset's rows into `harmony_demo_20260101` with the
+production data schema (db/druid/indexing/common.py), or without its
+''-to-null transform with `--raw`, and waits until the new segments are served.
+
+`replay` POSTs each golden case and each audit case (cases/) through the golden
+harness (tests/golden/harness.py), answering the app's Druid queries from the
+live broker, and stores the app's queries, the raw Druid rows and the endpoint
+body per case. `--candidate` rewrites each query on its way to Druid as the
+builder fixes requested from core would build it (`candidate_filters`).
+
+`diff` lists every case whose raw Druid rows or endpoint body differ between
+two replays, with the first differing paths.
 
 `parity` groups every day from 1900 to 2100 by the native epi week extraction
 (tests/druid/epi_week.py) and, with `--js`, by the JavaScript one it replaces,
 and fails unless both agree with each other and with the Python port.
-
-`index` loads make_dataset's rows into `harmony_demo_20260101` with the
-production data schema (db/druid/indexing/common.py) and waits until every
-segment is loaded. `replay` POSTs each golden case through the golden harness
-(tests/golden/harness.py), answering the app's Druid queries from the live
-broker, and stores the queries, the raw Druid rows and the endpoint body per
-case. `diff` lists every case whose raw Druid rows or endpoint body differ
-between two replays, with the first differing paths.
 
 The golden fixtures are not touched: their responses are synthetic, so the
 audit is differential, the same data under two Druid configurations.

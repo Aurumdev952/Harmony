@@ -69,7 +69,7 @@ Each request is the exact change verified in unit 4. The combined diff was appli
   - `mypy.ini`: delete the `[mypy-flask_admin.*]`, `[mypy-flask_graphql.*]`, `[mypy-graphene.*]` and `[mypy-graphene_sqlalchemy.*]` sections (two lines each).
   - `log/config.py`: delete the `'segment'` logger from `DEV_CONFIG['loggers']`. It was the logger for segment-analytics-python.
   - Optional, outside the phase list: `python-Levenshtein==0.12.1` in `requirements.txt` has no importer either. It was fuzzywuzzy's accelerator. Delete it if the lead agrees.
-- [ ] **backend**: delete the empty GraphQL endpoint.
+- [x] **backend**: delete the empty GraphQL endpoint. Done by backend-5 on `mig/WP-0d-dead-backend-code-backend`.
   - Delete `web/server/routes/graphql_api.py` and the `web/server/graphql/` package. Its schema is `graphene.Schema()` with no types. `filters.py` and `schemas/` have no importers.
   - In `web/server/app.py` `_register_routes`, delete three lines: `from web.server.routes.graphql_api import GraphqlPageRouter`, `graphql_api_router = GraphqlPageRouter()` and `app.register_blueprint(graphql_api_router.generate_blueprint())`.
   - Leave `/api/timeout` in place (see Phase-file corrections).
@@ -95,6 +95,7 @@ Each request is the exact change verified in unit 4. The combined diff was appli
 - 2026-10-04 core-2 unit 2: proved targets dead, found `/api/timeout` live; check: `/tmp/wp0d_dead.sh` transcript under Evidence.
 - 2026-10-04 core-2 unit 3: wrote per-owner requests; check: each names files, lines and scope.
 - 2026-10-04 core-2 unit 4: verified combined change in scratch copy; check: web-server base/trim build exit 0, sweep diff = deleted modules only, URL map diff = `/graphql` only (Potion 247/247); pipeline CPython install passes base and trim, trimmed sweep 0 removed-package errors; pipeline image itself broken on `main` (mc 410, PyPy maturin), reported to infra.
+- 2026-10-04 backend-5: deleted `web/server/routes/graphql_api.py`, the `web/server/graphql/` package and the three `_register_routes` lines in `web/server/app.py`. Added `tests/web/test_graphql_endpoint_removed.py`, plus `tests/web/conftest.py` byte-identical to WP-0c's. Check: the test failed before the deletion (`/graphql` in the rule set) and passes after, in a Python 3.8 env built from `requirements*.txt` minus graphene, Flask-GraphQL and Flask-Admin (none importable); `web.server.app` imports there; `route_map.py` gives 316 rules before and 315 after, the only diff is `/graphql graphql.graphql DELETE,GET,POST,PUT`, and both outputs match core-2's `routes-base.tsv` and `routes-trim.tsv` exactly (247 `/api2` rules; `/api/timeout api.timeout_session POST` present). `git grep` for `graphql_api`, `web.server.graphql`, `GraphqlPageRouter`, `flask_graphql` and `graphene` outside `docs/` finds only the infra-owned `requirements-web.txt` and `mypy.ini` lines.
 
 ## Evidence
 

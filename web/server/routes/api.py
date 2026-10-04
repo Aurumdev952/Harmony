@@ -21,11 +21,9 @@ from pylib.file.file_utils import FileUtils
 # pylint: disable=E0611
 # werkzeug does contain the secure_filename function.
 from werkzeug import secure_filename
-from werkzeug.exceptions import InternalServerError
 
 import web.server.routes.views.aggregate
 import web.server.routes.views.authorization
-import web.server.routes.views.dimension
 from log import LOG
 from db.postgres.utils import make_temp_directory
 from models.alchemy.query import Field
@@ -110,15 +108,6 @@ class ApiRouter:
 
     def api_health_check(self):
         return web.server.routes.views.aggregate.health_check()
-
-    @authentication_required(is_api_request=True)
-    def api_dimension_info(self, dimension_name, dimension_value):
-        response = current_app.druid_context.data_time_boundary.get_dimension_summary(
-            dimension_name, dimension_value
-        )
-        if response:
-            return jsonify(Success(response))
-        raise InternalServerError('Dimension lookup failed.')
 
     @authentication_required(is_api_request=True)
     def api_field_info(self, field_ids):
@@ -380,13 +369,6 @@ class ApiRouter:
             self.api_is_authorized_multi,
             methods=['POST'],
         )
-        api.add_url_rule(
-            '/api/dimension/<dimension_name>/<dimension_value>',
-            'dimension_info',
-            self.api_dimension_info,
-            methods=['GET'],
-        )
-
         api.add_url_rule(
             '/api/field/<field_ids>',
             'api_field_ids',

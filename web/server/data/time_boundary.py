@@ -1,6 +1,6 @@
 # mypy: disallow_untyped_defs=True
 from datetime import datetime, timedelta
-from typing import Dict, Optional, cast
+from typing import Optional, cast
 from typing_extensions import TypedDict
 
 from pydruid.utils.filters import Dimension as DimensionFilter
@@ -55,9 +55,6 @@ class DataTimeBoundary:
         self.query_client = query_client
         self.time_boundary = time_boundary
 
-        # Map from cache key to response.
-        self.time_boundary_cache: Dict[str, DateTimeInterval] = {}
-
     def load_time_boundary_from_druid(self) -> None:
         """Set time_boundary to the event dict from the time boundary query"""
         LOG.info('Getting time boundary from Druid...')
@@ -72,26 +69,21 @@ class DataTimeBoundary:
         )
 
     def get_filtered_time_boundary(
-        self, query_filter: DimensionFilter = None, cache_key: Optional[str] = None
+        self, query_filter: Optional[DimensionFilter] = None
     ) -> Optional[DateTimeInterval]:
-        if cache_key not in self.time_boundary_cache:
-            query = dict(construct_time_boundary_query(self.datasource.name))
-            if query_filter:
-                query['filter'] = query_filter.build_filter()
+        query = dict(construct_time_boundary_query(self.datasource.name))
+        if query_filter:
+            query['filter'] = query_filter.build_filter()
 
-            result = self.query_client.run_raw_query(query)
-            if len(result) != 1:
-                # Bad result for time boundary.
-                return None
+        result = self.query_client.run_raw_query(query)
+        if len(result) != 1:
+            # Bad result for time boundary.
+            return None
 
-            output: DateTimeInterval = {
-                'min': _datetime_from_iso(result[0]['result']['minTime']),
-                'max': _datetime_from_iso(result[0]['result']['maxTime']),
-            }
-            if not cache_key:
-                return output
-            self.time_boundary_cache[cache_key] = output
-        return self.time_boundary_cache[cache_key]
+        return {
+            'min': _datetime_from_iso(result[0]['result']['minTime']),
+            'max': _datetime_from_iso(result[0]['result']['maxTime']),
+        }
 
     def get_min_data_date(self) -> str:
         """Return a string of format YYYY-MM-DD that was the minimum data date."""
@@ -124,15 +116,3 @@ class DataTimeBoundary:
         # safe to do this cast.
         time_boundary = cast(TimeBoundaryQueryResult, self.time_boundary)
         return time_boundary
-
-    # TODO: Consolidate these scattered field metadata queries into a
-    # single place.
-
-    def get_field_time_boundary(
-        self, field_id: str, field_filter: DimensionFilter
-    ) -> Optional[DateTimeInterval]:
-        '''Returns the min/max timestamp for the given field.'''
-        cache_key = f'field__{field_id}'
-        return self.get_filtered_time_boundary(
-            query_filter=field_filter, cache_key=cache_key
-        )

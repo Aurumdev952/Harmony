@@ -16,15 +16,15 @@ jobs:
     strategy:
       matrix:
         python-version: ['3.9']
-    env:
-      GH_TOKEN: ${{ github.token }}
-      PR_NUMBER: ${{ github.event.pull_request.number }}
     steps:
       - name: Checkout repo
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
       - name: List changed files
+        env:
+          GH_TOKEN: ${{ github.token }}
+          PR_NUMBER: ${{ github.event.pull_request.number }}
         run: |
           gh pr view "$PR_NUMBER" --json files -q '.files[].path' > "$RUNNER_TEMP/changed-files"
           echo "Changed files:"
@@ -103,15 +103,15 @@ jobs:
     strategy:
       matrix:
         node-version: ['18.17']
-    env:
-      GH_TOKEN: ${{ github.token }}
-      PR_NUMBER: ${{ github.event.pull_request.number }}
     steps:
       - name: Checkout repo
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
       - name: List changed files
+        env:
+          GH_TOKEN: ${{ github.token }}
+          PR_NUMBER: ${{ github.event.pull_request.number }}
         run: gh pr view "$PR_NUMBER" --json files -q '.files[].path' > "$RUNNER_TEMP/changed-files"
       - name: Use Node.js ${{ matrix.node-version }}
         id: setup-node

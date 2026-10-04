@@ -2,8 +2,6 @@ ENV_FILE?=.env
 -include $(ENV_FILE)
 
 COMMIT?=main
-DOCKER_NAMESPACE?=zengineering
-DOCKER_TAG?=latest
 DOCKER_HOST?=ssh://$(WEB_REMOTE)
 SERVICE?=
 PROJECT_NAME?=harmony-web
@@ -36,6 +34,9 @@ black: # Run black on all python files that have changed on this branch, with re
 
 build: # Build docker images (for development and production) using docker compose.
 	docker compose --env-file $(ENV_FILE) -f docker-compose.build.yaml build $(SERVICE)
+
+push: # Push the images built by `make build` to $DOCKER_NAMESPACE (default ghcr.io/zenysis).
+	docker compose --env-file $(ENV_FILE) -f docker-compose.build.yaml push $(or $(SERVICE),web-client web-server web etl-pipeline)
 
 convert: # Use the "docker compose config" command to render the compose file. (Useful to see the impact of environment variables.) 
 	$(COMPOSE_COMMAND) config
@@ -109,37 +110,3 @@ populate-query-models:
 
 run-bash: # Bash into a container
 	$(COMPOSE_COMMAND) run --rm $(SERVICE) /bin/bash
-
-web-client-build:
-	@docker build -t $(DOCKER_NAMESPACE)/harmony-web-client:$(DOCKER_TAG) \
-		-f docker/web/Dockerfile_web-client .
-
-web-client-push: # Push the web client docker image to the container registry.
-	docker push $(DOCKER_NAMESPACE)/harmony-web-client:$(DOCKER_TAG)
-
-web-server-build:
-	@docker build -t $(DOCKER_NAMESPACE)/harmony-web-server:$(DOCKER_TAG) \
-		-f docker/web/Dockerfile_web-server .
-
-web-server-push: # Push the web server docker image to the container registry.
-	docker push $(DOCKER_NAMESPACE)/harmony-web-server:$(DOCKER_TAG)
-
-web-build:
-	@docker build -t $(DOCKER_NAMESPACE)/harmony-web:$(DOCKER_TAG) \
-		-f docker/web/Dockerfile_web \
-		--build-arg NAMESPACE=$(DOCKER_NAMESPACE) \
-		--build-arg TAG=$(DOCKER_TAG)  .
-
-web-push: # Push the web docker image to the container registry.
-	docker push $(DOCKER_NAMESPACE)/harmony-web:$(DOCKER_TAG)
-
-etl-pipeline-build:
-	@docker build -t $(DOCKER_NAMESPACE)/harmony-etl-pipeline:$(DOCKER_TAG) \
-		-f docker/pipeline/Dockerfile  .
-
-etl-pipeline-push: # Push the etl pipeline docker image to the container registry.
-	docker push $(DOCKER_NAMESPACE)/harmony-etl-pipeline:$(DOCKER_TAG)
-
-all-build: web-client-build web-server-build web-build etl-pipeline-build
-
-all-push: web-client-push web-server-push web-push etl-pipeline-push # Push all docker images.

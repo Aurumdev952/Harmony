@@ -36,6 +36,12 @@ jobs:
           uv lock --check --project ci/tools313
       - name: Install
         run: uv sync --locked
+      - name: Pipeline suite tools
+        # tests/pipeline runs the Zeus steps, which shell out to lz4, lz4cat and pigz.
+        # Installed before the linters so a lint failure cannot skip it.
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y --no-install-recommends lz4 pigz
       - name: Ruff
         env:
           RUFF_OUTPUT_FORMAT: github
@@ -44,17 +50,12 @@ jobs:
         # Run it even if ruff fails, so we can see all the errors at once.
         if: '!cancelled()'
         run: uv run --locked mypy
-      - name: Pipeline suite tools
-        # tests/pipeline runs the Zeus steps, which shell out to lz4, lz4cat and pigz.
-        run: |
-          sudo apt-get update -qq
-          sudo apt-get install -y --no-install-recommends lz4 pigz
       - name: Pytest
-        # Every suite under tests/ runs here; tests/infra runs in the 3.13 job.
-        # The contract replay needs the compose stack: it skips without
-        # CONTRACT_BASE_URL, and tests marked `stack` are deselected.
+        # Every directory under tests/ runs, each in its own process; tests/infra
+        # runs in the 3.13 job. The contract replay needs the compose stack: it
+        # skips without CONTRACT_BASE_URL, and tests marked `stack` are deselected.
         if: '!cancelled()'
-        run: uv run --locked pytest -m 'not stack'
+        run: ci/pytest_suites.sh
 
   python-313:
     name: Python 3.13 - standalone tools

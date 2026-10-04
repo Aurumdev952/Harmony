@@ -17,6 +17,13 @@ fi
 base=${1:?usage: ci/lint_python.sh [--fix] <base-ref>}
 cd "$(git rev-parse --show-toplevel)"
 
+# Resolved before anything else, so set -e stops on a bad ref or a shallow clone
+# instead of reporting "no Python files changed".
+merge_base=$(git merge-base HEAD "$base")
+changed_list=$(mktemp)
+trap 'rm -f "$changed_list"' EXIT
+git -c core.quotePath=false diff -z --name-only --diff-filter=d "$merge_base" -- '*.py' >"$changed_list"
+
 status=0
 uv run --locked ruff check --select E9,F63,F7,F82 . || status=1
 
@@ -24,7 +31,7 @@ uv run --locked ruff check --select E9,F63,F7,F82 . || status=1
 changed=()
 while IFS= read -r -d '' file; do
   changed+=("$file")
-done < <(git -c core.quotePath=false diff -z --name-only --diff-filter=d --merge-base "$base" -- '*.py')
+done <"$changed_list"
 
 if ((${#changed[@]} == 0)); then
   echo "no Python files changed since the merge-base with $base"

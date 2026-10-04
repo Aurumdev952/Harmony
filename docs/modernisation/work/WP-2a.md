@@ -236,6 +236,6 @@ Every fixture was recorded from, and replays green against, the current code.
 
 | Role | Verdict | Notes |
 |---|---|---|
-| qa | changes-requested | 2026-10-04 qa-2a-review: suite, determinism, drift check, characterisation and claimed mutants reproduce; but policy cases cover only bar_graph, table, line_graph, so a mutant dropping the policy on the other 9 routes stays green. Also: harness/README understate the patches (is_public_dashboard_user, clock, druid_context stub) and the ruff claim did not reproduce (27 UP findings). |
+| qa | approved | 2026-10-05 qa-2a-review at ebeeee6: all 9 round-1 findings fixed; 269 pass clean, 3 seeds, integration tip, 0 drift; mutants: policy disabled 31, Decimal decode 146, rounding 55, per-engine bypass 2-8 each (all 12), catalogue. Note: tests/infra needs 3.11+ (WP-2f gives it its own interpreter). |
 | reviewer | changes-requested | 2026-10-04 rev-2a: harness, determinism, normalisation and code-derived catalogue sound. Fix: policy case per route (10 of 13 missing) with catalogue enforcement; JWT query_needs built unlike production (use _compute_token_query_needs; drop all_values; re-record two cases); replace only the requests transport, not run_raw_query (decoder skipped); synth invents rows for unknown field ids (calc_formula_invalid); testpaths tests/golden until 2f; dead normalisation/broker branches; load_cases skips dirs without case.json; lint evidence. |
 | security | n/a | |

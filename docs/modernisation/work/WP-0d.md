@@ -1,7 +1,7 @@
 ---
 wp: "0d"
 title: "Delete dead backend code and dependencies"
-status: review
+status: ready
 owner_role: "core"
 instances:
   - name: "core-2"
@@ -195,8 +195,19 @@ Each request is the exact change verified in unit 4. The combined diff was appli
   - Corrected the `#Dask` status (removed in `b06c4bb`) and the PyPy Limit note (infra-5 built the PyPy venv; the change adds the `gspread` marker).
   - Merged `mig/integration`.
   - Check: no code changed; `git grep gspread -- '*.py'` finds 0 importers.
+- 2026-10-05 core-2 unit 9 (protocol step 8): merged `mig/integration` (WP-2d, gate scripts; `.playwright-mcp` not tracked; no deleted reference returned). Set `status: ready`. Check: `task_gate.py WP-0d` exit 0 (below).
 
 ## Evidence
+
+### Definition-of-done gate (protocol step 8)
+
+`uv run python scripts/agents/task_gate.py WP-0d` with `status: ready`, after merging `mig/integration` (which includes the SPEC 7.2 file-claim check), gives exit 0:
+
+```text
+WP-0d meets the definition of done gates
+```
+
+With `status: review`, just before, the only finding was `status is "review", expected ready or done`.
 
 ### infra-5: requirements trim and PyPy fix
 

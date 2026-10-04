@@ -66,8 +66,9 @@ PYTHONPATH=$PWD uv run --no-project -p 3.8 --with-requirements /tmp/reqs.txt --w
 | 3 | `is_session_persisted` moves into `web/server/util/authentication.py`. It reads a signed `remember_me` claim from the token that authenticated the request, and `login_user` signs that claim. | backend | `tests/web/test_session_persistence.py` (8 cases) | done: claim `68aa48d`, reader `ce12e99` |
 | 4 | SEC-4: delete `AuthorizedQueryClient.run_raw_query` and make the wrapped client private (`_query_client`). | backend | `tests/web/test_authorized_query_client.py` | done (`0cc1c6a`) |
 | 5 | Delete `/api/dimension/<name>/<value>`, which returns 500 on every call because it calls a method that never existed. Also delete its empty `views/dimension.py` and the unused `get_dimension_time_boundary`. | backend (route); core (time_boundary) | `tests/web/test_api_routes.py` | done: core `bd71d45`, route `abf1fa9` |
-| 6 | `/api/timeout` ends the session for real: unset the JWT cookies and log out of Flask-Login. Before, it only called `logout_user()`, and the next request signed the user back in from the 365-day `accessKey`. | backend | `tests/web/test_timeout_route.py` | planned |
+| 6 | `/api/timeout` ends the session for real: unset the JWT cookies and log out of Flask-Login. Before, it only called `logout_user()`, and the next request signed the user back in from the 365-day `accessKey`. | backend | `tests/web/test_timeout_route.py` (4 cases) | done: test `a076b1a`, fix `a010c1c` |
 | 7 | SEC-4 open item 1: `/api/field/<ids>` validates ids, caps their number, and stops returning whole-datasource numbers to restricted users. | backend (route); core (lookups, by request) | `tests/web/test_field_info_route.py` | planned |
+| 9 | `restrict_query_filter_to_user_permissions` built `{"type": "and", "fields": [null, <policy>]}` when the request filter was `EmptyFilter` (Druid rejects it), and crashed at build time when it was `None`. Now `query_filter & policy` (`EmptyFilter.__and__` returns the policy), or the policy alone for `None`. Found by WP-2a (golden case `policy_include_all_all_time`). | backend | `tests/web/test_query_policy_filter.py` (3 cases; the non-empty case pins the unchanged AND shape) | done: test `70ecd0e`, fix `64dc60e` |
 | 8 | Structural guard: routes and Potion APIs do not reach the system query client, `run_raw_query` or `druid_context` lookups outside a justified allowlist. | backend | `tests/web/test_no_raw_queries_from_routes.py` | planned |
 
 ### Unit 3 design
@@ -151,6 +152,7 @@ C-5's token claims gain `user_claims.remember_me: bool`. The change is additive,
 - [x] **infra (moved to WP-0b by the lead):** delete `docker-compose.pipeline.yaml` lines 16-17 and drop `POSTGRES_DB_URI` from `.env.example` if nothing else documents it. The regression test `tests/infra/test_compose_environment_names.py` and `infra.patch` are no longer on this branch; infra-0b can take them from `32dca82` (`git show 32dca82:tests/infra/test_compose_environment_names.py`, `git show 32dca82:docs/modernisation/work/WP-0c/infra.patch`).
 - [ ] **lead:** route the "Open SEC-4 items" above (item 1 is critical) and the `/api/timeout` cookie gap.
 - [ ] **lead:** the phase docs say "Alembic uses POSTGRES_DB_URI" (`phase-0-security-and-subtraction.md` 0c). That is wrong and should become "delete the unused variable".
+- [ ] **qa (WP-2a):** regenerate golden case `policy_include_all_all_time` in `tests/golden` after unit 9 lands. **INV-2 note:** the recorded Druid request changes from `{"type": "and", "fields": [null, <policy>]}` to `<policy>` alone. This is an intended difference: a real Druid rejected the old request, so no user ever received results from it. Requests whose request filter is non-empty are unchanged (pinned by `test_policy_is_anded_with_the_query_filter`). backend-2 did not edit `tests/golden`.
 - [ ] **qa:** for WP-2b, add an authz case showing a non-superuser's `run_query` carries their policy filter.
 - [x] **lead:** keep `/api/timeout` out of WP-0d. Done 2026-10-04.
 
@@ -164,6 +166,8 @@ C-5's token claims gain `user_claims.remember_me: bool`. The change is additive,
 - 2026-10-04 backend-2: took over on `mig/WP-0c-pure-mistake-bugs-backend` (from `32dca82`, merged `mig/integration`). Status `building`.
 - 2026-10-04 backend-2, units 2-5 (`638b9e4`, `68aa48d`, `ce12e99`, `0cc1c6a`, `abf1fa9`): applied `backend.patch` one fix per commit. Check: `pytest tests/web` 14 passed; the index matches the whole patch (`git apply -R --check --cached`); the claim decodes as `remember_me: true/false` from a real login response; `web.server.util.util`, `models.python.base` and `data.alerts.send_alert_notifications` import with `jwt` and `flask_jwt_extended` blocked. C-5 acknowledged.
 - 2026-10-04 backend-2, unit 1: moved to WP-0b by the lead. Removed `tests/infra/test_compose_environment_names.py` and `WP-0c/infra.patch` from this branch; both stay recoverable from `32dca82`.
+- 2026-10-04 backend-2, unit 6 (`a076b1a` test, `a010c1c` fix): `/api/timeout` now calls `unset_jwt_cookies` on the timeout response. Check: before the fix 1 failed and 3 passed (`assert 'accessKey' in set()`); after, `pytest tests/web` 18 passed.
+- 2026-10-04 backend-2, unit 9 (lead request from WP-2a; `70ecd0e` test, `64dc60e` fix): null AND operand in the policy filter. Check: before the fix 2 failed (`fields: [None, ...]` and `AttributeError: 'NoneType' object has no attribute 'filter'`); after, `pytest tests/web` 21 passed. Golden regeneration is requested from qa (see Requests).
 
 ## Evidence
 

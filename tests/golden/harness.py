@@ -23,6 +23,7 @@ The rest of the environment is fixed here, and nothing else is patched:
   public-access setting from Postgres), so the anonymous public-dashboard branch,
   which skips the policy, is not exercised.
 '''
+
 import gzip
 import importlib
 import json
@@ -199,9 +200,7 @@ def _broker_adapter(answer: Callable[[dict], list], exchanges: list):
     from requests.structures import CaseInsensitiveDict
 
     class BrokerAdapter(BaseAdapter):
-        def send(
-            self, request, stream=False, **kwargs
-        ):  # pylint: disable=arguments-differ
+        def send(self, request, stream=False, **kwargs):  # pylint: disable=arguments-differ
             asked = json.loads(request.body)
             posted = canonical_query(asked)
             rows = answer(posted)

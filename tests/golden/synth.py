@@ -17,6 +17,7 @@ Anything the cases do not use raises NotImplementedError rather than guessing.
 The replay test never calls this module: it reads the frozen
 `druid_response.json`.
 '''
+
 import hashlib
 import json
 import random

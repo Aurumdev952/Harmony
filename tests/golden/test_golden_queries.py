@@ -1,5 +1,6 @@
 '''Golden query suite (INV-2): each case's request must produce the recorded Druid
 queries and, fed the recorded Druid responses, the recorded endpoint body.'''
+
 from functools import lru_cache
 
 import pytest

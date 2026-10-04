@@ -110,7 +110,7 @@ None.
   - infra-4: not done. Agents cannot read `.env.example` either, so this is left for the human. Every deployment's `.env`, and every developer's for `make up DEV=1`, needs `HASURA_ADMIN_SECRET` before this branch lands, because Compose now refuses to render without it.
 - [ ] infra (WP-0b, for whichever branch lands second): `tests/infra/test_compose.py` on `mig/WP-0b-ports-secrets-pins` needs `'HASURA_ADMIN_SECRET'` in `BASE_ENV` and `hasura` removed from `PUBLISHED_UNTIL_WP_0A` and `UNPINNED_UNTIL_DECIDED`. This is WP-0b's R7. A trial merge with WP-0b head `0ecd19e` merges `docker-compose.yaml` cleanly. The only conflict is an add/add in `.claude/agent-memory/harmony-infra-engineer/MEMORY.md`, resolved by keeping both lines. With those three edits both suites pass (56 passed), including WP-0b's no-`BROKER_URL` check. Without them, 12 WP-0b tests fail because the config does not render.
 - [x] qa: run `verify` on Data Catalog, Field Setup and Data Upload (load and save) on a running stack. Done by qa-0a at f4db7c1: all three pages load and save. The remaining suggestion, moving `scripts/db/hasura/replay_relay_operations.py` into `tests/contract/`, is open for qa.
-- [ ] infra (round 2, blocks the security fix for item 9; the ownership hook blocked my edit): in `docker-compose.yaml`, switch to the CE image, enable only the graphql and metadata APIs, and correct the empty-secret comment. Update the digest in `tests/infra/test_compose_hasura.py` in the same commit:
+- [x] infra (round 2, blocks the security fix for item 9; the ownership hook blocked my edit): in `docker-compose.yaml`, switch to the CE image, enable only the graphql and metadata APIs, and correct the empty-secret comment. Update the digest in `tests/infra/test_compose_hasura.py` in the same commit:
 
   ```diff
      hasura:
@@ -140,6 +140,8 @@ None.
   ```
 
   Also consider asserting `HASURA_GRAPHQL_ENABLED_APIS == 'graphql,metadata'` in that test. I verified the exact values on the CE image (Evidence 10): relay, `/v1/graphql` and metadata apply all work, and `/v1/config`, `/v2/query`, pg_dump, `/dev/*`, `/v1/metrics` and `/console` return 404. The parity replay passes with them. `start_hasura.sh` (dev, mine) already uses the CE digest.
+  - infra-4: done on `mig/WP-0a-lock-down-hasura-infra` exactly as written, plus the suggested `HASURA_GRAPHQL_ENABLED_APIS` assertion (Evidence 13).
+    **Correction to Evidence 10:** `/v2/query` and `/v1/query` are part of the metadata API, so they stay enabled. With the admin secret, `run_sql` on either returns 200. Without it, `/v2/query` returns 401. Hasura cannot enable `/v1/metadata` without them, so they stay reachable by anyone holding the admin secret.
 - [ ] frontend-platform: regenerate six Relay artifacts against the new `graphql/schema.graphql` (role `user`):
   - `useBatchParentCategoryChangeMutation`
   - `CreateCalculationIndicatorViewMutation`
@@ -169,6 +171,10 @@ None.
   - Parity replay: 57 steps, 0 failures, 0 differences on both versions.
   - `test_compose_hasura.py`: 17 passed.
   - Relay compiler 10.1.0: validates every operation against the `user` schema.
+- 2026-10-04 infra-4 round 2 compose request applied: CE image, `HASURA_GRAPHQL_ENABLED_APIS: graphql,metadata`, corrected empty-secret comment, test digest updated. Checks:
+  - `test_compose_hasura.py`: 17 passed (1 failed before the compose edit).
+  - Rendering refuses a missing secret.
+  - On a real bring-up: `/v1/version` is `v2.45.8-ce`, and `/console`, `/v1alpha1/config` and `/v1alpha1/pg_dump` return 404.
 
 ## Evidence
 
@@ -236,6 +242,22 @@ Environment: throwaway Postgres 16 with all 142 Alembic revisions applied (`flas
     - `replay_relay_operations.py` refuses, with exit 2 and no rows written, when the flag is missing, when the database is unmarked, and when the database has another comment. The recipe id is now `-424242`.
     - `runserver.py`: a new secret file is created with mode 0600. A 0644 file is refused with a `chmod 600` hint, and the environment is left unset. `HASURA_ADMIN_SECRET` from the environment still wins.
     - pylint 10.00, black `-S` and ruff are clean on every changed Python file.
+13. **Round 2, Compose applied** (infra-4, `docker-compose.yaml` on `mig/WP-0a-lock-down-hasura-infra`, dummy env only, `--env-file /dev/null`).
+    - The CE digest `sha256:18b39122...` is the manifest list for linux/amd64 and linux/arm64 (`docker buildx imagetools inspect`).
+    - `tests/infra/test_compose_hasura.py`: `17 passed`. The new `ENABLED_APIS` assertion failed before the compose edit. ruff and black `-S` are clean.
+    - `docker compose -f docker-compose.yaml config` without the secret: exit 1, `required variable HASURA_ADMIN_SECRET is missing a value`, for hasura and web.
+    - With a dummy secret: `hasura` ports `[]`, the CE image, and `ENABLED_APIS=graphql,metadata`. The console, dev mode and telemetry are `false`.
+    - Bring-up of `hasura` plus a throwaway `postgres:16-alpine` on tmpfs, project `infra4-wp0a-hasura`, random secrets. Both were healthy. `docker compose port hasura 8080` gives no port, and host 8088 is refused. In-network results:
+      - `GET /v1/version`: 200 `{"server_type":"ce","version":"v2.45.8-ce"}`.
+      - `/v1/graphql`:
+        - no secret: 200 `access-denied`, required but not found;
+        - empty `X-Hasura-Admin-Secret` header: 200 `access-denied`, invalid;
+        - right secret: `{"data":{"__typename":"query_root"}}`.
+      - `/v1beta1/relay` with the secret: `{"data":{"__typename":"query_root"}}`.
+      - `/v1/metadata` `export_metadata`: 401 without the secret, 200 with it.
+      - 404 `not-found` even with the secret: `GET /console`, `GET /v1alpha1/config`, `POST /v1alpha1/pg_dump`, `GET /v1/config`, `GET /v1/metrics` and `GET /dev/plan_cache`. `/v1alpha1/config` is also 404 without the secret.
+      - Still enabled, as part of the metadata API: `POST /v2/query` and `POST /v1/query` `run_sql` return 200 with the secret. `/v2/query` returns 401 without it. This corrects the `/v2/query` line in Evidence 10.
+    - Torn down with `docker compose down`. No containers or volumes remain for the project.
 
 `pstack:interrogate` was run by the reviewer (rev-0a), with three reviewers, on the proxy and role model. Its findings are folded into the round 2 fixes above.
 

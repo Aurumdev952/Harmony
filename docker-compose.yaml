@@ -94,15 +94,18 @@ services:
       - redis-volume:/data
     logging: *default-logging
   hasura:
-    image: hasura/graphql-engine:v2.45.8.cli-migrations-v2@sha256:c23e41af28e4c8e27bf6b6e82a5ecdd5b3ba3bb373833f92f5136e25b0ad45c6
+    image: hasura/graphql-engine:v2.45.8-ce.cli-migrations-v2@sha256:18b39122f207afa4fe7116acaa6484ddac69c2160fde0571e3a27abf924e0bec
     # No published port: only web reaches Hasura, over the Compose network.
     environment:
       HASURA_GRAPHQL_ENABLE_TELEMETRY: 'false'
       HASURA_GRAPHQL_ENABLE_CONSOLE: 'false'
       HASURA_GRAPHQL_DEV_MODE: 'false'
+      # Relay (/v1beta1/relay) is part of the graphql API; metadata is for apply_metadata_snapshot.py.
+      HASURA_GRAPHQL_ENABLED_APIS: graphql,metadata
       HASURA_GRAPHQL_MIGRATIONS_SERVER_TIMEOUT: 500
       HASURA_GRAPHQL_DATABASE_URL: ${DATABASE_URL}
-      # Hasura treats an empty secret as no secret, so refuse to start without one.
+      # An empty value would make the empty string the secret, so that a request with an
+      # empty X-Hasura-Admin-Secret header gets admin. Refuse to start without a real one.
       HASURA_GRAPHQL_ADMIN_SECRET: ${HASURA_ADMIN_SECRET:?HASURA_ADMIN_SECRET must be set to a random value, e.g. openssl rand -hex 32}
     healthcheck:
       test: [ "CMD", "curl", "-fsS", "-o", "/dev/null", "http://127.0.0.1:8080/healthz" ]

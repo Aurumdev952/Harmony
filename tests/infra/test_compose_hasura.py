@@ -17,8 +17,8 @@ pytestmark = pytest.mark.skipif(
 )
 
 HASURA_IMAGE = (
-    'hasura/graphql-engine:v2.45.8.cli-migrations-v2'
-    '@sha256:c23e41af28e4c8e27bf6b6e82a5ecdd5b3ba3bb373833f92f5136e25b0ad45c6'
+    'hasura/graphql-engine:v2.45.8-ce.cli-migrations-v2'
+    '@sha256:18b39122f207afa4fe7116acaa6484ddac69c2160fde0571e3a27abf924e0bec'
 )
 
 # Dummy values only. Passing an explicit env file stops Compose from reading
@@ -100,8 +100,9 @@ def test_hasura_and_web_share_the_admin_secret(tmp_path, overlay):
     assert services['web']['environment']['HASURA_ADMIN_SECRET'] == secret
 
 
-def test_hasura_is_pinned_with_console_and_dev_mode_off(tmp_path):
+def test_hasura_is_pinned_with_only_graphql_and_metadata_apis(tmp_path):
     hasura = compose_services(tmp_path, [])['hasura']
     assert hasura['image'] == HASURA_IMAGE
     assert hasura['environment']['HASURA_GRAPHQL_ENABLE_CONSOLE'] == 'false'
     assert hasura['environment']['HASURA_GRAPHQL_DEV_MODE'] == 'false'
+    assert hasura['environment']['HASURA_GRAPHQL_ENABLED_APIS'] == 'graphql,metadata'

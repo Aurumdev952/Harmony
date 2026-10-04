@@ -5,7 +5,7 @@ metadata:
   type: feedback
 ---
 
-In an isolated worktree, a guard refuses Bash commands it cannot prove stay inside the worktree. That includes `git -C <other path>`, long multi-step chains that mention git, heredocs that contain Python, and docker `--format '{{...}}'`. It also refuses `for` loops whose body runs `git` or `docker` with a loop variable, and `sed` programs that use `#` as the delimiter. For those, write a small Python script under `/tmp` and run it with `uv run --no-project python`. `python3 ...` is blocked by a hook, so use `uv run python ...`.
+In an isolated worktree, a guard refuses Bash commands it cannot prove stay inside the worktree. That includes `git -C <other path>`, long multi-step chains that mention git, heredocs that contain Python, and docker `--format '{{...}}'`. It also refuses `for` loops whose body runs `git` or `docker` with a loop variable, and `sed` programs that use `#` as the delimiter. It also refuses a command whose program or option position is a shell variable (`sed -i ... $f`, `script.sh $PWD`), and `bash -x <script>`. Spell the paths out. For those, write a small Python script under `/tmp` and run it with `uv run --no-project python`. `python3 ...` is blocked by a hook, so use `uv run python ...`.
 
 **Why:** these refusals cost several round-trips during WP-0d (2026-10-04).
 

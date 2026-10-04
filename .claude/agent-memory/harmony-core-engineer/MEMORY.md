@@ -5,3 +5,4 @@
 - [Worktree shell guard](feedback_worktree_shell_guard.md) — command forms the isolation guard refuses and the workarounds that pass
 - [Tooling traps](tooling_traps.md) — multi-Python test runs, black vs ruff format, mypy flags, pipeline suite scratch runs, 3.13 wheel checks
 - [Config import hook](config_import_hook.md) — alias semantics, PathFinder precedence, __spec__ restore, lazy DATASOURCE
+- [Alembic migration runs](alembic_migration_runs.md) — cheap env.py runs (stamp on SQLite), full upgrade needs a Druid stub on :8081, flask db current broken

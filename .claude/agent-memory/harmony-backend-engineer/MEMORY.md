@@ -1,1 +1,2 @@
 - [Template render diff](template_render_diff.md) — prove Jinja template edits without a running app; known baseline failures
+- [Potion route test harness](potion_route_test_harness.md) — real Flask app + Potion over throwaway Postgres; WP-2b live layer on any tree; traps

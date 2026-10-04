@@ -43,9 +43,10 @@ None.
 
 ## Requests
 
-- [ ] R1 core (core-3, branch `mig/WP-0b-ports-secrets-pins-core`): in `config/settings.py:16`, refuse to import when `DEFAULT_SECRET_KEY` is unset, empty or `changeme` (case-insensitive, stripped). Raise `RuntimeError('DEFAULT_SECRET_KEY must be set to a random value, e.g. `openssl rand -hex 32`; refusing to start with an empty or default key')` so web, worker, pipeline and every script exit non-zero with that message. Add a unit test under `tests/core/`. Compose already refuses unset/empty (unit 4); this covers an explicit `changeme` and non-Compose runs. SEC-3. (blocks WP close, not a unit)
-- [ ] R2 backend (backend-4, branch `mig/WP-0b-ports-secrets-pins-backend`): Redis password. `web/server/configuration/celery.py:get_broker_url`: when `REDIS_HOST` is set, build `redis://:{quote(REDIS_PASSWORD, safe="")}@{host}:6379/` if `REDIS_PASSWORD` is set (unchanged URL otherwise). `web/server/configuration/flask.py` `CACHES['redis']`: add `'CACHE_REDIS_PASSWORD': getenv('REDIS_PASSWORD') or None`. Compose (unit 5) passes `REDIS_PASSWORD` to web and worker. Without this change the web container's cache and Celery client fail auth against the new Redis, so **WP-0b must not merge before R2 lands** (same stack). (blocks merge of unit 5)
-- [ ] R3 backend (backend-4, same branch): split the JWT key (`web/server/configuration/flask.py:34`). `SECRET_KEY = getenv('SECRET_KEY', settings.DEFAULT_SECRET_KEY)`; `JWT_SECRET_KEY = getenv('JWT_SECRET_KEY')`; raise at startup if `JWT_SECRET_KEY` is empty, `changeme`, or equal to `SECRET_KEY`. Compose already passes a required `JWT_SECRET_KEY` to web and worker (unit 4). Existing `accessKey` cookies and API tokens become invalid once, so users sign in again; say so in the release note. SEC-3. (blocks WP close)
+- [x] R1 core (core-3, branch `mig/WP-0b-ports-secrets-pins-core`, done): in `config/settings.py:16`, refuse to import when `DEFAULT_SECRET_KEY` is unset, empty or `changeme` (case-insensitive, stripped). Raise `RuntimeError('DEFAULT_SECRET_KEY must be set to a random value, e.g. `openssl rand -hex 32`; refusing to start with an empty or default key')` so web, worker, pipeline and every script exit non-zero with that message. Add a unit test under `tests/core/`. Compose already refuses unset/empty (unit 4); this covers an explicit `changeme` and non-Compose runs. SEC-3. (blocks WP close, not a unit)
+  - core-3 note for R3: `flask.py` reads `getenv('SECRET_KEY', settings.DEFAULT_SECRET_KEY)`, so an env `SECRET_KEY` overrides the checked key and is itself unchecked. R3 should read every signing key through `config.settings.require_secret(name)` (same rule and message as R1) or drop the `SECRET_KEY` override.
+- [x] R2 backend (backend-4, branch `mig/WP-0b-ports-secrets-pins-backend`, done): Redis password. `web/server/configuration/celery.py:get_broker_url`: when `REDIS_HOST` is set, build `redis://:{quote(REDIS_PASSWORD, safe="")}@{host}:6379/` if `REDIS_PASSWORD` is set (unchanged URL otherwise). `web/server/configuration/flask.py` `CACHES['redis']`: add `'CACHE_REDIS_PASSWORD': getenv('REDIS_PASSWORD') or None`. Compose (unit 5) passes `REDIS_PASSWORD` to web and worker. Without this change the web container's cache and Celery client fail auth against the new Redis, so **WP-0b must not merge before R2 lands** (same stack). (blocks merge of unit 5)
+- [x] R3 backend (backend-4, branch `mig/WP-0b-ports-secrets-pins-backend`, done): split the JWT key (`web/server/configuration/flask.py:34`). `SECRET_KEY = getenv('SECRET_KEY', settings.DEFAULT_SECRET_KEY)`; `JWT_SECRET_KEY = getenv('JWT_SECRET_KEY')`; raise at startup if `JWT_SECRET_KEY` is empty, `changeme`, or equal to `SECRET_KEY`. Compose already passes a required `JWT_SECRET_KEY` to web and worker (unit 4). Existing `accessKey` cookies and API tokens become invalid once, so users sign in again; say so in the release note. SEC-3. (blocks WP close)
 - [ ] R4 data-platform (data-platform-1, branch `mig/WP-0b-ports-secrets-pins-druid`): Druid setup items from phase 0b, all in `druid_setup/**`:
   - replace `FoolishPassword` (`single/docker-compose.yml:59`, `single/environment/common.env:25`, `cluster/cluster.env:8`) with a required variable (`${DRUID_POSTGRES_PASSWORD:?...}` in Compose, and read it from the env in `common.env`);
   - stop publishing ZooKeeper 2181, memcached 11211 and Postgres (5431/5432) in `single/docker-compose.yml` and `cluster/docker-compose-master.yml`; bind to `127.0.0.1` where a host tool needs them, or to a private interface variable where another host does (cluster mode);
@@ -55,6 +56,7 @@ None.
 - [ ] R5 human: MinIO no longer publishes server images. `minio/minio` on Docker Hub returns "repository does not exist" and `quay.io/minio/minio` returns 401, so `docker-compose.minio.yaml` cannot be pinned or even pulled on a fresh host. Existing hosts keep their cached image. Choose a replacement (a maintained fork image, a source build we publish to `ghcr.io/zenysis`, or another S3-compatible store such as Garage or SeaweedFS). Unit 6 leaves the `minio/minio:latest` line as is until you decide. (does not block other units)
 - [ ] R6 human: `.env.example` is infra-owned but agent settings deny reading it (it matches `.env*`). Add `DEFAULT_SECRET_KEY=`, `JWT_SECRET_KEY=`, `REDIS_PASSWORD=` (all generated with `openssl rand -hex 32`), and for separate-host setups `POSTGRES_BIND_ADDRESS=` and `MINIO_BIND_ADDRESS=`, and remove any `changeme` value. Also delete the unused `POSTGRES_DB_URI` entry (nothing reads it, see unit 2). Also update the README production `.env` sample (human-owned) with the same keys. (blocks WP close)
 - [ ] R7 backend (WP-0a): the Hasura port 8088 and image upgrade stay with WP-0a. When WP-0a asks, infra edits the `hasura` service; until then this WP leaves that service alone, so `docker compose config` on this branch still shows 8088 published.
+- [ ] R8 infra (from backend-4): in `docker-compose.yaml`, give `worker` `REDIS_HOST=redis` in place of the hand-built `BROKER_URL=redis://:${REDIS_PASSWORD}@redis:6379/0`. `get_broker_url` then builds the URL and URL-encodes the password, so the "must be URL-safe" note on the `redis` service can go, and the worker's Flask app cache gets the host and password too (today it has neither). Update `test_redis_requires_auth_and_clients_carry_the_password` to match. Not urgent: with a hex password the current line works. (does not block)
 
 ## Log
 
@@ -68,6 +70,9 @@ None.
 - 2026-10-04 infra-1 unit 8: dev overlay runtime check; check: postgres 15.19 and redis 8.10.2 healthy, published on 127.0.0.1 only, Redis refuses unauthenticated clients from the host; torn down.
 - 2026-10-04 infra-1 unit 2 (revised on lead request after WP-0c interrogate): the `POSTGRES_DB_URI` line and its "Alembic uses" comment are deleted rather than corrected; the test now asserts the key is absent, and a new test asserts no `environment:` key contains `:` in any Compose file set; check: absence test failed against the corrected line, 39 passed after; the colon check flags `POSTGRES_DB_URI:` when run against main's file.
 - 2026-10-04 infra-1 unit 9: `bcrypt==4.0.1` pinned beside `flask-user` in `requirements.txt` (WP-0a finding: the unpinned resolve gave bcrypt 5.0.0, which breaks passlib 1.7.4); check: `tests/infra/test_requirements.py` failed before, 40 passed after; web-server image rebuilt and hashes a password. Port 5000 (also from WP-0a) was already closed in unit 3; no change.
+- 2026-10-04 core-3 R1: `config/settings.py` refuses an unset, blank or `changeme` (case-insensitive, stripped) `DEFAULT_SECRET_KEY` at import with a `RuntimeError` naming the variable and `openssl rand -hex 32`; a real key passes through unchanged. Kept at import, not at the Flask read, because pipeline validate steps (`fetch_fields_from_database.py`, `update_db_datasource.py`) build a Flask app, so a lazy check would fail after indexing; no importer ran without the key before (it was `os.environ[...]`). Check: `uv run --no-project --with pytest pytest tests/core` 6 failed before, 7 passed after.
+- 2026-10-04 backend-4 R2: `get_broker_url` and the Flask Redis cache send `REDIS_PASSWORD` (URL-encoded in the broker URL, passed as `CACHE_REDIS_PASSWORD` to the cache); both refuse to start with a `RuntimeError` naming `REDIS_PASSWORD` when `REDIS_HOST` is set and the password is unset or empty; an explicit `BROKER_URL` and the no-Redis default are unchanged; check: `pytest tests/web/test_redis_password.py` 6 failed before, 9 passed after; Celery broker, result backend and Flask cache authenticated against a throwaway `redis:8.10.2` with password `p@ss:w/rd%#?&= x` (Evidence).
+- 2026-10-04 backend-4 R3: `JWT_SECRET_KEY` split from the session key. `FlaskConfiguration.SECRET_KEY` is `settings.DEFAULT_SECRET_KEY` only (the unchecked `SECRET_KEY` env override is gone, per core-3's note on R1). `initialize_jwt_manager` reads `JWT_SECRET_KEY` through `settings.require_secret` and refuses one equal to the session key, then sets it before `JWTManager(app)`; web calls it first in startup, before the database and Druid steps; the worker already calls it. Pipeline scripts build a `FlaskConfiguration` but never reach it, so the pipeline needs no JWT key. The request loader now treats a bad-signature token (an old cookie or API token) as anonymous, as it already did for an expired one; without that, every request carrying an old `accessKey` cookie failed with flask-jwt-extended's 422 "Signature verification failed", `/login` included; check: `pytest tests/web/test_jwt_secret_key.py` 9 failed before (8 for the split, 1 for the old cookie), 10 passed after; `create_app` under `SERVER_SOFTWARE=gunicorn` refuses unset, `ChangeMe` and equal keys and gets past the check with a valid one (Evidence).
 
 ## Evidence
 
@@ -199,10 +204,62 @@ Checks: `test_passlib_can_hash_with_the_installed_bcrypt` failed with "bcrypt is
 
 WP-0a reported that the base file publishes `web` on 5000. That was true on `main`; unit 3 (commit 42adab6) already removed it. The dev overlay binds `127.0.0.1:5000`, and `test_only_nginx_publishes_ports` (base, prod, local) and `test_dev_publishes_on_loopback_only` cover it. No further change.
 
+### R2 and R3 (backend-4)
+
+Test environment: Python 3.8 with `requirements.txt` and `requirements-web.txt`, as described in WP-0c's "How to run the tests" (the requirements rewritten into `/tmp/reqs.txt`):
+
+```
+PYTHONPATH=$PWD uv run --no-project -p 3.8 --with-requirements /tmp/reqs.txt --with 'pytest<8' \
+  python -m pytest tests/web tests/infra -q -p no:cacheprovider -W ignore      -> 58 passed
+uv run --no-project --with pytest pytest tests/core -q                        -> 7 passed
+pylint 2.17.4 (.pylintrc) and black 22.6.0 --skip-string-normalization on the changed files -> 10.00/10, unchanged
+```
+
+Before the fixes: `tests/web/test_redis_password.py` 6 failed, 3 passed; `tests/web/test_jwt_secret_key.py` 9 failed, 1 passed.
+
+R2 against a throwaway `redis:8.10.2-alpine` (the pinned digest), `--requirepass 'p@ss:w/rd%#?&= x'`, on `127.0.0.1:16379` (the host already uses 6379, so the check script sets the port to 16379). Container removed afterwards:
+
+```
+celery broker connected: redis://:**@127.0.0.1:16379//
+celery result backend uri (as logged): redis://:**@127.0.0.1:16379/
+celery result backend ping: True
+flask cache round trip: ok
+no password: AuthenticationError Authentication required.
+```
+
+Celery 5.4.0 masks the password in the URIs it logs (`as_uri()` above).
+
+Startup checks (dummy values, no `.env`):
+
+```
+REDIS_HOST=redis, no REDIS_PASSWORD, import web.server.configuration.celery
+  RuntimeError: REDIS_PASSWORD is unset or empty but REDIS_HOST is set; refusing to start. ...
+REDIS_HOST and JWT_SECRET_KEY unset (pipeline-like): FlaskConfiguration() and celery config import fine
+create_app() with SERVER_SOFTWARE=gunicorn/20:
+  JWT_SECRET_KEY unset     -> RuntimeError: JWT_SECRET_KEY is unset, empty or the default "changeme"; refusing to start. ...
+  JWT_SECRET_KEY=ChangeMe  -> same
+  JWT_SECRET_KEY=DEFAULT_SECRET_KEY -> RuntimeError: JWT_SECRET_KEY equals DEFAULT_SECRET_KEY; refusing to start. ...
+  JWT_SECRET_KEY valid     -> passes the check, then stops at the database step (no database in this check)
+docker compose --env-file /dev/null -f docker-compose.yaml -f docker-compose.dev.yaml config -q -> exit 0
+  web:    REDIS_HOST=redis, REDIS_PASSWORD, DEFAULT_SECRET_KEY, JWT_SECRET_KEY
+  worker: BROKER_URL=redis://:<pw>@redis:6379/0, REDIS_PASSWORD, DEFAULT_SECRET_KEY, JWT_SECRET_KEY
+```
+
+Not run: web and worker containers against the password-protected Redis, and a browser carrying an old `accessKey` cookie through `/login`. Both need a built image and a database; QA should include them in the `make up DEV=1` smoke run.
+
+## For the security reviewer
+
+- **Auth behaviour change (backend-4, R3):** `login_from_request` now treats a JWT with a bad signature as anonymous, as it already did for an expired one, instead of letting flask-jwt-extended return 422 "Signature verification failed". Without this, every request carrying a pre-upgrade `accessKey` cookie failed, including `/login`. Please confirm that a forged or tampered token can never authenticate this way: it must fall through to the anonymous path, with no partial identity. Test: `tests/web/test_jwt_secret_key.py`.
+- `SECRET_KEY` from the environment no longer overrides the checked `DEFAULT_SECRET_KEY`.
+- Web and worker refuse to start with an unset or empty `REDIS_PASSWORD` when `REDIS_HOST` is set, and with a `JWT_SECRET_KEY` that is unset, `changeme` or equal to the session key.
+
 ## Deployment notes (operator action at upgrade)
 
 - Set `DEFAULT_SECRET_KEY`, `JWT_SECRET_KEY` (different values) and `REDIS_PASSWORD` (hex, URL-safe) in the web host's `.env`, generated with `openssl rand -hex 32`. Until they are set, `make up` stops at config time and leaves running containers untouched.
 - The README's production `.env` sample never listed `DEFAULT_SECRET_KEY`, so most deployments run on `changeme`. Setting a real key, and the JWT split (R3), signs every user out once.
+- After the JWT split (R3), every `accessKey` cookie and every API token issued before the upgrade stops verifying. Users are sent to the login page once and sign in again; nothing needs clearing in the browser. **API tokens must be reissued**: they are 20-year JWTs signed with the old key, used by `web/python_client` and integrations. Tell token holders before the upgrade, and revoke the old tokens afterwards.
+- `SECRET_KEY` in the environment no longer overrides `DEFAULT_SECRET_KEY` (it bypassed the R1 check). Compose never passed it; a host that set it outside Compose must move the value to `DEFAULT_SECRET_KEY`.
+- Web and worker refuse to start when `REDIS_HOST` is set without `REDIS_PASSWORD`. Compose sets both.
 - Separate Postgres host (`docker-compose.db.yaml`): set `POSTGRES_BIND_ADDRESS` to the private interface IP, or to `127.0.0.1` when web shares the host. The same applies to `MINIO_BIND_ADDRESS`.
 - Anything that reached web on host port 5000, Redis on 6379 or the worker on 61234 directly now has to go through nginx, or through `127.0.0.1` in dev.
 - Postgres moves from 15.2 to 15.19 (minor upgrade, no dump or restore) and Redis is pinned to 8.10.2.

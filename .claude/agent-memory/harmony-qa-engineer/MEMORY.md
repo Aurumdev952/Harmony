@@ -1,0 +1,1 @@
+- [Review traps](review_traps.md) — gitignored fixtures (*.log), hook limits on shell loops/cd, use uv run python runners

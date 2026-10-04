@@ -1,0 +1,1 @@
+- [Infra tooling traps](infra_tooling_traps.md) — *.log gitignored, mypy.ini plugin, scripts/ vs prod/ ownership, nginx-proxy logs, worktree git

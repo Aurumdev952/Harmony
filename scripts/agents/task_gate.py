@@ -43,6 +43,15 @@ def verdicts(text: str) -> dict[str, str]:
     return rows
 
 
+def spec_roles(root: Path, wp: str) -> list[str]:
+    """Owner plus supporting roles from the SPEC WP table, e.g. ['backend', 'core', 'infra']."""
+    for line in (root / 'docs/modernisation/SPEC.md').read_text().splitlines():
+        cells = [c.strip() for c in line.strip().strip('|').split('|')]
+        if len(cells) >= 5 and cells[0].lower() == wp.lower():
+            return [cells[2]] + [r.strip() for r in cells[3].split(',') if r.strip() and r.strip() != 'none']
+    return []
+
+
 def problems_for(root: Path, wp: str) -> list[str]:
     path = root / WORK / f'WP-{wp}.md'
     if not path.exists():
@@ -63,8 +72,12 @@ def problems_for(root: Path, wp: str) -> list[str]:
         if exists.returncode != 0:
             found.append(f'branch {branch} not found')
         else:
+            roles = spec_roles(root, wp) or [role]
+            if role not in roles:
+                roles.insert(0, role)
+            role_args = [arg for r in roles for arg in ('--role', r)]
             check = subprocess.run(
-                [sys.executable, str(root / OWNERSHIP), 'check', '--role', role, '--head', branch],
+                [sys.executable, str(root / OWNERSHIP), 'check', *role_args, '--head', branch],
                 capture_output=True, text=True, cwd=root,
             )
             if check.returncode != 0:

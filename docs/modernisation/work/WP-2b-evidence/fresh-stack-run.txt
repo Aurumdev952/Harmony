@@ -1,4 +1,8 @@
 == stack down/up
+ Container harmony-wp2b-authz-forward-1 Stopping 
+ Container harmony-wp2b-authz-forward-1 Stopped 
+ Container harmony-wp2b-authz-forward-1 Removing 
+ Container harmony-wp2b-authz-forward-1 Removed 
  Container harmony-wp2b-authz-web-1 Stopping 
  Container harmony-wp2b-authz-web-1 Stopped 
  Container harmony-wp2b-authz-web-1 Removing 
@@ -27,46 +31,183 @@
  Container harmony-wp2b-authz-druid-stub-1 Stopped 
  Container harmony-wp2b-authz-druid-stub-1 Removing 
  Container harmony-wp2b-authz-druid-stub-1 Removed 
- Network harmony-wp2b-authz_default Removing 
- Network harmony-wp2b-authz_default Removed 
- Network harmony-wp2b-authz_default Creating 
- Network harmony-wp2b-authz_default Creating 
- Network harmony-wp2b-authz_default Created 
- Network harmony-wp2b-authz_default Created 
+ Network harmony-wp2b-authz_internal Removing 
+ Network harmony-wp2b-authz_edge Removing 
+ Network harmony-wp2b-authz_edge Removed 
+ Network harmony-wp2b-authz_internal Removed 
+#0 building with "rootless" instance using docker driver
+
+#1 [internal] load build definition from Dockerfile_web-server
+#1 transferring dockerfile: 1.45kB done
+#1 DONE 0.0s
+
+#2 [context python:3.8] load metadata for python:3.8@sha256:d411270700143fa2683cc8264d9fa5d3279fd3b6afff62ae81ea2f9d070e390c
+#2 DONE 0.1s
+
+#3 [internal] load .dockerignore
+#3 transferring context: 126B done
+#3 DONE 0.0s
+
+#4 [context python:3.8] python:3.8@sha256:d411270700143fa2683cc8264d9fa5d3279fd3b6afff62ae81ea2f9d070e390c
+#4 resolve docker.io/library/python:3.8@sha256:d411270700143fa2683cc8264d9fa5d3279fd3b6afff62ae81ea2f9d070e390c 0.1s done
+#4 DONE 0.1s
+
+#5 [internal] load build context
+#5 transferring context: 75.41kB 0.8s done
+#5 DONE 0.9s
+
+#6 [11/17] COPY log log
+#6 CACHED
+
+#7 [ 3/17] RUN   export DEBIAN_FRONTEND=noninteractive &&   apt-get update &&   apt-get install --no-install-recommends -y lz4 &&   apt-get clean &&   rm -rf /var/lib/apt/lists/*
+#7 CACHED
+
+#8 [14/17] COPY util util
+#8 CACHED
+
+#9 [ 8/17] COPY config config
+#9 CACHED
+
+#10 [13/17] COPY graphql graphql
+#10 CACHED
+
+#11 [ 7/17] RUN   rm -rf /usr/local/lib/python3.8/site-packages/*/tests &&   rm -rf /usr/local/lib/python3.8/site-packages/*/*/tests &&   find /usr/local/lib/python3.8/site-packages -name '*.pyc' -delete
+#11 CACHED
+
+#12 [ 5/17] COPY requirements-web.txt requirements-web.txt
+#12 CACHED
+
+#13 [10/17] COPY db db
+#13 CACHED
+
+#14 [12/17] COPY models models
+#14 CACHED
+
+#15 [ 9/17] COPY data data
+#15 CACHED
+
+#16 [ 2/17] WORKDIR /zenysis
+#16 CACHED
+
+#17 [ 6/17] RUN   pip install   --cache-dir /pip.cache   --src /usr/local/src   -r requirements.txt &&   pip install   --cache-dir /pip.cache   --src /usr/local/src   -r requirements-web.txt
+#17 CACHED
+
+#18 [15/17] COPY web/*.py web/
+#18 CACHED
+
+#19 [ 1/17] RUN mkdir -p /zenysis
+#19 CACHED
+
+#20 [ 4/17] COPY requirements.txt requirements.txt
+#20 CACHED
+
+#21 [16/17] COPY web/server web/server
+#21 CACHED
+
+#22 exporting to image
+#22 exporting layers 0.0s done
+#22 exporting manifest sha256:0122e2c09ac48c6b7a701f7c7c9a7e0bebc698799660a857df149c9dcb5377b8 0.0s done
+#22 exporting config sha256:4ab1031d827833866b6c4308ce1240fca7b882d1b8b53bdd509ed0aa43983b3e 0.0s done
+#22 exporting attestation manifest sha256:a35c2e0162652d15d5d42e80c2505bf2ee308e617a1bb803a48b8777f5ee66ea
+#22 exporting attestation manifest sha256:a35c2e0162652d15d5d42e80c2505bf2ee308e617a1bb803a48b8777f5ee66ea 0.1s done
+#22 exporting manifest list sha256:d79003b4b5b6c596fb6dd4a7528f82ab4ed3e56402d6f410e2984b02ae785166 0.1s done
+#22 naming to docker.io/library/harmony-contract-web-server:b28a8eb675e8
+#22 naming to docker.io/library/harmony-contract-web-server:b28a8eb675e8 done
+#22 unpacking to docker.io/library/harmony-contract-web-server:b28a8eb675e8 0.0s done
+#22 DONE 0.5s
+
+ [33m1 warning found (use docker --debug to expand):
+[0m - LegacyKeyValueFormat: "ENV key=value" should be used instead of legacy "ENV key value" format (line 3)
+#0 building with "rootless" instance using docker driver
+
+#1 [internal] load build definition from Dockerfile
+#1 transferring dockerfile: 619B done
+#1 DONE 0.0s
+
+#2 [internal] load metadata for docker.io/library/harmony-contract-web-server:b28a8eb675e8
+#2 DONE 0.1s
+
+#3 [internal] load .dockerignore
+#3 transferring context: 2B done
+#3 DONE 0.1s
+
+#4 [1/2] FROM docker.io/library/harmony-contract-web-server:b28a8eb675e8@sha256:d79003b4b5b6c596fb6dd4a7528f82ab4ed3e56402d6f410e2984b02ae785166
+#4 resolve docker.io/library/harmony-contract-web-server:b28a8eb675e8@sha256:d79003b4b5b6c596fb6dd4a7528f82ab4ed3e56402d6f410e2984b02ae785166
+#4 resolve docker.io/library/harmony-contract-web-server:b28a8eb675e8@sha256:d79003b4b5b6c596fb6dd4a7528f82ab4ed3e56402d6f410e2984b02ae785166 0.1s done
+#4 DONE 0.7s
+
+#5 [2/2] RUN pip install --no-cache-dir bcrypt==4.0.1
+#5 3.505 Collecting bcrypt==4.0.1
+#5 4.183   Downloading bcrypt-4.0.1-cp36-abi3-manylinux_2_28_x86_64.whl (593 kB)
+#5 5.092      ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ 593.7/593.7 kB 651.4 kB/s eta 0:00:00
+#5 6.109 Installing collected packages: bcrypt
+#5 6.109   Attempting uninstall: bcrypt
+#5 6.111     Found existing installation: bcrypt 5.0.0
+#5 6.114     Uninstalling bcrypt-5.0.0:
+#5 6.126       Successfully uninstalled bcrypt-5.0.0
+#5 6.198 Successfully installed bcrypt-4.0.1
+#5 6.199 WARNING: Running pip as the 'root' user can result in broken permissions and conflicting behaviour with the system package manager. It is recommended to use a virtual environment instead: https://pip.pypa.io/warnings/venv
+#5 7.059 
+#5 7.059 [notice] A new release of pip is available: 23.0.1 -> 25.0.1
+#5 7.059 [notice] To update, run: pip install --upgrade pip
+#5 DONE 7.4s
+
+#6 exporting to image
+#6 exporting layers
+#6 exporting layers 0.7s done
+#6 exporting manifest sha256:ed57e2259c75b382fcd02a1ee49b4b5acfefe6ddd7abbaa8bb91a331541c3212 0.1s done
+#6 exporting config sha256:80554d31ddd92a55ba09b0b0e5fbc8252cd74cb8db80e066205c1907109dc23a 0.1s done
+#6 exporting attestation manifest sha256:2f81122d6f59ad27dfdc37b596892b98fa72097b7d1684b835cc4efe86f46f0b 0.1s done
+#6 exporting manifest list sha256:a6b63edbfcbfbb0cf99e5e5fdeb08fe949380608b9b97e188cff7ce166aa49fe
+#6 exporting manifest list sha256:a6b63edbfcbfbb0cf99e5e5fdeb08fe949380608b9b97e188cff7ce166aa49fe 0.1s done
+#6 naming to docker.io/library/harmony-contract-web:b28a8eb675e8 done
+#6 unpacking to docker.io/library/harmony-contract-web:b28a8eb675e8
+#6 unpacking to docker.io/library/harmony-contract-web:b28a8eb675e8 0.2s done
+#6 DONE 1.3s
+ Network harmony-wp2b-authz_internal Creating 
+ Network harmony-wp2b-authz_internal Creating 
+ Network harmony-wp2b-authz_internal Created 
+ Network harmony-wp2b-authz_internal Created 
  Container harmony-wp2b-authz-redis-1 Creating 
- Container harmony-wp2b-authz-druid-stub-1 Creating 
- Container harmony-wp2b-authz-mailpit-1 Creating 
  Container harmony-wp2b-authz-postgres-1 Creating 
+ Container harmony-wp2b-authz-mailpit-1 Creating 
+ Container harmony-wp2b-authz-druid-stub-1 Creating 
  Container harmony-wp2b-authz-mailpit-1 Created 
- Container harmony-wp2b-authz-druid-stub-1 Created 
  Container harmony-wp2b-authz-postgres-1 Created 
+ Container harmony-wp2b-authz-druid-stub-1 Created 
  Container harmony-wp2b-authz-redis-1 Created 
- Container harmony-wp2b-authz-druid-stub-1 Starting 
  Container harmony-wp2b-authz-postgres-1 Starting 
+ Container harmony-wp2b-authz-druid-stub-1 Starting 
  Container harmony-wp2b-authz-mailpit-1 Starting 
  Container harmony-wp2b-authz-redis-1 Starting 
- Container harmony-wp2b-authz-druid-stub-1 Started 
  Container harmony-wp2b-authz-postgres-1 Started 
+ Container harmony-wp2b-authz-druid-stub-1 Started 
  Container harmony-wp2b-authz-mailpit-1 Started 
  Container harmony-wp2b-authz-redis-1 Started 
  Container harmony-wp2b-authz-postgres-1 Waiting 
+ Container harmony-wp2b-authz-druid-stub-1 Waiting 
  Container harmony-wp2b-authz-redis-1 Waiting 
  Container harmony-wp2b-authz-mailpit-1 Waiting 
- Container harmony-wp2b-authz-druid-stub-1 Waiting 
  Container harmony-wp2b-authz-druid-stub-1 Healthy 
  Container harmony-wp2b-authz-redis-1 Healthy 
  Container harmony-wp2b-authz-mailpit-1 Healthy 
  Container harmony-wp2b-authz-postgres-1 Healthy 
- Container harmony-wp2b-authz-redis-1 Running 
  Container harmony-wp2b-authz-mailpit-1 Running 
- Container harmony-wp2b-authz-druid-stub-1 Running 
+ Container harmony-wp2b-authz-redis-1 Running 
  Container harmony-wp2b-authz-postgres-1 Running 
+ Container harmony-wp2b-authz-druid-stub-1 Running 
  Container harmony-wp2b-authz-web-init-1 Creating 
+ Network harmony-wp2b-authz_edge Creating 
+ Network harmony-wp2b-authz_edge Creating 
+ Network harmony-wp2b-authz_edge Created 
+ Network harmony-wp2b-authz_edge Created 
  Container harmony-wp2b-authz-web-init-1 Created 
  Container harmony-wp2b-authz-hasura-1 Creating 
  Container harmony-wp2b-authz-hasura-1 Created 
  Container harmony-wp2b-authz-web-1 Creating 
  Container harmony-wp2b-authz-web-1 Created 
+ Container harmony-wp2b-authz-forward-1 Creating 
+ Container harmony-wp2b-authz-forward-1 Created 
  Container harmony-wp2b-authz-postgres-1 Waiting 
  Container harmony-wp2b-authz-postgres-1 Healthy 
  Container harmony-wp2b-authz-web-init-1 Starting 
@@ -79,15 +220,22 @@
  Container harmony-wp2b-authz-web-init-1 Exited 
  Container harmony-wp2b-authz-web-1 Starting 
  Container harmony-wp2b-authz-web-1 Started 
+ Container harmony-wp2b-authz-forward-1 Starting 
+ Container harmony-wp2b-authz-forward-1 Started 
 curl: (52) Empty reply from server
 curl: (52) Empty reply from server
-curl: (52) Empty reply from server
-authz stack: web is up at http://127.0.0.1:58660
+contract stack: web is up at http://127.0.0.1:58660
+20261004.181249.204 INFO apply_metadata_snapshot.py:main:52: Starting hasura metadata processing.
+20261004.181249.708 INFO apply_metadata_snapshot.py:main:76: Successfully applied metadata to http://hasura:8080/v1/query
+20261004.181249.708 INFO apply_metadata_snapshot.py:main:86: Done!
+/usr/local/lib/python3.8/site-packages/redis/utils.py:25: CryptographyDeprecationWarning: Python 3.8 is no longer supported by the Python core team and support for it is deprecated in cryptography. The next release of cryptography will remove support for Python 3.8.
+  import cryptography  # noqa
+contract stack: seeded thumbnail_contract-dashboard
 == pure layer
 ........................................................................ [ 98%]
-.............................................................            [100%]
-3085 passed in 203.40s (0:03:23)
+...............................................................          [100%]
+5247 passed in 215.50s (0:03:35)
 == live-stack layer, run 1
-569 passed, 2516 deselected in 219.98s (0:03:39)
+575 passed, 4672 deselected in 202.32s (0:03:22)
 == live-stack layer, run 2
-569 passed, 2516 deselected in 220.13s (0:03:40)
+575 passed, 4672 deselected in 221.54s (0:03:41)

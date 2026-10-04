@@ -36,6 +36,11 @@ def ensure_dev_hasura_admin_secret():
         fd = os.open(secret_path, os.O_WRONLY | os.O_CREAT | os.O_EXCL, 0o600)
         with os.fdopen(fd, 'w') as secret_file:
             secret_file.write(secrets.token_urlsafe(32))
+    if secret_path.stat().st_mode & 0o077:
+        raise PermissionError(
+            f'{secret_path} is readable by other users. Run `chmod 600 {secret_path}`, '
+            'or delete it so a new secret is generated.'
+        )
     os.environ['HASURA_ADMIN_SECRET'] = secret_path.read_text().strip()
 
 

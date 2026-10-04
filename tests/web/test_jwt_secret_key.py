@@ -18,7 +18,7 @@ from web.server.app_base import create_bare_app
 from web.server.configuration.flask import FlaskConfiguration
 from web.server.security.signal_handlers import install_login_manager_signal_handlers
 
-JWT_KEY = 'tests-web-jwt-key'
+JWT_KEY = 'tests-web-jwt-key-' + 'k' * 32
 
 
 @pytest.fixture(name='key_env')
@@ -52,17 +52,42 @@ def test_access_tokens_are_signed_with_the_jwt_key_only(key_env):
 
 
 @pytest.mark.parametrize(
-    'jwt_key',
-    [None, '', '   ', 'changeme', ' ChangeMe ', settings.DEFAULT_SECRET_KEY],
-    ids=['unset', 'empty', 'blank', 'changeme', 'changeme-mixed-case', 'secret-key'],
+    'jwt_key, message',
+    [
+        (None, 'JWT_SECRET_KEY is unset'),
+        ('', 'JWT_SECRET_KEY is unset'),
+        ('   ', 'JWT_SECRET_KEY is unset'),
+        ('changeme', 'JWT_SECRET_KEY is unset'),
+        (' ChangeMe ', 'JWT_SECRET_KEY is unset'),
+        (settings.DEFAULT_SECRET_KEY, 'JWT_SECRET_KEY equals DEFAULT_SECRET_KEY'),
+        ('k' * 31, 'JWT_SECRET_KEY is shorter than 32 characters'),
+    ],
+    ids=[
+        'unset',
+        'empty',
+        'blank',
+        'changeme',
+        'changeme-mixed-case',
+        'secret-key',
+        'shorter-than-32',
+    ],
 )
-def test_refuses_to_start_with_an_unusable_jwt_key(key_env, jwt_key):
+def test_refuses_to_start_with_an_unusable_jwt_key(key_env, jwt_key, message):
     if jwt_key is not None:
         key_env.setenv('JWT_SECRET_KEY', jwt_key)
     app = create_bare_app(FlaskConfiguration())
 
-    with pytest.raises(RuntimeError, match='JWT_SECRET_KEY'):
+    with pytest.raises(RuntimeError, match=message):
         initialize_jwt_manager(app)
+
+
+def test_accepts_a_32_character_key(key_env):
+    key_env.setenv('JWT_SECRET_KEY', 'k' * 32)
+    app = create_bare_app(FlaskConfiguration())
+
+    initialize_jwt_manager(app)
+
+    assert app.config['JWT_SECRET_KEY'] == 'k' * 32
 
 
 def test_cookie_signed_with_the_old_key_is_anonymous_not_an_error(key_env):

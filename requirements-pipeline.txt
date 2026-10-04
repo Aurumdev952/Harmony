@@ -2,20 +2,19 @@
 # The images install this with pip until WP-3b moves them to uv.
 xlrd>=1.0.0
 pyshp
-shapely==1.8
-pyproj==3.4.1
+shapely==2.0.7
+pyproj==3.7.2
 contextlib2
-lxml ; platform_python_implementation != 'PyPy'
-savReaderWriter ; platform_python_implementation != 'PyPy'
+lxml
 oauthlib
 requests_oauthlib
 isoweek
 unidecode==1.1.1
-zeep==3.4.0 ; platform_python_implementation != 'PyPy'
-scikit-learn>=0.21.3 ; platform_python_implementation != 'PyPy'
-scipy>=1.2.1 ; platform_python_implementation != 'PyPy'
+zeep==3.4.0
+scikit-learn>=0.21.3
+scipy>=1.2.1
 typing_extensions==4.1.1
-netCDF4 ; platform_python_implementation != 'PyPy'
+netCDF4
 dataclasses
 croniter==1.3.7
-lz4==4.3.2 ; platform_python_implementation != 'PyPy'
+lz4==4.4.5

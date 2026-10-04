@@ -35,7 +35,6 @@ UNPINNED_AT_ADOPTION = {
     "pyshp",
     "contextlib2",
     "lxml",
-    "savReaderWriter",
     "oauthlib",
     "requests_oauthlib",
     "isoweek",
@@ -166,10 +165,3 @@ def test_git_sources_become_editable_vcs_lines():
         "@bd398c18e8710a4e7cc87d9abb6ba9a95e7ba792#egg=Flask-Potion"
     ) in base
     assert "Flask-Potion" not in base
-
-
-def test_markers_are_kept_verbatim():
-    files = export_requirements.expected_files(ROOT)
-    pipeline = files[ROOT / "requirements-pipeline.txt"].splitlines()
-
-    assert "lxml ; platform_python_implementation != 'PyPy'" in pipeline

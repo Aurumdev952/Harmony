@@ -1,8 +1,6 @@
 # Generated from pyproject.toml by `make requirements`; do not edit.
 # The images install this with pip until WP-3b moves them to uv.
 pytest>=7.4.3
-pytest-selenium==4.0.1
-selenium==4.5.0
 pytest-flask>=0.15.0
 pytest-xdist>=1.29.0
 pytest-metadata>=1.8.0

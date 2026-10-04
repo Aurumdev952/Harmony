@@ -33,7 +33,7 @@ def test_passlib_can_hash_with_the_installed_bcrypt():
         "c = CryptContext(schemes=['bcrypt'])\n"
         "assert c.verify('password', c.hash('password'))"
     )
-    uv_run = ['uv', 'run', '--no-project', '--python', '3.8']
+    uv_run = ['uv', 'run', '--no-project', '--python', '3.13']
     packages = ['--with', 'passlib==1.7.4', '--with', f'bcrypt=={bcrypt}']
     result = subprocess.run(
         [*uv_run, *packages, 'python', '-W', 'ignore', '-c', script],

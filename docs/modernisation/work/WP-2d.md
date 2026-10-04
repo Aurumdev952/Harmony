@@ -77,6 +77,6 @@ All commands run from the worktree root at 62eb926.
 
 | Role | Verdict | Notes |
 |---|---|---|
-| qa | pending | Author is qa-4; an independent qa instance should rerun the evidence. |
+| qa | changes-requested | 2026-10-04 qa-2d-review: suite sound and sensitive (mutations, PyPy parity, hash seeds, synthetic data reproduced). Fix: files fail black 22.6 / ruff format at the repo config; 'every process_csv flag' is false (--value, tall --disaggregate, --exclude_zeros on disaggregated untested; mutant survives); hypothesis not derandomized; the WP-2a/2f dependency hazard understated. |
 | reviewer | pending | |
 | security | n/a | |

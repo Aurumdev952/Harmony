@@ -23,22 +23,41 @@ PINNED_POSTGRES = (
 )
 
 
-def run_make(tmp_path, target, **values):
-    """Runs a Makefile target with a stub `docker` that only logs its calls."""
+GOOD_BIND_ADDRESS = '10.0.0.20'
+CLUSTER_HOST_VARIABLES = ['DRUID_MASTER_HOST', 'DRUID_DATA_HOST', 'DRUID_QUERY_HOST']
+WILDCARD_ADDRESSES = ['', '0.0.0.0', '::', '[::]', ' 0.0.0.0 ']
+
+
+def run_make(tmp_path, target, shell=None, make_vars=None, **values):
+    """Runs a Makefile target with a stub `docker` that only logs its calls.
+
+    `values` go to the operator's druid_setup/.env (None leaves a key out);
+    `shell` is the caller's environment, which Compose prefers over
+    cluster/cluster.env; `make_vars` override Makefile variables.
+    """
     bin_dir = tmp_path / 'bin'
     bin_dir.mkdir(exist_ok=True)
     calls = tmp_path / 'docker-calls'
     docker = bin_dir / 'docker'
     docker.write_text(f'#!/bin/sh\necho "$@" >> {calls}\n')
     docker.chmod(0o755)
+    values = {'DRUID_BIND_ADDRESS': GOOD_BIND_ADDRESS, **values}
     env_file = tmp_path / 'druid.env'
-    env_file.write_text(''.join(f'{k}={v}\n' for k, v in values.items()))
+    env_file.write_text(
+        ''.join(f'{k}={v}\n' for k, v in values.items() if v is not None)
+    )
     result = subprocess.run(
-        ['make', '--no-print-directory', f'ENV_FILE={env_file}', target],
+        [
+            'make',
+            '--no-print-directory',
+            f'ENV_FILE={env_file}',
+            *(f'{k}={v}' for k, v in (make_vars or {}).items()),
+            target,
+        ],
         capture_output=True,
         text=True,
         cwd=DRUID_SETUP,
-        env={'PATH': f'{bin_dir}:/usr/bin:/bin'},
+        env={'PATH': f'{bin_dir}:/usr/bin:/bin', **(shell or {})},
         check=False,
     )
     return result, calls.read_text() if calls.exists() else ''
@@ -94,4 +113,60 @@ def test_refuses_an_unpinned_postgres_override(tmp_path, target, image):
     )
     assert result.returncode != 0
     assert 'DRUID_POSTGRES_IMAGE' in result.stderr
+    assert calls == ''
+
+
+@pytest.mark.parametrize('address', [None, *WILDCARD_ADDRESSES])
+def test_single_refuses_a_missing_or_wildcard_bind_address(tmp_path, address):
+    result, calls = run_make(
+        tmp_path,
+        'single_server_up',
+        DRUID_POSTGRES_PASSWORD=GOOD_PASSWORD,
+        DRUID_BIND_ADDRESS=address,
+    )
+    assert result.returncode != 0
+    assert 'DRUID_BIND_ADDRESS' in result.stderr
+    assert calls == ''
+
+
+def test_cluster_accepts_private_host_addresses(tmp_path):
+    shell = {
+        variable: f'10.0.0.{i}' for i, variable in enumerate(CLUSTER_HOST_VARIABLES)
+    }
+    result, calls = run_make(
+        tmp_path, 'cluster_server_up', shell, DRUID_POSTGRES_PASSWORD=GOOD_PASSWORD
+    )
+    assert result.returncode == 0, result.stderr
+    assert 'compose' in calls
+
+
+@pytest.mark.parametrize('variable', CLUSTER_HOST_VARIABLES)
+@pytest.mark.parametrize('address', WILDCARD_ADDRESSES)
+def test_cluster_refuses_a_wildcard_host_address(tmp_path, variable, address):
+    result, calls = run_make(
+        tmp_path,
+        'cluster_server_up',
+        {variable: address},
+        DRUID_POSTGRES_PASSWORD=GOOD_PASSWORD,
+    )
+    assert result.returncode != 0
+    assert variable in result.stderr
+    assert calls == ''
+
+
+@pytest.mark.parametrize('variable', CLUSTER_HOST_VARIABLES)
+def test_cluster_refuses_a_wildcard_in_cluster_env(tmp_path, variable):
+    # Without a value in the shell, Compose takes the cluster env file's.
+    cluster_env = tmp_path / 'cluster.env'
+    cluster_env.write_text(
+        (DRUID_SETUP / 'cluster' / 'cluster.env').read_text() + f'{variable}=0.0.0.0\n'
+    )
+    result, calls = run_make(
+        tmp_path,
+        'cluster_server_up',
+        make_vars={'CLUSTER_ENV': cluster_env},
+        DRUID_POSTGRES_PASSWORD=GOOD_PASSWORD,
+    )
+    assert result.returncode != 0
+    assert variable in result.stderr
     assert calls == ''

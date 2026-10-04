@@ -1,0 +1,2 @@
+- [Review traps](review_traps.md) — run tests in a clean scratch worktree (`*.log` ignored fixtures), worktree git limits, ownership.py via uv
+- [Gate arithmetic](review_gate_arithmetic.md) — probe threshold verdicts at the boundary and with zero input; compare unrounded counts

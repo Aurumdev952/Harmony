@@ -75,7 +75,20 @@ _REDACTIONS = (
         re.compile(r'(?i)(/(?:reset[-_]password|confirm[-_]email)/)[^\s/?"\']+'),
         r'\1' + REDACTED,
     ),
+    # gunicorn's body-parsing errors repeat the request body bytes they choked on,
+    # in its own lines and in app tracebacks alike.
+    (
+        re.compile(
+            r'(No more data after|Invalid chunk size|Invalid chunk terminator[^:\n]*)'
+            r': [^\n]+'
+        ),
+        r'\1: ' + REDACTED,
+    ),
 )
+
+# gunicorn logs client-supplied URIs ("Error handling request /path?query"), and a
+# query string can carry any secret, not only the named ones above.
+_QUERY_STRING = re.compile(r'(/[^\s?\'"]*)\?[^\s\'"]+')
 
 _FORMATS = ('json', 'text')
 _STREAMS = ('stdout', 'stderr')
@@ -84,6 +97,12 @@ _STREAMS = ('stdout', 'stderr')
 def redact(text: str) -> str:
     for pattern, replacement in _REDACTIONS:
         text = pattern.sub(replacement, text)
+    return text
+
+
+def _redact_request_uris(record: logging.LogRecord, text: str) -> str:
+    if record.name.startswith('gunicorn.'):
+        return _QUERY_STRING.sub(r'\1?' + REDACTED, text)
     return text
 
 
@@ -119,6 +138,22 @@ def _gunicorn_access_fields(atoms: Mapping[str, Any]) -> Dict[str, Any]:
     }
 
 
+def _gunicorn_access(
+    record: logging.LogRecord,
+) -> Optional[Tuple[str, Dict[str, Any], Optional[str]]]:
+    '''Message, http fields and response request id of a gunicorn access record.
+
+    Both formats build the line from these instead of gunicorn's access format,
+    whose request line, referer and user atoms carry query strings and credentials.
+    '''
+    if record.name != 'gunicorn.access' or not isinstance(record.args, Mapping):
+        return None
+    http = _gunicorn_access_fields(record.args)
+    message = f"{http['method']} {http['path']} {http['status']}"
+    request_id = record.args.get('{x-request-id}o', '-')
+    return message, http, None if request_id == '-' else str(request_id)
+
+
 class JsonFormatter(logging.Formatter):
     def __init__(self, deployment: Optional[str] = None) -> None:
         super().__init__()
@@ -139,26 +174,28 @@ class JsonFormatter(logging.Formatter):
             'level': record.levelname,
             'logger': record.name,
         }
-        if record.name == 'gunicorn.access' and isinstance(record.args, Mapping):
-            http = _gunicorn_access_fields(record.args)
-            entry['message'] = f"{http['method']} {http['path']} {http['status']}"
-            response_request_id = record.args.get('{x-request-id}o', '-')
-        else:
+        access = _gunicorn_access(record)
+        if access is None:
             http = None
-            entry['message'] = redact(record.getMessage())
-            response_request_id = '-'
+            response_request_id = None
+            message = redact(record.getMessage())
+            entry['message'] = _redact_request_uris(record, message)
+        else:
+            entry['message'], http, response_request_id = access
         entry['source'] = f'{record.filename}:{record.funcName}:{record.lineno}'
         if self.deployment:
             entry['deployment'] = self.deployment
         entry.update(_context_fields(record))
-        if response_request_id != '-':
+        if response_request_id is not None:
             entry.setdefault('request_id', response_request_id)
         if http is not None:
             entry['http'] = http
         if record.exc_info:
-            entry['exc_info'] = self.formatException(record.exc_info)
+            exc_text = self.formatException(record.exc_info)
+            entry['exc_info'] = _redact_request_uris(record, exc_text)
         elif record.exc_text:
-            entry['exc_info'] = redact(record.exc_text)
+            exc_text = redact(record.exc_text)
+            entry['exc_info'] = _redact_request_uris(record, exc_text)
         if record.stack_info:
             entry['stack_info'] = self.formatStack(record.stack_info)
         return json.dumps(entry, ensure_ascii=False, default=str)
@@ -174,11 +211,22 @@ class TextFormatter(logging.Formatter):
     def formatStack(self, stack_info: str) -> str:
         return redact(super().formatStack(stack_info))
 
+    def format(self, record: logging.LogRecord) -> str:
+        return _redact_request_uris(record, super().format(record))
+
     def formatMessage(self, record: logging.LogRecord) -> str:
         message = record.message
         fields = _context_fields(record)
+        access = _gunicorn_access(record)
+        if access is None:
+            text = redact(message)
+        else:
+            text, http, response_request_id = access
+            if response_request_id is not None:
+                fields.setdefault('request_id', response_request_id)
+            fields.update(bytes=http['bytes'], duration_s=http['duration_s'])
         suffix = ' '.join(f'{name}={value}' for name, value in fields.items())
-        record.message = f'{redact(message)} [{suffix}]' if suffix else redact(message)
+        record.message = f'{text} [{suffix}]' if suffix else text
         try:
             return super().formatMessage(record)
         finally:

@@ -147,6 +147,13 @@ def test_text_line_is_readable_with_context():
         ('password: hunter2', 'hunter2'),
         ("{'api_key': 'k-123'}", 'k-123'),
         ('X-Hasura-Admin-Secret: adm1n', 'adm1n'),
+        # gunicorn body-parsing errors, as they appear in app tracebacks.
+        ('NoMoreData: No more data after: b\'{"note": "b0dy"}\'', 'b0dy'),
+        ("InvalidChunkSize: Invalid chunk size: b'b0dy'", 'b0dy'),
+        (
+            "Invalid chunk terminator is not '\\r\\n': b'b0dy\\r\\nmore'",
+            'b0dy',
+        ),
     ],
 )
 def test_redact_removes_secret_values(raw, secret):
@@ -163,6 +170,8 @@ def test_redact_removes_secret_values(raw, secret):
         'Database schema version is: 9a628ffd6795',
         'User \'7\' logged in',
         'GET /api/v1/query 200',
+        # Query strings are stripped only from gunicorn's client URIs.
+        'Fetching http://druid:8082/druid/v2/?pretty',
     ],
 )
 def test_redact_keeps_ordinary_messages(message):

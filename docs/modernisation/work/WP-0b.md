@@ -59,6 +59,7 @@ None.
 - 2026-10-04 infra-1 unit 1: claimed WP-0b; check: commit 4acd856.
 - 2026-10-04 infra-1 unit 2: `POSTGRES_DB_URI:=` becomes `POSTGRES_DB_URI=` in `docker-compose.pipeline.yaml` (handed over from WP-0c); check: `uv run --no-project --with pytest pytest tests/infra` failed before (env key was `POSTGRES_DB_URI:`), 1 passed after.
 - 2026-10-04 infra-1 unit 3: base file publishes only nginx (redis, web, worker ports removed); dev binds postgres, redis, web to 127.0.0.1; db/minio files require an explicit bind address; check: `pytest tests/infra` 6 new tests failed before, 7 passed after; port summary under Evidence.
+- 2026-10-04 infra-1 unit 4: `:-changeme` fallbacks removed; `DEFAULT_SECRET_KEY`, `JWT_SECRET_KEY` (web, worker), `POSTGRES_PASSWORD`, `MINIO_ROOT_USER`/`MINIO_ROOT_PASSWORD` are `${VAR:?message}`; check: `pytest tests/infra` 14 new cases failed before, 27 passed after.
 
 ## Evidence
 
@@ -82,6 +83,20 @@ error while interpolating services.postgres.ports.[]: required variable POSTGRES
 ```
 
 The worker port 61234 had no listener behind it (Celery needs no inbound port), so dev does not re-add it.
+
+### Unit 4: secrets refused at the Compose layer
+
+`docker compose -f docker-compose.yaml config -q` with no `DEFAULT_SECRET_KEY` / `JWT_SECRET_KEY` (exit 1, before any container is touched):
+
+```
+error while interpolating services.web.environment.[]: required variable DEFAULT_SECRET_KEY is missing a value: set DEFAULT_SECRET_KEY to a random value, e.g. openssl rand -hex 32
+error while interpolating services.web.environment.[]: required variable JWT_SECRET_KEY is missing a value: set JWT_SECRET_KEY to a random value different from DEFAULT_SECRET_KEY, e.g. openssl rand -hex 32
+error while interpolating services.worker.environment.[]: required variable DEFAULT_SECRET_KEY is missing a value: ...
+error while interpolating services.worker.environment.[]: required variable JWT_SECRET_KEY is missing a value: ...
+exit=1
+```
+
+`tests/infra/test_compose.py::test_refuses_to_render_without_secret` covers unset and empty values for every required secret in every Compose file (14 cases); `test_no_default_secret_in_rendered_config` asserts `changeme` appears in no rendered file. An explicit `DEFAULT_SECRET_KEY=changeme` still renders; R1 makes the process refuse it.
 
 ## Verdicts
 

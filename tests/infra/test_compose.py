@@ -26,6 +26,13 @@ BASE_ENV = {
     'MC_CONFIG_PATH': '/tmp/mc',
     'DATA_PATH': '/tmp/data',
     'NGINX_VHOST': '/tmp/nginx_vhost',
+    'DEFAULT_SECRET_KEY': 'test-session-key',
+    'JWT_SECRET_KEY': 'test-jwt-key',
+    'POSTGRES_PASSWORD': 'test-postgres-password',
+    'POSTGRES_BIND_ADDRESS': '127.0.0.1',
+    'MINIO_ROOT_USER': 'test-minio-user',
+    'MINIO_ROOT_PASSWORD': 'test-minio-password',
+    'MINIO_BIND_ADDRESS': '127.0.0.1',
 }
 
 
@@ -104,10 +111,49 @@ def test_dev_publishes_on_loopback_only(tmp_path):
 def test_standalone_servers_need_an_explicit_bind_address(
     tmp_path, compose_file, service, variable
 ):
-    missing = render(tmp_path, [compose_file])
+    missing = render(tmp_path, [compose_file], unset=[variable])
     assert missing.returncode != 0
     assert variable in missing.stderr
 
     cfg = config(tmp_path, [compose_file], {variable: '10.0.0.5'})
     for entry in cfg['services'][service]['ports']:
         assert entry['host_ip'] == '10.0.0.5', entry
+
+
+REQUIRED_SECRETS = [
+    (['docker-compose.yaml'], 'DEFAULT_SECRET_KEY'),
+    (['docker-compose.yaml'], 'JWT_SECRET_KEY'),
+    (['docker-compose.yaml', 'docker-compose.dev.yaml'], 'DEFAULT_SECRET_KEY'),
+    (['docker-compose.pipeline.yaml'], 'DEFAULT_SECRET_KEY'),
+    (['docker-compose.db.yaml'], 'POSTGRES_PASSWORD'),
+    (['docker-compose.minio.yaml'], 'MINIO_ROOT_USER'),
+    (['docker-compose.minio.yaml'], 'MINIO_ROOT_PASSWORD'),
+]
+
+
+@pytest.mark.parametrize(('files', 'variable'), REQUIRED_SECRETS)
+@pytest.mark.parametrize('value', [None, ''], ids=['unset', 'empty'])
+def test_refuses_to_render_without_secret(tmp_path, files, variable, value):
+    if value is None:
+        result = render(tmp_path, files, unset=[variable])
+    else:
+        result = render(tmp_path, files, {variable: value})
+    assert result.returncode != 0
+    assert f'required variable {variable} is missing a value' in result.stderr
+
+
+@pytest.mark.parametrize(
+    'files',
+    [
+        ['docker-compose.yaml'],
+        ['docker-compose.yaml', 'docker-compose.prod.yaml'],
+        ['docker-compose.yaml', 'docker-compose.dev.yaml'],
+        ['docker-compose.pipeline.yaml'],
+        ['docker-compose.db.yaml'],
+        ['docker-compose.minio.yaml'],
+    ],
+)
+def test_no_default_secret_in_rendered_config(tmp_path, files):
+    result = render(tmp_path, files)
+    assert result.returncode == 0, result.stderr
+    assert 'changeme' not in result.stdout.lower()

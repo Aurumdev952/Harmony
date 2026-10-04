@@ -91,7 +91,7 @@ services:
       - DRUID_HOST=${DRUID_HOST}
       - COMMAND=${COMMAND-echo Specify a pipeline command, e.g. "./pipeline/harmony_demo/generate/zeus_generate run"}
       - PYTHONPATH=/app
-      - DEFAULT_SECRET_KEY=${DEFAULT_SECRET_KEY:-changeme}
+      - DEFAULT_SECRET_KEY=${DEFAULT_SECRET_KEY:?set DEFAULT_SECRET_KEY to a random value, e.g. openssl rand -hex 32}
       - HASURA_HOST=http://hasura:8080
       - SQLALCHEMY_DATABASE_URI=postgresql://postgres:zenysis@postgres:5432/${ZEN_ENV}-local
       - MAPBOX_ACCESS_TOKEN=${MAPBOX_ACCESS_TOKEN:-}

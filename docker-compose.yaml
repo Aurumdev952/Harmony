@@ -121,7 +121,8 @@ services:
       - MAILGUN_SMTP_ACCOUNT_ID=${MAILGUN_SMTP_ACCOUNT_ID:-}
       - EMAIL_TAG_HEADER_NAME=${EMAIL_TAG_HEADER_NAME:-X-Mailgun-Tag}
       - EMAIL_USE_ENCRYPTION=${EMAIL_USE_ENCRYPTION:-tls}
-      - DEFAULT_SECRET_KEY=${DEFAULT_SECRET_KEY:-changeme}
+      - DEFAULT_SECRET_KEY=${DEFAULT_SECRET_KEY:?set DEFAULT_SECRET_KEY to a random value, e.g. openssl rand -hex 32}
+      - JWT_SECRET_KEY=${JWT_SECRET_KEY:?set JWT_SECRET_KEY to a random value different from DEFAULT_SECRET_KEY, e.g. openssl rand -hex 32}
       - DRUID_HOST=${DRUID_HOST}
       - MAPBOX_ACCESS_TOKEN=${MAPBOX_ACCESS_TOKEN}
       - REDIS_HOST=redis
@@ -154,7 +155,8 @@ services:
       - MAILGUN_SMTP_ACCOUNT_ID=${MAILGUN_SMTP_ACCOUNT_ID:-}
       - EMAIL_TAG_HEADER_NAME=${EMAIL_TAG_HEADER_NAME:-X-Mailgun-Tag}
       - EMAIL_USE_ENCRYPTION=${EMAIL_USE_ENCRYPTION:-tls}
-      - DEFAULT_SECRET_KEY=${DEFAULT_SECRET_KEY:-changeme}
+      - DEFAULT_SECRET_KEY=${DEFAULT_SECRET_KEY:?set DEFAULT_SECRET_KEY to a random value, e.g. openssl rand -hex 32}
+      - JWT_SECRET_KEY=${JWT_SECRET_KEY:?set JWT_SECRET_KEY to a random value different from DEFAULT_SECRET_KEY, e.g. openssl rand -hex 32}
       - BROKER_URL=redis://redis:6379/0
       - SQLALCHEMY_DATABASE_URI=${DATABASE_URL}
       - HASURA_HOST=http://hasura:8080

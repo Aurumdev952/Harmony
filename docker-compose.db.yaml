@@ -28,7 +28,7 @@ services:
     restart: always
     environment:
       POSTGRES_USER: ${POSTGRES_USER:-postgres}
-      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?set POSTGRES_PASSWORD for the postgres superuser}
       POSTGRES_DB: ${POSTGRES_DB:-postgres}
     ports:
       - "${POSTGRES_BIND_ADDRESS:?set POSTGRES_BIND_ADDRESS to 127.0.0.1 when web runs on this host, or to this host's private IP when it runs elsewhere}:${POSTGRES_HOST_PORT:-5432}:5432"

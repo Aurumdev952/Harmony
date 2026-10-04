@@ -15,7 +15,7 @@ from flask import (
     send_file,
 )
 from flask_login import current_user, logout_user
-from flask_jwt_extended import get_jwt_claims
+from flask_jwt_extended import get_jwt_claims, unset_jwt_cookies
 from pylib.file.file_utils import FileUtils
 
 # pylint: disable=E0611
@@ -127,7 +127,9 @@ class ApiRouter:
             and automatic_signout_enabled
         ):
             logout_user()
-            return jsonify({'data': {'timeout': True}})
+            response = jsonify({'data': {'timeout': True}})
+            unset_jwt_cookies(response)
+            return response
         return jsonify({'data': {'timeout': False}})
 
     @authentication_required(is_api_request=True)

@@ -107,6 +107,6 @@ Every command ran on a clean `git archive` export of 7921b22, outside the reposi
 
 | Role | Verdict | Notes |
 |---|---|---|
-| qa | changes-requested | 2026-10-04 qa-2d-review: suite sound and sensitive (mutations, PyPy parity, hash seeds, synthetic data reproduced). Fix: files fail black 22.6 / ruff format at the repo config; 'every process_csv flag' is false (--value, tall --disaggregate, --exclude_zeros on disaggregated untested; mutant survives); hypothesis not derandomized; the WP-2a/2f dependency hazard understated. |
+| qa | approved | 2026-10-05 qa-2d-review at 067ec76: all round-1 findings fixed and reproduced: black and WP-2f ruff clean; three independent mutants and all seven mutation_check.py mutants fail the suite; CI=1 draws identical hypothesis examples twice; PyPy output byte-identical across 28 cases; fixtures synthetic, no volatile data. |
 | reviewer | changes-requested | 2026-10-04 rev-2d: harness sound; but 16 of 25 cases stop after process_csv so WP-8d has no Druid-level contract for them; druid_rows/druid_schema pin JSON-writer layout as if contract; rollup-key __ collision and partial dates not pinned; CI lint red; root pytest breaks beside 2a/2f; ZEN_ENV in shell aborts; property tests miss duplicate rows and import internals 8d removes; self-serve wrapper case not the production invocation; unit 1 not green on its own commit; --value never passed. |
 | security | n/a | |

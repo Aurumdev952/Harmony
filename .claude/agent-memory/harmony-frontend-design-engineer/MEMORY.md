@@ -1,0 +1,1 @@
+- [SCSS deletion verification](scss_deletion_verification.md) — postcss rule-level CSS diff to prove deletions; worktree Bash and grep traps

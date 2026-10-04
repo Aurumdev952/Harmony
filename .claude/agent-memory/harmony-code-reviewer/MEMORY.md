@@ -1,0 +1,1 @@
+- [CI review facts](ci_review_facts.md): buildx cache-from CSV, default Actions shell, jq null, registries, Makefile export, IMAGE_PREFIX mismatch, worktree-guard review recipe

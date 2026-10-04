@@ -37,7 +37,7 @@ Each unit is one PR.
 ## 0c. Fix the bugs that are pure mistakes
 
 - **Changes.** Each fix gets a regression test, even before phase 2 exists, as a plain pytest file run locally.
-  - `docker-compose.pipeline.yaml:17`: `POSTGRES_DB_URI:=` becomes `POSTGRES_DB_URI=`.
+  - `docker-compose.pipeline.yaml:17`: delete the `POSTGRES_DB_URI:=` line. Nothing reads `POSTGRES_DB_URI`; Alembic reads `SQLALCHEMY_DATABASE_URI`, which comes from `DATABASE_URL`.
   - `web/server/routes/dashboard.py:44`: point at the correct blueprint endpoint.
   - `web/server/util/util.py:622`: `is_session_persisted` reads the `accessKey` cookie's persistence instead of `remember_token`.
   - `run_raw_query`: apply the query policy, or restrict callers to service code. Decide this with `pstack:interrogate`.
@@ -48,9 +48,9 @@ Each unit is one PR.
 - **Changes.**
   - Remove from the requirements files: Flask-Admin, graphene-sqlalchemy, Flask-GraphQL, dask, google-cloud-logging, segment-analytics-python, paramiko and its pins, fuzzywuzzy, jellyfish, editdistance.
   - Delete the empty `/graphql` route and its module (`web/server/routes/graphql_api.py`, `web/server/graphql/`).
-  - Delete the unused `/api/timeout` route.
-  - Delete the Hadoop task templates (`db/druid/indexing/resources/task_templates`, `tuning_configs/on_prem.json`).
-  - Point `web/client/util/graphql/zen_environment.js` at the Hasura environment, or delete it.
+  - `/api/timeout` is live (the client's inactivity sign-out posts to it); keep it.
+  - Delete the Hadoop task templates (`db/druid/indexing/resources/task_templates`, `tuning_configs/on_prem.json`) together with `legacy_task_builder.py`, which reads them at import, and `scripts/run_indexing.py`, which nothing references.
+  - Delete `web/client/util/graphql/zen_environment.js` and its re-export in `index.jsx`; nothing uses it.
 - **Verification.** Images build. Every page and every Potion resource still responds; use the smoke list in [testing.md](testing.md). `grep` confirms no imports of the removed packages.
 
 ## 0e. Delete dead frontend code and dependencies

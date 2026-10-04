@@ -137,8 +137,12 @@ None of these blocks this WP.
 - [x] **lead (done in `665401e`):** add `.hypothesis/` to `.gitignore`. The contract suite's property tests write a Hypothesis example database at the repo root (`tests/pipeline` turns it off).
 - [ ] **lead:** delete the scripts nothing calls any more: `scripts/lint_python.sh`, `scripts/format_python.sh`, `scripts/format_python_files.sh`, `scripts/pylint/` and `scripts/mypy_parse.py`.
 - [ ] **lead:** plan one repo-wide `ruff format` commit for a quiet point after phase 2, recorded in `.git-blame-ignore-revs`. ruff formats in black 24 style, so until then the first PR to touch a file gets a whole-file reformat. 283 files are affected (Decisions).
-- [ ] **core (side branch `mig/WP-2f-uv-ruff-mypy-ci-core`, to merge here):** fix `util/unix.py:111`, where `subprocess` is undefined (ruff F821), then delete its line in `[tool.ruff.lint.per-file-ignores]`.
 - [x] **data-platform:** (done by data-platform-1 on `mig/WP-2f-uv-ruff-mypy-ci-druid`) delete the dead code at `scripts/druid/druid_task_memory_stats.py:54-59`, which reads an undefined `raw_timestamp` (ruff F821), then delete its line in `[tool.ruff.lint.per-file-ignores]`.
+- [x] **core** (done on `mig/WP-2f-uv-ruff-mypy-ci-core`, core-3): fix `util/unix.py:111`, where `subprocess` is undefined (ruff F821), then delete its line in `[tool.ruff.lint.per-file-ignores]`.
+- [ ] **core, WP-3 follow-up (found while fixing the F821; not changed here).** In `util/unix.py`:
+  - in `BackgroundProcess.wait()`, the `except CalledProcessError` can never run, because `Popen.wait` never raises it; and `wait()` never checks the exit code, so a failed child passes silently;
+  - `finalize()` builds an error without raising it;
+  - the errno 3 (`ESRCH`) handling re-raises in the case where the process was already killed, which is the case it should tolerate.
 - [ ] **frontend-platform and qa:** no Jest or Playwright suite exists on `mig/integration`. Ask infra for a CI job when the first suite lands (Vitest in WP-6, Playwright smoke from QA).
 - [ ] **qa (WP-2c), low:** no offline contract test pins the `date` format tag. Renaming it in `tests/contract/schema.py` left the suite green, while renaming `http-date` failed it (Unit 7 evidence). A `("2024-01-01", "date")` row in `test_string_format_tags` would close the gap.
 
@@ -180,6 +184,7 @@ None of these blocks this WP.
   - actionlint 0, zizmor 0 findings, and the WP-0f policy passes;
   - `git ls-files .playwright-mcp` is empty.
 - 2026-10-05 data-platform-1 (request, branch `mig/WP-2f-uv-ruff-mypy-ci-druid`): in `scripts/druid/druid_task_memory_stats.py`, deleted the unreachable second `return` in `build_timestamp`. It read the undefined `raw_timestamp`, and the function returns on its first line. Nothing else in the file reads `raw_timestamp`. Removed the file's F821 entry from `[tool.ruff.lint.per-file-ignores]`. Touching the file subjects it to the full changed-file rules, which flagged S101 on `assert False` in `_convert_to_mb`. It now raises `ValueError` for an unknown unit; before, it raised `AssertionError`, or under `-O` returned `'ERR'`. Check: the old file gives 6 errors under `ruff check --select E9,F63,F7,F82` without the ignore; `ci/lint_python.sh mig/WP-2f-uv-ruff-mypy-ci` exits 0 (tree-wide check passes, changed file lint-clean and formatted); the script on a sample filtered GC log writes `2026-10-04 16:14:20	30.5	1024.0	9.5	1000.0`.
+- 2026-10-04 core-3: `util/unix.py` `BackgroundProcess.wait` catches the already-imported `CalledProcessError` instead of the undefined `subprocess.CalledProcessError`, so an error from `Popen.wait()` (e.g. Ctrl-C) now propagates as itself instead of becoming a `NameError`; its `F821` per-file ignore is gone. That was the module's only undefined name. Touching the file brought it under the full rule set: `# noqa: S602` on the `shell=True` `Popen` (its callers in `util/file/compression` pass shell pipelines, for security to review), `# noqa: S110` on the deliberate swallow in `finalize`, and one blank line from `ruff format`. Check: `tests/core/test_unix.py` failed with `NameError` before and passes after; `ci/lint_python.sh mig/WP-2f-uv-ruff-mypy-ci` exit 0; a gzip round trip through `CommandLineCompressor`/`CommandLineDecompressor` returns the input.
 
 ## Decisions
 

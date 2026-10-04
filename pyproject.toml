@@ -210,8 +210,6 @@ select = ["E4", "E7", "E9", "F", "S"]
 ignore = ["S603", "S607"]
 
 [tool.ruff.lint.per-file-ignores]
-# Undefined names that are real bugs, left to their owners (WP-2f Requests).
-"util/unix.py" = ["F821"]
 # Tests assert, and draw synthetic data from `random`.
 "tests/**" = ["S101", "S311"]
 

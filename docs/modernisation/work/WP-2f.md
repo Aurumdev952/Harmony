@@ -169,5 +169,5 @@ All commands below ran on the branch after merging `mig/integration` at `e0c8228
 | Role | Verdict | Notes |
 |---|---|---|
 | qa | approved | 2026-10-04 qa-2f at 7b2f9b6: lock, cold uv sync (231 pkgs), CI run blocks replayed on a simulated PR merge commit, mypy parity with mypy.ini, requirements drift test, broken-case exit codes, actionlint 0 and WP-0f policy, new SHAs match tags. Follow-ups: hypothesis (and 2c/2d deps) in the dev group; make format-python stops on unfixable errors; druid_task_memory_stats dead code (delete); .vscode points at black (lead). |
-| reviewer | pending | |
+| reviewer | changes-requested | 2026-10-04 rev-2f at 7b2f9b6: design and parity sound. Fix: answer WP-2c/2d requests (hypothesis in dev; who runs stack suites; correct the 'turns PRs red' and 'run elsewhere' claims); lint script must diff against the merge-base; separate setup-uv cache keys per job; exporter must normalise names and fail on unused uv sources; mypy.ini deletion breaks watch_mypy.py and .vscode (lead fix must land in the same stack); describe the F401 ratchet and warn in-flight branches (list WP-0b in the porting request); mapfile needs bash 4; add a concurrency group. |
 | security | pending | |

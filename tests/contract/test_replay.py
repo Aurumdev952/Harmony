@@ -9,14 +9,17 @@ import json
 import pytest
 
 from .cases import compare, load_cases, recording_path
-from .runner import SkipCase
+
+pytestmark = pytest.mark.stack
 
 
 @pytest.mark.parametrize("case", load_cases(), ids=lambda c: c.id)
 def test_replay_matches_recording(case, contract_runner):
+    from .runner import SkipCase
+
     recorded = json.loads(recording_path(case.id).read_text())
     try:
         observed = contract_runner.run(case)
     except SkipCase as exc:
         pytest.fail(str(exc))
-    assert compare(case, recorded, observed) == []
+    assert compare(recorded, observed) == []

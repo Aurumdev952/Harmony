@@ -1,13 +1,28 @@
 """Contract cases: load them, run them, and turn a response into an observation.
 
 Cases live in ``cases/*.json`` and run in file-name order, then list order, so
-a case can use what an earlier one created. ``capture`` stores a value from a
-response under a name; ``{name}`` in a later path, query or body is replaced
-with it, and ``{env:NAME}`` with an environment variable (used for the login
-password, which therefore never appears in a case or a recording).
+a case can use what an earlier one created. Keys of a case:
+
+  id, route        unique id; ``"METHOD /path/template"`` from INVENTORY.md
+  path, query      the concrete request (path defaults to the route's)
+  body | files     a JSON body, or multipart parts (repo path or ``capture:<name>``)
+  session          ``admin*``, ``client*`` or ``anonymous*`` (see runner.py)
+  capture          ``{name: "/json/pointer"}``; ``#id`` takes a URI's trailing id
+  capture_body     name under which to keep the raw response body
+  pin              pointers whose deterministic values are compared too;
+                   ``[]``/``{*}`` tokens pin the set of values (enums)
+  maps             response paths that are maps keyed by data (see schema.infer)
+  cookies          true to record which cookies the response sets or clears
+  note             why the case looks the way it does
+
+``{name}`` in a path, query, body or key is replaced with a capture, and
+``{env:NAME}`` with an environment variable (the login password, which
+therefore never appears in a case or a recording).
 
 An observation is what a recording stores and a replay compares:
-``{status, content_type, headers, request_schema, response_schema, pinned}``.
+``{status, content_type, headers, response_schema, pinned}``, plus ``cookies``
+for cases that ask for it. Request bodies live in the case files, not the
+recordings.
 """
 
 from __future__ import annotations
@@ -23,6 +38,7 @@ from typing import Any
 from . import schema
 
 HERE = Path(__file__).parent
+REPO_ROOT = HERE.parents[1]
 CASES_DIR = HERE / "cases"
 RECORDINGS_DIR = HERE / "recordings"
 INVENTORY = HERE / "INVENTORY.md"
@@ -33,10 +49,32 @@ CONTRACT_HEADERS = ("content-disposition", "link", "location", "x-total-count")
 
 # Pinned values must be deterministic and harmless; these never qualify.
 _SECRET_NAME = re.compile(
-    r"pass(word)?|secret|token|api[_-]?key|hash|salt|session|cookie|authori[sz]ation|email|phone", re.IGNORECASE
+    r"pass(word)?|secret|token|api[_-]?key|hash|salt|session|cookie|authori[sz]ation|email|phone",
+    re.IGNORECASE,
 )
 
+# A multipart part whose source starts with this is the raw body an earlier
+# case captured with ``capture_body``, not a file in the repository.
+CAPTURED_FILE = "capture:"
+
 _PLACEHOLDER = re.compile(r"\{(env:)?([A-Za-z_][\w.]*)\}")
+
+
+CASE_KEYS = {
+    "id",
+    "route",
+    "path",
+    "query",
+    "body",
+    "files",
+    "session",
+    "capture",
+    "capture_body",
+    "pin",
+    "maps",
+    "cookies",
+    "note",
+}
 
 
 @dataclass(frozen=True)
@@ -50,32 +88,37 @@ class Case:
     files: Mapping[str, str] = field(default_factory=dict)
     session: str = "admin"
     capture: Mapping[str, str] = field(default_factory=dict)
+    capture_body: str | None = None
     pin: tuple[str, ...] = ()
-    compare: str = "shape"
+    maps: frozenset[str] = frozenset()
+    cookies: bool = False
     note: str = ""
 
     @classmethod
     def from_json(cls, raw: Mapping[str, Any]) -> Case:
+        unknown = set(raw) - CASE_KEYS
+        if unknown:
+            raise ValueError(f"{raw.get('id')}: unknown case keys {sorted(unknown)}")
         method, _, template = raw["route"].partition(" ")
-        if raw.get("compare", "shape") not in ("shape", "status"):
-            raise ValueError(f"{raw['id']}: compare must be 'shape' or 'status'")
-        if raw.get("compare") == "status" and not raw.get("note"):
-            raise ValueError(f"{raw['id']}: a status-only case must say why in 'note'")
         for pointer in raw.get("pin", []):
             if _SECRET_NAME.search(pointer):
-                raise ValueError(f"{raw['id']}: refusing to pin {pointer!r}; it names a secret or PII")
+                raise ValueError(
+                    f"{raw['id']}: refusing to pin {pointer!r}; it names a secret or PII"
+                )
         return cls(
             id=raw["id"],
             route=raw["route"],
-            method=raw.get("method", method),
+            method=method,
             path=raw.get("path", template),
             query=raw.get("query", {}),
             body=raw.get("body"),
             files=raw.get("files", {}),
             session=raw.get("session", "admin"),
             capture=raw.get("capture", {}),
+            capture_body=raw.get("capture_body"),
             pin=tuple(raw.get("pin", [])),
-            compare=raw.get("compare", "shape"),
+            maps=frozenset(raw.get("maps", [])),
+            cookies=bool(raw.get("cookies", False)),
             note=raw.get("note", ""),
         )
 
@@ -96,7 +139,22 @@ def recording_path(case_id: str, recordings_dir: Path = RECORDINGS_DIR) -> Path:
     return recordings_dir / f"{case_id}.json"
 
 
+# A string "relay:<path to __generated__/X.graphql.js>" stands for that
+# operation's query text, so GraphQL cases follow the client's real queries.
+RELAY_PREFIX = "relay:"
+_RELAY_TEXT = re.compile(r'"text":\s*("(?:[^"\\]|\\.)*")')
+
+
+def relay_text(artifact: str) -> str:
+    match = _RELAY_TEXT.search((REPO_ROOT / artifact).read_text())
+    if not match:
+        raise ValueError(f"no operation text in {artifact}")
+    return json.loads(match.group(1))
+
+
 def substitute(value: Any, captures: Mapping[str, Any]) -> Any:
+    if isinstance(value, str) and value.startswith(RELAY_PREFIX):
+        return relay_text(value.removeprefix(RELAY_PREFIX))
     if isinstance(value, str):
         whole = _PLACEHOLDER.fullmatch(value)
         if whole:
@@ -105,7 +163,9 @@ def substitute(value: Any, captures: Mapping[str, Any]) -> Any:
     if isinstance(value, list):
         return [substitute(v, captures) for v in value]
     if isinstance(value, dict):
-        return {k: substitute(v, captures) for k, v in value.items()}
+        return {
+            substitute(k, captures): substitute(v, captures) for k, v in value.items()
+        }
     return value
 
 
@@ -134,6 +194,35 @@ def resolve_pointer(document: Any, pointer: str) -> Any:
     return current
 
 
+EACH = ("[]", "{*}")
+
+
+def pin_value(document: Any, pointer: str) -> Any:
+    """A JSON pointer, where a ``[]`` token means every item of an array and
+    ``{*}`` every value of an object. Such a pointer pins the sorted set of
+    values found, which is how an enum-like field is pinned."""
+    tokens = [] if pointer in ("", "/") else pointer.lstrip("/").split("/")
+    if not any(t in EACH for t in tokens):
+        return resolve_pointer(document, pointer)
+    found = {json.dumps(v, sort_keys=True) for v in _walk(document, tokens)}
+    return [json.loads(v) for v in sorted(found)]
+
+
+def _walk(node: Any, tokens: list[str]) -> Iterator[Any]:
+    if not tokens:
+        yield node
+        return
+    token, rest = tokens[0], tokens[1:]
+    if token == "[]":
+        for item in node:
+            yield from _walk(item, rest)
+    elif token == "{*}":
+        for item in node.values():
+            yield from _walk(item, rest)
+    else:
+        yield from _walk(resolve_pointer(node, "/" + token), rest)
+
+
 def capture_value(document: Any, spec: str) -> Any:
     """``/pointer`` takes the value; ``/pointer#id`` takes the integer id at the
     end of a resource URI such as ``/api2/dashboard/7``."""
@@ -152,25 +241,54 @@ def placeholders(case: Case) -> Iterator[str]:
     for m in _PLACEHOLDER.finditer(text):
         if not m.group(1):
             yield m.group(2)
+    for source in case.files.values():
+        if source.startswith(CAPTURED_FILE):
+            yield source.removeprefix(CAPTURED_FILE)
+
+
+def captures_of(case: Case) -> set[str]:
+    return set(case.capture) | ({case.capture_body} if case.capture_body else set())
 
 
 def media_type(content_type: str | None) -> str:
     return (content_type or "").split(";", 1)[0].strip().lower()
 
 
-def _request_schema(case: Case, sent_body: Any) -> schema.Schema | None:
-    if case.files:
-        parts = sorted(case.files)
-        return {
-            "type": "object",
-            "x-format": "multipart",
-            "properties": {name: {"type": "string", "x-format": "binary"} for name in parts},
-            "required": parts,
-        }
-    return schema.infer(sent_body) if sent_body is not None else None
+def describe_set_cookie(header: str) -> str:
+    """One Set-Cookie header without its value: the name, then ``cleared``
+    (empty value, Max-Age=0 or an expiry in 1970), ``persistent`` (Max-Age or
+    Expires) or ``session``, then the attributes that matter for SEC-5."""
+    first, *attrs = [part.strip() for part in header.split(";") if part.strip()]
+    name, _, value = first.partition("=")
+    pairs = {
+        k.strip().lower(): v.strip() for k, _, v in (a.partition("=") for a in attrs)
+    }
+    if (
+        not value.strip('"')
+        or pairs.get("max-age") == "0"
+        or "1970" in pairs.get("expires", "")
+    ):
+        lifetime = "cleared"
+    elif "max-age" in pairs or "expires" in pairs:
+        lifetime = "persistent"
+    else:
+        lifetime = "session"
+    flags = [f for f in ("httponly", "secure") if f in pairs]
+    if "samesite" in pairs:
+        flags.append(f"samesite={pairs['samesite'].lower()}")
+    for key in ("path", "domain"):
+        if key in pairs:
+            flags.append(f"{key}={pairs[key]}")
+    return "; ".join([name, lifetime, *flags])
 
 
-def observe(case: Case, sent_body: Any, status: int, headers: Mapping[str, str], body: bytes) -> dict[str, Any]:
+def observe(
+    case: Case,
+    status: int,
+    headers: Mapping[str, str],
+    body: bytes,
+    set_cookies: tuple[str, ...] = (),
+) -> dict[str, Any]:
     lowered = {k.lower(): v for k, v in headers.items()}
     content_type = media_type(lowered.get("content-type"))
     parsed: Any = None
@@ -189,41 +307,73 @@ def observe(case: Case, sent_body: Any, status: int, headers: Mapping[str, str],
         "status": status,
         "content_type": content_type,
         "headers": sorted(h for h in CONTRACT_HEADERS if h in lowered),
-        "request_schema": _request_schema(case, sent_body),
-        "response_schema": schema.infer(parsed) if is_json and body else None,
+        "response_schema": schema.infer(parsed, case.maps)
+        if is_json and body
+        else None,
         "pinned": {},
     }
     if not is_json:
         observation["non_empty"] = bool(body)
+    if case.cookies:
+        observation["cookies"] = sorted(describe_set_cookie(h) for h in set_cookies)
+    missing = []
     for pointer in case.pin:
-        value = resolve_pointer(parsed, pointer)
-        if isinstance(value, (dict, list)):
-            raise TypeError(f"{case.id}: pin {pointer} must point at a scalar")
-        fmt = schema.string_format(value) if isinstance(value, str) else None
-        if fmt in ("email", "jwt"):
-            raise ValueError(f"{case.id}: refusing to pin {pointer}; the value looks like {fmt}")
+        try:
+            value = pin_value(parsed, pointer)
+        except (LookupError, TypeError, ValueError, AttributeError):
+            missing.append(pointer)
+            continue
+        values = (
+            value
+            if isinstance(value, list) and any(t in pointer for t in EACH)
+            else [value]
+        )
+        for v in values:
+            if isinstance(v, (dict, list)):
+                raise TypeError(f"{case.id}: pin {pointer} must point at scalars")
+            fmt = schema.string_format(v) if isinstance(v, str) else None
+            if fmt in ("email", "jwt"):
+                raise ValueError(
+                    f"{case.id}: refusing to pin {pointer}; a value looks like {fmt}"
+                )
         observation["pinned"][pointer] = value
+    if missing:
+        observation["missing_pins"] = missing
     return observation
 
 
-def compare(case: Case, recorded: Mapping[str, Any], observed: Mapping[str, Any]) -> list[str]:
+def compare(recorded: Mapping[str, Any], observed: Mapping[str, Any]) -> list[str]:
+    """Every difference between a recording and a replay, as readable lines."""
     problems: list[str] = []
     if recorded["status"] != observed["status"]:
         problems.append(f"status {recorded['status']} != {observed['status']}")
     if recorded["content_type"] != observed["content_type"]:
-        problems.append(f"content type {recorded['content_type']!r} != {observed['content_type']!r}")
-    if case.compare == "status":
-        return problems
+        problems.append(
+            f"content type {recorded['content_type']!r} != {observed['content_type']!r}"
+        )
     if recorded["headers"] != observed["headers"]:
-        problems.append(f"contract headers {recorded['headers']} != {observed['headers']}")
+        problems.append(
+            f"contract headers {recorded['headers']} != {observed['headers']}"
+        )
     if recorded.get("non_empty") != observed.get("non_empty"):
-        problems.append(f"non-JSON body present {recorded.get('non_empty')} != {observed.get('non_empty')}")
+        problems.append(
+            f"non-JSON body present {recorded.get('non_empty')} != {observed.get('non_empty')}"
+        )
+    if recorded.get("cookies") != observed.get("cookies"):
+        problems.append(
+            f"cookies {recorded.get('cookies')} != {observed.get('cookies')}"
+        )
     rs, os_ = recorded["response_schema"], observed["response_schema"]
     if (rs is None) != (os_ is None):
         problems.append(f"JSON body present {rs is not None} != {os_ is not None}")
     elif rs is not None:
         problems.extend(schema.diff(rs, os_))
     for pointer, value in recorded["pinned"].items():
-        if observed["pinned"].get(pointer) != value:
-            problems.append(f"pinned {pointer}: {value!r} != {observed['pinned'].get(pointer)!r}")
+        if pointer in observed.get("missing_pins", []):
+            problems.append(f"pinned {pointer}: {value!r} recorded, missing now")
+        elif observed["pinned"].get(pointer) != value:
+            problems.append(
+                f"pinned {pointer}: {value!r} != {observed['pinned'].get(pointer)!r}"
+            )
+    problems.extend(f"capture {error}" for error in observed.get("capture_errors", []))
     return problems

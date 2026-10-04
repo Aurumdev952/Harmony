@@ -25,12 +25,30 @@ TYPE_ORDER = ("null", "boolean", "integer", "number", "string", "array", "object
 
 # Order matters: the first matching pattern names the format.
 STRING_FORMATS: tuple[tuple[str, re.Pattern[str]], ...] = (
-    ("date-time", re.compile(r"^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}(:\d{2}(\.\d+)?)?(Z|[+-]\d{2}:?\d{2})?$")),
-    ("date-time-space", re.compile(r"^\d{4}-\d{2}-\d{2} \d{2}:\d{2}(:\d{2}(\.\d+)?)?(Z|[+-]\d{2}:?\d{2})?$")),
+    (
+        "date-time",
+        re.compile(
+            r"^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}(:\d{2}(\.\d+)?)?(Z|[+-]\d{2}:?\d{2})?$"
+        ),
+    ),
+    (
+        "date-time-space",
+        re.compile(
+            r"^\d{4}-\d{2}-\d{2} \d{2}:\d{2}(:\d{2}(\.\d+)?)?(Z|[+-]\d{2}:?\d{2})?$"
+        ),
+    ),
     ("date", re.compile(r"^\d{4}-\d{2}-\d{2}$")),
-    ("http-date", re.compile(r"^[A-Z][a-z]{2}, \d{2} [A-Z][a-z]{2} \d{4} \d{2}:\d{2}:\d{2} GMT$")),
+    (
+        "http-date",
+        re.compile(r"^[A-Z][a-z]{2}, \d{2} [A-Z][a-z]{2} \d{4} \d{2}:\d{2}:\d{2} GMT$"),
+    ),
     ("email", re.compile(r"^[^@\s]+@[^@\s]+\.[^@\s]+$")),
-    ("uuid", re.compile(r"^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$")),
+    (
+        "uuid",
+        re.compile(
+            r"^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$"
+        ),
+    ),
     ("api-uri", re.compile(r"^/api2?/[^\s?#]+$")),
     ("jwt", re.compile(r"^eyJ[\w-]+\.[\w-]+\.[\w-]*$")),
 )
@@ -59,11 +77,18 @@ def is_data_key(key: str) -> bool:
     return bool(_DATA_KEY.match(key)) or any(ch.isspace() for ch in key)
 
 
+# A declared map that happened to be empty; like ``maxItems: 0`` for arrays.
+EMPTY_MAP: Schema = {"type": "object", "additionalProperties": {}, "maxProperties": 0}
+
+
 def is_map(value: dict[str, Any]) -> bool:
     return len(value) > MAP_KEY_THRESHOLD or any(is_data_key(k) for k in value)
 
 
-def infer(value: Any) -> Schema:
+def infer(value: Any, maps: frozenset[str] = frozenset(), path: str = "$") -> Schema:
+    """``maps`` names objects keyed by data that the key heuristics cannot see
+    (dimension values, for one), using ``diff``'s path notation: ``$.totals``,
+    ``$.rows[]``, ``$.byState{*}``."""
     if value is None:
         return {"type": "null"}
     if isinstance(value, bool):
@@ -78,22 +103,26 @@ def infer(value: Any) -> Schema:
     if isinstance(value, (list, tuple)):
         if not value:
             return {"type": "array", "maxItems": 0}
-        items = infer(value[0])
+        items = infer(value[0], maps, f"{path}[]")
         for item in value[1:]:
-            items = merge(items, infer(item))
+            items = merge(items, infer(item, maps, f"{path}[]"))
         return {"type": "array", "items": items}
     if isinstance(value, dict):
         if not value:
+            if path in maps:
+                return dict(EMPTY_MAP)
             return {"type": "object", "properties": {}, "required": []}
-        if is_map(value):
+        if path in maps or is_map(value):
             values = list(value.values())
-            inner = infer(values[0])
+            inner = infer(values[0], maps, f"{path}{{*}}")
             for item in values[1:]:
-                inner = merge(inner, infer(item))
+                inner = merge(inner, infer(item, maps, f"{path}{{*}}"))
             return {"type": "object", "additionalProperties": inner}
         return {
             "type": "object",
-            "properties": {k: infer(value[k]) for k in sorted(value)},
+            "properties": {
+                k: infer(value[k], maps, f"{path}.{k}") for k in sorted(value)
+            },
             "required": sorted(value),
         }
     raise TypeError(f"not a JSON value: {type(value).__name__}")
@@ -145,13 +174,26 @@ def merge(a: Schema, b: Schema) -> Schema:
         parts.update(_merge_objects(a, b))
     elif "object" in ta or "object" in tb:
         src = a if "object" in ta else b
-        parts.update({k: src[k] for k in ("properties", "required", "additionalProperties") if k in src})
+        parts.update(
+            {
+                k: src[k]
+                for k in (
+                    "properties",
+                    "required",
+                    "additionalProperties",
+                    "maxProperties",
+                )
+                if k in src
+            }
+        )
 
     return _with_types(ta | tb, parts)
 
 
 def _object_values(schema: Schema) -> Schema | None:
-    """Every value schema an object admits, joined; None for an empty record."""
+    """Every value schema an object admits, joined; None for an empty record or map."""
+    if schema.get("maxProperties") == 0:
+        return None
     joined = schema.get("additionalProperties")
     for prop in schema.get("properties", {}).values():
         joined = prop if joined is None else merge(joined, prop)
@@ -165,7 +207,9 @@ def _merge_objects(a: Schema, b: Schema) -> Schema:
             joined = va if vb is None else vb
         else:
             joined = merge(va, vb)
-        return {"additionalProperties": joined} if joined is not None else {}
+        if joined is None:
+            return {k: v for k, v in EMPTY_MAP.items() if k != "type"}
+        return {"additionalProperties": joined}
     pa, pb = a.get("properties", {}), b.get("properties", {})
     props = {}
     for key in sorted(set(pa) | set(pb)):
@@ -186,7 +230,9 @@ def diff(expected: Schema, actual: Schema, path: str = "$") -> list[str]:
     common = te & ta
 
     if "string" in common and expected.get("x-format") != actual.get("x-format"):
-        out.append(f"{path}: string format {expected.get('x-format')!r} != {actual.get('x-format')!r}")
+        out.append(
+            f"{path}: string format {expected.get('x-format')!r} != {actual.get('x-format')!r}"
+        )
 
     if "array" in common:
         e_empty, a_empty = "items" not in expected, "items" not in actual
@@ -198,13 +244,32 @@ def diff(expected: Schema, actual: Schema, path: str = "$") -> list[str]:
             out.extend(diff(expected["items"], actual["items"], f"{path}[]"))
 
     if "object" in common:
-        e_map, a_map = "additionalProperties" in expected, "additionalProperties" in actual
+        e_map, a_map = (
+            "additionalProperties" in expected,
+            "additionalProperties" in actual,
+        )
         if e_map != a_map:
             out.append(
                 f"{path}: object is {'a map' if e_map else 'a record'} in recording, {'a map' if a_map else 'a record'} now"
             )
         elif e_map:
-            out.extend(diff(expected["additionalProperties"], actual["additionalProperties"], f"{path}{{*}}"))
+            e_empty, a_empty = (
+                expected.get("maxProperties") == 0,
+                actual.get("maxProperties") == 0,
+            )
+            if e_empty != a_empty:
+                out.append(
+                    f"{path}: map is {'empty' if e_empty else 'non-empty'} in recording, "
+                    f"{'empty' if a_empty else 'non-empty'} now"
+                )
+            elif not e_empty:
+                out.extend(
+                    diff(
+                        expected["additionalProperties"],
+                        actual["additionalProperties"],
+                        f"{path}{{*}}",
+                    )
+                )
         else:
             pe, pa = expected.get("properties", {}), actual.get("properties", {})
             for key in sorted(set(pe) - set(pa)):

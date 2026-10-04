@@ -28,8 +28,13 @@ leaf = st.one_of(
     st.text(max_size=8),
     shaped_strings,
 )
-record_keys = st.sampled_from(["id", "name", "$uri", "created", "items", "value", "isOfficial"])
-data_keys = st.one_of(st.integers(0, 999).map(str), st.sampled_from(["a@b.org", "2024-01-01", "/api2/user/3"]))
+record_keys = st.sampled_from(
+    ["id", "name", "$uri", "created", "items", "value", "isOfficial"]
+)
+data_keys = st.one_of(
+    st.integers(0, 999).map(str),
+    st.sampled_from(["a@b.org", "2024-01-01", "/api2/user/3"]),
+)
 json_values = st.recursive(
     leaf,
     lambda children: st.one_of(
@@ -81,7 +86,12 @@ secret_values = st.recursive(
     lambda children: st.one_of(
         st.lists(children, max_size=3),
         st.dictionaries(record_keys, children, max_size=3),
-        st.dictionaries(secret_text.map(lambda s: f"{s}@example.org"), children, min_size=1, max_size=3),
+        st.dictionaries(
+            secret_text.map(lambda s: f"{s}@example.org"),
+            children,
+            min_size=1,
+            max_size=3,
+        ),
         st.dictionaries(st.integers(0, 99).map(str), children, min_size=1, max_size=3),
     ),
     max_leaves=15,
@@ -102,7 +112,9 @@ def test_record_lists_keys_and_marks_them_required():
 
 
 def test_keys_that_are_data_collapse_into_a_map():
-    shape = infer({"someone@example.org": {"admin": True}, "other@example.org": {"admin": False}})
+    shape = infer(
+        {"someone@example.org": {"admin": True}, "other@example.org": {"admin": False}}
+    )
     assert shape == {
         "type": "object",
         "additionalProperties": {
@@ -120,7 +132,9 @@ def test_keys_missing_from_some_list_items_are_optional():
 
 
 def test_nullable_field_records_both_types():
-    assert infer([{"v": None}, {"v": 1.5}])["items"]["properties"]["v"] == {"type": ["null", "number"]}
+    assert infer([{"v": None}, {"v": 1.5}])["items"]["properties"]["v"] == {
+        "type": ["null", "number"]
+    }
 
 
 @pytest.mark.parametrize(
@@ -138,8 +152,16 @@ def test_string_format_tags(value, fmt):
 
 
 def test_diff_explains_serialisation_and_key_drift():
-    recorded = infer({"created": "Mon, 01 Jan 2024 10:00:00 GMT", "$uri": "/api2/dashboard/1", "id": 1})
-    replayed = infer({"created": "2024-01-01T10:00:00Z", "uri": "/api/v3/dashboards/1", "id": "1"})
+    recorded = infer(
+        {
+            "created": "Mon, 01 Jan 2024 10:00:00 GMT",
+            "$uri": "/api2/dashboard/1",
+            "id": 1,
+        }
+    )
+    replayed = infer(
+        {"created": "2024-01-01T10:00:00Z", "uri": "/api/v3/dashboards/1", "id": "1"}
+    )
     assert diff(recorded, replayed) == [
         "$: missing key '$uri'",
         "$: unexpected key 'uri'",
@@ -151,8 +173,47 @@ def test_diff_explains_serialisation_and_key_drift():
 def test_diff_reports_key_becoming_optional():
     always = infer([{"id": 1, "parent": 2}])
     sometimes = infer([{"id": 1, "parent": 2}, {"id": 2}])
-    assert diff(always, sometimes) == ["$[].parent: always present in recording, not now"]
+    assert diff(always, sometimes) == [
+        "$[].parent: always present in recording, not now"
+    ]
 
 
 def test_diff_reports_empty_array_turning_non_empty():
-    assert diff(infer({"rows": []}), infer({"rows": [1]})) == ["$.rows: array is empty in recording, non-empty now"]
+    assert diff(infer({"rows": []}), infer({"rows": [1]})) == [
+        "$.rows: array is empty in recording, non-empty now"
+    ]
+
+
+def test_declared_map_paths_collapse_keys_the_heuristics_miss():
+    response = {
+        "totals": {"Kigali": {"cases": 1.5}, "Huye": {"cases": 2.0}},
+        "dates": ["2024-01-01"],
+    }
+    shape = infer(response, frozenset({"$.totals"}))
+    assert shape["properties"]["totals"] == {
+        "type": "object",
+        "additionalProperties": {
+            "type": "object",
+            "properties": {"cases": {"type": "number"}},
+            "required": ["cases"],
+        },
+    }
+    assert "Kigali" not in json.dumps(shape)
+
+
+def test_map_paths_reach_into_arrays_and_maps():
+    shape = infer(
+        {"rows": [{"byState": {"Kigali": 1}}]}, frozenset({"$.rows[].byState"})
+    )
+    assert shape["properties"]["rows"]["items"]["properties"]["byState"] == {
+        "type": "object",
+        "additionalProperties": {"type": "integer"},
+    }
+
+
+def test_a_declared_map_that_is_empty_stays_a_map():
+    maps = frozenset({"$.totals"})
+    empty, full = infer({"totals": {}}, maps), infer({"totals": {"Kigali": 1}}, maps)
+    assert diff(empty, full) == ["$.totals: map is empty in recording, non-empty now"]
+    assert merge(empty, full) == full
+    assert diff(full, infer({"totals": {"Huye": 2}}, maps)) == []

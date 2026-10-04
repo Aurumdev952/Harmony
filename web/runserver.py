@@ -1,6 +1,8 @@
 import os
+import secrets
 import socket
 import sys
+from pathlib import Path
 from pylib.base.flags import Flags
 
 # NOTE: Need to import our dev reloader since registration is handled in that
@@ -21,6 +23,20 @@ def start_postgres():
         port_in_use = s.connect_ex(('localhost', 5432)) == 0
         if not port_in_use:
             os.system('scripts/db/postgres/dev/start_postgres.sh')
+
+
+def ensure_dev_hasura_admin_secret():
+    '''Give local Hasura a random admin secret that survives restarts, unless the
+    developer set HASURA_ADMIN_SECRET themselves.'''
+    if os.environ.get('HASURA_ADMIN_SECRET'):
+        return
+    secret_path = Path.home() / '.config' / 'harmony' / 'hasura_admin_secret'
+    if not secret_path.exists():
+        secret_path.parent.mkdir(parents=True, exist_ok=True)
+        fd = os.open(secret_path, os.O_WRONLY | os.O_CREAT | os.O_EXCL, 0o600)
+        with os.fdopen(fd, 'w') as secret_file:
+            secret_file.write(secrets.token_urlsafe(32))
+    os.environ['HASURA_ADMIN_SECRET'] = secret_path.read_text().strip()
 
 
 def main():
@@ -93,6 +109,8 @@ def main():
     # An instance config is not required in dev, so we don't want to print an error if
     # it is missing.
     instance_config = load_instance_configuration_from_file(log_missing=False)
+
+    ensure_dev_hasura_admin_secret()
 
     # Create the default flask configuration. Apply any instance config overrides the
     # dev might be using locally.

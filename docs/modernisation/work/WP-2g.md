@@ -40,8 +40,9 @@ Constraints found while reading the code:
 - `nginxproxy/nginx-proxy` (1.11.6, as pinned by WP-0b) takes `LOG_FORMAT` and `LOG_FORMAT_ESCAPE` from the environment. It does not forward `X-Request-ID`, and deployments run Compose against a remote `DOCKER_HOST`, so a repo-relative `conf.d` bind mount would not exist on the host. nginx therefore logs the app's id from the response header (`$upstream_http_x_request_id`) instead of setting one.
 
 Design:
-- **One configuration** in `log/config.py`, applied by `configure_logging()` when `log` is imported. One stdout handler on the root logger, so the app, Celery, gunicorn, werkzeug and libraries share it. `ZenysisLogger` propagates to it. The rotating files under `/data/output` go.
+- **One configuration** in `log/config.py`, applied by `configure_logging()` when `log` is imported. One stream handler on the root logger, so the app, Celery, gunicorn, werkzeug and libraries share it. `ZenysisLogger` propagates to it. The rotating files under `/data/output` go.
 - **Format** from `LOG_FORMAT` (`json` or `text`). Unset means `json` when `ZEN_PROD` is set (the web image) and `text` otherwise. Level from `LOG_LEVEL`, default `INFO`.
+- **Stream** from `LOG_STREAM` (`stdout` or `stderr`), default `stderr` as today. Pipeline steps capture other scripts' stdout (`SOURCES=($(generate_pipeline_sources.py ...))` in `pipeline/*/process/run/90_shared/*`) and `config.settings` logs warnings at import, so logging to stdout by default would put log lines into those arrays (INV-1). Compose sets `LOG_STREAM=stdout` for web and worker, whose stdout carries no data; that is where BE-8 applies. Docker collects both streams, so `docker compose logs` shows pipeline lines either way.
 - **JSON keys:** `timestamp` (ISO 8601, UTC, milliseconds), `level`, `logger`, `message`, `source`, `deployment` (`ZEN_ENV`), `request_id` and `user_id` when bound, `task` and `task_id` inside a Celery task, `exc_info` when there is an exception, `http` on access lines.
 - **Context** in `contextvars` (`log/context.py`): it follows threads started inside a request only when copied, and it is per greenlet under gevent (greenlet 3 keeps a context per greenlet).
 - **Request id:** a WSGI middleware (`log/request_id.py`) takes a well-formed `X-Request-ID` (1 to 128 of `A-Za-z0-9._:-`) or generates a uuid4 hex, binds it for the request and echoes it in the response header. `log/flask_request.py` installs it on a Flask app and adds a user-id provider that reads the user Flask-Login has already loaded, so logging never triggers a database load.
@@ -67,6 +68,8 @@ None.
 
 ## Log
 
+- 2026-10-04 infra-6 unit 1: claimed WP-2g and wrote the plan; check: `ownership.py who` on every planned path, all infra or shared.
+- 2026-10-04 infra-6 unit 2: `log/config.py` and `log/context.py` (JSON and text formatters, redaction, `LOG_FORMAT`/`LOG_STREAM`/`LOG_LEVEL`, excepthook), rotating files removed, `log` no longer imports `web`; check: `tests/infra/test_log_format.py` 39 passed on 3.9 and 3.8, `tests/web` 68 passed, ruff E/F/W/I/B clean, mypy --strict clean (3.13 and --python-version 3.8).
 ## Evidence
 
 ## Verdicts

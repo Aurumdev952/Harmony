@@ -20,9 +20,52 @@ def fixture_tag() -> str:
     return secrets.token_hex(4)
 
 
+ALL_VALUES_POLICIES = [
+    {
+        '$uri': '/api2/query_policy/1',
+        'dimension': 'StateName',
+        'dimensionValue': None,
+        'queryPolicyTypeId': 2,
+    },
+    {
+        '$uri': '/api2/query_policy/2',
+        'dimension': 'source',
+        'dimensionValue': None,
+        'queryPolicyTypeId': 1,
+    },
+]
+
+
 def _group_uri(stack, name):
     groups = stack.admin_json('GET', '/api2/group?per_page=100')
     return next(g['$uri'] for g in groups if g['name'] == name)
+
+
+def _own_policy_dimensions(stack, session) -> list:
+    '''The query policies the caller can see of its own: the manager filter
+    narrows a non-admin to the policies of the roles it holds, directly or
+    through a group (QueryPolicyResourceManager, read from the DB per request).'''
+    response = stack.request(session, 'GET', '/api2/query_policy?per_page=100')
+    assert response.status_code == 200, response.text[:300]
+    return sorted(policy['dimension'] for policy in response.json())
+
+
+def _role_body(label, name='', permissions=(), query_policies=(), data_export=False):
+    return {
+        '$uri': '',
+        'name': name,
+        'label': label,
+        'alertResourceRoleName': '',
+        'dashboardResourceRoleName': '',
+        'permissions': list(permissions),
+        'queryPolicies': list(query_policies),
+        'dataExport': data_export,
+    }
+
+
+def _delete_if_present(stack, uri) -> None:
+    response = stack.request(stack.admin, 'DELETE', uri)
+    assert response.status_code in (204, 404), (uri, response.status_code)
 
 
 @pytest.fixture(name='empty_group')
@@ -90,10 +133,13 @@ def test_group_moderator_becomes_site_admin_through_a_group_it_belongs_to(
 def test_group_moderator_gains_all_values_policies_by_attaching_a_role(
     stack, empty_group
 ):
-    '''N5: defect pinned as today; flips in WP-0h. _default_role carries the
-    seeded all-values query policies.'''
+    '''N5: defect pinned as today; flips in WP-0h (row 2). _default_role
+    carries the seeded all-values query policies, which the group_moderator
+    does not hold before the PATCH and holds after it.'''
     name, group_uri = empty_group
     actor = stack.ensure_user('esc-group-mod-policy', ['group_moderator'], [group_uri])
+    default_role = stack.roles_by_name()['_default_role']
+    assert _own_policy_dimensions(stack, actor) == []
 
     updated = stack.request(
         actor,
@@ -102,17 +148,15 @@ def test_group_moderator_gains_all_values_policies_by_attaching_a_role(
         {
             '$uri': group_uri,
             'name': name,
-            'roles': [stack.roles_by_name()['_default_role']],
+            'roles': [default_role],
             'users': [actor.headers['X-Username']],
             'acls': [],
         },
     )
     assert updated.status_code == 200
-    policies = {
-        p['dimension']
-        for p in stack.admin_json('GET', '/api2/query_policy?per_page=100')
-    }
-    assert {'source', 'StateName'} <= policies
+    group_roles = [role['$uri'] for role in stack.admin_json('GET', group_uri)['roles']]
+    assert group_roles == [default_role]
+    assert _own_policy_dimensions(stack, actor) == ['StateName', 'source']
 
 
 def test_group_moderator_cannot_reach_a_group_it_is_not_a_member_of(stack, tag):
@@ -210,20 +254,7 @@ def test_role_administrator_attaches_all_values_policies_and_data_export(stack, 
             'alertResourceRoleName': '',
             'dashboardResourceRoleName': '',
             'permissions': [],
-            'queryPolicies': [
-                {
-                    '$uri': '/api2/query_policy/1',
-                    'dimension': 'source',
-                    'dimensionValue': None,
-                    'queryPolicyTypeId': 1,
-                },
-                {
-                    '$uri': '/api2/query_policy/2',
-                    'dimension': 'StateName',
-                    'dimensionValue': None,
-                    'queryPolicyTypeId': 2,
-                },
-            ],
+            'queryPolicies': ALL_VALUES_POLICIES,
             'dataExport': True,
         },
     )
@@ -242,8 +273,107 @@ def test_role_administrator_attaches_all_values_policies_and_data_export(stack, 
             stack.admin_json('DELETE', role_uri)
 
 
+@pytest.mark.parametrize('actor_role', ['role_moderator', 'role_administrator'])
+def test_role_editor_attaches_all_values_policies_and_data_export_to_a_held_role(
+    stack, tag, actor_role
+):
+    '''N4 (update), flips in WP-0h row 10. update_role goes through the same
+    build_role as create, so the find_by_id bypass lets a holder attach the
+    seeded all-values policies and turn on data export for every holder,
+    itself included.'''
+    label = f'authz rolepatch {actor_role[:9]} {tag}'
+    role = stack.admin_json('POST', '/api2/role', _role_body(label))
+    role_uri = role['$uri']
+    try:
+        actor = stack.ensure_user(
+            f'esc-patch-{actor_role}', [actor_role, label.replace(' ', '_')]
+        )
+        assert _own_policy_dimensions(stack, actor) == []
+
+        updated = stack.request(
+            actor,
+            'PATCH',
+            role_uri,
+            {
+                **_role_body(
+                    label,
+                    name=role['name'],
+                    query_policies=ALL_VALUES_POLICIES,
+                    data_export=True,
+                ),
+                '$uri': role_uri,
+            },
+        )
+        assert updated.status_code == 200
+        role_now = stack.admin_json('GET', role_uri)
+        assert role_now['dataExport'] is True
+        assert sorted(p['$uri'] for p in role_now['queryPolicies']) == [
+            '/api2/query_policy/1',
+            '/api2/query_policy/2',
+        ]
+        assert _own_policy_dimensions(stack, actor) == ['StateName', 'source']
+    finally:
+        stack.admin_json('DELETE', role_uri)
+
+
+def test_group_moderator_empty_role_map_deletes_the_group_roles_for_everyone(
+    stack, tag
+):
+    '''/roles empty-map deletion (decision 0004 point 3): defect pinned as
+    today; flips in WP-0h (row 6). update_group_roles_from_map calls
+    session.delete on each Role row the group holds, so a bystander who holds
+    that role directly loses it too.'''
+    label = f'authz doomed group {tag}'
+    role_uri = stack.admin_json('POST', '/api2/role', _role_body(label))['$uri']
+    group_name = f'authz-doomed-{tag}'
+    stack.admin_json(
+        'POST',
+        '/api2/group',
+        {'$uri': '', 'name': group_name, 'roles': [role_uri], 'users': [], 'acls': []},
+    )
+    group_uri = _group_uri(stack, group_name)
+    role_name = label.replace(' ', '_')
+    try:
+        bystander = stack.ensure_user('esc-doomed-bystander', [role_name])
+        actor = stack.ensure_user(
+            'esc-doomed-group-mod', ['group_moderator'], [group_uri]
+        )
+
+        response = stack.request(actor, 'PATCH', f'{group_uri}/roles', {})
+        assert response.status_code == 200
+        assert stack.request(stack.admin, 'GET', role_uri).status_code == 404
+        bystander_roles = stack.find_user(bystander.headers['X-Username'])['roles']
+        assert role_uri not in [role['$uri'] for role in bystander_roles]
+    finally:
+        stack.admin_json('DELETE', group_uri)
+        _delete_if_present(stack, role_uri)
+
+
+def test_user_admin_empty_role_map_deletes_the_user_roles_for_everyone(stack, tag):
+    '''/roles empty-map deletion (decision 0004 point 3): defect pinned as
+    today; flips in WP-0h (row 6). update_user_roles_from_map calls
+    session.delete on each Role row the target holds, so a bystander who holds
+    that role loses it too.'''
+    label = f'authz doomed user {tag}'
+    role_uri = stack.admin_json('POST', '/api2/role', _role_body(label))['$uri']
+    role_name = label.replace(' ', '_')
+    try:
+        bystander = stack.ensure_user('esc-doomed-user-bystander', [role_name])
+        target = stack.ensure_user('esc-doomed-user-target', [role_name])
+        actor = stack.ensure_user('esc-doomed-user-admin', ['user_admin'])
+
+        response = stack.request(actor, 'PATCH', f'{target.user_uri}/roles', {})
+        assert response.status_code == 200
+        assert stack.request(stack.admin, 'GET', role_uri).status_code == 404
+        bystander_roles = stack.find_user(bystander.headers['X-Username'])['roles']
+        assert role_uri not in [role['$uri'] for role in bystander_roles]
+    finally:
+        _delete_if_present(stack, role_uri)
+
+
 def test_role_moderator_grants_a_role_it_holds_to_another_user(stack, tag):
-    '''N6: defect pinned as today; flips in WP-0h.'''
+    '''N6: lead ruled no change under decision 0004 rule 1; pinned as current
+    behaviour; residual on WP-0h's human acceptance list.'''
     label = f'authz grantable {tag}'
     role = stack.admin_json(
         'POST',

@@ -85,8 +85,10 @@ principals:
     jwt: {needs: ['*'], query_needs: ['*']}
     tags: [signed_in, superuser]
 
-  # API tokens (APIToken.generate_token): the session claims plus the token id,
-  # which login_from_request checks for revocation (tests/authz/http).
+  # API tokens (APIToken.generate_token): the session claims plus the token id.
+  # login_from_request accepts the token only while its api_token row exists and
+  # is not revoked. The principals below skip that check (they model a valid
+  # token); tests/authz/http/test_api_tokens.py covers issue and revocation live.
   api_token:_default_role:
     roles: [_default_role]
     jwt: {id: authztoken, needs: ['*'], query_needs: ['*']}

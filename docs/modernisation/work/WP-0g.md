@@ -48,6 +48,7 @@ None.
 ## Requests
 
 - [ ] human: run `docker logs <nginx> 2>/dev/null | uv run prod/browser_share/browser_share.py --deployment <code> -` on one deployment's production host and fill in [decision 0002](../decisions/0002-browser-baseline-for-tailwind-v4.md): the measurement table, the pasted output and the decision. This is the phase 7 decision-log entry, and phase 7 must not start until it is filled. It does not block review of the script.
+- [ ] lead: decide how to handle the legacy `integration.yml` failure on PR #3, which runs Black and pylint on Python 3.9 over changed files. Options: merge with that check red until WP-0f replaces the workflow, or land WP-0f first. Rewriting a 3.13 script for 3.9 would break SPEC section 9. Black and pylint also flag the lead-owned `scripts/agents/*.py` from `mig/integration`.
 
 ## Log
 
@@ -88,6 +89,13 @@ All of this was re-run on 2026-10-04 from a clean detached clone of the branch t
   ```text
   WP-0g meets the definition of done gates
   ```
+
+- **PR checks.** On [PR #3](https://github.com/Aurumdev952/Harmony/pull/3), legacy `integration.yml` run 37213899922 gave:
+  - JS - Lint: pass.
+  - Python - Lint (3.9): fail, exactly as predicted locally with the same pinned black 22.6.0 and pylint 2.17.4.
+    - Black flags only the lead's `scripts/agents/ownership.py` and `task_gate.py`.
+    - Pylint reports 15 errors in `browser_share.py`. All are Python 3.10+ features (`StrEnum`, `pairwise`, `dataclass(slots=)`, `X | None`, `Counter.total`) that SPEC section 9's Python 3.13 rule requires.
+    - Pylint reports one error in `scripts/agents/ownership.py`.
 
 ## Deferred
 

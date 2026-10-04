@@ -87,7 +87,13 @@ The five audit cases (`scripts/druid/null_audit/cases/`) cover shapes the golden
 
 Not observed: aggregate-over-null differences, such as a sum over no rows giving null instead of 0. `DruidQueryClient_` already turns zero-count aggregates into null (the strict-null fields), so bodies match.
 
-**For security review.** N2 also rewrites query-policy filters. Today an `exclude_values` policy becomes a `not`. On 38 without N2 it would additionally hide rows whose policy dimension is null. With N2 the policy behaves exactly as today (INV-3). `policy_jwt_exclude_values` is the golden case. It returns no rows in this dataset, so the policy row in the INV-3 suite (`tests/authz`) should confirm.
+**For security review (INV-3).** Exclusions in query policies become `~Filter(type='in', dimension=..., values=[...])` (`web/server/routes/views/query_policy.py:273` and `:302`), which is the native `not(in dim [...])` shape. `audit_not_in_query_filter` proves what Druid 38 does to that exact shape:
+- without N2, it also drops rows whose dimension is null, so a policy would hide more than it does today;
+- with N2, it matches legacy (diff-5 against diff-6).
+
+So N2 keeps policy decisions identical. Without N2 they would only become more restrictive, never less.
+
+Reachability: I could not reach the exclusion from a JWT identity. The token and account intersection removes it, as `policy_jwt_exclude_values` pins. An audit case built for this (account with all states, token excluding Pará) posted only `source in [yellow_fever]`. Whether any live identity reaches the exclusion branch is for the policy suite (`tests/authz`).
 
 ## Contract changes
 

@@ -31,7 +31,7 @@ instances:
 branch: "mig/WP-0c-pure-mistake-bugs"
 requirements: [SEC-4, QA-1]
 contracts_consumed: [C-5]
-contracts_changed: []
+contracts_changed: [C-5]
 security_review: true
 ---
 
@@ -63,14 +63,15 @@ PYTHONPATH=$PWD uv run --no-project -p 3.8 --with-requirements /tmp/reqs.txt --w
 | Unit | Change | Owner | Regression test | State |
 |---|---|---|---|---|
 | 1 | `docker-compose.pipeline.yaml`: delete `POSTGRES_DB_URI:=${POSTGRES_DB_URI}` and its comment. Nothing reads that variable: Alembic's `env.py` uses `SQLALCHEMY_DATABASE_URI`, which the same service already sets from `DATABASE_URL`. | infra | `tests/infra/test_compose_environment_names.py` (removed here; recoverable from `32dca82`) | **moved to WP-0b** (lead routing). Test and `infra.patch` removed from this branch. |
-| 2 | `dashboard.py:44`: redirect to `url_for('auth.unauthorized', locale=locale)`. The old code named the nonexistent `index.unauthorized` and returned a 500. It also forwarded `request.args` into `url_for`, so it must not be reintroduced (see the decision below). | backend | `tests/web/test_dashboard_unauthorized_redirect.py` (4 cases) | done (`638b9e4`) |
+| 2 | `dashboard.py:44`: redirect to `url_for('auth.unauthorized', locale=locale)`. The old code named the nonexistent `index.unauthorized` and returned a 500. It also forwarded `request.args` into `url_for`, so it must not be reintroduced (see the decision below). | backend | `tests/web/test_dashboard_unauthorized_redirect.py` (4 cases) | done (`638b9e4`); test drives the registered route and asserts the exact `Location` (`cf91896`) |
 | 3 | `is_session_persisted` moves into `web/server/util/authentication.py`. It reads a signed `remember_me` claim from the token that authenticated the request, and `login_user` signs that claim. | backend | `tests/web/test_session_persistence.py` (8 cases) | done: claim `68aa48d`, reader `ce12e99` |
 | 4 | SEC-4: delete `AuthorizedQueryClient.run_raw_query` and make the wrapped client private (`_query_client`). | backend | `tests/web/test_authorized_query_client.py` | done (`0cc1c6a`) |
 | 5 | Delete `/api/dimension/<name>/<value>`, which returns 500 on every call because it calls a method that never existed. Also delete its empty `views/dimension.py` and the unused `get_dimension_time_boundary`. | backend (route); core (time_boundary) | `tests/web/test_api_routes.py` | done: core `bd71d45`, route `abf1fa9` |
 | 6 | `/api/timeout` ends the session for real: unset the JWT cookies and log out of Flask-Login. Before, it only called `logout_user()`, and the next request signed the user back in from the 365-day `accessKey`. | backend | `tests/web/test_timeout_route.py` (4 cases) | done: test `a076b1a`, fix `a010c1c` |
 | 7 | SEC-4 open item 1: `/api/field/<ids>` validates ids (404) and caps them at 20 (400), ANDs the caller's policy into both lookups, keeps the shared row-count cache for callers without a policy only, never runs a lookup with an empty field filter, and returns the formula whatever the count. All backend-side; no core edit needed. See "Decision: `/api/field`". | backend | `tests/web/test_field_info_route.py` (9 cases, real `RowCountLookup`, `DataTimeBoundary`, policy builder and auth decorator over a fake Druid) | done: red test `f99d24d`, fix and final tests `1a72037` |
 | 9 | The policy AND built `{"type": "and", "fields": [null, <policy>]}` when the request filter was `EmptyFilter` (Druid rejects it), and crashed at build time when it was `None`. Now `and_policy_filter`: the policy alone for `None`/`EmptyFilter`, otherwise `Filter(and, [query_filter, policy])` exactly as before. The first fix (`64dc60e`) used pydruid's `&`, which appends into an existing `and` in place (flattening the request and mutating a shared filter); the unit 7 interrogate caught it and `a89c55d` replaced it. Found by WP-2a (golden case `policy_include_all_all_time`). | backend | `tests/web/test_query_policy_filter.py` (6 cases through `AuthorizedQueryClient.run_query`; pins the unchanged shape for selector and `and` filters, no mutation, and no policy for superusers or an empty policy) | done: `70ecd0e`, `64dc60e`, `3681cb7`, `a89c55d` |
-| 8 | Structural guard: an AST scan of `web/server/routes` and `web/server/api` fails on `system_query_client`, `run_raw_query`, `AuthorizedQueryClient._query_client` from outside, and any `druid_context` access (aliases included) other than `available_datasources`, `current_datasource`, `current_db_datasource` and `datasource_config`, unless allowlisted with a reason. A stale-entry test keeps the allowlist honest. | backend | `tests/web/test_no_raw_queries_from_routes.py` (13 cases) | done (`34c7e7b`) |
+| 10 | The policy now also reaches `GroupByQueryBuilder.dimension_filter`. `ExactUniqueCountAggregation.modify_query` rebuilds the inner groupBy from `dimension_filter` and clears the outer filter, so the policy on `query_filter` never reached Druid for such queries. This was latent: no checked-in config builds `ExactUniqueCountCalculation`. Only that modifier reads `dimension_filter` after construction, so other queries send exactly what the pre-WP decorator sent (pinned). Docstrings now state this invariant instead of claiming "every query carries the policy". Found by the reviewer at `60edb27`. | backend | `tests/web/test_query_policy_filter.py` (+2: modifier, unchanged ordinary query) | done: red `59c55d3`, fix `9158d00` |
+| 8 | Structural guard, capability-based: an AST scan of `web/server/routes`, `web/server/api`, `web/server/query` and `web/server/util`. It flags any import from the modules that build or run Druid queries (`db.druid.query_client`, `db.druid.metadata`, `data.pydruid_query`, `pydruid.client`, and the `web/server/data` lookups and status modules). It also flags `system_query_client`, `run_raw_query`, `AuthorizedQueryClient._query_client` from outside, and any `druid_context` access other than the datasource identity attributes, aliases included. `ALLOWLIST` holds justified uses. `KNOWN_VIOLATIONS` holds open item 2's datasource-wide dates and must stay present, so the test fails when one is fixed. One hop only, as the docstring says. | backend | `tests/web/test_no_raw_queries_from_routes.py` (26 cases) | done: `34c7e7b`, widened `ef790b0` |
 
 ### Unit 3 design
 
@@ -88,9 +89,12 @@ PYTHONPATH=$PWD uv run --no-project -p 3.8 --with-requirements /tmp/reqs.txt --w
 
 **Effects.**
 - **C-5 (backend's contract)** gains an additive claim. `_compute_token_provides` reads only `needs` and `query_needs`, so authorisation decisions are unchanged.
-- **Existing sessions** carry no claim and read as not persisted, which matches today. Users get the fix at their next "Remember me" login.
+- **Existing sessions** carry no claim and read as not persisted. With unit 6 that now has an effect: see "Who sees what differently".
 - **API tokens** and the export-render token never had the claim, so they read as not persisted, which also matches today.
-- **Security posture change (the security reviewer must accept this explicitly).** A "Remember me" user is now exempt from the client-side inactivity redirect for the cookie's 365-day lifetime. That was the original design intent, but it has not been true for as long as login has used the JWT cookie. If ministries want a cap on remembered sessions, that is a new rule for `/api/timeout`, not part of this fix.
+- **Security posture change (security and the human must accept this; see "Who sees what differently").** Before WP-0c nobody was really signed out by the inactivity timeout. `is_session_persisted` was always False, so `/api/timeout` answered `timeout: true` for every idle user. But the `accessKey` cookie survived, so the client's redirect to `/login?timeout=1&next=...` found the user still authenticated, and `/login` sent them straight back to `next`. With units 3 and 6 together, and `AUTOMATIC_SIGN_OUT` on (the default, `keep_me_signed_in: True`), after `SESSION_TIMEOUT` idle (1800 s in both checked-in configs):
+  - a user who did not tick "Remember me" is now really signed out and must log in again;
+  - a "Remember me" session issued before this deploy carries no claim, so it is really signed out once; the next "Remember me" login carries the claim;
+  - a "Remember me" session issued after deploy is not timed out at all: no toast and no bounce through `/login`, for the cookie's 365-day life. That was the original intent of "Remember me". A cap on remembered sessions would be a new rule for `/api/timeout`.
 
 ## Decision: `run_raw_query` (SEC-4)
 
@@ -107,7 +111,7 @@ PYTHONPATH=$PWD uv run --no-project -p 3.8 --with-requirements /tmp/reqs.txt --w
   - **The inner client becomes `_query_client`,** so `current_app.query_client.query_client.run_raw_query(...)` is no longer a public escape hatch (A).
 - **(C) Keep the method but raise. Rejected.** It is the same as (B) plus dead code (all three).
 
-### Open SEC-4 items (not fixed here; routed to the lead)
+### SEC-4 items (status on each; open ones routed to the lead)
 
 1. **Fixed in unit 7 (`1a72037`).** `GET /api/field/<field_ids>`, which the frontend uses (`web/client/services/FieldInfoService.js`). Critical (A, B and C).
    - **Path:** `api.py api_field_info`, then `views/field.py get_field_summary`, then `druid_context.row_count_lookup.get_row_count` and `data_time_boundary.get_field_time_boundary`, then the system client's `run_raw_query`.
@@ -124,9 +128,15 @@ PYTHONPATH=$PWD uv run --no-project -p 3.8 --with-requirements /tmp/reqs.txt --w
    - `SourceStatus.load_ranges_from_druid` (`web/server/data/status.py:93`) calls `run_query` on the system client.
    - Neither takes user input, so both are datasource-wide metadata rather than injection paths. WP-4e still has to decide whether dates are policy-scoped.
 3. **Done in unit 8 (`34c7e7b`).** Structural guard (C). It was red on the pre-unit-7 code (3 findings: `field.py` x2, `api.py` x1). Its allowlist now records item 2's `data_status_information` use in `data_upload_summary.py` and the health check.
-4. **Policy test on `run_query`.** `tests/web/test_query_policy_filter.py` now drives `AuthorizedQueryClient.run_query` (policy builder mocked), and `tests/web/test_field_info_route.py` uses the real `_construct_authorization_filter` with real `QueryNeed`s. The authz suite case is still wanted: request to qa for WP-2b.
+4. **Policy test on `run_query`.** `tests/web/test_query_policy_filter.py` now drives `AuthorizedQueryClient.run_query` (policy builder mocked, including a prepared query with a query-modifying aggregation), and `tests/web/test_field_info_route.py` uses the real `_construct_authorization_filter` with real `QueryNeed`s. The authz suite case is still wanted: request to qa for WP-2b.
 5. **Admin API tokens ignore their own `query_needs` (A, B, C; pre-existing, consider: security).** A token issued to a site administrator with `needs: ['*']` keeps `RoleNeed(admin)` (`_compute_token_item_needs`), so `SuperUserPermission().can()` is true and the token's `query_needs` never narrow it, in `run_query` and now in `/api/field` alike. `_compute_token_query_needs` has a superuser branch, which suggests tokens were meant to narrow admins. Unchanged here (INV-3); `caller_policy_filter`'s docstring states it. Needs a security decision (WP-5d or WP-4e).
 6. **Restricted callers get no row-count cache (A, B, C; performance).** Up to 20 ids x 2 uncached raw Druid queries per request for users with a non-empty policy. Callers whose policy reduces to nothing now share the cache (same filter). A bounded, policy-keyed cache needs core's `RowCountLookup` (C-9 rule): request to core. The only live caller sends one id per request.
+   The only live consumer, `useFieldFormula.js`, reads `formula` alone; nothing reads `count`, `startDate` or `endDate`. WP-4e can drop the two lookups from `/api/field` instead of building that cache.
+7. **Filters built outside the query builder are not covered (reviewer).** `AuthorizedQueryClient.run_query` ANDs the policy into `query_filter` and `dimension_filter` only. A nested `dataSource` or filtered aggregator assembled elsewhere would escape it. Unit 10 covers the one modifier that exists; the authz suite (WP-2b) should add a case for each new query shape.
+8. **Security lows (sec-0c), deferred to WP-5d (backend, C-5 and SEC-5):**
+   - `/api/timeout` is a state-changing POST with no CSRF check, and `accessKey` has no `SameSite`. A cross-site POST can sign a user out (no data exposure).
+   - Login writes the cookie with plain `set_cookie`, `/api/timeout` clears it with `unset_jwt_cookies` (which also emits refresh and CSRF deletions that were never set), and `logout()` uses a literal `delete_cookie('accessKey')`. WP-5d should replace all three with one end-session helper built on `unset_access_cookies`, with a test that path and domain match the login cookie.
+   - Flask-User's built-in `POST /login` (endpoint `user.login`, Flask-WTF form) still exists and sets Flask-Login's `remember_token`, which `is_session_persisted` no longer reads. No UI posts to it: `AuthenticationService.login` uses `/api2/authentication/login?set_cookie=true`. A session started there is subject to the inactivity timeout, and `/api/timeout` ends it. WP-5d retires Flask-User.
 
 ### Other findings from the review
 
@@ -186,9 +196,30 @@ Restricted callers now see only their slice. That is the intended INV-3 change a
 | `hide_constituents` indicators expose their formula | A | noted | Pre-existing: formulas were already returned whenever count > 0. The constituent names are visible through `/api2/query/fields`. |
 | `is_unrestricted_query_caller` may return a non-bool | C | dismissed | The function was replaced by `caller_policy_filter`, which returns `None` or a filter. |
 
+## Who sees what differently
+
+This table is for security and the human to accept: every user-visible difference this WP makes. Unit 1 moved to WP-0b. Unit 8 is a test.
+
+| Unit | Who | Before | After | Accept as |
+|---|---|---|---|---|
+| 2 | Signed-in user opening a dashboard they may not view | 500 page | 302 to `/<locale>/unauthorized` on the same host; query args are not forwarded | bug fix |
+| 3 + 6 | User who did not tick "Remember me", idle for `SESSION_TIMEOUT` (default 30 min) with automatic sign-out on (default) | toast, bounce through `/login`, still signed in (cookie kept) | really signed out; `accessKey` cleared; must log in again | **security posture change** (the control now works) |
+| 3 + 6 | "Remember me" session issued **before** deploy, idle | same bounce, still signed in | really signed out **once**; the next "Remember me" login is exempt | **one-off sign-out at deploy** (release note) |
+| 3 | "Remember me" session issued **after** deploy, idle | bounce, still signed in | no timeout: no toast and no bounce, for the cookie's 365 days | intended "Remember me" behaviour |
+| 3 + 6 | API-token and export-render callers | not affected (no browser timer) | not affected | none |
+| 5 | Anyone calling `GET /api/dimension/<name>/<value>` | 500 on every call | 404 (route gone); no UI calls it | bug fix |
+| 7 | User with a query policy, field-info API | whole-datasource row count and first/last dates for any field | count and dates within their policy only; formula always returned | **INV-3 narrowing (SEC-4)** |
+| 7 | Site administrator or public-access visitor, field-info API | count, dates; formula only when count > 0 | same numbers from the same queries; formula also at count 0; 0 instead of whole-datasource numbers for a configured field with no filter of its own | INV-2 difference (see the `/api/field` decision) |
+| 7 | Any caller: unknown id, or more than 20 ids | 500 (unknown id once the datasource had rows), or every id queried | 404, or 400 | bug fix |
+| 9 | User with a query policy running a query whose built filter is empty (golden case `policy_include_all_all_time`) | Druid rejected `and[null, policy]`: an error | results limited to their policy | bug fix |
+| 9 | Every other query | `and[filter, policy]` | identical | none |
+| 10 | User with a query policy, query using an exact-unique-count calculation | policy dropped in the inner query (latent: no config uses it) | policy applied | latent leak closed |
+
+**Release note (for the deploy that ships WP-0c).** "Sessions now really end after the inactivity timeout (30 minutes by default) unless you ticked *Remember me* when you signed in. If you ticked *Remember me* before this update, you will be asked to sign in once more after a period of inactivity; tick it again to stay signed in. Users with a data-access policy now see field record counts and date ranges for their own data only."
+
 ## Contract changes
 
-C-5's token claims gain `user_claims.remember_me: bool`. The change is additive, and only `is_session_persisted` reads it. backend owns C-5, so backend-2 should acknowledge here when applying the patch:
+C-5's token claims gain `user_claims.remember_me: bool` (listed in `contracts_changed`). The claim is additive and only `is_session_persisted` reads it. It does change behaviour: together with unit 6 it decides who the inactivity timeout signs out (see "Who sees what differently"). backend owns C-5:
 
 - [x] backend acknowledgement: backend-2, 2026-10-04. backend owns C-5 and is also its only consumer here. Old shape: `user_claims = {needs, query_needs}`. New shape: `user_claims = {needs, query_needs, remember_me: bool}`, written only by `create_user_access_token` (login, and the non-cookie login that returns the token in JSON with `remember_me` False). Readers: `is_session_persisted` reads `remember_me`; `_compute_token_provides` (`signal_handlers.py`) and `api.py` read only `needs`/`query_needs`, so authorisation is unchanged (INV-3). API tokens and the export-render token (`page_renderer.py`) carry no claim and read as not persisted. No migration: tokens without the claim read as False, which is today's behaviour. The FastAPI `PrincipalDep` (WP-5a) must ignore unknown `user_claims` keys.
 
@@ -197,10 +228,12 @@ C-5's token claims gain `user_claims.remember_me: bool`. The change is additive,
 - [x] **backend (backend-2):** apply `docs/modernisation/work/WP-0c/backend.patch`, commit per unit. Done 2026-10-04 (units 2-5). Note that WP-0a (backend-0a) edits the Hasura proxy in `api.py`; this branch touches `api.py` at its imports, the dimension handler and route, `timeout_user_session` and `api_field_info`.
 - [x] **infra (moved to WP-0b by the lead):** delete `docker-compose.pipeline.yaml` lines 16-17 and drop `POSTGRES_DB_URI` from `.env.example` if nothing else documents it. The regression test `tests/infra/test_compose_environment_names.py` and `infra.patch` are no longer on this branch; infra-0b can take them from `32dca82` (`git show 32dca82:tests/infra/test_compose_environment_names.py`, `git show 32dca82:docs/modernisation/work/WP-0c/infra.patch`).
 - [x] **lead:** route the "Open SEC-4 items" above and the `/api/timeout` cookie gap. Item 1 and the cookie gap were routed back to this WP and are fixed (units 7 and 6); item 3 is unit 8.
-- [ ] **lead:** route open SEC-4 items 2 (datasource-wide dates in page bootstrap and `data_upload_summary`), 5 (admin API tokens ignore their `query_needs`; security decision) and 6 (row-count cache for restricted callers) to WP-4e / WP-5d.
-- [ ] **core:** delete `DataTimeBoundary.get_field_time_boundary` (`web/server/data/time_boundary.py`). Its only caller was `views/field.py`, which now calls `get_filtered_time_boundary`. Its `field__<id>` key would leak restricted users' dates in `PopulatingDruidApplicationContext`, which caches `data_time_boundary`. Blocks nothing.
+- [ ] **lead:** route open SEC-4 items 2 (datasource-wide dates: page bootstrap, data status page, `data_upload_summary`; pinned in the guard's `KNOWN_VIOLATIONS`), 5 (admin API tokens ignore their `query_needs`; security decision), 6 (row-count cache for restricted callers, or drop the lookups), 7 (filters built outside the query builder) and 8 (security lows) to WP-4e / WP-5d.
+- [x] **core:** delete `DataTimeBoundary.get_field_time_boundary` and its cache. Done by core-1 on `mig/WP-0c-pure-mistake-bugs-core` (`21a6d89`), merged here.
 - [ ] **core (WP-1b or WP-4e):** give `RowCountLookup` a bounded cache keyed on (field filter, policy filter digest) so restricted callers can share cached counts safely (open item 6). Today `row_count_cache` is an unbounded `defaultdict`. Blocks nothing.
 - [ ] **frontend-platform:** `ZenClient.request` (`web/client/util/ZenClient.js`) uses `$.getJSON` with only a success callback, so a 4xx or 5xx never settles the promise. `/api/field` now answers 404 for ids outside the indicator config. That is the case for data-catalog-only fields that `LegacyIndicatorAboutPanel` asks about; they were a 500 before. Reject on error, and only ask `FieldInfoService` about config fields, or retire it when this domain moves to FastAPI. Blocks nothing.
+- [ ] **core or backend (WP-0d):** delete `web/server/util/dev/static_data_query_client.py`. Nothing imports it, and it is a policy-free system client (it sits in the guard's allowlist only for that reason).
+- [ ] **human (via the lead):** accept the authorisation and sign-out changes in "Who sees what differently" (INV-3; security's verdict waits on this).
 - [ ] **qa (WP-2c):** record the `/api/field` contract changes from the table under "Decision: `/api/field`": 404, 400, and formula with count 0.
 - [ ] **lead:** the phase docs say "Alembic uses POSTGRES_DB_URI" (`phase-0-security-and-subtraction.md` 0c). That is wrong and should become "delete the unused variable".
 - [ ] **qa (WP-2a):** regenerate golden case `policy_include_all_all_time` in `tests/golden` after unit 9 lands. **INV-2 note:** the recorded Druid request changes from `{"type": "and", "fields": [null, <policy>]}` to `<policy>` alone. This is an intended difference: a real Druid rejected the old request, so no user ever received results from it. Requests whose request filter is non-empty are unchanged, byte for byte, including `and`-shaped ones (pinned by `test_policy_is_anded_with_the_query_filter` and `test_an_and_query_filter_is_wrapped_not_mutated`). If any golden case was regenerated while `64dc60e` alone was on the branch, regenerate it again: that commit flattened `and` filters, and `a89c55d` restores the original shape. backend-2 did not edit `tests/golden`.
@@ -224,7 +257,16 @@ C-5's token claims gain `user_claims.remember_me: bool`. The change is additive,
 - 2026-10-04 backend-2, unit 9 follow-up (`3681cb7` red, `a89c55d` fix): `and_policy_filter` builds a new `and` instead of using pydruid's in-place `&`. Check: the new case failed with the flattened shape before the fix; 4 passed after.
 - 2026-10-04 backend-2, unit 7 (`1a72037`): reworked after the interrogate. Check: on the pre-unit-7 view, the final tests give 6 failed and 2 passed. The restricted user got `42` (whole datasource) instead of `7`, and unknown ids raised `AttributeError` (a 500). After the fix, `pytest tests/web` gives 46 passed, the Flask app imports, and lint shows only `main`'s findings.
 - 2026-10-04 backend-2, unit 8 (`34c7e7b`): structural guard. Check: the scanner reports 3 unallowlisted findings on the pre-unit-7 `field.py` and `api.py`, and 0 now; 13 cases pass. It catches aliases (`ctx = current_app.druid_context`).
-- 2026-10-04 backend-2: status `review`.
+- 2026-10-04 backend-2: status `review` at `60edb27`. Gates: qa approved; security blocked on human acceptance only; reviewer changes-requested.
+- 2026-10-04 backend-2, review round 1 fixes:
+  - `7ffdff4` deleted the applied `backend.patch`.
+  - `b67ec9d` made the field summary a function, dropped ApiRouter's `fields_api`, and reads each formula once.
+  - `cf91896` dashboard test through the registered route with the exact `Location`; it fails on the old `request.args` forwarding (evil.example host, dropped locale). Timeout test with the app's real `install_login_manager_signal_handlers`; it still fails without `unset_jwt_cookies`.
+  - Merged core-1's `mig/WP-0c-pure-mistake-bugs-core` (`21a6d89`: `get_field_time_boundary` and its cache deleted) and the WP branch's verdict commits.
+  - `59c55d3` red and `9158d00` fix: unit 10 (policy into `dimension_filter`; docstrings state the real invariant).
+  - `ef790b0` capability-based guard over four trees, with `ALLOWLIST` and `KNOWN_VIOLATIONS`.
+  - WP file: sign-out effect corrected; "Who sees what differently" table and release note added; `contracts_changed: [C-5]`; security lows recorded as open item 8.
+  - Check: `pytest tests/web` gives 61 passed.
 - 2026-10-04 core-1, review follow-up (branch `mig/WP-0c-pure-mistake-bugs-core`, from backend-2's `7ffdff4`): in `web/server/data/time_boundary.py`, deleted `DataTimeBoundary.get_field_time_boundary`, the `time_boundary_cache` and the `cache_key` path of `get_filtered_time_boundary`. Requested by interrogate A, B and C and the code reviewer. The only live caller (`views/field.py`) passes no key, and a `field__<id>` key would serve one user's policy-filtered dates to another. Check: a grep of `web`, `scripts`, `data`, `db`, `util`, `models` and `tests` finds no remaining reference (`tests/web/test_field_info_route.py` uses a real `DataTimeBoundary`, not a stub, so it needs no change). `pytest tests/web tests/infra` gives 46 passed. `ruff --select F`, black and mypy (`--disallow-untyped-defs`, module in isolation) are clean.
 
 ## Evidence
@@ -244,7 +286,7 @@ C-5's token claims gain `user_claims.remember_me: bool`. The change is additive,
 
 **Lint.** `ruff check tests` is clean, and `black --skip-string-normalization -t py38` is clean on the tests and on `time_boundary.py`. On the patched production files, `ruff --select F` and black report only findings that are already on `main`: F401 in `api.py` and `template_renderer.py`, black on `api.py`, and black on `query_policy.py`. The patch adds none.
 
-**backend-2, final branch head.** `PYTHONPATH=$PWD uv run --no-project -p 3.8 --with-requirements /tmp/reqs.txt --with 'pytest<8' python -m pytest tests/web -q` gives `46 passed`. The files are `test_api_routes` 1, `test_authorized_query_client` 1, `test_dashboard_unauthorized_redirect` 4, `test_session_persistence` 8, `test_timeout_route` 4, `test_query_policy_filter` 6, `test_field_info_route` 9 and `test_no_raw_queries_from_routes` 13.
+**backend-2, final branch head.** `PYTHONPATH=$PWD uv run --no-project -p 3.8 --with-requirements /tmp/reqs.txt --with 'pytest<8' python -m pytest tests/web -q` gives `61 passed` (review round 1; `46 passed` at `60edb27`). The files are `test_api_routes` 1, `test_authorized_query_client` 1, `test_dashboard_unauthorized_redirect` 4, `test_session_persistence` 8, `test_timeout_route` 4, `test_query_policy_filter` 8, `test_field_info_route` 9 and `test_no_raw_queries_from_routes` 26.
 - `import web.server.app, web.server.routes.api, web.server.routes.views.field` succeeds with placeholder environment variables.
 - `ruff check tests/web` is clean. `black -S -t py38` is clean on all new and changed test files and on `field.py`, `query_policy.py`, `authentication.py` and `dashboard.py`. `ruff --select F` and black on `api.py` and `template_renderer.py` report only what is already on `main` (F401 `ROOT_SITE_RESOURCE_ID`, F401 `get_configuration`, and black's tuple unpack in `import_self_serve`).
 - Red-before-fix evidence for each unit is in the Log.

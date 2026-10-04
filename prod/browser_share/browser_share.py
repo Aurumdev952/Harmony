@@ -7,12 +7,34 @@
 
 Tailwind CSS v4 needs Chrome 111, Safari 16.4 or Firefox 128. This reports which
 browsers each deployment's users run and the share of sessions below that line.
+
+nginx logs no session id, so a session is one (client address, user agent) pair
+with no gap longer than 30 minutes between requests. Client addresses are only
+used as keys in memory and never printed.
+
+    uv run prod/browser_share/browser_share.py --deployment rw access.log*
+    docker logs <nginx> 2>/dev/null | uv run <this script> --deployment rw -
+
+Without --deployment, each file's parent directory names its deployment.
 """
 
+import argparse
+import gzip
+import io
+import json
 import re
-from dataclasses import dataclass
+import sys
+from collections import Counter, defaultdict
+from collections.abc import Iterable, Iterator, Sequence
+from dataclasses import asdict, dataclass, field
 from datetime import datetime
 from enum import StrEnum
+from itertools import pairwise
+from pathlib import Path
+from typing import cast
+
+SESSION_GAP_SECONDS = 30 * 60
+PHASE_7_GATE_PCT = 5.0
 
 
 class Engine(StrEnum):
@@ -150,3 +172,173 @@ def classify(user_agent: str) -> Browser:
         return Browser(family, webkit[0], Engine.WEBKIT, webkit)
 
     return Browser("Other", None, Engine.UNKNOWN, None)
+
+
+@dataclass(frozen=True, slots=True)
+class BrowserShare:
+    family: str
+    major: int | None
+    share_pct: float
+
+
+@dataclass(frozen=True, slots=True)
+class DeploymentReport:
+    deployment: str
+    sessions: int
+    browsers: tuple[BrowserShare, ...]
+    below_baseline_pct: float
+    unknown_engine_pct: float
+    automated_requests: int
+    unparsed_lines: int
+
+
+@dataclass(slots=True)
+class _Tally:
+    request_times: defaultdict[tuple[str, str], list[int]] = field(
+        default_factory=lambda: defaultdict(list)
+    )
+    automated_requests: int = 0
+    unparsed_lines: int = 0
+
+    def add(self, line: str) -> None:
+        request = parse_line(line)
+        if request is None:
+            if line.strip():
+                self.unparsed_lines += 1
+        elif is_automated(request.user_agent):
+            self.automated_requests += 1
+        else:
+            key = (request.client, request.user_agent)
+            self.request_times[key].append(request.epoch_seconds)
+
+
+def count_sessions(epoch_seconds: Iterable[int]) -> int:
+    ordered = sorted(epoch_seconds)
+    if not ordered:
+        return 0
+    gaps = sum(1 for a, b in pairwise(ordered) if b - a > SESSION_GAP_SECONDS)
+    return 1 + gaps
+
+
+def _pct(part: int, whole: int) -> float:
+    return round(100 * part / whole, 1) if whole else 0.0
+
+
+def _report(deployment: str, tally: _Tally) -> DeploymentReport:
+    by_browser: Counter[Browser] = Counter()
+    for (_, user_agent), times in tally.request_times.items():
+        by_browser[classify(user_agent)] += count_sessions(times)
+    total = by_browser.total()
+
+    by_brand: Counter[tuple[str, int | None]] = Counter()
+    for browser, sessions in by_browser.items():
+        by_brand[browser.family, browser.major] += sessions
+    ranked = sorted(
+        by_brand.items(),
+        key=lambda item: (-item[1], item[0][0], -(item[0][1] or 0)),
+    )
+    return DeploymentReport(
+        deployment=deployment,
+        sessions=total,
+        browsers=tuple(
+            BrowserShare(family, major, _pct(sessions, total))
+            for (family, major), sessions in ranked
+        ),
+        below_baseline_pct=_pct(
+            sum(n for b, n in by_browser.items() if b.below_baseline), total
+        ),
+        unknown_engine_pct=_pct(
+            sum(n for b, n in by_browser.items() if b.engine is Engine.UNKNOWN),
+            total,
+        ),
+        automated_requests=tally.automated_requests,
+        unparsed_lines=tally.unparsed_lines,
+    )
+
+
+def build_reports(
+    sources: Iterable[tuple[str, Iterable[str]]],
+) -> list[DeploymentReport]:
+    """Reports per deployment, from (deployment, log lines) pairs in any order."""
+    tallies: defaultdict[str, _Tally] = defaultdict(_Tally)
+    for deployment, lines in sources:
+        tally = tallies[deployment]
+        for line in lines:
+            tally.add(line)
+    return [_report(name, tallies[name]) for name in sorted(tallies)]
+
+
+def read_lines(path: str) -> Iterator[str]:
+    """Lines of a plain or gzipped log file, or of stdin when `path` is `-`."""
+    stdin = cast(io.BufferedReader, sys.stdin.buffer)
+    with stdin if path == "-" else open(path, "rb") as raw:
+        stream: io.BufferedReader | gzip.GzipFile = raw
+        if raw.peek(2)[:2] == b"\x1f\x8b":
+            stream = gzip.GzipFile(fileobj=raw)
+        with io.TextIOWrapper(stream, encoding="utf-8", errors="replace") as text:
+            yield from text
+
+
+def format_text(report: DeploymentReport) -> str:
+    excluded = (
+        f"excluded {report.automated_requests} automated requests"
+        f" and {report.unparsed_lines} unparsed lines"
+    )
+    gate = f"the {PHASE_7_GATE_PCT:.0f}% phase 7 gate"
+    gate = (
+        f"within {gate}"
+        if report.below_baseline_pct <= PHASE_7_GATE_PCT
+        else f"above {gate}; phase 7 needs a fallback plan"
+    )
+    rows = [
+        f"Deployment {report.deployment}: {report.sessions} sessions; {excluded}",
+        f"  {'family':<20} {'major':>5} {'share_pct':>9}",
+        *(
+            f"  {b.family:<20} {'-' if b.major is None else b.major:>5}"
+            f" {b.share_pct:>9.1f}"
+            for b in report.browsers
+        ),
+        f"  Below Chrome 111, Safari 16.4 or Firefox 128: "
+        f"{report.below_baseline_pct:.1f}% of sessions ({gate})",
+        f"  Unknown engine: {report.unknown_engine_pct:.1f}% of sessions",
+    ]
+    return "\n".join(rows)
+
+
+def main(argv: Sequence[str] | None = None) -> int:
+    parser = argparse.ArgumentParser(description=__doc__.split("\n\n")[0])
+    parser.add_argument(
+        "paths",
+        nargs="+",
+        metavar="PATH",
+        help="access log, plain or gzipped; - for stdin",
+    )
+    parser.add_argument(
+        "--deployment",
+        help="deployment code for every PATH (default: parent directory)",
+    )
+    parser.add_argument("--json", action="store_true", help="print JSON")
+    args = parser.parse_args(argv)
+
+    deployments: list[str] = []
+    for path in args.paths:
+        if args.deployment:
+            deployments.append(args.deployment)
+        elif path == "-":
+            parser.error("reading stdin needs --deployment")
+        else:
+            deployments.append(Path(path).resolve().parent.name)
+
+    reports = build_reports(
+        (deployment, read_lines(path))
+        for deployment, path in zip(deployments, args.paths, strict=True)
+    )
+    if args.json:
+        print(json.dumps([asdict(r) for r in reports], indent=2))
+    else:
+        print("\n\n".join(format_text(r) for r in reports))
+    return 0
+
+
+if __name__ == "__main__":
+    raise SystemExit(main())

@@ -49,6 +49,7 @@ None.
 
 - 2026-10-04 infra-3 unit 1: claimed WP-0g and wrote the plan; check: `ownership.py who` reports infra for `prod/browser_share/**`, shared for `tests/infra/**` and the WP and decision files.
 - 2026-10-04 infra-3 unit 2: log-line parser and engine-based user-agent classifier; check: `pytest tests/infra` 37 passed, `ruff check` and `ruff format --check` clean, `mypy --strict` no issues.
+- 2026-10-04 infra-3 unit 3: 30-minute sessions per (client, user agent), `BrowserShare` report per deployment, CLI over plain, gzipped and stdin logs with a synthetic fixture; check: `pytest tests/infra` 49 passed, ruff and `mypy --strict` clean, `uv run prod/browser_share/browser_share.py` on the fixture (plain, gzipped, stdin) prints the expected 10 sessions and 40.0% below baseline.
 
 ## Evidence
 

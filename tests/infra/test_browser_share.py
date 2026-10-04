@@ -1,3 +1,5 @@
+import gzip
+import json
 import sys
 from pathlib import Path
 
@@ -7,11 +9,19 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[2] / "prod" / "browser_s
 
 from browser_share import (  # noqa: E402
     Browser,
+    BrowserShare,
+    DeploymentReport,
     Engine,
+    build_reports,
     classify,
+    count_sessions,
     is_automated,
+    main,
     parse_line,
+    read_lines,
 )
+
+FIXTURE = Path(__file__).parent / "testdata" / "zz" / "access.log"
 
 BLINK_TAIL = "AppleWebKit/537.36 (KHTML, like Gecko)"
 WEBKIT_TAIL = "AppleWebKit/605.1.15 (KHTML, like Gecko)"
@@ -164,3 +174,102 @@ def test_parse_nginx_proxy_vhost_line_with_compose_prefix() -> None:
 )
 def test_unparseable_lines_return_none(line: str) -> None:
     assert parse_line(line) is None
+
+
+EXPECTED_SHARES = [
+    BrowserShare("Chrome", 126, 20.0),
+    BrowserShare("Chrome", 109, 10.0),
+    BrowserShare("Chrome iOS", 118, 10.0),
+    BrowserShare("Edge", 125, 10.0),
+    BrowserShare("Firefox", 130, 10.0),
+    BrowserShare("Firefox", 115, 10.0),
+    BrowserShare("Mobile Safari", 17, 10.0),
+    BrowserShare("Other", None, 10.0),
+    BrowserShare("Safari", 16, 10.0),
+]
+
+
+def assert_fixture_report(report: DeploymentReport) -> None:
+    assert report.deployment == "zz"
+    assert report.sessions == 10
+    assert list(report.browsers) == EXPECTED_SHARES
+    assert report.below_baseline_pct == 40.0
+    assert report.unknown_engine_pct == 10.0
+    assert report.automated_requests == 3
+    assert report.unparsed_lines == 1
+
+
+@pytest.mark.parametrize(
+    ("times", "sessions"),
+    [
+        ([], 0),
+        ([0], 1),
+        ([0, 1800], 1),
+        ([0, 1801], 2),
+        ([5000, 0, 1000, 2000], 2),
+    ],
+)
+def test_sessions_split_on_gaps_over_thirty_minutes(
+    times: list[int], sessions: int
+) -> None:
+    assert count_sessions(times) == sessions
+
+
+def test_report_from_fixture() -> None:
+    [report] = build_reports([("zz", FIXTURE.read_text().splitlines())])
+    assert_fixture_report(report)
+
+
+def test_rotated_gzipped_files_give_the_same_report(tmp_path: Path) -> None:
+    lines = FIXTURE.read_bytes().splitlines(keepends=True)
+    deployment_dir = tmp_path / "zz"
+    deployment_dir.mkdir()
+    (deployment_dir / "access.log").write_bytes(b"".join(lines[:6]))
+    gzipped = gzip.compress(b"".join(lines[6:]))
+    (deployment_dir / "access.log.1.gz").write_bytes(gzipped)
+
+    [report] = build_reports(
+        ("zz", read_lines(str(path))) for path in sorted(deployment_dir.iterdir())
+    )
+    assert_fixture_report(report)
+
+
+def test_deployments_are_reported_separately() -> None:
+    lines = FIXTURE.read_text().splitlines()
+    reports = build_reports([("zz", lines), ("aa", lines[:1])])
+    assert [r.deployment for r in reports] == ["aa", "zz"]
+    assert reports[0].browsers == (BrowserShare("Chrome", 126, 100.0),)
+
+
+def test_cli_takes_deployment_from_parent_directory(
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    assert main(["--json", str(FIXTURE)]) == 0
+    [printed] = json.loads(capsys.readouterr().out)
+    assert printed["deployment"] == "zz"
+    assert printed["browsers"][0] == {
+        "family": "Chrome",
+        "major": 126,
+        "share_pct": 20.0,
+    }
+    assert printed["below_baseline_pct"] == 40.0
+
+
+def test_cli_text_output_names_the_gate(capsys: pytest.CaptureFixture[str]) -> None:
+    assert main(["--deployment", "qq", str(FIXTURE)]) == 0
+    out = capsys.readouterr().out
+    assert out.startswith("Deployment qq: 10 sessions;")
+    assert "40.0% of sessions (above the 5% phase 7 gate;" in out
+
+
+def test_cli_never_prints_client_addresses(capsys: pytest.CaptureFixture[str]) -> None:
+    main([str(FIXTURE)])
+    main(["--json", str(FIXTURE)])
+    out = capsys.readouterr().out
+    for address in ("192.0.2.", "198.51.100.", "203.0.113.", "2001:db8", "127.0.0.1"):
+        assert address not in out
+
+
+def test_cli_rejects_stdin_without_deployment() -> None:
+    with pytest.raises(SystemExit):
+        main(["-"])

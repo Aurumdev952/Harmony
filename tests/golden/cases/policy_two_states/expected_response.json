@@ -1,0 +1,31 @@
+{
+  "data": [
+    {
+      "Sex": "F",
+      "StateName": "Acre",
+      "yellow_fever_cases": 369.0
+    },
+    {
+      "Sex": "M",
+      "StateName": "Acre",
+      "yellow_fever_cases": 146.0
+    },
+    {
+      "Sex": "F",
+      "StateName": "Roraima",
+      "yellow_fever_cases": 265.45
+    },
+    {
+      "Sex": "M",
+      "StateName": "Roraima",
+      "yellow_fever_cases": 4.95
+    }
+  ],
+  "dimensions": [
+    "StateName",
+    "Sex"
+  ],
+  "fields": [
+    "yellow_fever_cases"
+  ]
+}

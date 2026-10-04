@@ -1,0 +1,5 @@
+demo_malaria_positive
+demo_status
+demo_status_confirmed
+demo_status_discarded
+demo_status_suspected

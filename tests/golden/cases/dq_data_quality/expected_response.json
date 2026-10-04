@@ -1,0 +1,182 @@
+{
+  "dataQuality": {
+    "Acre": {
+      "dimensions": {
+        "StateName": "Acre"
+      },
+      "geo": {
+        "lat": "-9.128693",
+        "lng": "-71.973581"
+      },
+      "indicatorCharacteristics": {
+        "ageScore": 1.0,
+        "completenessTrendIsUp": true,
+        "endIntervalTimestamp": 1710720000.0,
+        "firstEverReportTimestamp": 1514937600.0,
+        "freshnessScore": 0.6065306597126334,
+        "lastReportTimestamp": 1710633600.0,
+        "maxAgeScore": 1,
+        "maxFreshnessScore": 1,
+        "maxScore": 2,
+        "reportingPeriod": 1.0,
+        "score": 2,
+        "success": true
+      },
+      "outlierAnalysis": {
+        "firstReportDate": "1970-01-01",
+        "maxScore": 0,
+        "numFacilities": 0,
+        "numValues": 0,
+        "percentageExtremeOutliers": 0,
+        "percentageModerateOutliers": 0,
+        "score": 0,
+        "success": false
+      },
+      "reportingCompleteness": {
+        "averageReportCount": 137,
+        "firstReportTimestamp": 1709510400.0,
+        "maxReportCount": 275,
+        "maxScore": 4,
+        "minReportCount": 0,
+        "modeReportCount": 0,
+        "reportCountStd": 116.4,
+        "score": 1,
+        "success": true,
+        "totalReports": 1784
+      }
+    },
+    "Pará": {
+      "dimensions": {
+        "StateName": "Pará"
+      },
+      "geo": {
+        "lat": "-3.974166",
+        "lng": "-52.751945"
+      },
+      "indicatorCharacteristics": {
+        "ageScore": 1.0,
+        "completenessTrendIsUp": false,
+        "endIntervalTimestamp": 1710720000.0,
+        "firstEverReportTimestamp": 1514764800.0,
+        "freshnessScore": 0.36787944117144233,
+        "lastReportTimestamp": 1710547200.0,
+        "maxAgeScore": 1,
+        "maxFreshnessScore": 1,
+        "maxScore": 2,
+        "reportingPeriod": 1.0,
+        "score": 1,
+        "success": true
+      },
+      "outlierAnalysis": {
+        "firstReportDate": "1970-01-01",
+        "maxScore": 0,
+        "numFacilities": 0,
+        "numValues": 0,
+        "percentageExtremeOutliers": 0,
+        "percentageModerateOutliers": 0,
+        "score": 0,
+        "success": false
+      },
+      "reportingCompleteness": {
+        "averageReportCount": 136,
+        "firstReportTimestamp": 1709510400.0,
+        "maxReportCount": 374,
+        "maxScore": 4,
+        "minReportCount": 0,
+        "modeReportCount": 0,
+        "reportCountStd": 130.4,
+        "score": 0,
+        "success": true,
+        "totalReports": 1778
+      }
+    },
+    "Roraima": {
+      "dimensions": {
+        "StateName": "Roraima"
+      },
+      "geo": {
+        "lat": "1.989233",
+        "lng": "-61.330109"
+      },
+      "indicatorCharacteristics": {
+        "ageScore": 1.0,
+        "completenessTrendIsUp": false,
+        "endIntervalTimestamp": 1710720000.0,
+        "firstEverReportTimestamp": 1516320000.0,
+        "freshnessScore": 0.36787944117144233,
+        "lastReportTimestamp": 1710547200.0,
+        "maxAgeScore": 1,
+        "maxFreshnessScore": 1,
+        "maxScore": 2,
+        "reportingPeriod": 1.0,
+        "score": 1,
+        "success": true
+      },
+      "outlierAnalysis": {
+        "firstReportDate": "1970-01-01",
+        "maxScore": 0,
+        "numFacilities": 0,
+        "numValues": 0,
+        "percentageExtremeOutliers": 0,
+        "percentageModerateOutliers": 0,
+        "score": 0,
+        "success": false
+      },
+      "reportingCompleteness": {
+        "averageReportCount": 84,
+        "firstReportTimestamp": 1709510400.0,
+        "maxReportCount": 277,
+        "maxScore": 4,
+        "minReportCount": 0,
+        "modeReportCount": 0,
+        "reportCountStd": 103.8,
+        "score": 0,
+        "success": true,
+        "totalReports": 1102
+      }
+    },
+    "overall": {
+      "dimensions": {},
+      "geo": {
+        "lat": 0,
+        "lng": 0
+      },
+      "indicatorCharacteristics": {
+        "ageScore": 1.0,
+        "completenessTrendIsUp": false,
+        "endIntervalTimestamp": 1710720000.0,
+        "firstEverReportTimestamp": 1514764800.0,
+        "freshnessScore": 0.6065306597126334,
+        "lastReportTimestamp": 1710633600.0,
+        "maxAgeScore": 1,
+        "maxFreshnessScore": 1,
+        "maxScore": 2,
+        "reportingPeriod": 1.0,
+        "score": 2,
+        "success": true
+      },
+      "outlierAnalysis": {
+        "firstReportDate": "1970-01-01",
+        "maxScore": 0,
+        "numFacilities": 0,
+        "numValues": 0,
+        "percentageExtremeOutliers": 0,
+        "percentageModerateOutliers": 0,
+        "score": 0,
+        "success": false
+      },
+      "reportingCompleteness": {
+        "averageReportCount": 358,
+        "firstReportTimestamp": 1709510400.0,
+        "maxReportCount": 649,
+        "maxScore": 4,
+        "minReportCount": 113,
+        "modeReportCount": 113,
+        "reportCountStd": 147.9,
+        "score": 2,
+        "success": true,
+        "totalReports": 4664
+      }
+    }
+  }
+}

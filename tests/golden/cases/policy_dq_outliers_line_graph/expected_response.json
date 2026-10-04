@@ -1,0 +1,139 @@
+{
+  "data": [
+    {
+      "dimensions": {
+        "StateName": "Pará"
+      },
+      "key": "Pará",
+      "mean": 199.98090909090908,
+      "outlier_lower_bound": -49.390350272241335,
+      "outlier_upper_bound": 449.3521684540595,
+      "timestamp": "2024-03-05",
+      "yellow_fever_cases": 243.0
+    },
+    {
+      "dimensions": {
+        "StateName": "Pará"
+      },
+      "key": "Pará",
+      "mean": 199.98090909090908,
+      "outlier_lower_bound": -49.390350272241335,
+      "outlier_upper_bound": 449.3521684540595,
+      "timestamp": "2024-03-06",
+      "yellow_fever_cases": 179.0
+    },
+    {
+      "dimensions": {
+        "StateName": "Pará"
+      },
+      "key": "Pará",
+      "mean": 199.98090909090908,
+      "outlier_lower_bound": -49.390350272241335,
+      "outlier_upper_bound": 449.3521684540595,
+      "timestamp": "2024-03-07",
+      "yellow_fever_cases": 266.0
+    },
+    {
+      "dimensions": {
+        "StateName": "Pará"
+      },
+      "key": "Pará",
+      "mean": 199.98090909090908,
+      "outlier_lower_bound": -49.390350272241335,
+      "outlier_upper_bound": 449.3521684540595,
+      "timestamp": "2024-03-08",
+      "yellow_fever_cases": 15.0
+    },
+    {
+      "dimensions": {
+        "StateName": "Pará"
+      },
+      "key": "Pará",
+      "mean": 199.98090909090908,
+      "outlier_lower_bound": -49.390350272241335,
+      "outlier_upper_bound": 449.3521684540595,
+      "timestamp": "2024-03-10",
+      "yellow_fever_cases": 107.23
+    },
+    {
+      "dimensions": {
+        "StateName": "Pará"
+      },
+      "key": "Pará",
+      "mean": 199.98090909090908,
+      "outlier_lower_bound": -49.390350272241335,
+      "outlier_upper_bound": 449.3521684540595,
+      "timestamp": "2024-03-11",
+      "yellow_fever_cases": 190.0
+    },
+    {
+      "dimensions": {
+        "StateName": "Pará"
+      },
+      "key": "Pará",
+      "mean": 199.98090909090908,
+      "outlier_lower_bound": -49.390350272241335,
+      "outlier_upper_bound": 449.3521684540595,
+      "timestamp": "2024-03-12",
+      "yellow_fever_cases": 129.56
+    },
+    {
+      "dimensions": {
+        "StateName": "Pará"
+      },
+      "key": "Pará",
+      "mean": 199.98090909090908,
+      "outlier_lower_bound": -49.390350272241335,
+      "outlier_upper_bound": 449.3521684540595,
+      "timestamp": "2024-03-13",
+      "yellow_fever_cases": 400.0
+    },
+    {
+      "dimensions": {
+        "StateName": "Pará"
+      },
+      "key": "Pará",
+      "mean": 199.98090909090908,
+      "outlier_lower_bound": -49.390350272241335,
+      "outlier_upper_bound": 449.3521684540595,
+      "timestamp": "2024-03-14",
+      "yellow_fever_cases": 343.0
+    },
+    {
+      "dimensions": {
+        "StateName": "Pará"
+      },
+      "key": "Pará",
+      "mean": 199.98090909090908,
+      "outlier_lower_bound": -49.390350272241335,
+      "outlier_upper_bound": 449.3521684540595,
+      "timestamp": "2024-03-15",
+      "yellow_fever_cases": 26.0
+    },
+    {
+      "dimensions": {
+        "StateName": "Pará"
+      },
+      "key": "Pará",
+      "mean": 199.98090909090908,
+      "outlier_lower_bound": -49.390350272241335,
+      "outlier_upper_bound": 449.3521684540595,
+      "timestamp": "2024-03-16",
+      "yellow_fever_cases": 301.0
+    }
+  ],
+  "dates": [
+    "2024-03-05",
+    "2024-03-06",
+    "2024-03-07",
+    "2024-03-08",
+    "2024-03-10",
+    "2024-03-11",
+    "2024-03-12",
+    "2024-03-13",
+    "2024-03-14",
+    "2024-03-15",
+    "2024-03-16"
+  ],
+  "totals": {}
+}

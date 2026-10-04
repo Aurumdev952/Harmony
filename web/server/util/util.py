@@ -29,7 +29,6 @@ INTERNAL_SERVER_ERROR = 'INTERNAL_SERVER_ERROR'
 ISO_DATETIME_FORMAT = '%Y-%m-%dT%H:%M:%S'
 SELECTIONS_DATETIME_FORMAT = '%Y-%m-%d'
 DATE_TIME_NOW = '@now'
-REMEMBER_COOKIE_NAME = 'remember_token'
 
 Node = collections.namedtuple('Node', ['original_dictionary', 'new_dictionary', 'key'])
 
@@ -617,11 +616,6 @@ def assert_users_exist(value):
 
 def construct_recursive_dictionary():
     return collections.defaultdict(construct_recursive_dictionary)
-
-
-def is_session_persisted():
-    cookie_name = current_app.config.get('REMEMBER_COOKIE_NAME', REMEMBER_COOKIE_NAME)
-    return cookie_name in request.cookies
 
 
 class CachedRoute(Route):

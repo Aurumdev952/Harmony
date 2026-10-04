@@ -40,7 +40,7 @@ from web.server.routes.views.authorization import (
     authorization_required,
     is_authorized_api,
 )
-from web.server.routes.views.field import FieldsApi
+from web.server.routes.views.field import get_field_summaries
 from web.server.routes.views.validate_data_catalog import (
     update_data_catalog_import_date,
     validate_import_file,
@@ -61,15 +61,9 @@ MAX_DATA_CATALOG_UPLOAD_SIZE_BYTES = 5 * 1024**2  # disallow files larger than 5
 
 
 class ApiRouter:
-    def __init__(
-        self,
-        template_renderer,
-        configuration_module,
-        fields_api=None,
-    ):
+    def __init__(self, template_renderer, configuration_module):
         self.template_renderer = template_renderer
         self.configuration_module = configuration_module
-        self.fields_api = fields_api or FieldsApi()
 
     @authentication_required(is_api_request=True)
     def api_is_authorized(self):
@@ -105,7 +99,7 @@ class ApiRouter:
 
     @authentication_required(is_api_request=True)
     def api_field_info(self, field_ids):
-        summaries = self.fields_api.get_field_summaries(set(field_ids.split(',')))
+        summaries = get_field_summaries(set(field_ids.split(',')))
         return jsonify(
             Success(
                 {field_id: summary.to_json() for field_id, summary in summaries.items()}

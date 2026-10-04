@@ -54,57 +54,56 @@ class FieldSummary:
         return json.dumps(self.to_json(), indent=2)
 
 
-class FieldsApi:
-    def get_indicator_formula(self, field_id):
-        indicator = get_indicator_by_id(field_id, {'formula'})
-        formula = indicator.get('formula') if indicator else None
-        return formula
-
-    def get_human_readable_formula_html(self, field_id):
-        formula = self.get_indicator_formula(field_id)
-        if not formula:
-            return None
-        matches = re.findall(r'\w+', formula)
-
-        if not matches:
-            return None
-
-        ret = formula[:]
-        ret = (
-            ret.replace(' ', '')
-            .replace('+', ' + ')
-            .replace('-', ' - ')
-            .replace('/', ' / ')
-            .replace('*', ' * ')
+def get_field_summaries(field_ids):
+    '''Summaries of configured fields. Counts and dates cover only the rows the
+    caller's query policy allows; formulas are configuration and always returned.
+    '''
+    if len(field_ids) > MAX_FIELD_IDS_PER_REQUEST:
+        raise BadRequest(
+            description=f'At most {MAX_FIELD_IDS_PER_REQUEST} field ids per request.'
         )
-        for constit_field_id in set(matches):
-            ind = get_indicator_by_id(constit_field_id)
-            if ind:
-                ret = ret.replace(constit_field_id, f"<span>{ind['text']}</span>")
-        return ret
+    configured_field_ids = current_app.zen_config.indicators.ID_LOOKUP
+    if not all(field_id in configured_field_ids for field_id in field_ids):
+        raise NotFound(description='Unknown field id.')
 
-    def get_field_summaries(self, field_ids):
-        '''Summaries of configured fields. Counts and dates cover only the rows the
-        caller's query policy allows; formulas are configuration and always returned.
-        '''
-        if len(field_ids) > MAX_FIELD_IDS_PER_REQUEST:
-            raise BadRequest(
-                description=f'At most {MAX_FIELD_IDS_PER_REQUEST} field ids per request.'
-            )
-        configured_field_ids = current_app.zen_config.indicators.ID_LOOKUP
-        if not all(field_id in configured_field_ids for field_id in field_ids):
-            raise NotFound(description='Unknown field id.')
+    field_rows = _FieldRows(caller_policy_filter())
+    summaries = {}
+    for field_id in field_ids:
+        formula = _indicator_formula(field_id)
+        summaries[field_id] = FieldSummary(
+            field_id,
+            *field_rows.count_and_range(field_id),
+            formula=formula,
+            human_readable_formula=_human_readable_formula_html(formula),
+        )
+    return summaries
 
-        field_rows = _FieldRows(caller_policy_filter())
-        return {
-            field_id: FieldSummary(
-                field_id,
-                *field_rows.count_and_range(field_id),
-                formula=self.get_indicator_formula(field_id),
-                human_readable_formula=self.get_human_readable_formula_html(field_id),
-            )
-            for field_id in field_ids
-        }
+
+def _indicator_formula(field_id):
+    return get_indicator_by_id(field_id, {'formula'}).get('formula')
+
+
+def _human_readable_formula_html(formula):
+    if not formula:
+        return None
+    matches = re.findall(r'\w+', formula)
+
+    if not matches:
+        return None
+
+    ret = formula[:]
+    ret = (
+        ret.replace(' ', '')
+        .replace('+', ' + ')
+        .replace('-', ' - ')
+        .replace('/', ' / ')
+        .replace('*', ' * ')
+    )
+    for constit_field_id in set(matches):
+        ind = get_indicator_by_id(constit_field_id)
+        if ind:
+            ret = ret.replace(constit_field_id, f"<span>{ind['text']}</span>")
+    return ret
 
 
 class _FieldRows:

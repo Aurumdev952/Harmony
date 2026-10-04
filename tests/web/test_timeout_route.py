@@ -50,9 +50,7 @@ def fixture_app(bare_flask_app) -> Flask:
         verify_jwt_in_request_optional()
         return _User() if get_jwt_identity() == USERNAME else None
 
-    app.register_blueprint(
-        ApiRouter(None, None, fields_api=object()).generate_blueprint()
-    )
+    app.register_blueprint(ApiRouter(None, None).generate_blueprint())
     app.add_url_rule(
         '/whoami', 'whoami', lambda: jsonify(current_user.is_authenticated)
     )

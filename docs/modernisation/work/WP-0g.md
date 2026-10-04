@@ -1,7 +1,7 @@
 ---
 wp: "0g"
 title: "Browser-share report from nginx logs"
-status: review
+status: ready
 owner_role: "infra"
 instances:
   - name: "infra-3"
@@ -84,6 +84,18 @@ All of this was re-run on 2026-10-04 from a clean detached clone of the branch t
   - No `--deployment`: a usage error, exit 2.
 - **Fixture.** `tests/infra/testdata/zz/access_log.txt` is now committed (`*.log` is gitignored, so the old name never was). It uses only RFC 5737 and RFC 3849 documentation addresses, loopback and `*.example.org` hosts.
 - **Not done.** There is no measurement on real logs, because the repo has none. See Requests.
+- **Completion gate.** After merging `mig/integration` (at `92f57f2`) and setting `status: ready`, `uv run python scripts/agents/task_gate.py WP-0g` printed the following and exited 0:
+  ```text
+  WP-0g meets the definition of done gates
+  ```
+
+## Deferred
+
+- The measurement on real logs. A human runs the piped command on one deployment's host and fills in decision 0002 (see Requests).
+- Low, from review and not fixed here:
+  - Slackbot 1.0, TelegramBot, WhatsApp and kube-probe user agents pass the bot filter and count as unknown-engine sessions. They inflate the "unknown engine" share, not the below-baseline share. Possible follow-up: treat any `bot` as automated when no engine is recognised.
+  - A truncated `.gz` file exits 1 with a traceback instead of a usage error.
+  - The gate tests overlap slightly (`test_gate_compares_raw_counts` and the two report-level gate tests).
 
 ## Verdicts
 

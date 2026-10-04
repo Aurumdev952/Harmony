@@ -3,7 +3,7 @@
 # Flask 1.0.1, Flask-Potion fork). There is no pyproject.toml yet, and uv rejects
 # `-e git+...` requirement lines, so they are rewritten into direct references.
 #
-#   tests/authz/run.sh                 # pure layer
+#   tests/authz/run.sh                 # pure layer (select with -k, not paths)
 #   tests/authz/run.sh -m authz_http   # live-stack layer; eval "$(tests/authz/stack.sh env)" first
 set -euo pipefail
 

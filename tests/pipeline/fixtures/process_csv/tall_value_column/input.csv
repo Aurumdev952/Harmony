@@ -1,0 +1,6 @@
+StateName,MunicipalityName,Date,field,val,Count
+Northvale,Ashford,2021-10-01,Malaria Positive,999,3
+Northvale,Ashford,2021-10-01,Malaria Positive,999,4
+Northvale,Ashford,2021-10-01,Malaria Tested,999,
+Southmere,Cedar Point,2021-10-02,Malaria Tested,999,0
+Southmere,Cedar Point,2021-10-02,Bed Nets,,2.5

@@ -13,3 +13,5 @@ metadata:
 - In an isolated worktree, the sandbox refuses Bash commands that combine `git` with loops, `$var` expansion or `--exclude-dir=.git`. Run git commands on their own line.
 
 Related: [[full-stack-page-check]]
+- Grepping `web/` for a symbol also hits stale webpack source maps in `web/public/build/` (megabytes of output). Pass `--exclude-dir=build --exclude-dir=node_modules`.
+- `flow check` and eslint print `node[<pid>]: pthread_create: Invalid argument` on this host. It is noise; diff full flow output and ignore that line.

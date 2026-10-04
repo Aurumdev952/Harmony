@@ -1,0 +1,5 @@
+StateName,MunicipalityName,Date,*field_Malaria Positive,*field_Referral Reason
+Northvale,Ashford,2021-06-01,3,Fever
+Northvale,Ashford,2021-06-01,2,Fever
+Northvale,Ashford,2021-06-01,1,Rash
+Southmere,Cedar Point,2021-06-02,,Other Reason

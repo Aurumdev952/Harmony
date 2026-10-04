@@ -129,7 +129,6 @@ Commit the regenerated fixtures in the same commit as the code change. That way 
 - STOCK and other time-interval indicator calculations, and the `JOIN` request type, do not exist in harmony_demo.
 - `GET /api2/query/table?h=` needs a stored query session in Postgres. It is not covered.
 - `data_quality` never runs the outlier sub-query, because `query_models.py` computes `include_outliers` as always false (WP-1e). The case pins today's three queries.
-- `policy_include_all_all_time` pins a policy filter ANDed with an empty query filter. It serialises as `{"type": "and", "fields": [null, ...]}`, which a real broker rejects. WP-0c fixes this, and the case is regenerated with an INV-2 note when WP-0c lands.
 - `policy_jwt_exclude_values` pins today's JWT behaviour: a token that only excludes a state leaves no source need after the token-account intersection, so the caller gets `source == __NO_VAL__` and no rows.
 - The anonymous public-dashboard branch of `apply_authorization_filters` skips the policy entirely. It is not exercised, because `is_public_dashboard_user` is patched to `False`. The authorisation suite (`tests/authz`) owns that decision.
 

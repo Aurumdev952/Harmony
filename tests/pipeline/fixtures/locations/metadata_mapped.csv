@@ -1,0 +1,6 @@
+StateName,MunicipalityName,StateID,MunicipalityID,StateLat,StateLon,MunicipalityLat,MunicipalityLon
+Northvale,,1,,10.5,20.25,,
+Southmere,,2,,-3.75,40,,
+Northvale,Ashford Town,1,101,10.5,20.25,10.61,20.3
+Northvale,Brookline,1,102,10.5,20.25,10.7,20.1
+Southmere,Cedar Point,2,201,-3.75,40,-3.9,40.2

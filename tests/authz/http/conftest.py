@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import os
+from collections.abc import Iterator
 
 import pytest
 
@@ -20,5 +21,7 @@ def pytest_collection_modifyitems(config, items):
 
 
 @pytest.fixture(name='stack', scope='session')
-def fixture_stack() -> Stack:
-    return Stack.from_env()
+def fixture_stack() -> Iterator[Stack]:
+    stack = Stack.from_env()
+    yield stack
+    stack.cleanup()

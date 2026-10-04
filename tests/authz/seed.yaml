@@ -1,7 +1,9 @@
 # Roles, resource roles and query policies exactly as `flask db upgrade` seeds
 # them for harmony_demo (alembic head 2b730c14f514, empty Druid). Captured from
-# a freshly migrated database with tests/authz/stack.sh; the live-stack layer
-# (tests/authz/http/test_seed.py) fails if the migrations drift from this file.
+# a freshly migrated database with tests/authz/stack.sh. The live-stack layer
+# (tests/authz/http/test_seed.py) fails if the migrations drift: one test for
+# `roles` (permissions, resource roles, query policies, data export) and one for
+# `resource_roles` (type and permission set).
 #
 # permissions: {resource type: [permission, ...]} from role_permissions.
 # dashboard / alert: the role's dashboard_resource_role / alert_resource_role.

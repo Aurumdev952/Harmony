@@ -1,5 +1,7 @@
 '''What Potion list endpoints return to each seeded role: the manager filters in
-web/server/potion/managers.py and the principal list filter.'''
+web/server/potion/managers.py and the principal list filter. The user list
+showing all users (I1) and admins-via-group (H5, part of I1) are today's
+behaviour; owners I1 WP-5d, H5 WP-5d.'''
 
 from __future__ import annotations
 

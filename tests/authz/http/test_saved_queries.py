@@ -1,5 +1,6 @@
 '''Saved queries (`/api2/user_query_session`) carry no item permission: any
-signed-in user reads any saved query and can attribute a new one to anyone.'''
+signed-in user reads any saved query and can attribute a new one to anyone.
+H4 (and P1): defect pinned as today; owner accept until WP-5b.'''
 
 from __future__ import annotations
 

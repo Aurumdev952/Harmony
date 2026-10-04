@@ -48,7 +48,22 @@ def test_seeded_roles_match_seed_yaml(stack):
     live = {
         role['name']: _as_seed(role)
         for role in stack.admin_json('GET', '/api2/role?per_page=100')
-        if not role['name'].startswith('authz_')
+        if not role['name'].startswith('authz')
     }
     expected = {name: _normalised_seed(raw) for name, raw in SEED['roles'].items()}
+    assert live == expected
+
+
+def test_seeded_resource_roles_match_seed_yaml(stack):
+    live = {
+        rr['name']: {
+            'type': rr['resourceType'].lower(),
+            'permissions': sorted(p['permission'] for p in rr['permissions']),
+        }
+        for rr in stack.admin_json('GET', '/api2/resource_role?per_page=100')
+    }
+    expected = {
+        name: {'type': raw['type'], 'permissions': sorted(raw['permissions'])}
+        for name, raw in SEED['resource_roles'].items()
+    }
     assert live == expected

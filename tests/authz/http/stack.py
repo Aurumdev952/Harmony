@@ -4,7 +4,10 @@ Every seeded role gets one user, `role-<role>@authz.invalid`, created (or
 reset) through the admin API with a password generated for this run and never
 written anywhere. Requests authenticate with X-Username / X-Password headers,
 which load the account's needs without JWT narrowing, like the `role:<name>`
-principals of the pure layer.
+principals of the pure layer. Every user and group the run creates is deleted
+when the session ends (`Stack.cleanup`).
+
+Only a loopback stack is accepted: the suite creates and deletes users.
 '''
 
 from __future__ import annotations
@@ -23,6 +26,7 @@ from urllib3.util.retry import Retry
 
 TIMEOUT_SECONDS = 120
 USER_DOMAIN = 'authz.invalid'
+LOOPBACK_HOSTS = ('127.0.0.1', 'localhost', '::1')
 _BUNDLE = re.compile(r'/([A-Za-z]+)\.bundle\.js')
 
 
@@ -67,10 +71,14 @@ class Stack:
     base_url: str
     admin: requests.Session
     _users: dict = field(default_factory=dict, repr=False)
+    created_users: set = field(default_factory=set, repr=False)
 
     @classmethod
     def from_env(cls) -> Stack:
         base_url = os.environ['AUTHZ_BASE_URL'].rstrip('/')
+        host = urlparse(base_url).hostname
+        if host not in LOOPBACK_HOSTS:
+            raise RuntimeError(f'AUTHZ_BASE_URL must be a loopback stack, not {host!r}')
         admin = new_session()
         response = admin.post(
             f'{base_url}/api2/authentication/login',
@@ -127,6 +135,7 @@ class Stack:
         if user is None:
             user = self.admin_json('POST', '/api2/user', {**fields, 'status': 'active'})
         uri = user['$uri']
+        self.created_users.add(uri)
         password = secrets.token_urlsafe(18)
         self.admin_json('POST', f'{uri}/password', {'newPassword': password})
         roles = self.roles_by_name()
@@ -158,3 +167,17 @@ class Stack:
             return new_session()
         assert principal.startswith('role:'), principal
         return self.role_user(principal[len('role:') :])
+
+    def delete_group_named(self, name: str) -> None:
+        for group in self.admin_json('GET', '/api2/group?per_page=100'):
+            if group['name'] == name:
+                self.admin_json('DELETE', group['$uri'])
+
+    def cleanup(self) -> None:
+        '''Deletes every user this run created or reset. Saved queries go with
+        their users (user_query_session.user_id cascades).'''
+        for uri in sorted(self.created_users):
+            response = self.request(self.admin, 'DELETE', uri)
+            assert response.status_code in (204, 404), (uri, response.status_code)
+        self.created_users.clear()
+        self._users.clear()

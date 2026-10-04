@@ -58,10 +58,11 @@ None. C-1 (`AppContext`) arrives in WP-4f and will hold `Settings` and `Deployme
 
 ## Requests
 
-None yet.
+- [ ] infra: run `make requirements` on this branch (or in WP-3b) so `requirements.txt` picks up `pydantic==2.10.6` and `pydantic-settings==2.8.1`, and `requirements-web.txt` / `requirements-pipeline.txt` pick up `typing_extensions==4.12.2`. The images install from those files, and CI's sync check fails until they match `pyproject.toml`. Blocks merge (INV-1, INV-8), not the build units.
 
 ## Log
 
+- 2026-10-04 core-4a unit 1: `pydantic==2.10.6`, `pydantic-settings==2.8.1` in the root dependencies; `typing_extensions` 4.1.1 to 4.12.2 in the web and pipeline groups (pydantic 2.10 needs >= 4.12.2); `uv lock` adds annotated-types, pydantic-core 2.27.2 and python-dotenv. check: `uv lock --check` and `uv sync --locked` clean; pydantic 2.10.6 + pydantic-settings 2.8.1 import on CPython 3.8, 3.9, 3.13 and PyPy 3.8 (PyPy 3.9 has no pydantic-core wheel at the latest release; no image runs it); golden 269 passed, `record.py --check` 85 cases 0 drift; every CI suite green (core 25, web 95, druid 1, druid_setup 79, graphql 22, pipeline 129 + 1 skipped, toolchain 9).
 ## Evidence
 
 ## Verdicts

@@ -320,12 +320,16 @@ def construct_query_need_from_policy(query_policy):
 
 
 class AuthorizedQueryClient:
+    '''The query client for user requests. Every query carries the caller's policy.
+
+    It has no `run_raw_query`: a raw Druid dict cannot reliably carry the policy
+    filter. Code that sends raw queries holds the system client, and SEC-4 requires
+    it to take no user input (see docs/modernisation/work/WP-0c.md for the open item).
+    '''
+
     def __init__(self, query_client):
-        self.query_client = query_client
+        self._query_client = query_client
 
     @apply_authorization_filters()
     def run_query(self, query):
-        return self.query_client.run_query(query)
-
-    def run_raw_query(self, query):
-        return self.query_client.run_raw_query(query)
+        return self._query_client.run_query(query)

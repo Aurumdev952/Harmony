@@ -17,6 +17,9 @@
 #   PERF_SCRATCH          default ${TMPDIR:-/tmp}/<project>: dataset, pipeline output, broker request log
 # Every port is published on 127.0.0.1 only. Secrets are generated per stack into a
 # mode-600 file outside the repository (SPEC INV-6); compose reads no .env file.
+# The file lives under XDG_STATE_HOME, not the tmpfs XDG_RUNTIME_DIR: Druid's
+# containers and volumes survive a reboot, and its metadata database keeps the
+# password it was created with.
 set -euo pipefail
 
 HERE="$(cd "$(dirname "$0")" && pwd -P)"
@@ -34,7 +37,7 @@ export PERF_STACK_DIR="${HERE}/stack"
 # Read by druid_setup/single before WP-0b (image tags) and after it (bind address).
 export DRUID_VERSION=0.23.0 ZOOKEEPER_VERSION=3.8 DRUID_BIND_ADDRESS=127.0.0.1
 
-SECRETS_DIR="${XDG_RUNTIME_DIR:-${HOME}/.local/state/harmony-perf}"
+SECRETS_DIR="${XDG_STATE_HOME:-${HOME}/.local/state}/harmony-perf"
 SECRETS="${SECRETS_DIR}/${PERF_PROJECT}.env"
 SECRET_NAMES=(PERF_PASSWORD POSTGRES_PASSWORD REDIS_PASSWORD HASURA_ADMIN_SECRET DEFAULT_SECRET_KEY JWT_SECRET_KEY DRUID_POSTGRES_PASSWORD)
 
@@ -60,6 +63,11 @@ new_secret() {
 }
 
 create_secrets() {
+  if docker volume inspect "${PERF_PROJECT}-druid_metadata_data" >/dev/null 2>&1; then
+    echo "perf stack: ${SECRETS} is missing but Druid's metadata volume exists;" \
+      "new secrets would lock Druid out of it. Run stack.sh down to start over." >&2
+    exit 1
+  fi
   mkdir -p "${SECRETS_DIR}"
   chmod 700 "${SECRETS_DIR}"
   ( umask 077
@@ -140,6 +148,10 @@ wait_for() {
 
 coordinator() { curl -fsS "http://127.0.0.1:${PERF_COORDINATOR_PORT}$1"; }
 broker() { curl -fsS "http://127.0.0.1:${PERF_BROKER_PORT}$1"; }
+
+druid_jvms_running() {
+  [[ -n "$(druid_compose ps -q --status running coordinator broker historical middlemanager router)" ]]
+}
 
 druid_ready() {
   coordinator /status/health | grep -q true &&
@@ -230,12 +242,15 @@ up() {
   load_secrets
   build_images
   # The loader empties the extensions volume before downloading, and `up`
-  # restarts it, so it runs alone and never beside a running Druid JVM.
+  # restarts it, so it runs alone and never beside a running Druid JVM. After a
+  # reboot Docker restarts the JVMs (restart: always) on the loaded volume.
   if ! druid_ready 2>/dev/null; then
-    druid_compose build extension_loader
-    druid_compose run --rm volumes-init
-    druid_compose up -d extension_loader
-    druid_compose wait extension_loader
+    if ! druid_jvms_running; then
+      druid_compose build extension_loader
+      druid_compose run --rm volumes-init
+      druid_compose up -d extension_loader
+      druid_compose wait extension_loader
+    fi
     druid_compose up -d --no-deps "${DRUID_SERVICES[@]}"
     wait_for 'Druid coordinator, broker, middlemanager and historical are up' 60 druid_ready
   fi

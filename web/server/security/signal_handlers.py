@@ -34,6 +34,10 @@ from web.server.routes.views.authorization import (
 from web.server.security.permissions import SuperUserPermission
 from web.server.util.util import get_user_string, get_remote_ip_address
 
+# Dashboard render tokens keep whatever query policy the account they are issued
+# for holds.
+RENDER_TOKEN_QUERY_NEEDS = ['*']
+
 
 def register_for_signals(app, principals):
     install_user_events_handlers(app)
@@ -160,6 +164,13 @@ def _compute_token_query_needs(token_query_needs):
             result.add(intersection)
 
     return result
+
+
+def render_token_query_needs():
+    '''The query needs a `query_needs: ['*']` token issued to the current user
+    resolves to: the policy a dashboard render made as that user runs under.
+    '''
+    return _compute_token_query_needs(RENDER_TOKEN_QUERY_NEEDS)
 
 
 def _compute_token_provides(claims):

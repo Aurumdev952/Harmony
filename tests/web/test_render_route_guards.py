@@ -7,7 +7,8 @@ import json
 
 import pytest
 
-from tests.web.conftest import DASHBOARD_SLUG, FakeRenderResponse
+from tests.web.fakes import DASHBOARDS, DASHBOARD_SLUG, FakeDashboard, FakeRenderResponse
+from web.server.routes.views.dashboard import get_email_attachments
 
 SLUG = DASHBOARD_SLUG
 RENDER_ROUTES = [
@@ -87,12 +88,13 @@ def test_viewer_gets_a_render_made_as_themselves(client, renderer, route):
 @pytest.mark.parametrize('route', RENDER_ROUTES)
 def test_request_args_cannot_redirect_the_minted_token(client, renderer, route):
     response = client.get(
-        f'{route}?url=https://attacker.invalid/&cookie=accessKey=planted',
+        f'{route}?url=https://attacker.invalid/&cookie=accessKey=planted&force=false',
         headers=as_user(VIEWER),
     )
 
     assert response.status_code == 200
     [call] = renderer.calls
+    assert call.params['force'] == 'true'
     assert call.params['url'].startswith('http://harmony.tests.invalid/')
     assert call.params['url'].split('?')[0].endswith(f'/dashboard/{SLUG}')
     assert call.identity == VIEWER
@@ -175,3 +177,64 @@ def test_failed_thumbnail_render_does_not_leave_the_cache_pending(
 
     assert retrieve_thumbnail(client, VIEWER) == ''
     assert 'PENDING' not in app.cache.values.values()
+
+
+def test_thumbnail_retrieve_refuses_an_anonymous_caller_under_public_access(
+    client, renderer, public_access
+):
+    public_access['enabled'] = True
+
+    response = client.get(
+        f'/api2/storage/retrieve?key={SLUG}',
+        headers={'Referer': f'http://harmony.tests.invalid/dashboard/{SLUG}'},
+    )
+
+    assert response.status_code == 401
+    assert renderer.calls == []
+
+
+def test_slug_spelt_in_another_case_reuses_the_cached_thumbnail(client, renderer):
+    retrieve_thumbnail(client, NORTH)
+
+    response = client.get(
+        f'/api2/storage/retrieve?key={SLUG.upper()}', headers=as_user(NORTH)
+    )
+
+    assert response.status_code == 200
+    assert len(renderer.calls) == 1
+
+
+def test_slug_reused_by_another_dashboard_does_not_serve_the_old_thumbnail(
+    client, renderer, monkeypatch
+):
+    retrieve_thumbnail(client, ADMIN)
+    monkeypatch.setitem(DASHBOARDS, SLUG, FakeDashboard(SLUG, 8))
+
+    retrieve_thumbnail(client, ADMIN)
+
+    assert len(renderer.calls) == 2
+
+
+@pytest.mark.parametrize(
+    'link, page',
+    [
+        (
+            'https://attacker.invalid/fr/dashboard/elsewhere#h=a1b2c3',
+            f'http://harmony.tests.invalid/fr/dashboard/{SLUG}?screenshot=1&pdf=1#h=a1b2c3',
+        ),
+        (
+            'https://attacker.invalid/steal',
+            f'http://harmony.tests.invalid/dashboard/{SLUG}?screenshot=1&pdf=1',
+        ),
+        (None, f'http://harmony.tests.invalid/dashboard/{SLUG}?screenshot=1&pdf=1'),
+    ],
+)
+def test_emailed_render_loads_this_apps_dashboard_whatever_link_is_sent(
+    app, renderer, link, page
+):
+    with app.test_request_context('/'):
+        get_email_attachments(VIEWER, SLUG, should_attach_pdf=True, dashboard_url=link)
+
+    [call] = renderer.calls
+    assert call.params['url'] == page
+    assert call.identity == VIEWER

@@ -10,6 +10,7 @@ from slugify import slugify
 
 from flask import current_app, g, url_for
 from flask_user import current_user
+from werkzeug.exceptions import Forbidden, NotFound
 
 from log import LOG
 from models.alchemy.dashboard import Dashboard, DashboardUserMetadata
@@ -39,6 +40,7 @@ from web.server.routes.views.authorization import is_authorized
 from web.server.routes.views.feed import add_share_notification
 from web.server.routes.views.users import add_user_acl, get_current_user, try_get_user
 from web.server.routes.views.page_renderer import (
+    dashboard_page_args,
     grid_dashboard_to_pdf,
     grid_dashboard_to_image,
 )
@@ -112,6 +114,18 @@ def get_dashboard(slug, session=None) -> Dashboard:
     return find_one_by_fields(
         Dashboard, case_sensitive=False, search_fields={'slug': slug}, session=session
     )
+
+
+def get_viewable_dashboard(slug) -> Dashboard:
+    '''The dashboard page's lookup and `view_resource` check, answered with a
+    status code (404 or 403) instead of a page.
+    '''
+    dashboard = get_dashboard(slug)
+    if not dashboard:
+        raise NotFound()
+    if not is_authorized('view_resource', 'dashboard', dashboard.resource_id):
+        raise Forbidden()
+    return dashboard
 
 
 def add_item_holder_to_dashboard(dashboard: Dashboard, raw_item_holder: dict):
@@ -381,9 +395,13 @@ def get_email_attachments(
 ):
     attachments = []
     image_name = None
+    locale, session_hash = dashboard_page_args(dashboard_url)
     if should_attach_pdf:
         render_response = grid_dashboard_to_pdf(
-            name=slug, dashboard_url=dashboard_url, auth_user_email=auth_user_email
+            locale,
+            slug,
+            auth_user_email=auth_user_email,
+            session_hash=session_hash,
         )
         if render_response.status_code != 200:
             g.request_logger.error(f'Failed to render dashboard: "{slug}" to PDF')
@@ -397,7 +415,10 @@ def get_email_attachments(
 
     if should_embed_image:
         image_render_response = grid_dashboard_to_image(
-            name=slug, dashboard_url=dashboard_url, auth_user_email=auth_user_email
+            locale,
+            slug,
+            auth_user_email=auth_user_email,
+            session_hash=session_hash,
         )
         if image_render_response.status_code != 200:
             g.request_logger.error(f'Failed to render dashboard: "{slug}" to JPEG')

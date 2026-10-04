@@ -1,1 +1,2 @@
 - [Template render diff](template_render_diff.md) — prove Jinja template edits without a running app; known baseline failures
+- [Flask local test env](flask_local_test_env.md) — offline Python 3.8 env, env placeholders and mocks to build the Flask route map; worktree-guard traps

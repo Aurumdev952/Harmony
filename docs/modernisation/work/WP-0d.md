@@ -71,6 +71,9 @@ Each request is the exact change verified in unit 4. The combined diff was appli
   - This WP does not touch `web/server/routes/api.py` (WP-0a and WP-0c).
 - [ ] **data-platform**: delete the Hadoop ingestion path as one change: `db/druid/indexing/resources/task_templates/`, `db/druid/indexing/resources/tuning_configs/on_prem.json` (the directory's only file), `db/druid/indexing/legacy_task_builder.py` and `db/druid/indexing/scripts/run_indexing.py`. `run_native_indexing.py` and `task_runner_util.py` do not depend on them.
 - [ ] **frontend-platform**: delete `web/client/util/graphql/zen_environment.js`. In `web/client/util/graphql/index.jsx`, delete the line `import zenEnvironment from 'util/graphql/zen_environment';` and the `zenEnvironment,` export entry. This can land in WP-0e.
+- [ ] **infra (found during verification; already broken on `main`, not caused by this WP)**: the `etl-pipeline` image does not build.
+  - `docker/pipeline/Dockerfile:29-36` downloads the MinIO client from `https://dl.minio.io/client/mc/release/linux-*/mc`. That URL now returns `HTTP 410 Gone`, so the `downloader` stage fails with `wget` exit 8. This breaks INV-1 for the pipeline image.
+  - Suggested fix: pin a versioned `mc` release URL with a SHA-256 check (SEC-9), or copy it from a pinned `minio/mc` image. WP-0b may be the natural home.
 - [ ] **lead**: edit `docs/modernisation/phase-0-security-and-subtraction.md` section 0d.
   - Drop "Delete the unused `/api/timeout` route".
   - Replace "Point `zen_environment.js` at the Hasura environment, or delete it" with "Delete it".
@@ -102,6 +105,45 @@ Command: a grep over the repo, excluding `docs/`, `.claude/` and `node_modules`.
 - **`/api/timeout`** is live: see Phase-file corrections.
 - **The Hadoop templates** are reached only through `legacy_task_builder.py`, which only `scripts/run_indexing.py` imports, and nothing references that script.
 - **`zenEnvironment`** is used only by its re-export in `web/client/util/graphql/index.jsx`.
+- **Files:**
+  - The grep script and its output: [`WP-0d-evidence/wp0d_dead.sh`](WP-0d-evidence/wp0d_dead.sh) and [`wp0d_dead.out`](WP-0d-evidence/wp0d_dead.out).
+  - Two further greps: `ZenClient.post('timeout'` in `web/client/util/timeoutSession.js:42`, and `fetch('/api/graphql'` in `util/graphql/environment.js:22`.
+
+### Unit 4: the combined change builds and imports
+
+**Method.**
+- `git archive HEAD` was unpacked twice under `/tmp/wp0d-core2/`, as `base` and `trim`.
+- The exact change from the Requests section was applied to `trim`. The result is [`WP-0d-evidence/combined.diff`](WP-0d-evidence/combined.diff) (`diff -ru base trim`). That copy is never committed and edits no owned path in this branch.
+- Images were built with `DOCKER_NAMESPACE=local/wp0d-core2-<v> DOCKER_TAG=<v> docker compose -p wp0d-core2-<v> -f docker-compose.build.yaml build <service>`.
+
+**`web-server` image.**
+- Both `base` and `trim` build (exit 0).
+- Both print the same pip warning: `typing-extensions 4.1.1` conflicts with `exceptiongroup` and `cryptography 47`. This is pre-existing and not caused by the change.
+- `cryptography` is still installed transitively in `trim`.
+
+**Import sweep.**
+- Script: [`import_sweep.py`](WP-0d-evidence/import_sweep.py). It imports every module under `config data db log models util web`, without `web/client` or `web/public`.
+- Command: `docker run --rm --network none -e ZEN_ENV=harmony_demo -e DEFAULT_SECRET_KEY=<dummy> <image> python /sweep.py`.
+
+| Image | Modules | OK | Errors from a removed package |
+|---|---|---|---|
+| base | 759 | 631 | 0 |
+| trim | 752 | 625 | 0 |
+
+- `diff` of the two outputs ([base](WP-0d-evidence/sweep-web-base.tsv), [trim](WP-0d-evidence/sweep-web-trim.tsv)) differs only by the deleted modules:
+  - `db.druid.indexing.legacy_task_builder`
+  - `db.druid.indexing.scripts.run_indexing`, which already failed on base with `KeyError: 'DRUID_HOST'`
+  - `web.server.graphql`, `web.server.graphql.filters`, `web.server.graphql.schema` and `web.server.graphql.schemas`
+  - `web.server.routes.graphql_api`
+- Every other module has the same status in both images. The remaining errors exist on both images: missing pipeline-only packages in the web image, Flask app-context access at import, and mapper initialisation without a database.
+
+**URL map.**
+- Script: [`route_map.py`](WP-0d-evidence/route_map.py). It builds the app with `create_app(skip_db_check=True)`, mocks `template_renderer` and `druid_context`, runs the real `_initialize_query_data`, and then runs the real `_register_routes`, which includes Potion.
+- Run with `--network none` and dummy environment values.
+- Base has 316 rules and trim has 315. The 247 Potion `/api2` rules are identical.
+- [`diff`](WP-0d-evidence/routes-base.tsv) shows that the only change is the removal of `/graphql  graphql.graphql  DELETE,GET,POST,PUT`. `/api/timeout  api.timeout_session  POST` is still present in [trim](WP-0d-evidence/routes-trim.tsv).
+
+**`etl-pipeline` image.** See the next update.
 
 ## Verdicts
 

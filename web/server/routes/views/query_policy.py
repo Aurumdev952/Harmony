@@ -86,10 +86,13 @@ def restrict_query_filter_to_user_permissions(query, user_identity=None):
 
     # Take the logical AND of the original query filter with all the filters
     # referring to the query policies held by the user.
+    # EmptyFilter & policy is the policy alone: Druid rejects a null AND operand.
     if authorization_filter and not isinstance(authorization_filter, EmptyFilter):
         query_filter = query.query_filter
-        query.query_filter = Filter(
-            type=AND_FILTER_SYMBOL, fields=[query_filter, authorization_filter]
+        query.query_filter = (
+            authorization_filter
+            if query_filter is None
+            else query_filter & authorization_filter
         )
 
     return query

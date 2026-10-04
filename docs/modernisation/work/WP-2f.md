@@ -111,11 +111,10 @@ None of these blocks this WP.
   - move `bcrypt==4.0.1` from `requirements.txt` into `[project].dependencies` next to flask-user, then `uv lock` (today's lock resolves bcrypt 5.0.0) and `make requirements`. Its `requirements.txt` edit would otherwise fail the drift test. Until then the lock stays as it is;
   - `tests/infra/test_requirements.py` reads the generated `requirements.txt` in the 3.13 lane, so it keeps working;
   - `tests/core`, `tests/web` and `tests/druid_setup` join the 3.9 job automatically. Re-run the full local CI on that merge, and mark anything that needs the stack `stack`.
-- [ ] **WP-0d (`mig/WP-0d-dead-backend-code-infra`), whichever merges second.** Port:
+- [ ] **WP-0d (`mig/WP-0d-dead-backend-code`, with its infra side branch), whichever merges second.** Port:
   - the removed packages out of `pyproject.toml` (`[project].dependencies`, `web`, `pipeline`, `dev`), then `uv lock` and `make requirements`;
-  - the four removed mypy overrides (`flask_admin`, `flask_graphql`, `graphene`, `graphene_sqlalchemy`) out of `[[tool.mypy.overrides]]`;
-  - the PyPy `cryptography==41.0.7` marker line. The lead's Phase 3b note deletes it outright, so it does not enter `pyproject.toml`.
-  - **the gspread PyPy exclusion.** WP-0d replaced that cryptography pin with `gspread>=5.4.0 ; platform_python_implementation != 'PyPy'` in `requirements.txt`. Nothing imports gspread, and under PyPy it pulls in cryptography, which aborts PyPy on import. When porting WP-0d, change the `"gspread>=5.4.0"` line in `[project].dependencies` to `"gspread>=5.4.0 ; platform_python_implementation != 'PyPy'"`, then run `uv lock` and `make requirements`. `make requirements` must never export an unmarked gspread, or the etl-pipeline image's PyPy step builds cryptography from source and fails. The pin test in `tests/infra/test_requirements_export.py` strips markers before matching, so the allowlist stays as it is.
+  - the five removed mypy overrides (`flask_admin`, `flask_graphql`, `graphene`, `graphene_sqlalchemy`, `graphql_relay`) out of `[[tool.mypy.overrides]]`;
+  - **the gspread PyPy marker, not a pin.** WP-0d has no cryptography line any more. It changes gspread to `gspread>=5.4.0 ; platform_python_implementation != 'PyPy'`. Nothing imports gspread, and under PyPy it pulls in cryptography, which aborts PyPy on import. So in `[project].dependencies`, `"gspread>=5.4.0"` becomes that marked line, followed by `uv lock` and `make requirements`. `make requirements` must never export an unmarked gspread, or the etl-pipeline image's PyPy step builds cryptography from source and fails. The pin test strips markers before matching, so its allowlist stays as it is.
 - [ ] **In-flight branches, after rebasing onto this WP.** Before WP-2f, pylint failed CI only on `type == error`, so unused imports (F401) and formatting passed unless black objected. Now ruff fails CI on F401 and on any unformatted changed file. Each in-flight branch owner runs `make format-python COMMIT=<base>` and turns intentional imports into `# noqa: F401`. Known today:
   - WP-0c (backend side): 2 F401 and 4 files to reformat (reviewer's count);
   - WP-0b: 2 F401 and 2 to reformat (reviewer's count);
@@ -139,7 +138,7 @@ None of these blocks this WP.
 - [ ] **lead:** delete the scripts nothing calls any more: `scripts/lint_python.sh`, `scripts/format_python.sh`, `scripts/format_python_files.sh`, `scripts/pylint/` and `scripts/mypy_parse.py`.
 - [ ] **lead:** plan one repo-wide `ruff format` commit for a quiet point after phase 2, recorded in `.git-blame-ignore-revs`. ruff formats in black 24 style, so until then the first PR to touch a file gets a whole-file reformat. 283 files are affected (Decisions).
 - [ ] **core (side branch `mig/WP-2f-uv-ruff-mypy-ci-core`, to merge here):** fix `util/unix.py:111`, where `subprocess` is undefined (ruff F821), then delete its line in `[tool.ruff.lint.per-file-ignores]`.
-- [ ] **data-platform (side branch `mig/WP-2f-uv-ruff-mypy-ci-druid`, to merge here):** delete the dead code at `scripts/druid/druid_task_memory_stats.py:54-59`, which reads an undefined `raw_timestamp` (ruff F821), then delete its line in `[tool.ruff.lint.per-file-ignores]`.
+- [x] **data-platform:** (done by data-platform-1 on `mig/WP-2f-uv-ruff-mypy-ci-druid`) delete the dead code at `scripts/druid/druid_task_memory_stats.py:54-59`, which reads an undefined `raw_timestamp` (ruff F821), then delete its line in `[tool.ruff.lint.per-file-ignores]`.
 - [ ] **frontend-platform and qa:** no Jest or Playwright suite exists on `mig/integration`. Ask infra for a CI job when the first suite lands (Vitest in WP-6, Playwright smoke from QA).
 - [ ] **qa (WP-2c), low:** no offline contract test pins the `date` format tag. Renaming it in `tests/contract/schema.py` left the suite green, while renaming `http-date` failed it (Unit 7 evidence). A `("2024-01-01", "date")` row in `test_string_format_tags` would close the gap.
 
@@ -180,6 +179,7 @@ None of these blocks this WP.
   - golden, pipeline and contract breaks each exit 1 and name the case;
   - actionlint 0, zizmor 0 findings, and the WP-0f policy passes;
   - `git ls-files .playwright-mcp` is empty.
+- 2026-10-05 data-platform-1 (request, branch `mig/WP-2f-uv-ruff-mypy-ci-druid`): in `scripts/druid/druid_task_memory_stats.py`, deleted the unreachable second `return` in `build_timestamp`. It read the undefined `raw_timestamp`, and the function returns on its first line. Nothing else in the file reads `raw_timestamp`. Removed the file's F821 entry from `[tool.ruff.lint.per-file-ignores]`. Touching the file subjects it to the full changed-file rules, which flagged S101 on `assert False` in `_convert_to_mb`. It now raises `ValueError` for an unknown unit; before, it raised `AssertionError`, or under `-O` returned `'ERR'`. Check: the old file gives 6 errors under `ruff check --select E9,F63,F7,F82` without the ignore; `ci/lint_python.sh mig/WP-2f-uv-ruff-mypy-ci` exits 0 (tree-wide check passes, changed file lint-clean and formatted); the script on a sample filtered GC log writes `2026-10-04 16:14:20	30.5	1024.0	9.5	1000.0`.
 
 ## Decisions
 

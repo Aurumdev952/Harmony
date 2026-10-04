@@ -3,12 +3,6 @@ import os
 import pytest
 
 
-def pytest_configure(config):
-    # WP-2f's marker for tests that need a running stack; registered here too
-    # so the contract suite runs cleanly before WP-2f's pytest config lands.
-    config.addinivalue_line("markers", "stack: needs a running docker compose stack")
-
-
 @pytest.fixture(scope="session")
 def contract_runner():
     """A runner bound to the server under test, shared by every replayed case

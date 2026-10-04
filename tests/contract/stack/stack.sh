@@ -26,10 +26,6 @@ SECRETS_DIR="${XDG_RUNTIME_DIR:-${HOME}/.local/state/harmony-contract}"
 SECRETS="${SECRETS_DIR}/${CONTRACT_PROJECT}.env"
 SECRET_NAMES=(CONTRACT_PASSWORD POSTGRES_PASSWORD REDIS_PASSWORD HASURA_ADMIN_SECRET DEFAULT_SECRET_KEY JWT_SECRET_KEY)
 
-# python:3.8 is what docker/web/Dockerfile_web-server builds FROM on main; the
-# build pins it to this digest. WP-0b pins the Dockerfile itself.
-PYTHON_38="python:3.8@sha256:d411270700143fa2683cc8264d9fa5d3279fd3b6afff62ae81ea2f9d070e390c"
-
 compose_files() {
   local files=(-f "${HERE}/compose.yaml")
   # Match the secrets Redis and Hasura demand to what the checked-out code sends.
@@ -86,15 +82,11 @@ load_secrets() {
 build_images() {
   local hash
   hash="$(cat "${ROOT}/requirements.txt" "${ROOT}/requirements-web.txt" \
-    "${ROOT}/docker/web/Dockerfile_web-server" "${HERE}/Dockerfile" | sha256sum | cut -c1-12)"
+    "${ROOT}/docker/web/Dockerfile_web-server" | sha256sum | cut -c1-12)"
   docker build --platform linux/amd64 \
-    --build-context "python:3.8=docker-image://${PYTHON_38}" \
     -f "${ROOT}/docker/web/Dockerfile_web-server" \
     -t "harmony-contract-web-server:${hash}" "${ROOT}"
-  docker build --platform linux/amd64 \
-    --build-arg "BASE_IMAGE=harmony-contract-web-server:${hash}" \
-    -t "harmony-contract-web:${hash}" "${HERE}"
-  export CONTRACT_WEB_IMAGE="harmony-contract-web:${hash}"
+  export CONTRACT_WEB_IMAGE="harmony-contract-web-server:${hash}"
 }
 
 wait_for_web() {

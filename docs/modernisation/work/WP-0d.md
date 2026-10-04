@@ -107,8 +107,21 @@ At the lead's instruction on 2026-10-04, this branch merges `mig/decisions-0001-
   3. data-platform `2ccbe74`
   4. frontend-platform `ae5d798`
   5. `mig/integration`
+  6. After review: backend `d0c8f78` (`/graphql` tool chain), then infra `318cd18`, which fast-forwards (gspread PyPy marker, cryptography pin dropped, `[mypy-graphql_relay.*]` removed), then `mig/integration` again (2026-10-05). `git ls-files .playwright-mcp` is empty.
 - The infra trim must never land without the backend deletion. Without it, `_register_routes` fails with `No module named 'flask_graphql'`.
 - The `etl-pipeline` image builds only once WP-0b's MinIO fix (`mig/WP-0b-ports-secrets-pins`) is merged. Until then, it stops at the `mc` download with HTTP 410, the same as on `main`. With WP-0b's Dockerfile, infra-5 built it with exit 0. The PyPy step skips `gspread`, so it installs no `cryptography` at all. Merge WP-0b before, or together with, WP-0d.
+- **Hand-off to WP-2f (`mig/WP-2f-uv-ruff-mypy-ci`, checked at `e07f929`).**
+  - WP-2f makes `pyproject.toml` the source of `requirements*.txt` (`make requirements` runs `uv run docker/export_requirements.py`), and it deletes `mypy.ini`. A trial merge of the two branches conflicts in all four `requirements*.txt` and in `mypy.ini`.
+  - Whichever of WP-0d and WP-2f lands second must, in that WP:
+    1. Remove the WP-0d packages from WP-2f's `pyproject.toml`:
+       - `[project].dependencies`: `python-Levenshtein==0.12.1` and `google-cloud-logging==1.11.0 ; …`.
+       - `web` group: `Flask-Admin`, `graphene-sqlalchemy`, `Flask-GraphQL` and `segment-analytics-python`.
+       - `pipeline` group: `fuzzywuzzy`, `jellyfish`, `editdistance` and `dask`.
+       - `dev` group: the Paramiko block `cryptography==37.0.2`, `pyasn1==0.4.8`, `PyNaCl==1.4.0` and `paramiko==2.7.1`, with its comment.
+    2. Remove the mypy overrides for the removed packages from `[[tool.mypy.overrides]]`: `flask_admin.*`, `flask_graphql.*`, `graphene.*`, `graphene_sqlalchemy.*` and `graphql_relay.*`.
+    3. Carry infra-5's PyPy marker. On WP-2f, `gspread>=5.4.0` sits in `[project].dependencies` (exported to `requirements.txt`), not in the `pipeline` group. Write it there as `gspread>=5.4.0 ; platform_python_implementation != 'PyPy'`, with infra-5's comment, so the exported `requirements.txt` matches this branch. No `cryptography` pin is carried, because infra-5 dropped it.
+    4. Run `uv lock` and then `make requirements`. Check that the regenerated `requirements*.txt` contain none of the removed packages and keep the `gspread` marker.
+    5. Resolve the `mypy.ini` conflict by taking WP-2f's deletion.
 
 ## Contract changes
 
@@ -167,6 +180,7 @@ Each request is the exact change verified in unit 4. The combined diff was appli
 - 2026-10-04 core-2 unit 5: merged backend `1e7cfa7`, infra `c310537`, data-platform `2ccbe74`, frontend-platform `ae5d798`, then `mig/integration`. Resolved the WP-file conflicts by keeping all lines, and took the done state of each request checkbox. Accepted the `metrics_spec.json` deletion. Check: the merged web-server image builds; the import sweep (752/625 OK, 0 removed-package errors) and URL map (315 rules) are byte-identical to the scratch `trim`; `tests/web` and `tests/druid` 3 passed (uv, Python 3.8); `tests/infra` 79 passed (uv, Python 3.13).
 - 2026-10-05 backend-5, reviewer fix: deleted the tool chain for the removed `/graphql` endpoint. That is `scripts/db/graphql/sync_schema.sh`, which introspected `http://0.0.0.0:5000/graphql` into `graphql/v2/schema.graphql`, the `graphql/v2/` snapshot of the graphene schema, and the `relay-web` npm script in `package.json`. `relay.config.js` and the `relay` script use `graphql/schema.graphql`, which stays. `graphqurl` stays, because `scripts/db/hasura/dev/sync_graphql_schema.sh` still runs `gq`. Check: `git grep -E "relay-web|graphql/v2|sync_schema\.sh|scripts/db/graphql"` over every tracked file (including Makefile, docs, `package.json` and CI) matches nothing outside this WP file; `package.json` parses as JSON.
 - 2026-10-05 core-2 unit 6 (review fixes 5-9): merged backend `d0c8f78`. Corrected the `/graphql` reference claim. Recorded the aniso8601 change. Replaced the bulky TSVs with summaries and reran the web sweep with `DRUID_HOST`. Removed the layout-asserting druid test, because WP-8b may add files under `resources/`; the native-indexing import test is kept. Ticked the lead request. Check: rerun web sweep with `DRUID_HOST` gives base 759/690 OK and merged 752/683 OK, 0 removed-package errors, diff = 7 deleted modules; `tests/web` + `tests/druid` 2 passed; ruff and black clean on the edited test.
+- 2026-10-05 core-2 unit 7: merged infra `318cd18` (fast-forward), then `mig/integration` (`.playwright-mcp` not tracked). Recorded the WP-2f hand-off under Merge order. Check: the web-server image rebuilt from the final tree builds (exit 0); the `DRUID_HOST` sweep gives 752 modules, 683 OK, 0 removed-package errors, identical to unit 6; the URL map gives 315 rules, identical to unit 5; `tests/web` + `tests/druid` 2 passed (uv, Python 3.8); `tests/infra` 79 passed (uv, Python 3.13); `tests/golden` 269 passed (`uv run pytest`, project env).
 
 ## Evidence
 
@@ -346,6 +360,19 @@ This was run on the merged head, which holds all four side branches plus `mig/in
   - `test_native_indexing_imports_without_druid` stays.
   - Check: `uvx ruff check` and `black==22.6.0 -S --check` are clean. `tests/web` and `tests/druid` give **2 passed** (uv, Python 3.8, merged requirements).
 - **Item 9.** The lead request is ticked. The phase 0d text and the `.gitignore` edit are on `mig/integration`, and the orphaned `#Dask` comment is noted.
+
+### core-2 unit 7: the final integrated tree
+
+The tree is the merged head after infra `318cd18` and `mig/integration`, exported with `git archive HEAD` to `/tmp/wp0d-core2/merged2`. The image was built with `DOCKER_NAMESPACE=local/wp0d-core2-merged2 DOCKER_TAG=merged2 docker compose -p wp0d-core2-merged2 -f docker-compose.build.yaml build web-server`.
+
+| Check | Result |
+|---|---|
+| web-server image build | exit 0, with the same pre-existing `typing-extensions` warning. CPython still installs `gspread`, because the marker excludes it only under PyPy. |
+| Import sweep, `DRUID_HOST=http://druid.invalid` | 752 modules, 683 OK, 0 removed-package errors, 0 stop at `DRUID_HOST`. Byte-identical to unit 6's merged run ([`sweep-web-summary.txt`](WP-0d-evidence/sweep-web-summary.txt), run 2). |
+| URL map | 315 rules, 247 `/api2`, `/api/timeout api.timeout_session POST` present, no `/graphql`. Byte-identical to unit 5 ([`routes-summary.txt`](WP-0d-evidence/routes-summary.txt)). |
+| `tests/web` + `tests/druid` (uv, Python 3.8, requirements rebuilt from this tree) | 2 passed |
+| `tests/infra` (uv, Python 3.13) | 79 passed |
+| `tests/golden` (`uv run pytest tests/golden`, project env from `mig/integration`) | 269 passed |
 
 ### data-platform-2: the Hadoop ingestion path is deleted
 

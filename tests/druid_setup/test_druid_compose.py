@@ -52,8 +52,15 @@ def render(tmp_path, setup, env=None, unset=()):
         values.pop(key, None)
     return subprocess.run(
         [
-            'docker', 'compose', '--env-file', env_file, '-f', compose_file,
-            'config', '--format', 'json',
+            'docker',
+            'compose',
+            '--env-file',
+            env_file,
+            '-f',
+            compose_file,
+            'config',
+            '--format',
+            'json',
         ],
         capture_output=True,
         text=True,

@@ -1,6 +1,7 @@
 '''This module is responsible for managing CRUD requests against the Query Policy API and also for
 converting query policies into Druid Filters which are used to restrict query access.
 '''
+
 from collections import defaultdict
 from functools import wraps
 from datetime import datetime
@@ -60,39 +61,49 @@ def apply_authorization_filters():
     def filter_query(run_query):
         @wraps(run_query)
         def filter_query_inner(self, query):
-            if SuperUserPermission().can() or is_public_dashboard_user():
-                # NOTE: Since we are not using the standard authorization path, it is
-                # possible that Site Administrator queries may be inadvertently filtered.
-                # All other users will be expected to have a defined Query Policy to control what
-                # data they are allowed to view.
-                # NOTE: We also skip this for unregistered users when
-                # public access is turned on
-                return run_query(self, query)
-
-            updated_query = restrict_query_filter_to_user_permissions(query)
-            return run_query(self, updated_query)
+            policy_filter = caller_policy_filter()
+            if policy_filter is not None:
+                query.query_filter = and_policy_filter(
+                    query.query_filter, policy_filter
+                )
+                # A query-modifying aggregation (ExactUniqueCount) rebuilds its
+                # inner query from dimension_filter and drops query_filter.
+                if hasattr(query, 'dimension_filter'):
+                    query.dimension_filter = and_policy_filter(
+                        query.dimension_filter, policy_filter
+                    )
+            return run_query(self, query)
 
         return filter_query_inner
 
     return filter_query
 
 
-def restrict_query_filter_to_user_permissions(query, user_identity=None):
-    '''Returns a Druid filter that has been injected with a security filter that
-    accounts for the QueryPolicies a given user has been given.
+def caller_policy_filter():
+    '''The current caller's query policy as a Druid filter, or None when no policy
+    limits what they see.
+
+    Site administrators and, when public access is on, unregistered users have no
+    policy. Every other user sees only what their Query Policies allow.
+    NOTE: an API token issued to a site administrator keeps the administrator role,
+    so the token's own query_needs do not narrow it here.
     '''
-    user_identity = user_identity or g.identity
-    authorization_filter = _construct_authorization_filter(user_identity)
+    if SuperUserPermission().can() or is_public_dashboard_user():
+        return None
 
-    # Take the logical AND of the original query filter with all the filters
-    # referring to the query policies held by the user.
-    if authorization_filter and not isinstance(authorization_filter, EmptyFilter):
-        query_filter = query.query_filter
-        query.query_filter = Filter(
-            type=AND_FILTER_SYMBOL, fields=[query_filter, authorization_filter]
-        )
+    authorization_filter = _construct_authorization_filter(g.identity)
+    if not authorization_filter or isinstance(authorization_filter, EmptyFilter):
+        return None
+    return authorization_filter
 
-    return query
+
+def and_policy_filter(query_filter, policy_filter):
+    '''The query filter ANDed with a policy filter, as a new filter.'''
+    # EmptyFilter builds as null, and Druid rejects a null AND operand.
+    if query_filter is None or isinstance(query_filter, EmptyFilter):
+        return policy_filter
+    # Not `&`: pydruid appends into an existing "and" filter in place.
+    return Filter(type=AND_FILTER_SYMBOL, fields=[query_filter, policy_filter])
 
 
 def enumerate_query_needs(user_identity=None):
@@ -320,12 +331,19 @@ def construct_query_need_from_policy(query_policy):
 
 
 class AuthorizedQueryClient:
+    '''The query client for user requests.
+
+    run_query ANDs the caller's policy into the query builder's query_filter and,
+    for groupBy builders, its dimension_filter, which query-modifying aggregations
+    rebuild from. A query whose Druid filter comes from anywhere else (a raw dict,
+    a nested dataSource built outside the builder) is not covered, so the client
+    has no run_raw_query: code that sends raw queries holds the system client and
+    must take no user input.
+    '''
+
     def __init__(self, query_client):
-        self.query_client = query_client
+        self._query_client = query_client
 
     @apply_authorization_filters()
     def run_query(self, query):
-        return self.query_client.run_query(query)
-
-    def run_raw_query(self, query):
-        return self.query_client.run_raw_query(query)
+        return self._query_client.run_query(query)

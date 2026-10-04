@@ -1,0 +1,2 @@
+- [Pipeline suite runtime](pipeline_suite_runtime.md) — run step scripts on py3.9 or pypy3.9 via tests/pipeline/run.sh; 3.12+ breaks config import
+- [Worktree guard and Bash](worktree_guard_bash.md) — commands the isolation guard refuses and how to phrase them instead

@@ -76,6 +76,7 @@ All five units are done.
 | Signed-in UI operations (all 51 compiled) | Hasura admin | role `user`; identical responses (Evidence 4) | INV-3 | no change |
 | Signed-in access to 28 tables the UI never uses (`dashboard`, `alert_definitions`, `case*`, `pipeline_entity*`, ...) | read and write as admin | none | INV-3 | **tightened on purpose; human acceptance requested** |
 | Signed-out visitors, public access on | any query or mutation via a smuggled second operation | reads of 6 public columns only | INV-3 | **tightened on purpose** |
+| Hasura metadata API, including `run_sql` (`/v1/metadata`, `/v1/query`, `/v2/query`) | reachable by anyone who could reach port 8088, with no secret | reachable with the secret only, from inside the Compose network; returns 401 without it; the port is not published | INV-3 | **tightened on purpose**. It stays enabled because `apply_metadata_snapshot.py` needs it, so the admin secret is equivalent to database access and must be handled as such |
 | Error bodies | admin errors can carry `extensions.internal` (SQL and statement detail) | users are not admin, so it is withheld | INV-3 (information) | reported by the reviewer. My probes (constraint violation, data exception, invalid regex) showed the same body on both sides, so the difference only shows for error classes Hasura reports with `internal` |
 | Per-permission checks (`can_view_data_catalog` and others) on GraphQL edits | not enforced | not enforced | INV-3 | unchanged; WP-5e |
 
@@ -139,7 +140,7 @@ None.
   +    '@sha256:18b39122f207afa4fe7116acaa6484ddac69c2160fde0571e3a27abf924e0bec'
   ```
 
-  Also consider asserting `HASURA_GRAPHQL_ENABLED_APIS == 'graphql,metadata'` in that test. I verified the exact values on the CE image (Evidence 10): relay, `/v1/graphql` and metadata apply all work, and `/v1/config`, `/v2/query`, pg_dump, `/dev/*`, `/v1/metrics` and `/console` return 404. The parity replay passes with them. `start_hasura.sh` (dev, mine) already uses the CE digest.
+  Also consider asserting `HASURA_GRAPHQL_ENABLED_APIS == 'graphql,metadata'` in that test. I verified the exact values on the CE image (Evidence 10): relay, `/v1/graphql` and metadata apply all work, and `/v1/config`, pg_dump, `/dev/*`, `/v1/metrics` and `/console` return 404. `/v2/query` and `/v1/query` stay reachable with the secret, as part of the metadata API (see the correction below). The parity replay passes with them. `start_hasura.sh` (dev, mine) already uses the CE digest.
   - infra-4: done on `mig/WP-0a-lock-down-hasura-infra` exactly as written, plus the suggested `HASURA_GRAPHQL_ENABLED_APIS` assertion (Evidence 13).
     **Correction to Evidence 10:** `/v2/query` and `/v1/query` are part of the metadata API, so they stay enabled. With the admin secret, `run_sql` on either returns 200. Without it, `/v2/query` returns 401. Hasura cannot enable `/v1/metadata` without them, so they stay reachable by anyone holding the admin secret.
 - [ ] frontend-platform: regenerate six Relay artifacts against the new `graphql/schema.graphql` (role `user`):
@@ -221,7 +222,8 @@ Environment: throwaway Postgres 16 with all 142 Alembic revisions applied (`flas
 10. **Round 2: CE image and enabled APIs.** `hasura/graphql-engine:v2.45.8-ce.cli-migrations-v2@sha256:18b39122f207afa4fe7116acaa6484ddac69c2160fde0571e3a27abf924e0bec` with `HASURA_GRAPHQL_ENABLED_APIS=graphql,metadata`:
     - `/v1/version` returns `{"server_type":"ce","version":"v2.45.8-ce"}`. The startup log has no `license_info` line, which the non-CE tag logs.
     - As `user`, `/v1beta1/relay` and `/v1/graphql` both answer `{"__typename":"query_root"}`, and `apply_metadata_snapshot.py` applies (it uses `/v1/metadata`).
-    - `/v1/config`, `/v2/query`, `/v1alpha1/pg_dump`, `/dev/plan_cache`, `/v1/metrics` and `/console` all return 404.
+    - `/v1/config`, `/v1alpha1/pg_dump`, `/dev/plan_cache`, `/v1/metrics` and `/console` all return 404.
+    - Correction: my `/v2/query` probe sent a GET, which returned 404. infra-4's POST shows that `/v2/query` and `/v1/query` (including `run_sql`) stay enabled as part of the metadata API. They return 200 with the admin secret and 401 without it (Evidence 13).
     - `get_inconsistent_metadata` returns `is_consistent: true`. `check_role_permissions.py` reports 0 failures.
     - Parity replay against this exact configuration, compared with main on v2.11.3: `57 steps, 0 failed`, `0 differences`. The v2.11.3 run with the branch metadata and the same enabled-APIs setting gives the same result.
     - `start_hasura.sh` starts the CE digest bound to `127.0.0.1:8088`.

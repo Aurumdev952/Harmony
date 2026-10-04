@@ -190,13 +190,11 @@ db.druid.config	OK
 db.druid.datasource	OK
 db.druid.errors	OK
 db.druid.indexing.common	OK
-db.druid.indexing.legacy_task_builder	OK
 db.druid.indexing.minio_task_builder	OK
 db.druid.indexing	OK
 db.druid.indexing.scripts.fetch_status	OK
 db.druid.indexing.scripts	OK
 db.druid.indexing.scripts.run_compaction	OK
-db.druid.indexing.scripts.run_indexing	OK
 db.druid.indexing.scripts.run_native_indexing	OK
 db.druid.indexing.task_runner_util	OK
 db.druid.js_formulas.base_formula	OK

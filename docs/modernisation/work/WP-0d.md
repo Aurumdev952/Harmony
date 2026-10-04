@@ -112,7 +112,7 @@ At the lead's instruction on 2026-10-04, this branch merges `mig/decisions-0001-
   4. frontend-platform `ae5d798`
   5. `mig/integration`
 - The infra trim must never land without the backend deletion. Without it, `_register_routes` fails with `No module named 'flask_graphql'`.
-- The `etl-pipeline` image builds only once WP-0b's MinIO fix (`mig/WP-0b-ports-secrets-pins`) is merged. Until then, it stops at the `mc` download with HTTP 410, the same as on `main`. With WP-0b's Dockerfile, infra-5 built it with exit 0, and the PyPy step now installs the `cryptography 41.0.7` pp38 wheel. Merge WP-0b before, or together with, WP-0d.
+- The `etl-pipeline` image builds only once WP-0b's MinIO fix (`mig/WP-0b-ports-secrets-pins`) is merged. Until then, it stops at the `mc` download with HTTP 410, the same as on `main`. With WP-0b's Dockerfile, infra-5 built it with exit 0. The PyPy step skips `gspread`, so it installs no `cryptography` at all. Merge WP-0b before, or together with, WP-0d.
 
 ## Contract changes
 
@@ -143,7 +143,7 @@ Each request is the exact change verified in unit 4. The combined diff was appli
     - On the merged branch, `git grep metrics_spec` outside `docs/` and `.claude/` finds nothing.
     - Native ingestion builds its spec from `common.py`, so ingested metrics do not change.
 - [x] **frontend-platform** (done on `mig/WP-0d-dead-backend-code-frontend`): delete `web/client/util/graphql/zen_environment.js`. In `web/client/util/graphql/index.jsx`, delete the line `import zenEnvironment from 'util/graphql/zen_environment';` and the `zenEnvironment,` export entry. This can land in WP-0e.
-- [x] **infra (found during verification; already broken on `main`, not caused by this WP)**: the `etl-pipeline` image does not build. infra-5 on `mig/WP-0d-dead-backend-code-infra`: PyPy failure fixed with `cryptography==41.0.7 ; platform_python_implementation == 'PyPy'` in `requirements-pipeline.txt`. The MinIO 410 is fixed on WP-0b's branch (`mig/WP-0b-ports-secrets-pins`) and is not duplicated here, so this branch's own pipeline build still stops at the `mc` download until WP-0b lands.
+- [x] **infra (found during verification; already broken on `main`, not caused by this WP)**: the `etl-pipeline` image does not build. infra-5 on `mig/WP-0d-dead-backend-code-infra`: PyPy failure fixed by marking `gspread>=5.4.0 ; platform_python_implementation != 'PyPy'` in `requirements.txt`. gspread, through google-auth, was the only thing that pulled `cryptography` into the PyPy venv, and nothing in the repo imports gspread. An earlier `cryptography==41.0.7` PyPy pin installed but aborted PyPy 7.3.9 on import (QA finding), so it was dropped. The MinIO 410 is fixed on WP-0b's branch (`mig/WP-0b-ports-secrets-pins`) and is not duplicated here, so this branch's own pipeline build still stops at the `mc` download until WP-0b lands.
   - `docker/pipeline/Dockerfile:29-36` downloads the MinIO client from `https://dl.minio.io/client/mc/release/linux-*/mc`. That URL now returns `HTTP 410 Gone`, so the `downloader` stage fails with `wget` exit 8. This breaks INV-1 for the pipeline image.
   - Suggested fix: pin a versioned `mc` release URL with a SHA-256 check (SEC-9), or copy it from a pinned `minio/mc` image. WP-0b may be the natural home.
   - **Second, independent failure.** Once `mc` is stubbed, the PyPy step fails (`docker/pipeline/Dockerfile:153-159`).
@@ -164,14 +164,15 @@ Each request is the exact change verified in unit 4. The combined diff was appli
 - 2026-10-04 core-2 unit 4: verified combined change in scratch copy; check: web-server base/trim build exit 0, sweep diff = deleted modules only, URL map diff = `/graphql` only (Potion 247/247); pipeline CPython install passes base and trim, trimmed sweep 0 removed-package errors; pipeline image itself broken on `main` (mc 410, PyPy maturin), reported to infra.
 - 2026-10-04 backend-5: deleted `web/server/routes/graphql_api.py`, the `web/server/graphql/` package and the three `_register_routes` lines in `web/server/app.py`. Added `tests/web/test_graphql_endpoint_removed.py`, plus `tests/web/conftest.py` byte-identical to WP-0c's. Check: the test failed before the deletion (`/graphql` in the rule set) and passes after, in a Python 3.8 env built from `requirements*.txt` minus graphene, Flask-GraphQL and Flask-Admin (none importable); `web.server.app` imports there; `route_map.py` gives 316 rules before and 315 after, the only diff is `/graphql graphql.graphql DELETE,GET,POST,PUT`, and both outputs match core-2's `routes-base.tsv` and `routes-trim.tsv` exactly (247 `/api2` rules; `/api/timeout api.timeout_session POST` present). `git grep` for `graphql_api`, `web.server.graphql`, `GraphqlPageRouter`, `flask_graphql` and `graphene` outside `docs/` finds only the infra-owned `requirements-web.txt` and `mypy.ini` lines.
 - 2026-10-04 infra-5 unit 1: trimmed the four requirements files, the 4 mypy sections and the `segment` logger (commit `WP-0d: drop requirements, mypy sections and logger for removed packages`); check: removed-package grep 0 importers outside the backend-deleted modules, web-server image built, sweep and URL map match core-2's trim once the backend deletion is overlaid.
-- 2026-10-04 infra-5 unit 2: pinned `cryptography==41.0.7` for PyPy in `requirements-pipeline.txt`; check: scratch pipeline build with WP-0b's Dockerfile exit 0, PyPy step installs the pp38 wheel, PyPy and CPython sweeps have 0 removed-package errors. Real-branch pipeline build stops at the `mc` 410, which WP-0b fixes.
+- 2026-10-04 infra-5 unit 2 (superseded): pinned `cryptography==41.0.7` for PyPy. QA at 5f3e040 found it installs but `import cryptography.x509`, `google.auth.crypt` and `gspread` abort PyPy 7.3.9 with `Fatal RPython error: AssertionError` (reproduced by infra-5: exit 139).
+- 2026-10-04 infra-5 unit 3: replaced the pin with `gspread ; platform_python_implementation != 'PyPy'` in `requirements.txt`, and removed the dead `[mypy-graphql_relay.*]` section; check: scratch pipeline build with WP-0b's Dockerfile exit 0, PyPy step (`#17 DONE 156.9s`) installs no cryptography/google-auth/gspread and `pip check` is clean, PyPy and CPython sweeps have 0 removed-package errors. Real-branch pipeline build still stops at the `mc` 410 until WP-0b lands.
 - 2026-10-04 data-platform-2: deleted the Hadoop ingestion path (`db/druid/indexing/resources/`, `legacy_task_builder.py`, `scripts/run_indexing.py`) on `mig/WP-0d-dead-backend-code-druid` and added `tests/druid/test_hadoop_ingestion_removed.py`; check: grep report has 0 references outside the deleted files, `db/druid` import sweep 41/41 OK, the new test passes on the branch and fails on the pre-deletion tree.
 - 2026-10-04 frontend-platform-2: deleted `web/client/util/graphql/zen_environment.js` and its `zenEnvironment` re-export in `index.jsx` (branch `mig/WP-0d-dead-backend-code-frontend`); check: grep for `zen_environment|zenEnvironment` over `web` (excluding build output and node_modules, including flow-typed), `.flowconfig`, `relay.config.js`, `graphql/` and `package.json` finds nothing; Node 24.12 `yarn install --frozen-lockfile --ignore-scripts` then `yarn build` exit 0 with the same two webpack size warnings as before; `flow check` output identical before and after (19 errors); eslint on `index.jsx` clean; `commons` bundle 412 bytes smaller and no longer contains `fetch('/graphql')`, other entries +1 byte (module ids).
 - 2026-10-04 core-2 unit 5: merged backend `1e7cfa7`, infra `c310537`, data-platform `2ccbe74`, frontend-platform `ae5d798`, then `mig/integration`. Resolved the WP-file conflicts by keeping all lines, and took the done state of each request checkbox. Accepted the `metrics_spec.json` deletion. Check: the merged web-server image builds; the import sweep (752/625 OK, 0 removed-package errors) and URL map (315 rules) are byte-identical to the scratch `trim`; `tests/web` and `tests/druid` 3 passed (uv, Python 3.8); `tests/infra` 79 passed (uv, Python 3.13).
 
 ## Evidence
 
-### infra-5: requirements trim and PyPy pin
+### infra-5: requirements trim and PyPy fix
 
 Branch `mig/WP-0d-dead-backend-code-infra`, built from the WP branch with `mig/integration` merged. The six-file trim matches core-2's [`combined.diff`](WP-0d-evidence/combined.diff) line for line, plus `python-Levenshtein==0.12.1`.
 
@@ -198,23 +199,27 @@ Branch `mig/WP-0d-dead-backend-code-infra`, built from the WP branch with `mig/i
 
 **`etl-pipeline` image.**
 - **This branch as committed:** `DOCKER_NAMESPACE=local/wp0d-infra5 DOCKER_TAG=pipe docker compose -p wp0d-infra5-pipe -f docker-compose.build.yaml build etl-pipeline` stops at step `#8`, the `downloader` stage `mc` download, with `ERROR 410: Gone` (`wget` exit 8). This is the `main` breakage that WP-0b fixes. The build never reaches pip.
-- **Scratch copy** (`git archive HEAD`, never committed) with WP-0b's `docker/pipeline/Dockerfile` swapped in and `ENV PIP_DEFAULT_TIMEOUT=300` added after a transient PyPI read timeout. The harness diff is [`infra5-pipeline-harness.diff`](WP-0d-evidence/infra5-pipeline-harness.diff), and no requirement line differs from this branch. Image built, exit 0:
+- **Scratch copy** (a copy of the branch tree, never committed) with WP-0b's `docker/pipeline/Dockerfile` swapped in and `ENV PIP_DEFAULT_TIMEOUT=300` added after a transient PyPI read timeout. The harness diff is [`infra5-pipeline-harness.diff`](WP-0d-evidence/infra5-pipeline-harness.diff), and no requirement line differs from this branch. Image built, exit 0:
   - WP-0b's `mc` download and `sha256sum -c` passed.
-  - CPython venv step `#15 DONE 664.3s`.
-  - PyPy venv step `#17 DONE 276.2s`. It picked `cryptography-41.0.7-pp38-pypy38_pp73-manylinux_2_28_x86_64.whl`, and no maturin build ran.
-  - Installed `cryptography`: CPython 45.0.7 (unpinned, unchanged), PyPy 41.0.7.
-- **Import sweep** over `pipeline data util db config models log` in both venvs, run with `--network none` and dummy environment values:
+  - CPython venv step `#15 DONE 677.1s`.
+  - PyPy venv step `#17 DONE 156.9s`. Its only mention of the packages involved is `Ignoring gspread: markers 'platform_python_implementation != "PyPy"' don't match your environment`. No cryptography download, no sdist build and no maturin.
+  - PyPy venv: `pip list` has no `cryptography`, `google-auth`, `gspread`, `pyasn1` or `rsa`, and `pip check` reports `No broken requirements found.` The CPython venv is unchanged: `gspread 6.2.1`, `google-auth 2.50.0` and `cryptography 45.0.7`.
+- **Import sweep** over `pipeline data util db config models log` in both venvs, run with `--network none` and dummy environment values, on the WP branch tree (Hadoop files already deleted):
 
 | Venv | Modules | OK | Removed-package errors |
 |---|---|---|---|
-| CPython ([tsv](WP-0d-evidence/sweep-pipeline-infra5-cpython.tsv)) | 400 | 394 | 0 |
-| PyPy ([tsv](WP-0d-evidence/sweep-pipeline-infra5-pypy.tsv)) | 400 | 386 | 0 |
+| CPython ([tsv](WP-0d-evidence/sweep-pipeline-infra5-cpython.tsv)) | 398 | 392 | 0 |
+| PyPy ([tsv](WP-0d-evidence/sweep-pipeline-infra5-pypy.tsv)) | 398 | 384 | 0 |
 
-- The CPython sweep differs from core-2's trim sweep only by the two Hadoop modules (not overlaid) and `config.template.ui` (`MAPBOX_ACCESS_TOKEN` unset in my run).
-- The PyPy sweep has 8 more failures than CPython. Each one is a package that `requirements.txt` already excludes under PyPy: `pandas`, `psycopg2`, and `flask_login` through `flask-user`.
-- This is the first PyPy evidence for WP-0d. Before the pin, core-2 could not build the PyPy venv.
+- The CPython sweep differs from core-2's trim sweep only by `config.template.ui` (`MAPBOX_ACCESS_TOKEN` unset in my run).
+- The PyPy sweep has 8 more failures than CPython. Each one is a package that `requirements.txt` already excludes under PyPy: `pandas`, `psycopg2`, and `flask_login` through `flask-user`. No swept module imports gspread, google-auth or cryptography.
+- This is the first PyPy evidence for WP-0d. Before this fix, core-2 could not build the PyPy venv.
 
-**Why 41.0.7.** PyPI shows `pp38` wheels for cryptography up to 41.0.7 and none for 42.0.0 or later. Ubuntu 22.04's `pypy3` is PyPy 7.3.9 (Python 3.8). 41.0.7 also has `pp39` and `pp310` wheels for x86_64 and aarch64. The pin therefore also suits the dev image's PyPy 7.3.11 (Python 3.9), which installs the same file and would otherwise hit the same maturin build once cryptography passes 43.x. Restricting the pin with a PyPy marker leaves CPython's resolution unchanged.
+**Why the marker and not a pin.**
+- The first fix pinned `cryptography==41.0.7` under PyPy. It was the last release with pp38 wheels, and it installed. Importing it, however, aborts Ubuntu 22.04's PyPy 7.3.9 with `Fatal RPython error: AssertionError PyThreadState_Swap()`. QA saw exit 134, and infra-5 reproduced it with exit 139 on `cryptography.x509`, `google.auth.crypt` and `gspread`.
+- QA's reverse-dependency check found that gspread, through google-auth, is the only reason cryptography enters the PyPy venv. A grep for `gspread`, `google.auth`, `google.oauth2` and `oauth2client` across the repo, outside docs, finds no importer at all. Leaving gspread out of PyPy therefore costs nothing and removes the native extension.
+- The same marker applies to the dev image's PyPy 7.3.11 install.
+- Whether to delete gspread outright, since it is also unused under CPython, is a separate call that WP-0d does not make.
 
 ### Unit 2: the targets are dead
 

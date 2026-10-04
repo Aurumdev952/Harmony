@@ -46,7 +46,9 @@ boto3==1.16.25
 SQLAlchemy==1.3.24
 related>=0.7.0
 attrs==21.4.0
-gspread>=5.4.0
+# gspread pulls in google-auth and cryptography. Importing cryptography aborts
+# PyPy 7.3.9, and no pipeline code imports gspread.
+gspread>=5.4.0 ; platform_python_implementation != 'PyPy'
 
 # With PyPy shapely ends up pulling in numpy 1.21.0, for when we get to the pipeline step, so not sure why we 
 # don't use the same version for both.

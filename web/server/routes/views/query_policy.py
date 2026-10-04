@@ -1,6 +1,7 @@
 '''This module is responsible for managing CRUD requests against the Query Policy API and also for
 converting query policies into Druid Filters which are used to restrict query access.
 '''
+
 from collections import defaultdict
 from functools import wraps
 from datetime import datetime
@@ -60,36 +61,34 @@ def apply_authorization_filters():
     def filter_query(run_query):
         @wraps(run_query)
         def filter_query_inner(self, query):
-            if SuperUserPermission().can() or is_public_dashboard_user():
-                # NOTE: Since we are not using the standard authorization path, it is
-                # possible that Site Administrator queries may be inadvertently filtered.
-                # All other users will be expected to have a defined Query Policy to control what
-                # data they are allowed to view.
-                # NOTE: We also skip this for unregistered users when
-                # public access is turned on
-                return run_query(self, query)
-
-            updated_query = restrict_query_filter_to_user_permissions(query)
-            return run_query(self, updated_query)
+            policy_filter = caller_policy_filter()
+            if policy_filter is not None:
+                query.query_filter = and_policy_filter(
+                    query.query_filter, policy_filter
+                )
+            return run_query(self, query)
 
         return filter_query_inner
 
     return filter_query
 
 
-def restrict_query_filter_to_user_permissions(query, user_identity=None):
-    '''Returns a Druid filter that has been injected with a security filter that
-    accounts for the QueryPolicies a given user has been given.
+def caller_policy_filter():
+    '''The current caller's query policy as a Druid filter, or None when no policy
+    limits what they see.
+
+    Site administrators and, when public access is on, unregistered users have no
+    policy. Every other user sees only what their Query Policies allow.
+    NOTE: an API token issued to a site administrator keeps the administrator role,
+    so its own query_needs do not narrow it here (open item in WP-0c).
     '''
-    user_identity = user_identity or g.identity
-    authorization_filter = _construct_authorization_filter(user_identity)
+    if SuperUserPermission().can() or is_public_dashboard_user():
+        return None
 
-    # Take the logical AND of the original query filter with all the filters
-    # referring to the query policies held by the user.
-    if authorization_filter and not isinstance(authorization_filter, EmptyFilter):
-        query.query_filter = and_policy_filter(query.query_filter, authorization_filter)
-
-    return query
+    authorization_filter = _construct_authorization_filter(g.identity)
+    if not authorization_filter or isinstance(authorization_filter, EmptyFilter):
+        return None
+    return authorization_filter
 
 
 def and_policy_filter(query_filter, policy_filter):

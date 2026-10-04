@@ -69,13 +69,7 @@ class ApiRouter:
     ):
         self.template_renderer = template_renderer
         self.configuration_module = configuration_module
-
-        if not fields_api:
-            row_count_lookup = current_app.druid_context.row_count_lookup
-
-            fields_api = FieldsApi(row_count_lookup)
-
-        self.fields_api = fields_api
+        self.fields_api = fields_api or FieldsApi()
 
     @authentication_required(is_api_request=True)
     def api_is_authorized(self):
@@ -111,12 +105,12 @@ class ApiRouter:
 
     @authentication_required(is_api_request=True)
     def api_field_info(self, field_ids):
-        field_ids_sep = set(field_ids.split(','))
-        ret = {}
-        for field_id in field_ids_sep:
-            summary = self.fields_api.get_field_summary(field_id)
-            ret[field_id] = summary.to_json()
-        return jsonify(Success(ret))
+        summaries = self.fields_api.get_field_summaries(set(field_ids.split(',')))
+        return jsonify(
+            Success(
+                {field_id: summary.to_json() for field_id, summary in summaries.items()}
+            )
+        )
 
     def timeout_user_session(self):
         automatic_signout_enabled = get_configuration(AUTOMATIC_SIGN_OUT_KEY)

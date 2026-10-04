@@ -1,0 +1,251 @@
+[
+  {
+    "aggregations": [
+      {
+        "aggregator": {
+          "fieldName": "count",
+          "name": "case_fatality_rate_female__count",
+          "type": "longSum"
+        },
+        "filter": {
+          "fields": [
+            {
+              "fields": [
+                {
+                  "dimension": "Sex",
+                  "type": "selector",
+                  "value": "F"
+                },
+                {
+                  "dimension": "field",
+                  "type": "selector",
+                  "value": "yellow_fever_cases"
+                }
+              ],
+              "type": "and"
+            },
+            {
+              "fields": [
+                {
+                  "dimension": "Sex",
+                  "type": "selector",
+                  "value": "F"
+                },
+                {
+                  "fields": [
+                    {
+                      "dimension": "Death",
+                      "type": "selector",
+                      "value": "1"
+                    },
+                    {
+                      "dimension": "field",
+                      "type": "selector",
+                      "value": "yellow_fever_cases"
+                    }
+                  ],
+                  "type": "and"
+                }
+              ],
+              "type": "and"
+            }
+          ],
+          "type": "or"
+        },
+        "type": "filtered"
+      },
+      {
+        "aggregator": {
+          "fieldName": "sum",
+          "name": "cases__case_fatality_rate_female",
+          "type": "doubleSum"
+        },
+        "filter": {
+          "fields": [
+            {
+              "dimension": "Sex",
+              "type": "selector",
+              "value": "F"
+            },
+            {
+              "dimension": "field",
+              "type": "selector",
+              "value": "yellow_fever_cases"
+            }
+          ],
+          "type": "and"
+        },
+        "type": "filtered"
+      },
+      {
+        "aggregator": {
+          "fieldName": "count",
+          "name": "cases__case_fatality_rate_female__count",
+          "type": "longSum"
+        },
+        "filter": {
+          "fields": [
+            {
+              "dimension": "Sex",
+              "type": "selector",
+              "value": "F"
+            },
+            {
+              "dimension": "field",
+              "type": "selector",
+              "value": "yellow_fever_cases"
+            }
+          ],
+          "type": "and"
+        },
+        "type": "filtered"
+      },
+      {
+        "aggregator": {
+          "fieldName": "sum",
+          "name": "deaths__case_fatality_rate_female",
+          "type": "doubleSum"
+        },
+        "filter": {
+          "fields": [
+            {
+              "dimension": "Sex",
+              "type": "selector",
+              "value": "F"
+            },
+            {
+              "fields": [
+                {
+                  "dimension": "Death",
+                  "type": "selector",
+                  "value": "1"
+                },
+                {
+                  "dimension": "field",
+                  "type": "selector",
+                  "value": "yellow_fever_cases"
+                }
+              ],
+              "type": "and"
+            }
+          ],
+          "type": "and"
+        },
+        "type": "filtered"
+      },
+      {
+        "aggregator": {
+          "fieldName": "count",
+          "name": "deaths__case_fatality_rate_female__count",
+          "type": "longSum"
+        },
+        "filter": {
+          "fields": [
+            {
+              "dimension": "Sex",
+              "type": "selector",
+              "value": "F"
+            },
+            {
+              "fields": [
+                {
+                  "dimension": "Death",
+                  "type": "selector",
+                  "value": "1"
+                },
+                {
+                  "dimension": "field",
+                  "type": "selector",
+                  "value": "yellow_fever_cases"
+                }
+              ],
+              "type": "and"
+            }
+          ],
+          "type": "and"
+        },
+        "type": "filtered"
+      }
+    ],
+    "context": {
+      "resultAsArray": true
+    },
+    "dataSource": "harmony_demo_20260101",
+    "dimensions": [
+      "StateName"
+    ],
+    "filter": {
+      "fields": [
+        {
+          "dimension": "__time",
+          "intervals": [
+            "2024-01-01/2024-04-01"
+          ],
+          "type": "interval"
+        },
+        {
+          "field": {
+            "dimension": "StateName",
+            "type": "selector",
+            "value": ""
+          },
+          "type": "not"
+        },
+        {
+          "fields": [
+            {
+              "fields": [
+                {
+                  "dimension": "Death",
+                  "type": "selector",
+                  "value": "1"
+                },
+                {
+                  "dimension": "Sex",
+                  "type": "selector",
+                  "value": "F"
+                },
+                {
+                  "dimension": "field",
+                  "type": "selector",
+                  "value": "yellow_fever_cases"
+                }
+              ],
+              "type": "and"
+            },
+            {
+              "fields": [
+                {
+                  "dimension": "Sex",
+                  "type": "selector",
+                  "value": "F"
+                },
+                {
+                  "dimension": "field",
+                  "type": "selector",
+                  "value": "yellow_fever_cases"
+                }
+              ],
+              "type": "and"
+            }
+          ],
+          "type": "or"
+        }
+      ],
+      "type": "and"
+    },
+    "granularity": "all",
+    "having": null,
+    "intervals": [
+      "2024-01-01/2024-04-01"
+    ],
+    "postAggregations": [
+      {
+        "expression": "deaths__case_fatality_rate_female / cases__case_fatality_rate_female * 100",
+        "name": "case_fatality_rate_female",
+        "type": "expression"
+      }
+    ],
+    "queryType": "groupBy"
+  }
+]

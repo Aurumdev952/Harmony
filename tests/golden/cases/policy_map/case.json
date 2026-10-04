@@ -1,0 +1,16 @@
+{
+  "description": "Map for a user restricted to Pará.",
+  "endpoint": "map",
+  "policy": {
+    "query_policies": [
+      {
+        "dimension": "StateName",
+        "dimension_value": "Pará"
+      },
+      {
+        "dimension": "source",
+        "dimension_value": null
+      }
+    ]
+  }
+}

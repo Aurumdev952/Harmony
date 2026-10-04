@@ -1,0 +1,33 @@
+{
+  "levels": [
+    "Sex"
+  ],
+  "root": {
+    "children": [
+      {
+        "children": [],
+        "dimension": "Sex",
+        "metrics": {
+          "yellow_fever_cases": 327.63,
+          "yellow_fever_cases__k2": 277.56
+        },
+        "name": "F"
+      },
+      {
+        "children": [],
+        "dimension": "Sex",
+        "metrics": {
+          "yellow_fever_cases": 330.0,
+          "yellow_fever_cases__k2": 209.0
+        },
+        "name": "M"
+      }
+    ],
+    "dimension": "",
+    "metrics": {
+      "yellow_fever_cases": 326.52,
+      "yellow_fever_cases__k2": 178.79
+    },
+    "name": "Overall"
+  }
+}

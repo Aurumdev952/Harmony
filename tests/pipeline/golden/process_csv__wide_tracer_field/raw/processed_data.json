@@ -3,3 +3,4 @@
 {"key": {"StateName": "Northvale", "MunicipalityName": "Brookline", "Age": "41", "Sex": "M", "Death": "SIM"}, "data": {"demo_malaria_positive": 1.75, "demo_malaria_tested": 2, "demo_facility_count": 1}, "Real_Date": "2021-05-20", "source": "demo_wide"}
 {"key": {"StateName": "Southmere", "MunicipalityName": "Cedar Point", "Age": "5", "Sex": "F", "Death": "NAO"}, "data": {"demo_malaria_positive": 7, "demo_malaria_tested": 7}, "Real_Date": "2021-06-30", "source": "demo_wide"}
 {"key": {"StateName": "Southmere", "MunicipalityName": "Lagoa \u00c1urea", "Age": "62", "Sex": "M", "Death": "NAO"}, "data": {"demo_malaria_positive": 1, "demo_malaria_tested": 3}, "Real_Date": "2021-07-04", "source": "demo_wide"}
+{"key": {"StateName": "Southmere", "MunicipalityName": "Lagoa \u00c1urea", "Age": "62", "Sex": "F", "Death": "NAO"}, "data": {"demo_malaria_positive": 0, "demo_malaria_tested": 6}, "Real_Date": "2021-07-05", "source": "demo_wide"}

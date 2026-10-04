@@ -1,0 +1,16 @@
+StateName,MunicipalityName,Sex,Age,Death,Date,field,val
+Northvale,Ashford,F,30,NAO,2021-03-01,Malaria Positive,4
+Northvale,Ashford,F,30,NAO,2021-03-01,Malaria Positive,3
+Northvale,Ashford,F,30,NAO,2021-03-01,Malaria Tested,0.1
+Northvale,Ashford,F,30,NAO,2021-03-01,Malaria Tested,0.2
+Northvale,Ashford,F,30,NAO,2021-03-01,Bed Nets,0
+Northvale,Ashford,F,30,NAO,2021-03-01,Referrals,0
+Northvale,Ashford,F,30,NAO,2021-03-01,%%%,5
+Northvale, Brookline ,M,41,NAO,2021-03-02,Malaria Positive,-2
+Northvale,Brookline,M,41,NAO,2021-03-02,Malaria Positive,
+Northvale,Brookline,M,41,NAO,2021-03-02,Bed Nets,0.0
+Southmere,Cedar Point,M,5,SIM,2021-04-10,Malaria Positive,1e3
+Southmere,Cedar Point,M,5,SIM,2021-04-10,Malaria Tested, 1.0
+Southmere,Lagoa Áurea,F,62,NAO,2021-04-11,Malaria Tested,2.50
+Southmere,,F,62,NAO,2021-04-11,Malaria Tested,7
+Westfold,Nowhere Creek,F,19,NAO,2021-04-12,Malaria Tested,9

@@ -244,16 +244,16 @@ up() {
   # The loader empties the extensions volume before downloading, and `up`
   # restarts it, so it runs alone and never beside a running Druid JVM. After a
   # reboot Docker restarts the JVMs (restart: always) on the loaded volume.
-  if ! druid_ready 2>/dev/null; then
-    if ! druid_jvms_running; then
-      druid_compose build extension_loader
-      druid_compose run --rm volumes-init
-      druid_compose up -d extension_loader
-      druid_compose wait extension_loader
-    fi
-    druid_compose up -d --no-deps "${DRUID_SERVICES[@]}"
-    wait_for 'Druid coordinator, broker, middlemanager and historical are up' 60 druid_ready
+  if ! druid_jvms_running; then
+    druid_compose build extension_loader
+    druid_compose run --rm volumes-init
+    druid_compose up -d extension_loader
+    druid_compose wait extension_loader
   fi
+  # Recreates only the services whose configuration changed, such as an edit
+  # to druid.override.yaml; segments stay in the named volumes.
+  druid_compose up -d --no-deps "${DRUID_SERVICES[@]}"
+  wait_for 'Druid coordinator, broker, middlemanager and historical are up' 60 druid_ready
   broker_sees_datasource || index_druid
   web_compose up -d --wait postgres redis
   web_compose up -d web

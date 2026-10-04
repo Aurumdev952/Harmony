@@ -8,16 +8,20 @@
 # - Images pinned to the digests WP-0b pins.
 # - Shared folder and segment cache in named volumes, not host paths.
 # - Smaller JVM floors and processing buffers so the stack fits a shared
-#   development host (Druid allocates merge buffers eagerly). These settings are
-#   part of the baseline method: compare only runs made with the same overlay.
+#   development host (Druid allocates merge buffers eagerly). The stock size is
+#   about 1 GiB (direct memory / (threads + merge buffers + 1)). 512 MiB
+#   answers every baseline case; 128 MiB fails dq_data_quality_table's 579
+#   theta sketches with "Not enough aggregation buffer space". These settings
+#   are part of the baseline method: compare only runs made with the same
+#   overlay.
 # - The broker writes a request log, which is where Druid-side query time
 #   comes from.
 # - A `druid` forwarder joins the web network (see druid_forward.py).
 
 x-perf-druid-env: &perf-druid-env
   DRUID_XMS: 512m
-  DRUID_MAXDIRECTMEMORYSIZE: 1g
-  druid_processing_buffer_sizeBytes: "134217728"
+  DRUID_MAXDIRECTMEMORYSIZE: 3g
+  druid_processing_buffer_sizeBytes: "536870912"
 
 x-druid-image: &druid-image apache/druid:0.23.0@sha256:ed9719968b4be3a2f1643907a1a5a5814e2ee1215f3604da8b2da2ac05f65912
 

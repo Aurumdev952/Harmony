@@ -116,5 +116,5 @@ None.
 | Role | Verdict | Notes |
 |---|---|---|
 | qa | approved | 2026-10-04 qa-0f: actionlint 38 to 0 reproduced; SHA pins, permissions, Makefile and hostile-filename simulation verified. PR run of integration.yml deferred until push; human to confirm Jenkinsfile. |
-| reviewer | changes-requested | 2026-10-04 rev-0f: pins, runners, permissions and env indirection correct. Fix: scope GH_TOKEN/PR_NUMBER to the list-changed-files steps; amend the Jenkins evidence (Docker Hub zengineering vs ghcr, README:390,429, hyphenated Makefile push targets, Hub images last pushed 2023-11-16); correct the false --cache-from and default-shell claims in WP and memory. |
+| reviewer | approved | 2026-10-04 rev-0f re-review at 9061ee6: all three findings closed; make build/up/down unchanged, make push targets the four services. Fix the 'honours DOCKER_IMAGE_PREFIX' sentence (WP-0f.md:82) before the PR; docker/build.sh and the hardcoded harmony- image names go to WP-3b. |
 | security | approved | 2026-10-04 sec-0f: SHA pins match tags and are signed upstream heads; zizmor 100 to 0, actionlint 38 to 0; least-privilege per job; no untrusted interpolation; nothing to rotate. Low: scope GH_TOKEN to the two list-changed-files steps (WP-2f); mutable :latest deploy tag (WP-0b/3b); retire any old Jenkins docker-io-credentials. |

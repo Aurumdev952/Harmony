@@ -77,6 +77,6 @@ None.
 
 | Role | Verdict | Notes |
 |---|---|---|
-| qa | pending | |
+| qa | changes-requested | 2026-10-04 qa-0g: fixture gitignored so 6/49 tests fail on a clean checkout; 0-session run reports gate pass; unbounded int() on UA digits crashes; Edge iOS Version/ token misclassifies; 'bot' matches CUBOT; quadratic regex on long non-matching lines. Findings consolidated by the lead. |
 | reviewer | pending | |
 | security | n/a | |

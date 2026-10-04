@@ -205,12 +205,16 @@ quote-style = "preserve"
 # CI applies this set to the Python files a PR changes, and E9, F63, F7 and F82
 # to the whole tree.
 select = ["E4", "E7", "E9", "F", "S"]
+# S603 and S607 flag every subprocess call, even a fixed argument list with no
+# shell; the shell=True rules (S602, S604, S605) stay on.
+ignore = ["S603", "S607"]
 
 [tool.ruff.lint.per-file-ignores]
 # Undefined names that are real bugs, left to their owners (WP-2f Requests).
 "scripts/druid/druid_task_memory_stats.py" = ["F821"]
 "util/unix.py" = ["F821"]
-"tests/**" = ["S101"]
+# Tests assert, and draw synthetic data from `random`.
+"tests/**" = ["S101", "S311"]
 
 [tool.mypy]
 files = ["web/server", "models", "db"]

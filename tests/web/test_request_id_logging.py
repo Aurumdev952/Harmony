@@ -316,9 +316,7 @@ def test_app_startup_logs_no_secret():
     }
     script = (
         'from web.server.app import create_app\n'
-        'from log.flask_request import install_request_logging\n'
         'app = create_app(skip_db_check=True)\n'
-        'install_request_logging(app)\n'
         "app.test_client().get('/', headers={'Authorization': 'Bearer x'})\n"
     )
     result = subprocess.run(

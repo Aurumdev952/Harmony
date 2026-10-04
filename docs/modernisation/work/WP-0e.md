@@ -125,5 +125,5 @@ None.
 | Role | Verdict | Notes |
 |---|---|---|
 | qa | approved | 2026-10-04 qa-0e: lockfile drops only the four packages; JS bundles identical except navbar source-map line; CSS loses exactly 111 plugin-only rules; rendered pages lose only dead script tags; every script URL resolves; headless Chromium console identical except removed 404s. Running-app check deferred to WP-2e; Alerts to the human. Note: auth/layout.html also extends layout.html (20 templates, not 18). |
-| reviewer | changes-requested | 2026-10-04 rev-0e: deletions correct, unreferenced and fully reproduced. WP-file fixes: list backend-3 and frontend-design-1 instances with their files (SPEC 7.2); correct the auth/ templates claim (auth/layout.html extends layout.html; /user/profile loses the tag) and add /user/profile to the WP-2e page list; navbarEntry.js:7 comment names .jsx; move the newUserButton note under Requests. Gate now accepts contributing roles (lead change), so no SPEC row edit is needed. |
+| reviewer | approved | 2026-10-04 rev-0e re-review at 3744e85: all findings closed; gate shows only status and verdict; auth render reproduced (23 to 21 templates, only the Bootstrap 5 tag removed); production unchanged apart from the comment fix. |
 | security | n/a | |

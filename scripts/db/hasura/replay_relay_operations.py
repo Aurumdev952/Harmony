@@ -7,6 +7,9 @@ mutations included. The normalised responses are written to `--out`. Pass
 `--compare` with an earlier output to diff two runs, for example main's proxy on
 Hasura v2.11 against this branch's proxy on Hasura v2.45.
 
+It works once per database: rows from the first run leave duplicate keys
+behind, so start each run from a fresh copy of the database.
+
 It creates, edits and deletes catalog, field setup and data upload rows, so it
 refuses to run unless `--disposable-database` is passed and the database is
 marked disposable:

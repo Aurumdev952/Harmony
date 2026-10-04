@@ -12,6 +12,7 @@ frontend ships (`web/client/**/__generated__/*.graphql.js`) against it:
 
 - every operation must validate for `user`;
 - the public-access operations must validate for `anonymous`;
+- `anonymous` must have no mutation root;
 - every other operation must fail to validate for `anonymous`, except those
   in ANONYMOUS_SUBSET_OPERATIONS, which read only public columns.
 
@@ -45,8 +46,9 @@ SRC_ROOT = Path(__file__).resolve().parents[3]
 ARTIFACT_GLOB = 'web/client/**/__generated__/*.graphql.js'
 PUBLIC_OPERATIONS = frozenset({'patchDimensionServiceQuery'})
 # Reads only dimension and dimension-category ids and names, a subset of what
-# the public query returns, so Hasura cannot tell them apart. The proxy still
-# refuses it for signed-out visitors by operation name.
+# the public query returns, so Hasura cannot tell them apart. The proxy only
+# checks that the query text starts with the public query, so a signed-out
+# visitor can smuggle this one in as a second operation; it reveals nothing new.
 ANONYMOUS_SUBSET_OPERATIONS = frozenset({'EditableCalculationQuery'})
 ROLES = ('user', 'anonymous')
 TEXT_PATTERN = re.compile(r'"text": ("(?:[^"\\]|\\.)*")')
@@ -107,6 +109,10 @@ def check(
 
     missing = (PUBLIC_OPERATIONS | ANONYMOUS_SUBSET_OPERATIONS) - operations.keys()
     failures.extend(f'public operation {name} not found' for name in missing)
+    if anonymous_schema.mutation_type is not None:
+        failures.append(
+            f'anonymous has a mutation root: {anonymous_schema.mutation_type.name}'
+        )
     return failures
 
 

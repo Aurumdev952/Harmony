@@ -1,0 +1,1 @@
+- [CI review facts](ci_review_facts.md): buildx cache-from CSV, default Actions shell, jq null, ghcr vs Docker Hub, and how to review CI branches under the worktree guard

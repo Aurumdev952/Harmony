@@ -64,6 +64,27 @@ None blocking. Two notes for the lead:
    - WP-8a needs a deployment that enables them, or a core-level unit test, to pin that extraction before removing it.
 4. **core (WP-1e): `data_quality` never runs outliers** (`query_models.py:266`). `dq_data_quality` pins today's three queries. WP-1e will change it with an INV-2 note.
 
+## Pending regeneration
+
+Not yet executed. Run this only when the lead confirms that WP-0c (branch `mig/WP-0c-pure-mistake-bugs-backend`, test 70ecd0e, fix 64dc60e) is on `mig/integration`. Until then the case keeps characterising today's code, and the suite must keep passing on `mig/integration`.
+
+**INV-2 note for `policy_include_all_all_time`:**
+- **Cause.** WP-0c changes `restrict_query_filter_to_user_permissions` to combine filters as `query_filter & policy`. `EmptyFilter.__and__` returns the policy alone, and a None query filter uses the policy itself.
+- **Before.** The posted Druid filter is `{"type": "and", "fields": [null, {"type": "in", "dimension": "StateName", "values": ["Acre"]}]}` (Findings, item 1).
+- **After.** The posted filter is the policy filter alone, `{"type": "in", "dimension": "StateName", "values": ["Acre"]}`.
+- **Why the new output is correct.** A real Druid broker rejected the old request, so no user ever saw a result from it. Nothing a user saw changes. The new query restricts rows exactly as the policy intends.
+- **Expected scope.**
+  - Only `policy_include_all_all_time/druid_query.json` should change.
+  - `druid_response.json` stays byte-identical. The synthetic broker's seed ignores the filter, and the filter rows are the same: the null operand was already ignored when the response was recorded.
+  - Therefore `expected_response.json` should stay byte-identical as well.
+  - If any other case or file changes, stop and report it. Do not commit it.
+- **Commands.**
+  1. On a branch containing WP-0c, run `uv run python tests/golden/record.py --check`. It must list only `policy_include_all_all_time/druid_query.json`.
+  2. Run `uv run python tests/golden/record.py policy_include_all_all_time`.
+  3. Run `uv run pytest tests/golden`.
+  4. Update the case description in `case.json` to drop the "a real broker rejects" sentence.
+  5. Record the diff here and ask the reviewer to accept it.
+
 ## Log
 
 - 2026-10-04 qa-1 unit 1: uv project on CPython 3.9.25; check: `uv sync` OK, all 12 query and data quality modules import in a bare app context (`IMPORT-OK`).

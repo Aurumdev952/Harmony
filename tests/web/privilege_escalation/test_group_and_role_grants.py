@@ -22,6 +22,20 @@ def fixture_db(app):
         yield app.extensions['sqlalchemy'].db
 
 
+@pytest.fixture(name='refusals')
+def fixture_refusals(caplog):
+    '''The WARNING audit lines of refused grants logged so far.'''
+    # The app logger does not propagate to the root logger caplog listens on.
+    app_logger = logging.getLogger('ZenysisLogger')
+    app_logger.addHandler(caplog.handler)
+    yield lambda: [
+        record.getMessage()
+        for record in caplog.records
+        if record.levelno == logging.WARNING and 'Refused grant' in record.getMessage()
+    ]
+    app_logger.removeHandler(caplog.handler)
+
+
 def _name(prefix: str) -> str:
     return f'{prefix}-{uuid.uuid4().hex[:8]}'
 
@@ -160,31 +174,24 @@ def test_group_admin_cannot_create_a_group_holding_the_admin_role(db, make_user)
     assert response.status_code == 403
     assert _group(db, name) is None
     assert _roles_of(db, actor) == {'group_admin'}
-    assert "['admin']" not in response.get_data(as_text=True)
+    # Neither the name nor the id: the caller cannot list the role.
+    body = response.get_data(as_text=True)
+    assert 'admin' not in body
+    assert _role_uri(db, 'admin') not in body
 
 
-def test_a_refused_grant_is_audited_with_the_caller(db, make_user, caplog):
+def test_a_refused_grant_is_audited_with_the_caller(db, make_user, refusals):
     actor = make_user(['group_admin'])
-    # The app logger does not propagate to the root logger caplog listens on.
-    app_logger = logging.getLogger('ZenysisLogger')
-    app_logger.addHandler(caplog.handler)
-    try:
-        actor.request(
-            'POST',
-            '/api2/group',
-            _group_body(_name('group'), roles=[_role_uri(db, 'admin')]),
-        )
-    finally:
-        app_logger.removeHandler(caplog.handler)
 
-    refusals = [
-        record.getMessage()
-        for record in caplog.records
-        if record.levelno == logging.WARNING and 'Refused grant' in record.getMessage()
-    ]
-    assert len(refusals) == 1
-    assert actor.username in refusals[0]
-    assert "['admin']" in refusals[0]
+    actor.request(
+        'POST',
+        '/api2/group',
+        _group_body(_name('group'), roles=[_role_uri(db, 'admin')]),
+    )
+
+    assert len(refusals()) == 1
+    assert actor.username in refusals()[0]
+    assert "'admin'" in refusals()[0]
 
 
 def test_group_admin_creates_a_group_with_a_role_it_holds_and_joins_it(db, make_user):
@@ -238,6 +245,22 @@ def test_admin_creates_a_group_holding_the_admin_role(db, make_user):
     assert [role.name for role in _group(db, name).roles] == ['admin']
 
 
+@pytest.mark.parametrize('narrowed', [False, True], ids=['full_session', 'narrowed'])
+def test_only_a_superuser_identity_sets_the_members_of_a_new_group(
+    app, db, make_user, narrowed
+):
+    # F4: the identity, not the account, decides whose `users` are kept.
+    admin = make_user(['admin'])
+    other = make_user()
+    name = _name('group')
+    client = _token_client(app, admin.username, _NARROWED_NEEDS if narrowed else None)
+
+    response = client.post('/api2/group', json=_group_body(name, users=[other]))
+
+    assert response.status_code == 200
+    assert _user_ids(_group(db, name)) == [admin.id if narrowed else other.id]
+
+
 def test_group_admin_cannot_create_a_group_holding_a_dashboard_it_cannot_share(
     db, make_user
 ):
@@ -281,6 +304,153 @@ def test_an_admin_token_narrowed_to_groups_cannot_grant_admin(app, db, make_user
 
     assert response.status_code == 403
     assert _group(db, group_name).roles == []
+
+
+# Every grant path decides "superuser" from the identity, not the account: an
+# admin account's token narrowed to the container permissions (no admin need,
+# no update_permissions, nothing on dashboards) is refused wherever a full admin
+# session succeeds.
+
+_NARROWED_NEEDS = [
+    *(
+        [permission, None, 'group']
+        for permission in ('view_resource', 'create_resource', 'edit_resource')
+    ),
+    ['update_users', None, 'group'],
+    *(
+        [permission, None, 'role']
+        for permission in ('view_resource', 'create_resource', 'edit_resource')
+    ),
+    ['view_resource', None, 'user'],
+    ['edit_resource', None, 'user'],
+    ['edit_user', None, 'site'],
+]
+
+
+def _token_client(app, username: str, needs=None):
+    '''A client with the `accessKey` cookie: the login page's token when `needs`
+    is None, otherwise a token narrowed to `needs` and no query needs.
+    '''
+    # pylint: disable=import-outside-toplevel
+    from flask_jwt_extended import create_access_token
+
+    from web.server.util.authentication import create_user_access_token
+
+    with app.test_request_context():
+        token = (
+            create_user_access_token(username)
+            if needs is None
+            else create_access_token(
+                identity=username, user_claims={'needs': needs, 'query_needs': []}
+            )
+        )
+    client = app.test_client()
+    client.set_cookie('localhost', 'accessKey', token)
+    return client
+
+
+def _is_admin(db, user) -> bool:
+    return 'admin' in _roles_of(db, user)
+
+
+def _group_create(db, _admin, other):
+    body = _group_body(_name('group'), roles=[_role_uri(db, 'admin')], users=[other])
+    return ('POST', '/api2/group', body), lambda: _is_admin(db, other)
+
+
+def _group_attach_admin(db, _admin, other):
+    group = _make_group(db, users=[other])
+    body = _group_body(group.name, roles=[_role_uri(db, 'admin')], users=[other])
+    return ('PATCH', f'/api2/group/{group.id}', body), lambda: _is_admin(db, other)
+
+
+def _group_patch_members(db, admin, other):
+    group = _make_group(db, roles=['admin'], users=[admin])
+    body = _group_body(group.name, roles=[_role_uri(db, 'admin')], users=[admin, other])
+    return ('PATCH', f'/api2/group/{group.id}', body), lambda: _is_admin(db, other)
+
+
+def _group_users_route(db, admin, other):
+    group = _make_group(db, roles=['admin'], users=[admin])
+    body = [admin.username, other.username]
+    return ('PATCH', f'/api2/group/{group.id}/users', body), lambda: _is_admin(
+        db, other
+    )
+
+
+def _group_acl(db, admin, other):
+    group = _make_group(db, users=[admin, other])
+    group_id, group_name = group.id, group.name
+    dashboard = _make_dashboard(db)
+    body = _group_body(
+        group_name, users=[admin, other], acls=[_acl('dashboard_admin', dashboard)]
+    )
+    return ('PATCH', f'/api2/group/{group_id}', body), lambda: bool(
+        _group(db, group_name).acls
+    )
+
+
+def _role_create(db, _admin, _other):
+    label = _name('role')
+    body = _role_body(label, permissions=[('SITE', 'view_admin_page')])
+    return ('POST', '/api2/role', body), lambda: _role_by_label(db, label) is not None
+
+
+def _role_add_policy(db, _admin, _other):
+    label = _name('role')
+    db.session.add(Role(name=label, label=label))
+    db.session.commit()
+    role_id = _role_by_label(db, label).id
+    body = _role_body(label, query_policies=[_policy(db, 'source', None)])
+    return ('PATCH', f'/api2/role/{role_id}', body), lambda: bool(
+        _role_by_label(db, label).query_policies
+    )
+
+
+def _role_users_route(db, admin, other):
+    body = [admin.username, other.username]
+    return ('PATCH', f'{_role_uri(db, "admin")}/users', body), lambda: _is_admin(
+        db, other
+    )
+
+
+def _user_patch(db, _admin, other):
+    body = _user_body(db, other.id, roles=[_role_uri(db, 'admin')])
+    return ('PATCH', f'/api2/user/{other.id}', body), lambda: _is_admin(db, other)
+
+
+@pytest.mark.parametrize(
+    'grant_path',
+    [
+        _group_create,
+        _group_attach_admin,
+        _group_patch_members,
+        _group_users_route,
+        _group_acl,
+        _role_create,
+        _role_add_policy,
+        _role_users_route,
+        _user_patch,
+    ],
+    ids=lambda grant_path: grant_path.__name__.lstrip('_'),
+)
+@pytest.mark.parametrize('narrowed', [False, True], ids=['full_session', 'narrowed'])
+def test_a_narrowed_admin_token_cannot_grant_through_any_path(
+    app, db, make_user, grant_path, narrowed
+):
+    admin = make_user(['admin'])
+    other = make_user()
+    (method, url, body), written = grant_path(db, admin, other)
+    client = _token_client(app, admin.username, _NARROWED_NEEDS if narrowed else None)
+
+    response = client.open(url, method=method, json=body)
+
+    if narrowed:
+        assert response.status_code in (403, 404)
+        assert not written()
+    else:
+        assert response.status_code == 200
+        assert written()
 
 
 # Groups: escalation 2 (WP-2b), a member with edit_resource on group attaches admin.
@@ -525,9 +695,9 @@ def test_role_administrator_cannot_create_a_role_reading_data_it_cannot_read(
 
     assert response.status_code == 403
     assert _role_by_label(db, label) is None
-    # The caller cannot read the policy, so the body names it by URI only.
+    # The caller cannot list the policy, so the body names neither it nor its id.
     body = response.get_data(as_text=True)
-    assert f'/api2/query_policy/{policy.id}' in body
+    assert f'/api2/query_policy/{policy.id}' not in body
     assert 'source' not in body
 
 
@@ -609,6 +779,74 @@ def test_admin_creates_a_role_with_permissions(db, make_user):
     assert [p.permission for p in role.permissions] == ['view_admin_page']
     assert role.dashboard_resource_role.name == 'dashboard_admin'
     assert _roles_of(db, admin) == {'admin'}
+
+
+def test_policies_held_by_the_account_pass_under_a_narrowed_token(app, db, make_user):
+    # What a caller holds comes from its account, as for roles: a token without
+    # query needs still adds a policy the account holds.
+    actor = make_user(['role_administrator', 'all_sources_reader'])
+    label = _name('role')
+    client = _token_client(
+        app,
+        actor.username,
+        [
+            [permission, None, 'role']
+            for permission in ('create_resource', 'view_resource')
+        ],
+    )
+
+    response = client.post(
+        '/api2/role',
+        json=_role_body(label, query_policies=[_policy(db, 'source', None)]),
+    )
+
+    assert response.status_code == 200
+    assert [p.dimension for p in _role_by_label(db, label).query_policies] == ['source']
+
+
+# Potion's own create_resource/edit_resource check runs before the grant checks:
+# no audit line for a caller who could not change the role at all, and a 403
+# rather than a 500 for an unknown resource role name (INV-3 row 13).
+
+_UNGRANTABLE_CHANGES = pytest.mark.parametrize(
+    'change',
+    [
+        {'permissions': [{'permission': 'view_admin_page', 'resource_type_id': 1}]},
+        {'dashboardResourceRoleName': 'no_such_resource_role'},
+    ],
+    ids=['permission', 'unknown_resource_role'],
+)
+
+
+@_UNGRANTABLE_CHANGES
+def test_a_role_create_without_create_resource_is_refused_first(
+    db, make_user, refusals, change
+):
+    actor = make_user(['group_admin'])
+    label = _name('role')
+
+    response = actor.request('POST', '/api2/role', {**_role_body(label), **change})
+
+    assert response.status_code == 403
+    assert _role_by_label(db, label) is None
+    assert refusals() == []
+
+
+@_UNGRANTABLE_CHANGES
+def test_a_role_update_without_edit_resource_is_refused_first(
+    db, make_user, refusals, change
+):
+    role_id = _new_role(db)
+    actor = make_user([_role(db, role_id).name])
+
+    response = actor.request(
+        'PATCH', f'/api2/role/{role_id}', _patch_body(db, role_id, **change)
+    )
+
+    assert response.status_code == 403
+    role = _role(db, role_id)
+    assert (role.permissions, role.dashboard_resource_role_id) == ([], None)
+    assert refusals() == []
 
 
 # N3 (decision 0004): holders of edit_resource on role change a role they hold.
@@ -953,24 +1191,20 @@ def test_user_editor_removes_grants_it_does_not_hold(db, make_user):
 
 
 def test_a_user_edit_without_edit_resource_on_users_is_refused_before_grants(
-    db, make_user, caplog
+    db, make_user, refusals
 ):
     actor = make_user(['manager'])
     target = make_user()
-    app_logger = logging.getLogger('ZenysisLogger')
-    app_logger.addHandler(caplog.handler)
-    try:
-        response = actor.request(
-            'PATCH',
-            f'/api2/user/{target.id}',
-            _user_body(db, target.id, roles=[_role_uri(db, 'admin')]),
-        )
-    finally:
-        app_logger.removeHandler(caplog.handler)
+
+    response = actor.request(
+        'PATCH',
+        f'/api2/user/{target.id}',
+        _user_body(db, target.id, roles=[_role_uri(db, 'admin')]),
+    )
 
     assert response.status_code == 403
     assert _roles_of(db, target) == set()
-    assert not [r for r in caplog.records if 'Refused grant' in r.getMessage()]
+    assert refusals() == []
 
 
 @pytest.mark.parametrize('field', ['roles', 'groups'])
@@ -998,3 +1232,24 @@ def test_admin_sending_a_user_acl_without_a_resource_gets_a_bad_request(db, make
 
     assert response.status_code == 400
     assert _acls_of(db, target.id) == []
+
+
+# try_get_role_and_resource no longer dereferences a missing resource role, so an
+# unknown name is its NotFound (404), not an AttributeError (500), on every route
+# that names resource roles (INV-3 row 14).
+
+
+@pytest.mark.parametrize('target', ['user', 'group'])
+def test_an_unknown_resource_role_name_is_not_found(db, make_user, target):
+    admin = make_user(['admin'])
+    acl = _acl('no_such_resource_role', _make_dashboard(db))
+    if target == 'user':
+        other = make_user()
+        url, body = f'/api2/user/{other.id}', _user_body(db, other.id, acls=[acl])
+    else:
+        group = _make_group(db)
+        url, body = f'/api2/group/{group.id}', _group_body(group.name, acls=[acl])
+
+    response = admin.request('PATCH', url, body)
+
+    assert response.status_code == 404

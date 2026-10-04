@@ -44,7 +44,10 @@ from web.server.errors import ItemNotFound, NotificationError
 from web.server.potion.filters import ResourceTypeFilter
 from web.server.potion.managers import RoleResourceManager
 from web.server.potion.signals import after_roles_update
-from web.server.routes.views.authorization import AuthorizedOperation
+from web.server.routes.views.authorization import (
+    AuthorizedOperation,
+    current_user_is_superuser,
+)
 from web.server.routes.views.feed import create_dashboard_permission_updates
 from web.server.routes.views.permission import build_role, add_current_user_to_role
 from web.server.routes.views.resource import (
@@ -383,12 +386,11 @@ class RoleResource(PrincipalResource):
     def create_role(self, obj):
         if not self.manager.can_create_item(obj):
             raise Forbidden()
-        unique_name = obj['label'].lower().replace(' ', '_')
         new_role = build_role(obj)
         verify_role_grants(new_role)
-        new_role['name'] = unique_name
-        role = self.manager.create(new_role)
-        if current_user.is_superuser():
+        unique_name = obj['label'].lower().replace(' ', '_')
+        role = self.manager.create({**new_role, 'name': unique_name})
+        if current_user_is_superuser():
             return role
         if holds_everything_in(role):
             add_current_user_to_role(role.id, current_user)

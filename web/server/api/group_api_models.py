@@ -23,7 +23,10 @@ from web.server.api.permission_api_schemas import (
 from web.server.api.permission_api_models import RoleResource
 from web.server.api.responses import STANDARD_RESPONSE_SCHEMA, StandardResponse
 from web.server.potion.managers import GroupResourceManager
-from web.server.routes.views.authorization import AuthorizedOperation
+from web.server.routes.views.authorization import (
+    AuthorizedOperation,
+    current_user_is_superuser,
+)
 from web.server.routes.views.groups import (
     add_group_role,
     delete_group_role,
@@ -49,15 +52,13 @@ FRONTEND_GROUP_SCHEMA = fields.Object(
 )
 
 
-def build_group(group_obj, existing_roles=()):
-    '''The group model fields from a `FRONTEND_GROUP_SCHEMA` body. Users are left
-    out because `self.manager.update` cannot hash a users list; the routes set
-    them separately.
+def build_group(group_obj, roles):
+    '''The group model fields from a `FRONTEND_GROUP_SCHEMA` body and its roles,
+    already resolved and authorised. Users are left out because
+    `self.manager.update` cannot hash a users list; the routes set them
+    separately.
     '''
-    return {
-        'name': group_obj.get('name'),
-        'roles': held_roles_from_uris(group_obj.get('roles'), existing=existing_roles),
-    }
+    return {'name': group_obj.get('name'), 'roles': roles}
 
 
 class GroupAclResource(PrincipalResource):
@@ -118,11 +119,12 @@ class GroupResource(PrincipalResource):
         `Admin` like a `Manager`.
         '''
         with AuthorizedOperation('create_resource', 'group'):
+            roles = held_roles_from_uris(group_obj.get('roles'))
             acl_grants = verify_acl_grants(group_obj.get('acls', []), existing_acls=[])
             # We update users separately because self.manager.update cannot
             # hash users list.
-            group = self.manager.create(build_group(group_obj))
-            if current_user.is_superuser():
+            group = self.manager.create(build_group(group_obj, roles))
+            if current_user_is_superuser():
                 update_group_users(group, group_obj.get('users', []))
             else:
                 update_group_users(group, [current_user.username])
@@ -139,12 +141,13 @@ class GroupResource(PrincipalResource):
     )
     def update_group(self, group, obj):
         with AuthorizedOperation('edit_resource', 'group'):
+            roles = held_roles_from_uris(obj.get('roles'))
             acl_grants = verify_acl_grants(
                 obj.get('acls', []), existing_acls=group.acls
             )
             # We update users separately because self.manager.update cannot
             # hash users list.
-            updated_group = self.manager.update(group, build_group(obj, group.roles))
+            updated_group = self.manager.update(group, build_group(obj, roles))
             update_group_users(updated_group, obj.get('users', []))
             replace_group_acls(updated_group, acl_grants)
             return None, OK

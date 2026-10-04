@@ -5,33 +5,49 @@ not decide what it receives. A non-superuser may attach or confer only grants
 it already holds: roles, membership of its own groups, query policies and
 data export. Permissions and resource roles on a role pass the
 `update_permissions` gate, and a resource role on a resource needs
-`update_users` there. Grants the target already has may be sent again
-unchanged.
+`update_users` there. Roles, groups and ACLs the target group or user already
+has may be sent again unchanged.
+
+"Superuser" is the identity (`current_user_is_superuser`), never the account,
+so a token narrowed on an admin account grants like a non-superuser. What a
+non-superuser holds comes from its account.
 '''
 
 from __future__ import annotations
 
-from collections.abc import Iterable
-from typing import NoReturn
+from collections.abc import Iterable, Mapping
+from typing import TYPE_CHECKING, Any, NoReturn
 
 from flask import g
 from flask_login import current_user
+from flask_principal import Need
 from werkzeug.exceptions import BadRequest, Forbidden
 
 from models.alchemy.permission import Resource, ResourceRole, Role
-from models.alchemy.security_group import Group
+from models.alchemy.security_group import Group, GroupAcl
+from models.alchemy.user import UserAcl
 from models.alchemy.user.web_base_user import BaseWebUserMixin
+from models.python.permissions import QueryNeed
 from web.server.data.data_access import get_db_adapter
 from web.server.potion.access import get_id_from_uri
-from web.server.routes.views.authorization import is_authorized
+from web.server.routes.views.authorization import (
+    current_user_is_superuser,
+    is_authorized,
+)
 from web.server.routes.views.core import try_get_role_and_resource
 from web.server.routes.views.query_policy import construct_query_need_from_policy
-from web.server.security.permissions import SuperUserPermission
+from web.server.security.permissions import SUPERUSER_ROLENAME
 from web.server.util.util import get_user_string
 
+if TYPE_CHECKING:
+    from web.server.routes.views.permission import RoleFields
 
-def refuse_grant(description: str, detail: str = '') -> NoReturn:
-    '''`detail` goes to the audit line only, for names the caller may not list.'''
+
+def refuse_grant(description: str, detail: str) -> NoReturn:
+    '''The 403 body is `description` alone. `detail`, which names what was
+    refused, goes only to the audit line: naming a role, group or policy would
+    tell the caller that an id it cannot list exists.
+    '''
     # The log formatter drops LoggerAdapter extras, so the caller goes in the text.
     g.request_logger.warning(
         'Refused grant by \'%s\': %s %s',
@@ -42,21 +58,12 @@ def refuse_grant(description: str, detail: str = '') -> NoReturn:
     raise Forbidden(description=description)
 
 
-def _is_superuser() -> bool:
-    # The identity, not the account: a narrowed JWT on an admin account loses
-    # RoleNeed('admin') and must not grant as an admin.
-    return SuperUserPermission().can()
-
-
-def _account_needs() -> set:
+def _account_needs() -> set[Need]:
     '''Needs are compared by equality, never by `QueryNeed` containment, which
     does not follow how policies combine into the Druid filter: a broader held
     policy is not trusted to cover a narrower one.
     '''
-    # The identity adds the default needs; the account's own needs are added
-    # because a JWT session can narrow query needs into intersections that no
-    # longer compare equal to the policies they came from.
-    return g.identity.provides | current_user.get_permissions()
+    return current_user.get_permissions()
 
 
 def _exports_data() -> bool:
@@ -71,62 +78,60 @@ def _ids_from_uris(uris: Iterable[str], kind: str) -> set[int]:
 
 
 def held_roles_from_uris(
-    role_uris: Iterable[str], existing: Iterable = ()
+    role_uris: Iterable[str], existing: Iterable[Role] = ()
 ) -> list[Role]:
-    '''Resolves role URIs for a group or user that already has the `existing`
-    roles. Each other role must be one the caller holds, as the
-    `RoleResourceManager` filter has it. URIs naming no role are skipped.
+    '''Resolves role URIs. A non-superuser is refused any role it does not hold
+    unless the target already has it (`existing`). URIs naming no role are
+    skipped.
     '''
     role_ids = _ids_from_uris(role_uris, 'role')
-    session = get_db_adapter().session
-    requested = session.query(Role).filter(Role.id.in_(role_ids)).all()
-    if _is_superuser():
-        return requested
+    requested = get_db_adapter().session.query(Role).filter(Role.id.in_(role_ids))
+    roles = sorted(requested, key=lambda role: role.id)
+    if current_user_is_superuser():
+        return roles
     allowed_ids = {role.id for role in existing} | {
-        role.id for role in current_user.get_all_roles() if role.name != 'admin'
+        role.id
+        for role in current_user.get_all_roles()
+        # An admin account whose identity is not a superuser (a narrowed token)
+        # must not pass the admin role on.
+        if role.name != SUPERUSER_ROLENAME
     }
-    not_held = sorted(
-        (role for role in requested if role.id not in allowed_ids), key=lambda r: r.id
-    )
+    not_held = [role for role in roles if role.id not in allowed_ids]
     if not_held:
         refuse_grant(
-            'You may only attach roles you hold yourself. Not held: '
-            f'{[f"/api2/role/{role.id}" for role in not_held]}.',
-            f'Role names: {[role.name for role in not_held]}.',
+            'You may only attach roles you hold yourself.',
+            f'Not held: {[(role.id, role.name) for role in not_held]}.',
         )
-    return requested
+    return roles
 
 
 def member_groups_from_uris(
-    group_uris: Iterable[str], existing: Iterable
+    group_uris: Iterable[str], existing: Iterable[Group]
 ) -> list[Group]:
-    '''Resolves group URIs for a user already in the `existing` groups. Each
-    other group must be one the caller belongs to, whose roles and ACLs it
-    therefore holds. URIs naming no group are skipped.
+    '''Resolves group URIs for a user. A non-superuser is refused any group it
+    does not belong to, and so whose roles and ACLs it does not hold, unless
+    the user is already in it (`existing`). URIs naming no group are skipped.
     '''
     group_ids = _ids_from_uris(group_uris, 'group')
-    session = get_db_adapter().session
-    requested = session.query(Group).filter(Group.id.in_(group_ids)).all()
-    if _is_superuser():
-        return requested
+    requested = get_db_adapter().session.query(Group).filter(Group.id.in_(group_ids))
+    groups = sorted(requested, key=lambda group: group.id)
+    if current_user_is_superuser():
+        return groups
     allowed_ids = {group.id for group in existing} | {
         group.id for group in current_user.groups
     }
-    not_member = sorted(
-        (group for group in requested if group.id not in allowed_ids),
-        key=lambda group: group.id,
-    )
+    not_member = [group for group in groups if group.id not in allowed_ids]
     if not_member:
         refuse_grant(
-            'You may only add users to groups you belong to. Not a member: '
-            f'{[f"/api2/group/{group.id}" for group in not_member]}.',
-            f'Group names: {[group.name for group in not_member]}.',
+            'You may only add users to groups you belong to.',
+            f'Not a member: {[(group.id, group.name) for group in not_member]}.',
         )
-    return requested
+    return groups
 
 
 def verify_acl_grants(
-    acls: Iterable[dict], existing_acls: Iterable
+    acls: Iterable[Mapping[str, Any]],
+    existing_acls: Iterable[GroupAcl | UserAcl],
 ) -> list[tuple[ResourceRole, Resource]]:
     '''Resolves a group's or user's ACL list. Each new resource role on a
     resource needs `update_users` on that resource, as sharing it through
@@ -152,74 +157,82 @@ def verify_acl_grants(
         if not is_authorized('update_users', resource_type, resource.id):
             refuse_grant(
                 f'Granting \'{resource_role.name}\' on {resource_type} '
-                f'\'{resource.name}\' needs the \'update_users\' permission on it.'
+                f'\'{resource.name}\' needs the \'update_users\' permission on it.',
+                '',
             )
     return grants
 
 
-def verify_role_grants(new_role: dict, role: Role | None = None) -> None:
-    '''Checks a role create (`role` is None) or update. `new_role` is the output
-    of `build_role`. Every holder of the role, the caller included, gains what
-    is added.
+def verify_role_grants(new_role: RoleFields, role: Role | None = None) -> None:
+    '''Checks a role create (`role` is None) or update. Every holder of the role,
+    the caller included, gains what is added.
+
+    A non-superuser reaches only roles it holds (`RoleResourceManager`), so the
+    role's own policies and export are among its account's: resending them
+    passes the checks below without an exemption.
     '''
+    if role is None:
+        permission_ids, dashboard_role_id, alert_role_id = set(), None, None
+    else:
+        permission_ids = {permission.id for permission in role.permissions}
+        dashboard_role_id = role.dashboard_resource_role_id
+        alert_role_id = role.alert_resource_role_id
     gated = [
         name
-        for name, current, requested in (
+        for name, changed in (
             (
                 'permissions',
-                {p.id for p in role.permissions} if role else set(),
-                {p.id for p in new_role['permissions']},
+                {permission.id for permission in new_role['permissions']}
+                != permission_ids,
             ),
             (
                 'dashboard resource role',
-                role.dashboard_resource_role_id if role else None,
-                new_role['dashboard_resource_role_id'],
+                new_role['dashboard_resource_role_id'] != dashboard_role_id,
             ),
             (
                 'alert resource role',
-                role.alert_resource_role_id if role else None,
-                new_role['alert_resource_role_id'],
+                new_role['alert_resource_role_id'] != alert_role_id,
             ),
         )
-        if current != requested
+        if changed
     ]
     if gated and not is_authorized(
         'update_permissions', 'role', role.id if role else None
     ):
         refuse_grant(
             f'Changing the {", ".join(gated)} of a role needs the '
-            '\'update_permissions\' permission.'
+            '\'update_permissions\' permission.',
+            '',
         )
 
-    if _is_superuser():
+    if current_user_is_superuser():
         return
-    current_policy_ids = {q.id for q in role.query_policies} if role else set()
     account_needs = _account_needs()
     not_held = [
         policy
         for policy in new_role['query_policies']
-        if policy.id not in current_policy_ids
-        and construct_query_need_from_policy(policy) not in account_needs
+        if construct_query_need_from_policy(policy) not in account_needs
     ]
     if not_held:
         refuse_grant(
-            'You may only add query policies you hold yourself. Not held: '
-            f'{sorted(f"/api2/query_policy/{p.id}" for p in not_held)}.',
-            'Policies: '
-            f'{sorted((p.dimension, p.dimension_value or "*") for p in not_held)}.',
+            'You may only add query policies you hold yourself.',
+            'Not held: '
+            f'{[(p.id, p.dimension, p.dimension_value or "*") for p in not_held]}.',
         )
-    exported = role.enable_data_export if role else False
-    if new_role['enable_data_export'] and not exported and not _exports_data():
-        refuse_grant('You may only allow data export if you can export data yourself.')
+    if new_role['enable_data_export'] and not _exports_data():
+        refuse_grant(
+            'You may only allow data export if you can export data yourself.', ''
+        )
 
 
 def holds_everything_in(role: Role) -> bool:
-    '''Whether the caller's account already holds every need `role` grants, and
-    data export if the role allows it.
+    '''Whether the caller's account already holds every permission and resource
+    role `role` grants. Its policies and export passed `verify_role_grants`.
     '''
     account_needs = _account_needs()
     # pylint: disable=protected-access
-    role_needs = BaseWebUserMixin._build_role_needs([role])
-    if not all(need in account_needs for need in role_needs):
-        return False
-    return not role.enable_data_export or _exports_data()
+    return all(
+        need in account_needs
+        for need in BaseWebUserMixin._build_role_needs([role])
+        if not isinstance(need, QueryNeed)
+    )

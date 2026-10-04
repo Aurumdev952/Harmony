@@ -261,4 +261,4 @@ C-5's token claims gain `user_claims.remember_me: bool`. The change is additive,
 |---|---|---|
 | qa | approved | 2026-10-04 qa-0c at 60edb27: all 8 units red on integration and green on the branch; 22 request-level probes through real routes and decorators (9 open-redirect payloads, timeout cookie clearing, /api/field restricted vs admin, 400 random filters through and_policy_filter byte-identical, pipeline import without JWT libs); 7 deliberate breakages all caught. Browser verify deferred to WP-2e. |
 | reviewer | pending | |
-| security | pending | |
+| security | blocked | 2026-10-04 sec-0c at 60edb27: no high or medium findings; all seven rulings hold. Blocked only for HUMAN acceptance of the intended /api/field narrowing (INV-3/SEC-4); becomes approved with no code change once accepted. Low: /api/timeout has no CSRF (SEC-5/WP-5d); login set_cookie vs timeout unset_jwt_cookies settings may diverge (WP-5d helper); AST guard should scan web/server/util too. |

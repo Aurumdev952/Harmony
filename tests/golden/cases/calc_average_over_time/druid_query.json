@@ -1,0 +1,90 @@
+[
+  {
+    "aggregations": [
+      {
+        "aggregator": {
+          "fieldName": "__time",
+          "name": "yellow_fever_cases__max_time",
+          "type": "longMax"
+        },
+        "filter": {
+          "dimension": "field",
+          "type": "selector",
+          "value": "yellow_fever_cases"
+        },
+        "type": "filtered"
+      },
+      {
+        "aggregator": {
+          "fieldName": "__time",
+          "name": "yellow_fever_cases__min_time",
+          "type": "longMin"
+        },
+        "filter": {
+          "dimension": "field",
+          "type": "selector",
+          "value": "yellow_fever_cases"
+        },
+        "type": "filtered"
+      },
+      {
+        "aggregator": {
+          "fieldName": "sum",
+          "name": "yellow_fever_cases__raw_sum",
+          "type": "doubleSum"
+        },
+        "filter": {
+          "dimension": "field",
+          "type": "selector",
+          "value": "yellow_fever_cases"
+        },
+        "type": "filtered"
+      }
+    ],
+    "context": {
+      "resultAsArray": true
+    },
+    "dataSource": "harmony_demo_20260101",
+    "dimensions": [
+      "StateName"
+    ],
+    "filter": {
+      "fields": [
+        {
+          "dimension": "__time",
+          "intervals": [
+            "2024-01-01/2024-04-01"
+          ],
+          "type": "interval"
+        },
+        {
+          "dimension": "field",
+          "type": "selector",
+          "value": "yellow_fever_cases"
+        },
+        {
+          "field": {
+            "dimension": "StateName",
+            "type": "selector",
+            "value": ""
+          },
+          "type": "not"
+        }
+      ],
+      "type": "and"
+    },
+    "granularity": "all",
+    "having": null,
+    "intervals": [
+      "2024-01-01/2024-04-01"
+    ],
+    "postAggregations": [
+      {
+        "expression": "yellow_fever_cases__raw_sum / (1 + (yellow_fever_cases__max_time - yellow_fever_cases__min_time) / 86400000)",
+        "name": "yellow_fever_cases",
+        "type": "expression"
+      }
+    ],
+    "queryType": "groupBy"
+  }
+]

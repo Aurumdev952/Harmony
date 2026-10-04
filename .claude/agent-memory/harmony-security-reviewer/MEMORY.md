@@ -1,0 +1,2 @@
+- [Actions review tooling](actions_review_tooling.md): zizmor/actionlint/SHA/advisory commands that work, plus worktree-guard and uv-shim traps
+- [Actions trust model](actions_trust_model.md): who runs what with which token in Harmony CI; why write-all existed; dispatch tag limits

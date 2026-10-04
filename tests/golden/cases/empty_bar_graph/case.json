@@ -1,0 +1,8 @@
+{
+  "description": "bar_graph when Druid returns no rows.",
+  "endpoint": "bar_graph",
+  "policy": null,
+  "druid": {
+    "empty": true
+  }
+}

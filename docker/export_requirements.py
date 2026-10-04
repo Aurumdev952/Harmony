@@ -61,7 +61,9 @@ def expected_files(root: Path) -> dict[Path, str]:
 
 def main(argv: list[str] | None = None, root: Path = ROOT) -> int:
     parser = argparse.ArgumentParser(description=__doc__.splitlines()[0])
-    parser.add_argument("--check", action="store_true", help="report stale files and exit 1")
+    parser.add_argument(
+        "--check", action="store_true", help="report stale files and exit 1"
+    )
     args = parser.parse_args(argv)
     stale = []
     for path, content in expected_files(root).items():

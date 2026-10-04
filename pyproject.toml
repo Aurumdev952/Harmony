@@ -134,8 +134,7 @@ dev = [
     "termcolor==1.1.0",
     "googlemaps==4.2.0",
     "geopy==2.1.0",
-    "pylint==2.17.4",
-    "black==22.6.0",
+    "ruff==0.16.10",
     "PyInstaller>=3.4",
     "pytest-env==0.6.2",
     "coverage==5.2.1",
@@ -172,6 +171,31 @@ override-dependencies = [
 Flask-Potion = { git = "https://github.com/Zenysis/potion.git", rev = "bd398c18e8710a4e7cc87d9abb6ba9a95e7ba792" }
 pylib = { git = "https://github.com/room77/py77.git", rev = "70280110ec342a6f6db1c102e96756fcc3c3c01b" }
 pydruid = { git = "https://github.com/druid-io/pydruid.git", rev = "2420109553812470ed4d91cd0f8d5e70bbf2cfd3" }
+
+[tool.ruff]
+line-length = 88
+extend-exclude = ["web/public", "node_modules"]
+
+[tool.ruff.per-file-target-version]
+# Standalone tools on CPython 3.13 (PEP 723 scripts); the rest targets 3.9 from
+# requires-python until WP-3b.
+"prod/browser_share/**" = "py313"
+"docker/export_requirements.py" = "py313"
+"tests/infra/**" = "py313"
+
+[tool.ruff.format]
+# black --skip-string-normalization, which CI ran before ruff.
+quote-style = "preserve"
+
+[tool.ruff.lint]
+# CI applies this set to the Python files a PR changes, and E9, F63, F7 and F82
+# to the whole tree.
+select = ["E4", "E7", "E9", "F"]
+
+[tool.ruff.lint.per-file-ignores]
+# Undefined names that are real bugs, left to their owners (WP-2f Requests).
+"scripts/druid/druid_task_memory_stats.py" = ["F821"]
+"util/unix.py" = ["F821"]
 
 [tool.pytest.ini_options]
 pythonpath = ["."]

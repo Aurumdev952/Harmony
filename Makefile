@@ -21,16 +21,16 @@ help: # Show help for each of the Makefile recipes.
 configure:	
 	scp ./prod/nginx/nginx_vhost_default_location $(WEB_REMOTE):${NGINX_VHOST}
 
-lint-python: # Lint only the python files that have changed on this branch, with respect to main. (You can run `make lint-python COMMIT=<my-commit>` e.g. `make lint-python COMMIT=HEAD~1` to lint the files that have changed on the last commit.)
-	COMMIT=$(COMMIT) ./scripts/lint_python.sh
+lint-python: # Ruff: the whole tree for syntax errors and undefined names, plus lint and format checks on the Python files changed with respect to main (`make lint-python COMMIT=HEAD~1` for the last commit).
+	ci/lint_python.sh $(COMMIT)
 
 lint-js: # Lint only the js and jsx files that have changed on this branch, with respect to main. (You can run `make lint-js COMMIT=<my-commit>` e.g. `make lint-js COMMIT=my-other-branch` to lint the files that have changed with respect to my-other-branch.)
 	COMMIT=$(COMMIT) ./scripts/lint_js.sh
 
 lint: lint-python lint-js # Lint only the python, js and jsx files that have changed on this branch, with respect to main. (You can run `make lint COMMIT=<my-commit>` e.g. `make lint COMMIT=HEAD~1` to lint the files that have changed on the last commit.)
 	
-black: # Run black on all python files that have changed on this branch, with respect to main. (You can run `make black COMMIT=<my-commit>` e.g. `make black COMMIT=origin/main` to lint the files that have changed with respect to origin/main.)
-	COMMIT=$(COMMIT) ./scripts/format_python.sh
+format-python: # Ruff: fix and format the Python files changed with respect to main (`make format-python COMMIT=origin/main`).
+	ci/lint_python.sh --fix $(COMMIT)
 
 build: # Build docker images (for development and production) using docker compose.
 	docker compose --env-file $(ENV_FILE) -f docker-compose.build.yaml build $(SERVICE)

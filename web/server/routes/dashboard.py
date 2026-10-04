@@ -7,7 +7,6 @@ from flask import (
     make_response,
     abort,
     url_for,
-    request,
 )
 from flask_login import current_user
 from werkzeug.exceptions import BadRequest
@@ -41,7 +40,7 @@ class DashboardPageRouter:
             # If the user is authenticated, they should be shown the unauthorized page
             # since they do not have *authorization* permission to view this dashboard.
             if current_user.is_authenticated:
-                return redirect(url_for('index.unauthorized', **request.args.to_dict()))
+                return redirect(url_for('auth.unauthorized', locale=locale))
 
             # If the user is not authenticated, redirect to the login page.
             # NOTE: This check is needed because when public access is enabled,

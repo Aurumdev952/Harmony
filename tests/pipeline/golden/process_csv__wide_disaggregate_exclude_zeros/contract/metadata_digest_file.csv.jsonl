@@ -1,0 +1,5 @@
+{"count": "1", "end_date": "2021-05-20", "indicator_id": "demo_malaria_positive_m_sim", "start_date": "2021-05-20"}
+{"count": "1", "end_date": "2021-07-04", "indicator_id": "demo_malaria_positive_m_nao", "start_date": "2021-07-04"}
+{"count": "2", "end_date": "2021-06-30", "indicator_id": "demo_malaria_positive_f_nao", "start_date": "2021-05-01"}
+{"count": "4", "end_date": "2021-07-04", "indicator_id": "demo_malaria_positive", "start_date": "2021-05-01"}
+{"count": "5", "end_date": "2021-07-05", "indicator_id": "demo_malaria_tested", "start_date": "2021-05-01"}

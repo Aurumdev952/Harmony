@@ -3,3 +3,4 @@
 - [WP-0f open items](wp_0f_open_items.md): Docker Hub path removal awaits the human; slash-tag bug for WP-3b; comma `--cache-from` is fine
 - [WP-2f toolchain](wp_2f_next.md): two uv lanes (3.9 app, 3.13 tools), generated requirements, ruff/pytest traps
 - [Infra tooling traps](infra_tooling_traps.md) — *.log gitignored, strict mypy via ci/tools313, scripts/ vs prod/ ownership, nginx-proxy logs, worktree git
+- [Image verification recipes](image_verification_recipes.md) — unique compose build names, sweep env/PYTHONPATH, overlays, PyPy: import-test wheels, gspread marker

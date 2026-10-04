@@ -29,7 +29,6 @@ dependencies = [
     "hvac>=0.7.0",
     "pandas>=1.3,<2.0 ; platform_python_implementation != 'PyPy'",
     "psycopg2-binary==2.8.5 ; platform_python_implementation != 'PyPy'",
-    "python-Levenshtein==0.12.1",
     "python-dateutil>=2.8.1",
     "requests==2.28.1 ; platform_python_implementation != 'PyPy'",
     "httpx[socks]==0.27.0",
@@ -44,9 +43,9 @@ dependencies = [
     "boto3==1.16.25",
     "SQLAlchemy==1.3.24",
     "related>=0.7.0",
-    "gspread>=5.4.0",
-    # Does not install on PyPy (needs grpcio).
-    "google-cloud-logging==1.11.0 ; platform_python_implementation != 'PyPy'",
+    # gspread pulls in google-auth and cryptography; importing cryptography aborts
+    # PyPy 7.3.9, and no pipeline code imports gspread (WP-0d).
+    "gspread>=5.4.0 ; platform_python_implementation != 'PyPy'",
     # numpy 1.16.0-1.16.2 break on PyPy, and 1.21.0 has no PyPy build.
     "numpy==1.21.0 ; platform_python_implementation != 'PyPy'",
     "numpy==1.15.4 ; platform_python_implementation == 'PyPy'",
@@ -67,9 +66,6 @@ dependencies = [
 [dependency-groups]
 # Exported to requirements-web.txt.
 web = [
-    "Flask-Admin==1.5.3",
-    "graphene-sqlalchemy==2.3.0",
-    "Flask-GraphQL==2.0.1",
     "flask-jwt-extended==3.25.1",
     "blinker==1.4",
     "flask-caching==2.0.1",
@@ -82,7 +78,6 @@ web = [
     "PyJWT==1.7.1",
     "typing_extensions==4.1.1",
     "alembic>=1.7.1",
-    "segment-analytics-python==2.2.3",
 ]
 # Exported to requirements-pipeline.txt.
 pipeline = [
@@ -96,8 +91,6 @@ pipeline = [
     "savReaderWriter ; platform_python_implementation != 'PyPy'",
     "oauthlib",
     "requests_oauthlib",
-    "fuzzywuzzy",
-    "jellyfish==0.7.2",
     "isoweek",
     "unidecode==1.1.1",
     "zeep==3.4.0 ; platform_python_implementation != 'PyPy'",
@@ -106,18 +99,11 @@ pipeline = [
     "typing_extensions==4.1.1",
     "netCDF4 ; platform_python_implementation != 'PyPy'",
     "dataclasses",
-    "editdistance",
     "croniter==1.3.7",
-    "dask==2022.2.0 ; platform_python_implementation != 'PyPy'",
     "lz4==4.3.2 ; platform_python_implementation != 'PyPy'",
 ]
 # Exported to requirements-dev.txt.
 dev = [
-    # Paramiko and its dependencies (used by Fabric).
-    "cryptography==37.0.2",
-    "pyasn1==0.4.8",
-    "PyNaCl==1.4.0",
-    "paramiko==2.7.1",
     "pytest>=7.4.3",
     "pytest-selenium==4.0.1",
     "selenium==4.5.0",
@@ -237,8 +223,6 @@ module = [
     "flask_login.*",
     "flask_migrate.*",
     "flask_sqlalchemy.*",
-    "flask_admin.*",
-    "flask_graphql.*",
     "related.*",
     "slugify.*",
     "pydruid.*",
@@ -259,12 +243,9 @@ module = [
     "_pypyjson.*",
     "factory.*",
     "alchemy_mock.*",
-    "graphene.*",
-    "graphene_sqlalchemy.*",
     "ijson.*",
     "rapidjson.*",
     "flask_jwt_extended.*",
-    "graphql_relay.*",
     "boto3.*",
 ]
 ignore_missing_imports = true

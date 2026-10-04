@@ -20,7 +20,6 @@ ethiopian-date-converter==0.1.5
 hvac>=0.7.0
 pandas>=1.3,<2.0 ; platform_python_implementation != 'PyPy'
 psycopg2-binary==2.8.5 ; platform_python_implementation != 'PyPy'
-python-Levenshtein==0.12.1
 python-dateutil>=2.8.1
 requests==2.28.1 ; platform_python_implementation != 'PyPy'
 httpx[socks]==0.27.0
@@ -35,8 +34,7 @@ pyyaml>=3.12
 boto3==1.16.25
 SQLAlchemy==1.3.24
 related>=0.7.0
-gspread>=5.4.0
-google-cloud-logging==1.11.0 ; platform_python_implementation != 'PyPy'
+gspread>=5.4.0 ; platform_python_implementation != 'PyPy'
 numpy==1.21.0 ; platform_python_implementation != 'PyPy'
 numpy==1.15.4 ; platform_python_implementation == 'PyPy'
 python-nginx==1.2

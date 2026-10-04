@@ -202,11 +202,15 @@ def main() -> int:
     )
     check.add_argument('--head', default='HEAD')
     sub.add_parser('hook')
+    sub.add_parser('base', help='print the default base ref for checks')
     args = parser.parse_args()
     if args.mode == 'who':
         return cmd_who(args.paths)
     if args.mode == 'check':
         return cmd_check(args.role, args.base or default_base(), args.head)
+    if args.mode == 'base':
+        print(default_base())
+        return 0
     return cmd_hook()
 
 

@@ -1,0 +1,62 @@
+- generic [active] [ref=f6e1]:
+  - generic [ref=f6e2]:
+    - button [ref=f6e3] [cursor=pointer]
+    - generic [ref=f6e6]:
+      - generic [ref=f6e7]:
+        - link [ref=f6e8] [cursor=pointer]:
+          - /url: /advanced-query
+          - button "Analyze" [ref=f6e9]
+        - button "Dashboards" [ref=f6e11] [cursor=pointer]
+        - link [ref=f6e12] [cursor=pointer]:
+          - /url: /data-quality
+          - button "Data Quality" [ref=f6e13]
+      - button "Brow " [ref=f6e17] [cursor=pointer]:
+        - generic [ref=f6e19]:
+          - text: Brow
+          - generic [ref=f6e20]: 
+  - main [ref=f6e21]:
+    - generic [ref=f6e103]:
+      - generic [ref=f6e104]:
+        - heading "Data Upload" [level=1] [ref=f6e106]
+        - button "+ Add source" [ref=f6e108] [cursor=pointer]:
+          - generic [ref=f6e109]:
+            - generic [ref=f6e110]: +
+            - text: Add source
+        - generic [ref=f6e112]:
+          - generic [ref=f6e113]: Estimated next pipeline completion
+          - generic [ref=f6e119]: No Information
+        - generic [ref=f6e128]:
+          - generic [ref=f6e129]: Last successful pipeline completion
+          - generic [ref=f6e135]: No Information
+      - table [ref=f6e140]:
+        - rowgroup [ref=f6e141]:
+          - row [ref=f6e142]:
+            - columnheader "Datasource" [ref=f6e143] [cursor=pointer]:
+              - generic [ref=f6e144]:
+                - generic [ref=f6e145]: Datasource
+                - generic [ref=f6e146]:
+                  - generic [ref=f6e148]: 
+                  - generic [ref=f6e150]: 
+            - columnheader "Integration type" [ref=f6e151] [cursor=pointer]:
+              - generic [ref=f6e152]:
+                - generic [ref=f6e153]: Integration type
+                - generic [ref=f6e154]:
+                  - generic [ref=f6e156]: 
+                  - generic [ref=f6e158]: 
+            - columnheader "Last updated" [ref=f6e159] [cursor=pointer]:
+              - generic [ref=f6e160]:
+                - generic [ref=f6e161]: Last updated
+                - generic [ref=f6e162]:
+                  - generic [ref=f6e164]: 
+                  - generic [ref=f6e166]: 
+            - columnheader "Time range of data" [ref=f6e167]
+            - columnheader "New indicator count" [ref=f6e170] [cursor=pointer]:
+              - generic [ref=f6e171]:
+                - generic [ref=f6e172]: New indicator count
+                - generic [ref=f6e173]:
+                  - generic [ref=f6e175]: 
+                  - generic [ref=f6e177]: 
+            - columnheader "Manage" [ref=f6e178]
+        - rowgroup [ref=f6e181]:
+          - row [ref=f6e182]:
+            - cell "There are no data sources at this time." [ref=f6e183]

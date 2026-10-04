@@ -1,0 +1,107 @@
+- generic [ref=f6e1]:
+  - generic [ref=f6e2]:
+    - button [ref=f6e3] [cursor=pointer]
+    - generic [ref=f6e6]:
+      - generic [ref=f6e7]:
+        - link [ref=f6e8] [cursor=pointer]:
+          - /url: /advanced-query
+          - button "Analyze" [ref=f6e9]
+        - button "Dashboards" [ref=f6e11] [cursor=pointer]
+        - link [ref=f6e12] [cursor=pointer]:
+          - /url: /data-quality
+          - button "Data Quality" [ref=f6e13]
+      - button "Brow " [ref=f6e17] [cursor=pointer]:
+        - generic [ref=f6e19]:
+          - text: Brow
+          - generic [ref=f6e20]: 
+  - main [aria-hidden] [ref=f6e21]:
+    - generic [ref=f6e103]:
+      - generic [ref=f6e104]:
+        - heading [level=1] [ref=f6e184]: Data Upload
+        - button [ref=f6e185] [cursor=pointer]:
+          - generic [ref=f6e109]:
+            - generic [ref=f6e110]: +
+            - text: Add source
+        - generic [ref=f6e112]:
+          - generic [ref=f6e113]: Estimated next pipeline completion
+          - generic [ref=f6e119]: No Information
+        - generic [ref=f6e128]:
+          - generic [ref=f6e129]: Last successful pipeline completion
+          - generic [ref=f6e135]: No Information
+      - table [ref=f6e140]:
+        - rowgroup [ref=f6e141]:
+          - row [ref=f6e186]:
+            - columnheader [ref=f6e187] [cursor=pointer]:
+              - generic [ref=f6e144]:
+                - generic [ref=f6e145]: Datasource
+                - generic [ref=f6e146]:
+                  - generic [ref=f6e148]: 
+                  - generic [ref=f6e150]: 
+            - columnheader [ref=f6e188] [cursor=pointer]:
+              - generic [ref=f6e152]:
+                - generic [ref=f6e153]: Integration type
+                - generic [ref=f6e154]:
+                  - generic [ref=f6e156]: 
+                  - generic [ref=f6e158]: 
+            - columnheader [ref=f6e189] [cursor=pointer]:
+              - generic [ref=f6e160]:
+                - generic [ref=f6e161]: Last updated
+                - generic [ref=f6e162]:
+                  - generic [ref=f6e164]: 
+                  - generic [ref=f6e166]: 
+            - columnheader [ref=f6e190]:
+              - generic [ref=f6e168]: Time range of data
+            - columnheader [ref=f6e191] [cursor=pointer]:
+              - generic [ref=f6e171]:
+                - generic [ref=f6e172]: New indicator count
+                - generic [ref=f6e173]:
+                  - generic [ref=f6e175]: 
+                  - generic [ref=f6e177]: 
+            - columnheader [ref=f6e192]:
+              - generic [ref=f6e179]: Manage
+        - rowgroup [ref=f6e181]:
+          - row [ref=f6e193]:
+            - cell [ref=f6e194]: There are no data sources at this time.
+  - dialog "Prompt Modal" [active] [ref=f6e196]:
+    - generic [ref=f6e198]:
+      - heading "Add data" [level=2] [ref=f6e199]
+      - generic [ref=f6e200]:
+        - generic [ref=f6e201]: Upload
+        - generic [ref=f6e204]:
+          - generic [ref=f6e205]: 
+          - text: Mapping
+        - generic [ref=f6e207]:
+          - generic [ref=f6e208]: 
+          - text: Review
+    - generic [ref=f6e212]:
+      - generic [ref=f6e214]:
+        - heading "Data Source Type" [level=3] [ref=f6e216]
+        - radiogroup [ref=f6e218]:
+          - generic [ref=f6e219] [cursor=pointer]:
+            - radio "CSV Source" [checked] [ref=f6e220]
+            - text: CSV Source
+          - generic [ref=f6e221] [cursor=pointer]:
+            - radio "Dataprep Source" [ref=f6e222]
+            - text: Dataprep Source
+      - generic [ref=f6e224]:
+        - heading "Data Source Name" [level=3] [ref=f6e226]
+        - textbox "Data Source Name" [ref=f6e228]:
+          - /placeholder: ""
+      - generic [ref=f6e230]:
+        - generic [ref=f6e232]:
+          - button [ref=f6e234] [cursor=pointer]:
+            - generic [ref=f6e235]: Drag and drop or click to select file
+          - generic [ref=f6e244]: only .csv or .csv.gz files accepted
+        - generic [ref=f6e246]:
+          - generic [ref=f6e247]: "In order to successfully ingest your data into our database, data must be in the Zenysis Base Format:"
+          - generic [ref=f6e248]: groupby 1, groupby 2, ..., groupbyN, date, indicator 1, indicator 2, ..., indicatorN
+          - generic [ref=f6e249]: Dates must be in the format YYYY-MM-DD (eg. 2021-01-30).
+          - generic [ref=f6e250]: Indicators must have only numerical or empty values.
+          - link "Learn More" [ref=f6e252] [cursor=pointer]:
+            - /url: https://github.com/Zenysis/Harmony#formatting-data-for-ingestion
+    - generic [ref=f6e254]:
+      - button "cancel" [ref=f6e256] [cursor=pointer]:
+        - generic [ref=f6e257]: Cancel
+      - button "mapping" [disabled] [ref=f6e260]:
+        - generic [ref=f6e261]: Mapping
+    - button "×" [ref=f6e262] [cursor=pointer]

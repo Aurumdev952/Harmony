@@ -11,6 +11,20 @@ instances:
       - web/public/js/vendor/**
       - web/client/entryPoints/navbarEntry.js
       - docs/modernisation/work/WP-0e.md
+  - name: "backend-3"
+    files:
+      - web/server/templates/query.html
+      - web/server/templates/facilities_map.html
+      - web/server/templates/grid_dashboard.html
+      - web/server/templates/layout.html
+      - web/server/templates/query_app_vendor_scripts.html
+  - name: "frontend-design-1"
+    files:
+      - web/public/scss/vendor/bootstrap-datepicker-1.5.1.scss
+      - web/public/scss/vendor/bootstrap-select-1.9.4.scss
+      - web/public/scss/entry.scss
+      - web/public/scss/overrides/_smartadmin_overrides.scss
+      - web/public/scss/components/visualizations/_visualization_container.scss
 branch: "mig/WP-0e-dead-frontend-code"
 requirements: []
 contracts_consumed: []
@@ -32,8 +46,6 @@ Units, in order. Each line names the change and the check that ends it. Units 3 
 6. Remove `bootstrap-datepicker-1.5.1.js` and `bootstrap-select-1.12.2.patched.js` from `query_app_vendor_scripts.html` (R4) and their SCSS (R5), then delete both scripts from `web/public/js/vendor/` and `web/public/js/vendor/min/` (this role, after R4). Check: no `.selectpicker`, `.datepicker(`, `.input-daterange`, `.input-append`, `.bs-searchbox` usage in `web/client` or templates (the React `DatePicker` does not use them); `yarn build`; page check.
 7. Page check across the stack: all 15 page routes render with no console errors (`verify`), once R1 to R5 have landed in this stack.
 
-Out of scope, noted for the lead: `web/client/entryPoints/newUserButtonEntry.js` is built as an entry but no template loads `newUserButton.bundle.js`. It looks dead; it is not on the phase 0e list, so it is left alone here.
-
 ## Contract changes
 
 None.
@@ -49,6 +61,7 @@ None.
 ### Requests addressed to the human lead
 
 - [ ] human: Should Alerts be revived or deleted? `/alerts` and `/<locale>/alerts` render `notfound.html` today (`web/server/routes/index.py`, `alerts()`), while webpack still builds the `alerts` entry (`web/client/entryPoints/alertsAppEntry.js`). This WP leaves the route, the entry and the Alerts code as they are until product answers.
+- [ ] human: Should the `newUserButton` entry be deleted? `web/client/entryPoints/newUserButtonEntry.js` is built as a webpack entry, but no template loads `newUserButton.bundle.js`. It is not on the phase 0e list, so this WP leaves it alone.
 
 ## Log
 
@@ -63,6 +76,7 @@ None.
 - 2026-10-04 frontend-platform-1: merged `mig/WP-0e-dead-frontend-code-backend` (08337c2) and `mig/WP-0e-dead-frontend-code-design` (f979ad4); units 3 and 4 are done by R1 and R2.
 - 2026-10-04 frontend-platform-1 units 5 and 6: deleted `bootstrap-5.2.0.js`, `bootstrap-datepicker-1.5.1.js` and `bootstrap-select-1.12.2.patched.js` from `web/public/js/vendor/` and `vendor/min/` (5522214); check: zero references repo-wide; `yarn install --frozen-lockfile` and `yarn build` pass on host Node 24 and in the node:18.17 image; JS bundles identical to `main`, CSS loses only plugin rules.
 - 2026-10-04 frontend-platform-1 unit 7: every page template rendered with Jinja2 on `main` and on this branch; the output differs only by the removed script tags, and every remaining script URL resolves to a file. The running-app check is deferred to the QA harness (WP-2e), see Evidence.
+- 2026-10-04 frontend-platform-1 review fixes (rev-0e): listed backend-3 and frontend-design-1 instances, corrected the `auth/` claim (20 templates lose Bootstrap 5, including `/user/profile`), added `/user/profile` and the embedded-query iframe to the WP-2e list, fixed the `.jsx` name in the navbar entry comment, and moved the `newUserButton` note to Requests; check: render harness extended to `auth/`, 0 failures, diff shows only removed script tags; eslint clean on `navbarEntry.js`.
 
 ## Evidence
 
@@ -82,19 +96,21 @@ None.
 - **No references remain.** `grep -rnE "bootstrap-5\.2\.0|bootstrap-datepicker|bootstrap-select|selectpicker|asyncMapChunk|facilities_map|['\"/]query\.html" --exclude-dir=node_modules --exclude-dir=docs --exclude-dir=build --exclude-dir=agent-memory .` returns nothing (exit 1).
 - **Template render check (unit 7).**
   - **Method.** `web/server/templates` was exported from `main` and from HEAD with `git archive`. Each page template was then rendered with Jinja2 3.1.6, with `is_screenshot_request` both false and true. The stubs were `config` (`VENDOR_SCRIPT_PATH=/js/vendor/min/`, `IS_PRODUCTION=False`), `sourcemap={}`, `url_for`, `get_flashed_messages` and `pass_to_js`, with `ChainableUndefined` for everything else.
-  - **Coverage.** 21 templates render on `main`: admin, advanced_query, data_catalog, data_catalog_changes, data_digest, data_quality, data_status, data_upload, embedded_query, facilities_map, field_setup, forgot_password, grid_dashboard, layout, login, notfound, overview, query, register, reset_password, unauthorized. 19 render on the branch, because two were deleted. There are 0 failures on either side. The `emails/` and `auth/` templates are excluded because they need the app's `flask_user` loader and none of them uses a changed file. `query_app_vendor_scripts.html` is a partial; it is covered through the 12 pages that include it.
+  - **Coverage.** 23 templates render on `main`: admin, advanced_query, auth/layout, auth/user_profile, data_catalog, data_catalog_changes, data_digest, data_quality, data_status, data_upload, embedded_query, facilities_map, field_setup, forgot_password, grid_dashboard, layout, login, notfound, overview, query, register, reset_password, unauthorized. 21 render on the branch, because two were deleted. There are 0 failures on either side. `auth/user_profile.html` needs the `i18n` extension and Flask-User 0.6.21's own templates (`flask_user/_macros.html`, from the pinned sdist) on the loader path, and both were added. Only `emails/` is excluded: email templates extend `emails/base_email.html`, not `layout.html`, and none of them includes a changed file. `query_app_vendor_scripts.html` is a partial; it is covered through the 12 pages that include it.
+  - **Correction (review rev-0e).** An earlier revision said no `auth/` template uses a changed file. That was wrong. `auth/layout.html` extends `layout.html`, and `auth/user_profile.html` (Flask-User `USER_PROFILE_TEMPLATE`, served at `/user/profile`) extends `auth/layout.html`. Both lose the `bootstrap-5.2.0.js` tag and nothing else. Neither page, nor any other rendered page, carries a `data-bs-*`, `data-toggle` or `data-dismiss` attribute.
   - **Diff.** `diff -r` of the rendered output shows only:
-    - the `bootstrap-5.2.0.js` tag, removed from the 18 remaining outputs built on `layout.html`;
+    - the `bootstrap-5.2.0.js` tag, removed from the 20 remaining templates built on `layout.html`: 18 top-level ones plus `auth/layout` and `auth/user_profile`;
     - the `bootstrap-datepicker` and `bootstrap-select` tags, removed from the 12 remaining pages that include `query_app_vendor_scripts.html`;
     - `asyncMapChunk.bundle.js`, removed from `grid_dashboard.html` only when `is_screenshot_request` is true;
     - the outputs of the two deleted templates.
   - **Script URLs.** All 26 distinct script URLs in the branch's rendered pages resolve to a file in the build output or `web/public/js`. On `main`, `/build/asyncMapChunk.bundle.js` did not resolve.
 - **Deferred to the QA harness (WP-2e).** These need the running app, which needs Druid with `harmony_demo` data, Postgres and Hasura, and could not be started this session:
-  - every page route at 390, 1024 and 1440 px with no console errors (`verify`), in particular the 18 pages that no longer load Bootstrap 5 JS and the 12 that no longer load bootstrap-select and bootstrap-datepicker;
+  - every page route at 390, 1024 and 1440 px with no console errors (`verify`), in particular the 20 templates that no longer load Bootstrap 5 JS and the 12 that no longer load bootstrap-select and bootstrap-datepicker. Include `/user/profile` (`auth/user_profile.html`), which the 15-route smoke list does not cover;
+  - `embedded_query.html` loaded inside an iframe (`is_iframe_request`, the `embedded-page` body class), since it loses all three plugin scripts;
   - a dashboard screenshot or export with a map tile (`is_screenshot_request`), to confirm that dropping the never-built `asyncMapChunk` tag leaves map tiles rendering as before;
   - a visual pass on pages using the query form, data quality and visualization controls, to confirm the 111 removed plugin CSS rules styled nothing on screen.
 - **Deslop (units 5 to 7).** The diff is six file deletions plus the WP file; there is nothing to narrate.
-- **R1 to R4 templates (backend-3).** Every file under `web/server/templates` was compiled and rendered with Jinja2 3 before and after the change. Undefined names and helpers were stubbed, and each template was rendered with `is_screenshot_request` both false and true. All 34 files compile before and all 32 compile after. `diff -r` of the rendered output shows only removed `<script>` tags (`bootstrap-5.2.0.js` from every page that extends `layout.html`; `bootstrap-datepicker`/`bootstrap-select` from every page that includes `query_app_vendor_scripts.html`; `asyncMapChunk.bundle.js` only from `grid_dashboard.html` with `is_screenshot_request` true) plus the outputs of the two deleted templates. Seven email and `auth/user_profile` templates do not render under this harness (they need the app's `flask_user` loader and repo-root paths). That fails identically before and after, and none of them touches the changed files. `grep -rnE "asyncMapChunk|bootstrap-5\.2\.0|bootstrap-datepicker|bootstrap-select|['\"/](query|facilities_map)\.html" --exclude-dir={node_modules,.git,docs,public} .` returns nothing. Under `web/public` the only matches are the vendor scripts (frontend-platform units 5 and 6) and the SCSS in R5.
+- **R1 to R4 templates (backend-3).** Every file under `web/server/templates` was compiled and rendered with Jinja2 3 before and after the change. Undefined names and helpers were stubbed, and each template was rendered with `is_screenshot_request` both false and true. All 34 files compile before and all 32 compile after. `diff -r` of the rendered output shows only removed `<script>` tags (`bootstrap-5.2.0.js` from every page that extends `layout.html`; `bootstrap-datepicker`/`bootstrap-select` from every page that includes `query_app_vendor_scripts.html`; `asyncMapChunk.bundle.js` only from `grid_dashboard.html` with `is_screenshot_request` true) plus the outputs of the two deleted templates. Seven email and `auth/user_profile` templates do not render under this harness (they need the app's `flask_user` loader and repo-root paths). That fails identically before and after. *Correction by frontend-platform-1 (review rev-0e): `auth/user_profile` does use a changed file. It extends `auth/layout.html`, which extends `layout.html`, so `/user/profile` loses the `bootstrap-5.2.0.js` tag. The render check in unit 7 renders it, and it is on the WP-2e page list.* `grep -rnE "asyncMapChunk|bootstrap-5\.2\.0|bootstrap-datepicker|bootstrap-select|['\"/](query|facilities_map)\.html" --exclude-dir={node_modules,.git,docs,public} .` returns nothing. Under `web/public` the only matches are the vendor scripts (frontend-platform units 5 and 6) and the SCSS in R5.
 - **R5 SCSS deletion (frontend-design-1).**
   - **Scope.** Every top-level selector in the two vendor files names a plugin-only class: `datepicker`, `input-daterange`, `input-append`/`input-prepend`, `bootstrap-select` or `bs-*`. Neither file nests rules.
   - **No users.** A case-sensitive `grep -rnE "bootstrap-select|selectpicker|bs-searchbox|bs-actionsbox|bs-donebutton|bs-container|datepicker|input-daterange|input-append|input-prepend|show-menu-arrow|filter-option" web/client web/server/templates` matches only the two `<script>` tags in `query_app_vendor_scripts.html` (R4).

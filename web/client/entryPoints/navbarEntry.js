@@ -4,7 +4,7 @@
  * dependency.
  *
  * If a template has other JS dependencies, create a new entry point for it and
- * render the Navbar within that entry point. Do not include navbarEntry.jsx as
+ * render the Navbar within that entry point. Do not include navbarEntry.js as
  * well, otherwise you'll be downloading a lot of duplicate boilerplate.
  */
 import 'translate';

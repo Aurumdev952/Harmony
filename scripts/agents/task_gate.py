@@ -19,7 +19,12 @@ TOP_LEVEL = re.compile(r'^\s*WP-([0-9]+[a-z])\s*:', re.IGNORECASE)
 
 
 def repo_root(cwd: str) -> Path:
-    out = subprocess.run(['git', '-C', cwd, 'rev-parse', '--show-toplevel'], capture_output=True, text=True, check=True)
+    out = subprocess.run(
+        ['git', '-C', cwd, 'rev-parse', '--show-toplevel'],
+        capture_output=True,
+        text=True,
+        check=True,
+    )
     return Path(out.stdout.strip())
 
 
@@ -43,32 +48,81 @@ def verdicts(text: str) -> dict[str, str]:
     return rows
 
 
+def spec_roles(root: Path, wp: str) -> list[str]:
+    """Owner plus supporting roles from the SPEC WP table, e.g. ['backend', 'core', 'infra']."""
+    for line in (root / 'docs/modernisation/SPEC.md').read_text().splitlines():
+        cells = [c.strip() for c in line.strip().strip('|').split('|')]
+        if len(cells) >= 5 and cells[0].lower() == wp.lower():
+            return [cells[2]] + [
+                r.strip()
+                for r in cells[3].split(',')
+                if r.strip() and r.strip() != 'none'
+            ]
+    return []
+
+
+ROLES = 'core|backend|frontend-platform|frontend-design|visualization|data-platform|pipeline|infra|qa'
+INSTANCE_DECL = re.compile(rf'^\s*-\s*name:\s*"?({ROLES})-\d+"?', re.M)
+LOG_LINE = re.compile(rf'^\d{{4}}-\d{{2}}-\d{{2}}\s+({ROLES})-\d+\b', re.M)
+
+
+def contributing_roles(text: str) -> list[str]:
+    """Roles whose instances the WP file declares (front matter) or that wrote a dated log line."""
+    return sorted(set(INSTANCE_DECL.findall(text)) | set(LOG_LINE.findall(text)))
+
+
 def problems_for(root: Path, wp: str) -> list[str]:
     path = root / WORK / f'WP-{wp}.md'
     if not path.exists():
-        return [f'{path.relative_to(root)} does not exist; claim the WP first (SPEC 7.1)']
+        return [
+            f'{path.relative_to(root)} does not exist; claim the WP first (SPEC 7.1)'
+        ]
     text = path.read_text()
     meta = front_matter(text)
     found = []
     if meta.get('status') not in ('ready', 'done'):
         found.append(f'status is "{meta.get("status")}", expected ready or done')
     v = verdicts(text)
-    required = ['qa', 'reviewer'] + (['security'] if meta.get('security_review') == 'true' else [])
+    required = ['qa', 'reviewer'] + (
+        ['security'] if meta.get('security_review') == 'true' else []
+    )
     for role in required:
         if v.get(role) != 'approved':
-            found.append(f'{role} verdict is "{v.get(role, "missing")}", expected approved')
+            found.append(
+                f'{role} verdict is "{v.get(role, "missing")}", expected approved'
+            )
     branch, role = meta.get('branch', ''), meta.get('owner_role', '')
     if branch and role and (root / OWNERSHIP).exists():
-        exists = subprocess.run(['git', '-C', str(root), 'rev-parse', '--verify', '-q', branch], capture_output=True)
+        exists = subprocess.run(
+            ['git', '-C', str(root), 'rev-parse', '--verify', '-q', branch],
+            capture_output=True,
+        )
         if exists.returncode != 0:
             found.append(f'branch {branch} not found')
         else:
+            roles = spec_roles(root, wp) or [role]
+            if role not in roles:
+                roles.insert(0, role)
+            roles += [r for r in contributing_roles(text) if r not in roles]
+            role_args = [arg for r in roles for arg in ('--role', r)]
             check = subprocess.run(
-                [sys.executable, str(root / OWNERSHIP), 'check', '--role', role, '--head', branch],
-                capture_output=True, text=True, cwd=root,
+                [
+                    sys.executable,
+                    str(root / OWNERSHIP),
+                    'check',
+                    *role_args,
+                    '--head',
+                    branch,
+                ],
+                capture_output=True,
+                text=True,
+                cwd=root,
             )
             if check.returncode != 0:
-                found.append('files outside the owner role:\n  ' + check.stdout.strip().replace('\n', '\n  '))
+                found.append(
+                    'files outside the owner role:\n  '
+                    + check.stdout.strip().replace('\n', '\n  ')
+                )
     return found
 
 
@@ -76,7 +130,9 @@ def main() -> int:
     if len(sys.argv) > 1:
         wp = sys.argv[1].removeprefix('WP-')
         found = problems_for(repo_root('.'), wp)
-        print('\n'.join(found) if found else f'WP-{wp} meets the definition of done gates')
+        print(
+            '\n'.join(found) if found else f'WP-{wp} meets the definition of done gates'
+        )
         return 1 if found else 0
     event = json.load(sys.stdin)
     m = TOP_LEVEL.match(event.get('task_subject', ''))
@@ -85,7 +141,10 @@ def main() -> int:
     found = problems_for(repo_root(event.get('cwd', '.')), m.group(1).lower())
     if not found:
         return 0
-    print(f'WP-{m.group(1)} cannot close yet (SPEC section 8):\n- ' + '\n- '.join(found), file=sys.stderr)
+    print(
+        f'WP-{m.group(1)} cannot close yet (SPEC section 8):\n- ' + '\n- '.join(found),
+        file=sys.stderr,
+    )
     return 2
 
 

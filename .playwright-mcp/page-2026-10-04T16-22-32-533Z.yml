@@ -1,0 +1,65 @@
+- generic [ref=f3e1]:
+  - generic [ref=f3e2]:
+    - button [ref=f3e3] [cursor=pointer]
+    - generic [ref=f3e6]:
+      - generic [ref=f3e7]:
+        - link [ref=f3e8] [cursor=pointer]:
+          - /url: /advanced-query
+          - button "Analyze" [ref=f3e9]
+        - button "Dashboards" [ref=f3e11] [cursor=pointer]
+        - link [ref=f3e12] [cursor=pointer]:
+          - /url: /data-quality
+          - button "Data Quality" [ref=f3e13]
+      - button "Brow " [ref=f3e17] [cursor=pointer]:
+        - generic [ref=f3e19]:
+          - text: Brow
+          - generic [ref=f3e20]: 
+  - main [aria-hidden] [ref=f3e21]:
+    - generic [ref=f3e24]:
+      - generic [ref=f3e75]:
+        - button [ref=f3e133] [cursor=pointer]:
+          - heading [level=1] [ref=f3e134]: All resources
+        - button [ref=f3e82] [cursor=pointer]:
+          - generic [ref=f3e84]: 
+      - generic [ref=f3e85]:
+        - generic [ref=f3e87]:
+          - generic [ref=f3e88]: 2 results
+          - generic [ref=f3e89]:
+            - button [ref=f3e135] [cursor=pointer]:
+              - generic [ref=f3e91]: Create new group
+            - button [ref=f3e136] [cursor=pointer]:
+              - generic [ref=f3e98]:
+                - generic [ref=f3e99]: ✏
+                - generic [ref=f3e101]: Define new indicator
+        - table [ref=f3e102]:
+          - table [ref=f3e103]:
+            - row [ref=f3e137]:
+              - columnheader [ref=f3e138]: Name
+              - columnheader [ref=f3e139]: Description
+              - columnheader [ref=f3e140]: Data Source
+              - columnheader [ref=f3e141]: Status
+            - row [ref=f3e142] [cursor=pointer]:
+              - cell [ref=f3e143]:
+                - generic [ref=f3e115]: Group
+              - cell [ref=f3e116]
+              - cell [ref=f3e117]
+              - cell [ref=f3e144]:
+                - generic [ref=f3e119]: Visible
+              - cell [ref=f3e120]
+            - row [ref=f3e145] [cursor=pointer]:
+              - cell [ref=f3e146]:
+                - generic [ref=f3e127]: QA probe
+              - cell [ref=f3e128]
+              - cell [ref=f3e129]
+              - cell [ref=f3e147]:
+                - generic [ref=f3e131]: Visible
+              - cell [ref=f3e132]
+  - dialog "Prompt Modal" [active] [ref=f3e149]:
+    - heading "Create new group" [level=3] [ref=f3e151]
+    - textbox "Name" [ref=f3e153]
+    - generic [ref=f3e155]:
+      - button "save" [disabled] [ref=f3e157]:
+        - generic [ref=f3e158]: Save
+      - button "cancel" [ref=f3e160] [cursor=pointer]:
+        - generic [ref=f3e161]: Cancel
+    - button "×" [ref=f3e162] [cursor=pointer]

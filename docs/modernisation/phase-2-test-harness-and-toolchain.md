@@ -14,7 +14,7 @@ Back to [overview](overview.md). Strategy: [testing.md](testing.md).
 
 ## 2b. Permission and policy tests
 
-- **Changes.** Add table-driven tests over `web/server/security/permissions.py`, the resource managers in `web/server/potion/managers.py`, and `restrict_query_filter_to_user_permissions`. Each row is a principal, an action, a resource and the expected allow or deny.
+- **Changes.** Add table-driven tests over `web/server/security/permissions.py`, the resource managers in `web/server/potion/managers.py`, and `caller_policy_filter` / `and_policy_filter` (the policy path behind `AuthorizedQueryClient.run_query`; WP-0c renamed them from `restrict_query_filter_to_user_permissions`). Each row is a principal, an action, a resource and the expected allow or deny.
 - **Verification.** Every role type in the seed scripts has at least one allow case and one deny case.
 
 ## 2c. API contract recordings

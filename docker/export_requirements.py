@@ -19,6 +19,7 @@ import re
 import sys
 import tomllib
 from pathlib import Path
+from typing import Any
 
 ROOT = Path(__file__).resolve().parents[1]
 HEADER = (
@@ -32,31 +33,69 @@ TARGETS = {
     "requirements-dev.txt": "dev",
 }
 NAME = re.compile(r"^[A-Za-z0-9][A-Za-z0-9._-]*")
+COMMIT_SHA = re.compile(r"^[0-9a-f]{40}$")
+
+
+class ExportError(Exception):
+    pass
+
+
+def normalise(name: str) -> str:
+    """PEP 503 name normalisation, as uv applies it to [tool.uv.sources] keys."""
+    return re.sub(r"[-_.]+", "-", name).lower()
+
+
+def requirement_name(requirement: str) -> str:
+    match = NAME.match(requirement)
+    return normalise(match.group(0)) if match else ""
 
 
 def render(requirements: list[str], sources: dict[str, dict[str, str]]) -> str:
     lines = []
     for requirement in requirements:
-        match = NAME.match(requirement)
-        name = match.group(0) if match else ""
-        source = sources.get(name)
+        source = sources.get(requirement_name(requirement))
         if source is not None:
-            lines.append(f"-e git+{source['git']}@{source['rev']}#egg={name}")
+            name = NAME.match(requirement)
+            assert name is not None
+            lines.append(f"-e git+{source['git']}@{source['rev']}#egg={name.group(0)}")
         else:
             lines.append(requirement)
     return HEADER + "\n".join(lines) + "\n"
 
 
+def git_sources(
+    pyproject: dict[str, Any], requirements: list[str]
+) -> dict[str, dict[str, str]]:
+    sources = {
+        normalise(name): source
+        for name, source in pyproject["tool"]["uv"]["sources"].items()
+    }
+    for name, source in sources.items():
+        if not COMMIT_SHA.match(source.get("rev", "")):
+            raise ExportError(
+                f"[tool.uv.sources] {name}: rev must be a 40-character commit SHA"
+            )
+    unused = set(sources) - {requirement_name(r) for r in requirements}
+    if unused:
+        raise ExportError(
+            f"[tool.uv.sources] not used by any requirement: {', '.join(sorted(unused))}"
+        )
+    return sources
+
+
 def expected_files(root: Path) -> dict[Path, str]:
     pyproject = tomllib.loads((root / "pyproject.toml").read_text())
-    sources = pyproject["tool"]["uv"]["sources"]
     groups = pyproject["dependency-groups"]
-    return {
-        root / filename: render(
-            pyproject["project"]["dependencies"] if group is None else groups[group],
-            sources,
-        )
+    lists = {
+        filename: pyproject["project"]["dependencies"]
+        if group is None
+        else groups[group]
         for filename, group in TARGETS.items()
+    }
+    sources = git_sources(pyproject, [r for group in lists.values() for r in group])
+    return {
+        root / filename: render(requirements, sources)
+        for filename, requirements in lists.items()
     }
 
 
@@ -66,8 +105,13 @@ def main(argv: list[str] | None = None, root: Path = ROOT) -> int:
         "--check", action="store_true", help="report stale files and exit 1"
     )
     args = parser.parse_args(argv)
+    try:
+        expected = expected_files(root)
+    except ExportError as error:
+        print(error, file=sys.stderr)
+        return 2
     stale = []
-    for path, content in expected_files(root).items():
+    for path, content in expected.items():
         current = path.read_text() if path.exists() else None
         if current == content:
             continue

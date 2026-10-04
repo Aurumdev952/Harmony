@@ -14,7 +14,7 @@
 checks:
   # Site permissions (page routes and custom API routes)
   - {check: [view_query_form, site, null], used_by: "/query, /advanced-query, user_query_session",
-     allow: [tag:superuser, role:query_analyst, role:_default_role, session:_default_role]}
+     allow: [tag:superuser, role:query_analyst, role:_default_role, session:_default_role, api_token:_default_role]}
   - {check: [view_admin_page, site, null], used_by: "/admin, /data-status, /data-digest, /uploads, self-serve and data-catalog exports",
      allow: [tag:superuser, role:manager]}
   - {check: [view_data_quality, site, null], used_by: /data-quality,
@@ -45,17 +45,17 @@ checks:
   # Dashboards (Resource.id; the creator holds a dashboard_admin ACL)
   - {check: [view_resource, dashboard, null], used_by: "Potion dashboard list returns every dashboard",
      allow: [tag:superuser, role:dashboard_viewer, role:dashboard_editor, role:dashboard_admin, group_dashboard_admin]}
-  - {check: [view_resource, dashboard, 7], used_by: "dashboard page, embed, export, thumbnail, GET /api2/dashboard/<id>",
+  - {check: [view_resource, dashboard, 7], used_by: "dashboard page, embed, PDF and JPEG export, /api2/storage/retrieve, GET /api2/dashboard/<id>; the PNG thumbnail route has no check (N1, test_render_routes.py)",
      allow: [tag:superuser, role:dashboard_viewer, role:dashboard_editor, role:dashboard_admin, group_dashboard_admin,
              dashboard_owner, dashboard_acl_editor, dashboard_acl_viewer, group_acl_viewer, session:dashboard_owner,
-             render_token:admin, render_token:dashboard_acl_viewer]}
+             render_token:admin, render_token:admin_via_group, render_token:dashboard_acl_viewer]}
   - {check: [view_resource, dashboard, 8], used_by: "a dashboard nobody holds an ACL on",
      allow: [tag:superuser, role:dashboard_viewer, role:dashboard_editor, role:dashboard_admin, group_dashboard_admin]}
   - {check: [view_resource, dashboard, 9], used_by: "a dashboard with a sitewide ACL, where the principal has one",
      allow: [tag:superuser, role:dashboard_viewer, role:dashboard_editor, role:dashboard_admin, group_dashboard_admin,
              anonymous_public, signed_in_public]}
   - {check: [create_resource, dashboard, null], used_by: "POST /api2/dashboard",
-     allow: [tag:superuser, role:dashboard_admin, group_dashboard_admin, role:_default_role, session:_default_role]}
+     allow: [tag:superuser, role:dashboard_admin, group_dashboard_admin, role:_default_role, session:_default_role, api_token:_default_role]}
   - {check: [edit_resource, dashboard, 7], used_by: "PATCH /api2/dashboard/<id>, add_item",
      allow: [tag:superuser, role:dashboard_editor, role:dashboard_admin, group_dashboard_admin,
              dashboard_owner, dashboard_acl_editor, session:dashboard_owner]}

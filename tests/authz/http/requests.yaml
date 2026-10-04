@@ -2,6 +2,8 @@
 # decision is only visible over HTTP: page decorators, which render the
 # "unauthorized" page with status 200 instead of failing, and the /api2
 # authentication gate. Recorded against harmony_demo with public_access off.
+# The dashboard render routes (thumbnail, PDF, JPEG) are covered in-process by
+# tests/authz/test_render_routes.py, with the outbound renderer mocked.
 #
 # Principals: `anonymous` and `role:<name>` for every role in seed.yaml.
 # Outcomes (tests/authz/http/stack.py `outcome`): `login`, `redirect:<path>`,

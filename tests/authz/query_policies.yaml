@@ -155,6 +155,19 @@ cases:
     policies: [[source, null], [StateName, null]]
     jwt: {needs: ['*'], query_needs: [{source: {included_values: [S1]}}]}
     expect: {eq: [StateName, __NO_VAL__]}
+  # Superuser tokens with needs ['*'] keep RoleNeed('admin'), so their own
+  # query_needs never reach the filter. Defect pinned as today (WP-0c review,
+  # Low); owner WP-4e, issuance in WP-5d.
+  - name: superuser_token_ignores_its_own_query_needs
+    principal: role:admin
+    policies: []
+    jwt: {needs: ['*'], query_needs: [{source: {include_values: [S1]}}]}
+    expect: null
+  - name: superuser_via_group_token_ignores_its_own_query_needs
+    principal: admin_via_group
+    policies: []
+    jwt: {needs: ['*'], query_needs: [{StateName: {include_values: [A]}}]}
+    expect: null
   - name: token_cannot_widen_account_policies
     policies: [[source, S1], [StateName, A]]
     jwt: {needs: ['*'], query_needs: [{source: {include_values: [S1, S2]}}, {StateName: {}}]}

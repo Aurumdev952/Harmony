@@ -11,6 +11,8 @@ import pytest
 os.environ.setdefault('DEFAULT_SECRET_KEY', 'tests-authz-placeholder-key')
 os.environ.setdefault('DRUID_HOST', 'http://druid.invalid')
 os.environ.setdefault('ZEN_ENV', 'harmony_demo')
+os.environ.setdefault('RENDERBOT_EMAIL', 'renderbot@authz.invalid')
+os.environ.setdefault('URLBOX_API_URL', 'http://urlbox.invalid')
 
 # pylint: disable=wrong-import-position
 from flask import Flask, g

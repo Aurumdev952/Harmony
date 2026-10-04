@@ -80,10 +80,28 @@ principals:
     roles: [_default_role]
     jwt: {needs: ['*'], query_needs: ['*']}
     tags: [signed_in]
+  session:admin_via_group:
+    groups: [{roles: [admin]}]
+    jwt: {needs: ['*'], query_needs: ['*']}
+    tags: [signed_in, superuser]
+
+  # API tokens (APIToken.generate_token): the session claims plus the token id,
+  # which login_from_request checks for revocation (tests/authz/http).
+  api_token:_default_role:
+    roles: [_default_role]
+    jwt: {id: authztoken, needs: ['*'], query_needs: ['*']}
+    tags: [signed_in]
+  api_token:admin:
+    roles: [admin]
+    jwt: {id: authztoken, needs: ['*'], query_needs: ['*']}
+    tags: [signed_in, superuser]
 
   # Export render tokens (page_renderer.py): one dashboard, every query need.
   render_token:admin:
     roles: [admin]
+    jwt: {needs: [[view_resource, 7, dashboard]], query_needs: ['*']}
+  render_token:admin_via_group:
+    groups: [{roles: [admin]}]
     jwt: {needs: [[view_resource, 7, dashboard]], query_needs: ['*']}
   render_token:dashboard_acl_viewer:
     acls: [{resource: 7, role: dashboard_viewer}]

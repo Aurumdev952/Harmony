@@ -1,6 +1,5 @@
 // @flow
 import environment from 'util/graphql/environment';
-import zenEnvironment from 'util/graphql/zen_environment';
 import {
   databaseIdToRelayId,
   relayIdToDatabaseId,
@@ -16,5 +15,4 @@ export {
   relayIdToDatabaseNumberId,
   relayIdToDatabaseIdV2,
   relayIdToDatabaseNumberIdV2,
-  zenEnvironment,
 };

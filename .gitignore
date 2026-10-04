@@ -225,3 +225,6 @@ scripts/agents/__pycache__/
 
 # Playwright MCP snapshots written into the checkout by browser sessions
 .playwright-mcp/
+
+# hypothesis example database (contract and pipeline property tests)
+.hypothesis/

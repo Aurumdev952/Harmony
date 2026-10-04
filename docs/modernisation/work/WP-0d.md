@@ -349,5 +349,5 @@ Branch `mig/WP-0d-dead-backend-code-druid`. It was created from `mig/WP-0d-dead-
 | Role | Verdict | Notes |
 |---|---|---|
 | qa | changes-requested | 2026-10-04 qa-0d at 5f3e040: every deletion verified (grep, reverse deps, web image import sweep and 315-rule route map, 540 contract replays on the trimmed image, yarn build, pipeline image with WP-0b's Dockerfile). Blocker: the cryptography==41.0.7 PyPy pin installs but importing it aborts the pipeline image's PyPy 7.3.9 (Fatal RPython error); latent since nothing imports gspread/google.auth under PyPy. Fix evidence and either exclude gspread from PyPy with a marker (its only reverse dep) or track for WP-3b. Note: mypy.ini still has [mypy-graphql_relay.*]. |
-| reviewer | pending | |
+| reviewer | changes-requested | 2026-10-05 rev-0d at 5f3e040: deletions correct and tested. Fix: dead /graphql tool chain left (scripts/db/graphql/sync_schema.sh, graphql/v2/schema.graphql, relay-web npm script); WP-2f hand-off not recorded (requirements and mypy conflicts; the PyPy cryptography pin would be lost by make requirements); the pin has advisories and no removal plan (WP-3b deletes the line); aniso8601 7->10 transitive change unrecorded; [mypy-graphql_relay.*] dead; 350 KB of duplicate evidence; file-absence test; stale lead request. |
 | security | n/a | |

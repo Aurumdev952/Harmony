@@ -1,0 +1,2 @@
+- [Compose testing traps](compose_testing_traps.md) — dummy env files, worktree Bash guard, host port clashes, anonymous volumes, redis-cli exit codes
+- [Upstream artifacts gone](upstream_artifacts_gone.md) — MinIO images gone, mc downloads 410; pinned GitHub release; R5 pending

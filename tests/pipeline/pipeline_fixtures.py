@@ -54,6 +54,7 @@ FIELD_COLUMN = 'field'
 # {"data": {field: val}} row for Druid's nestedJson parser.
 NESTED_DATA_COLUMN = 'data'
 ERROR_SUFFIX = '.error.txt'
+_ABSENT = object()
 
 
 @dataclasses.dataclass(frozen=True)
@@ -277,9 +278,14 @@ def canonical_schema(rows: Sequence[dict]) -> str:
 
 
 def _druid_facts(row: dict) -> list[tuple[str, float]]:
-    """(field, val) pairs of one Druid row, in the flat or the nestedJson row shape."""
-    if NESTED_DATA_COLUMN in row:
-        return list(row[NESTED_DATA_COLUMN].items())
+    """(field, val) pairs of one Druid row, in the flat or the nestedJson row shape.
+
+    A typed table carries a null ``data`` on flat rows and null struct members for
+    fields a nested row lacks; neither is a value.
+    """
+    nested = row.get(NESTED_DATA_COLUMN)
+    if nested is not None:
+        return [(field, value) for field, value in nested.items() if value is not None]
     fields = row[FIELD_COLUMN]
     return [
         (field, row[VALUE_COLUMN])
@@ -287,22 +293,50 @@ def _druid_facts(row: dict) -> list[tuple[str, float]]:
     ]
 
 
+def _stored_dimension(value: object) -> object:
+    """A dimension value as Druid stores it, or ``_ABSENT`` when it stores nothing.
+
+    Druid keeps no value for a missing column, null or ``[]``, stores a one-element
+    list as its element, and sorts multi-value lists. ``''`` stays distinct from
+    absent, as it does under Druid 37's SQL-compatible null handling.
+    """
+    if value is None:
+        return _ABSENT
+    if isinstance(value, list):
+        if not value:
+            return _ABSENT
+        if len(value) == 1:
+            return value[0]
+        return sorted(value)
+    return value
+
+
+def _stored_dimensions(row: dict) -> dict:
+    stored = {}
+    for column, value in row.items():
+        if column in (VALUE_COLUMN, NESTED_DATA_COLUMN, FIELD_COLUMN):
+            continue
+        value = _stored_dimension(value)
+        if value is not _ABSENT:
+            stored[column] = value
+    return stored
+
+
 def contract_rollup(rows: Iterable[dict]) -> str:
     """What Druid stores per query-visible key after ingest rollup.
 
     Mirrors ``db/druid/indexing``: queryGranularity none, metrics count, doubleSum,
     doubleMin and doubleMax over ``val``. A multi-valued ``field`` is exploded, because
-    a filter on one field id matches the collapsed zero row. The sum is ``math.fsum``,
-    the correctly rounded sum, so it does not depend on row order.
+    a filter on one field id matches the collapsed zero row. Dimensions are compared
+    as Druid stores them (``_stored_dimension``), so a typed Parquet round trip of the
+    same rows gives the same facts. The sum is ``math.fsum``, the correctly rounded
+    sum, so it does not depend on row order.
     """
     groups: dict[str, list[float]] = {}
     for row in rows:
+        dimensions = _stored_dimensions(row)
         for field, value in _druid_facts(row):
-            key = {
-                k: v
-                for k, v in row.items()
-                if k not in (VALUE_COLUMN, NESTED_DATA_COLUMN)
-            }
+            key = dict(dimensions)
             key[FIELD_COLUMN] = field
             groups.setdefault(_dump(key), []).append(float(value))
     lines = []
@@ -322,13 +356,12 @@ def contract_rollup(rows: Iterable[dict]) -> str:
 
 
 def contract_columns(rows: Iterable[dict]) -> str:
-    """The Druid column set, one name per line, with the field and value columns named
-    as Druid ingests them whatever the row layout."""
+    """The Druid columns that hold a stored value in some row, one name per line, with
+    the field and value columns named as Druid ingests them whatever the row layout."""
     columns = set()
     for row in rows:
-        columns.update(k for k in row if k != NESTED_DATA_COLUMN)
-        if NESTED_DATA_COLUMN in row:
-            columns.update((FIELD_COLUMN, VALUE_COLUMN))
+        columns.update(_stored_dimensions(row))
+        columns.update((FIELD_COLUMN, VALUE_COLUMN))
     return ''.join(f'{column}\n' for column in sorted(columns))
 
 

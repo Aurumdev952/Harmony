@@ -11,11 +11,13 @@ import pytest
 from pipeline_cases import CASES, PROCESS_OUTPUTS, TALL_ARGS
 from pipeline_fixtures import (
     GOLDEN_DIR,
+    NESTED_DATA_COLUMN,
     PROCESS_CSV,
     Case,
     Step,
     canonical_rows,
     capture_raw,
+    contract_columns,
     contract_rollup,
     golden_files,
     layers,
@@ -109,6 +111,74 @@ def test_without_date_column_rows_are_dated_today(tmp_path):
     rows = [json.loads(line) for line in raw['processed_data.json'].splitlines()]
     assert rows
     assert {row['Real_Date'] for row in rows} <= {before, after}
+
+
+def _typed_table_round_trip(rows: list[dict]) -> list[dict]:
+    """What a typed columnar writer (Polars to Parquet, then to_dicts) returns.
+
+    Every row gets every column, missing ones as null. A column holding any list
+    becomes a list column, so its scalars become one-element lists. ``val`` becomes a
+    float column, and the nestedJson ``data`` object a struct with every field.
+    """
+    columns = sorted({column for row in rows for column in row})
+    list_columns = {
+        column
+        for column in columns
+        if any(isinstance(row.get(column), list) for row in rows)
+    }
+    struct_fields = sorted(
+        {field for row in rows for field in (row.get(NESTED_DATA_COLUMN) or {})}
+    )
+    typed = []
+    for row in rows:
+        out = {}
+        for column in columns:
+            value = row.get(column)
+            if column == NESTED_DATA_COLUMN and value is not None:
+                value = {field: value.get(field) for field in struct_fields}
+            elif column == 'val' and value is not None:
+                value = float(value)
+            elif (
+                column in list_columns
+                and value is not None
+                and not isinstance(value, list)
+            ):
+                value = [value]
+            out[column] = value
+        typed.append(out)
+    return typed
+
+
+@pytest.mark.parametrize(
+    'case', [name for name in CASE_NAMES if golden_files(name, 'contract')]
+)
+def test_contract_survives_a_typed_table_round_trip(case):
+    """A Parquet rewrite that stores the same Druid rows reproduces contract/."""
+    rows = [
+        json.loads(line)
+        for line in golden_files(case, 'canonical')
+        .get('druid_rows.jsonl', b'')
+        .decode('utf-8')
+        .splitlines()
+    ]
+    typed = _typed_table_round_trip(rows)
+    assert contract_rollup(typed) == contract_rollup(rows)
+    assert contract_columns(typed) == contract_columns(rows)
+
+
+def test_contract_compares_dimensions_as_druid_stores_them():
+    base = {'StateName': 'Northvale', 'field': 'demo_a', 'val': 1}
+    same = [
+        ({'Sex': None}, {}),
+        ({'Sex': []}, {}),
+        ({'Sex': ['F']}, {'Sex': 'F'}),
+        ({'Sex': ['X', 'F']}, {'Sex': ['F', 'X']}),
+    ]
+    for left, right in same:
+        assert contract_rollup([{**base, **left}]) == contract_rollup(
+            [{**base, **right}]
+        )
+    assert contract_rollup([{**base, 'Sex': ''}]) != contract_rollup([base])
 
 
 def test_canonical_rows_keep_integer_and_float_apart():

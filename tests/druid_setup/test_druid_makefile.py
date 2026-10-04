@@ -60,3 +60,38 @@ def test_refuses_empty_or_default_password(tmp_path, target, password):
     assert result.returncode != 0
     assert 'DRUID_POSTGRES_PASSWORD' in result.stderr
     assert calls == ''
+
+
+@pytest.mark.parametrize('target', UP_TARGETS)
+def test_accepts_a_pinned_postgres_override(tmp_path, target):
+    result, calls = run_make(
+        tmp_path,
+        target,
+        DRUID_POSTGRES_PASSWORD=GOOD_PASSWORD,
+        DRUID_POSTGRES_IMAGE=PINNED_POSTGRES,
+    )
+    assert result.returncode == 0, result.stderr
+    assert 'compose' in calls
+
+
+@pytest.mark.parametrize('target', UP_TARGETS)
+@pytest.mark.parametrize(
+    'image',
+    [
+        'postgres:16',
+        'postgres:latest',
+        'postgres@sha256:efedf3595f1d6f415c08568ba171029bf54052e754cc9f030e3f2412b21f3d67',
+        'postgres:16.15-bookworm@sha256:efedf359',
+        f'{PINNED_POSTGRES} ; true',
+    ],
+)
+def test_refuses_an_unpinned_postgres_override(tmp_path, target, image):
+    result, calls = run_make(
+        tmp_path,
+        target,
+        DRUID_POSTGRES_PASSWORD=GOOD_PASSWORD,
+        DRUID_POSTGRES_IMAGE=image,
+    )
+    assert result.returncode != 0
+    assert 'DRUID_POSTGRES_IMAGE' in result.stderr
+    assert calls == ''

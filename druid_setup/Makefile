@@ -19,6 +19,11 @@ check_secrets:
 			echo "DRUID_POSTGRES_PASSWORD in $(ENV_FILE) is empty or the old default; set a random value (openssl rand -hex 32) and change it in Postgres with ALTER USER first" >&2; \
 			exit 1;; \
 	esac
+	@if [ -n "$$DRUID_POSTGRES_IMAGE" ] && ! printf '%s\n' "$$DRUID_POSTGRES_IMAGE" | \
+		grep -Eqx '[a-z0-9./_-]+:[A-Za-z0-9._-]+@sha256:[0-9a-f]{64}'; then \
+		echo "DRUID_POSTGRES_IMAGE in $(ENV_FILE) must be pinned as name:tag@sha256:<digest>; copy a line from the comment in the Compose file" >&2; \
+		exit 1; \
+	fi
 
 single_server_up: check_secrets
 	@cd single && \

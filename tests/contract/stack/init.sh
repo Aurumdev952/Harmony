@@ -15,6 +15,6 @@ python scripts/create_user.py \
   --first_name Contract \
   --last_name Admin \
   --site_admin \
-  --overwrite 2>&1 | sed -E "s/password '[^']*'/password '[redacted]'/"
+  --overwrite
 
 echo 'contract-init: done'

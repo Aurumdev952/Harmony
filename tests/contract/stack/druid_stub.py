@@ -19,7 +19,12 @@ MAX_TIME = "2024-01-01T00:00:00.000Z"
 def answer_query(query: dict) -> object:
     query_type = query.get("queryType")
     if query_type == "timeBoundary":
-        return [{"timestamp": MIN_TIME, "result": {"minTime": MIN_TIME, "maxTime": MAX_TIME}}]
+        return [
+            {
+                "timestamp": MIN_TIME,
+                "result": {"minTime": MIN_TIME, "maxTime": MAX_TIME},
+            }
+        ]
     if query_type == "dataSourceMetadata":
         return [{"timestamp": MAX_TIME, "result": {"maxIngestedEventTime": MAX_TIME}}]
     return []
@@ -56,11 +61,15 @@ class Handler(BaseHTTPRequestHandler):
         self._send(answer_query(query))
 
     def log_message(self, format: str, *args: object) -> None:
-        sys.stderr.write(f"druid-stub {self.server.server_port} {self.command} {self.path} {format % args}\n")
+        sys.stderr.write(
+            f"druid-stub {self.server.server_port} {self.command} {self.path} {format % args}\n"
+        )
 
 
 def main() -> None:
-    servers = [ThreadingHTTPServer(("0.0.0.0", port), Handler) for port in (8081, 8082, 8888)]
+    servers = [
+        ThreadingHTTPServer(("0.0.0.0", port), Handler) for port in (8081, 8082, 8888)
+    ]
     for server in servers[1:]:
         threading.Thread(target=server.serve_forever, daemon=True).start()
     servers[0].serve_forever()

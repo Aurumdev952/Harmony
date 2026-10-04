@@ -43,7 +43,7 @@ security_review: true
 - proved every fix in a scratch copy of the tree;
 - settled the `run_raw_query` question with `pstack:interrogate`.
 
-core-1 left the fixes for paths core does not own as patches. backend-2 applied `docs/modernisation/work/WP-0c/backend.patch` in one commit per fix (units 2-5); the index matched the whole patch afterwards (`git apply -R --check --cached`). The compose fix (`infra.patch`) moved to WP-0b with its test (unit 1).
+core-1 left the fixes for paths core does not own as patches. backend-2 applied `docs/modernisation/work/WP-0c/backend.patch` in one commit per fix (units 2-5); the index matched the whole patch afterwards (`git apply -R --check --cached`). The compose fix (`infra.patch`) moved to WP-0b with its test (unit 1). Both patch files are deleted from the branch now that they are applied or handed over; they stay readable at `32dca82`.
 
 ## How to run the tests
 

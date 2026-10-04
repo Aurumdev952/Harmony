@@ -211,7 +211,7 @@ None.
 - 2026-10-04 backend-1 merge-order fix with WP-0c (PR #6), which removes `ApiRouter`'s `fields_api` parameter. `test_hasura_proxy.py` now builds the router with `ApiRouter.__new__(ApiRouter)`, because the proxy reads no router state.
   - The suggested `ApiRouter(None, None)` works only on WP-0c's signature. On this branch, without `fields_api`, the constructor builds a `FieldsApi` from `current_app` (`druid_context` and `zen_config`), and all 7 tests failed.
   - Checks: 7 passed on this branch (old signature), and 7 passed in an exported copy of `mig/integration` (new signature). black and pylint are clean.
-- Note on PR #6's failing Python-lint check: the failure is `scripts/browser_share.py` from WP-0g, run under the py3.9 pylint job. It is not from WP-0c or WP-0a, and it goes away when WP-2f replaces that job with ruff on 3.13.
+- Note on PR #6's failing Python-lint check: the failure is `prod/browser_share/browser_share.py` from WP-0g, run under the py3.9 pylint job. It is not from WP-0c or WP-0a, and it goes away when WP-2f replaces that job with ruff on 3.13.
 
 ## Evidence
 

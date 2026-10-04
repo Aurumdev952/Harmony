@@ -96,7 +96,7 @@ class BackgroundProcess:
             # Errno 3 indicates the process was already killed
             if e.errno == 3:
                 raise
-        except Exception:  # noqa: S110  # pylint: disable=broad-except
+        except Exception:  # noqa: S110
             # Ignore other exceptions so that we continue trying to
             # kill the process
             pass

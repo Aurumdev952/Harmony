@@ -60,12 +60,12 @@ _ABSENT = object()
 
 @dataclasses.dataclass(frozen=True)
 class Step:
-    """A Python step script, or with ``shell`` a bash script, and its arguments."""
+    """A Python step script, or with ``bash`` a bash script, and its arguments."""
 
     script: Path
     args: tuple[str, ...]
     expect_returncode: int = 0
-    shell: bool = False
+    bash: bool = False
 
 
 @dataclasses.dataclass(frozen=True)
@@ -179,7 +179,7 @@ def run_case(case: Case, base: Path, hash_seed: str | None = None) -> Path:
     _stage_inputs(case, work)
     env = step_env(tool_dir(base), hash_seed)
     for index, step in enumerate(case.steps):
-        command = ['bash' if step.shell else sys.executable, str(step.script)]
+        command = ['bash' if step.bash else sys.executable, str(step.script)]
         command.extend(_expand(arg, work, out) for arg in step.args)
         result = subprocess.run(
             command,

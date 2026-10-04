@@ -5,6 +5,7 @@ must not change (SPEC INV-3).
 
 from __future__ import annotations
 
+import logging
 import uuid
 
 import pytest
@@ -145,6 +146,30 @@ def test_group_admin_cannot_create_a_group_holding_the_admin_role(db, make_user)
     assert response.status_code == 403
     assert _group(db, name) is None
     assert _roles_of(db, actor) == {'group_admin'}
+
+
+def test_a_refused_grant_is_audited_with_the_caller(db, make_user, caplog):
+    actor = make_user(['group_admin'])
+    # The app logger does not propagate to the root logger caplog listens on.
+    app_logger = logging.getLogger('ZenysisLogger')
+    app_logger.addHandler(caplog.handler)
+    try:
+        actor.request(
+            'POST',
+            '/api2/group',
+            _group_body(_name('group'), roles=[_role_uri(db, 'admin')]),
+        )
+    finally:
+        app_logger.removeHandler(caplog.handler)
+
+    refusals = [
+        record.getMessage()
+        for record in caplog.records
+        if record.levelno == logging.WARNING and 'Refused grant' in record.getMessage()
+    ]
+    assert len(refusals) == 1
+    assert actor.username in refusals[0]
+    assert "['admin']" in refusals[0]
 
 
 def test_group_admin_creates_a_group_with_a_role_it_holds_and_joins_it(db, make_user):

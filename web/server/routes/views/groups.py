@@ -1,7 +1,6 @@
 from collections import defaultdict
 
 from models.alchemy.security_group import GroupAcl, GroupRoles, GroupUsers
-from models.alchemy.permission import Role
 from web.server.data.data_access import (
     get_db_adapter,
     add_entity,
@@ -11,7 +10,6 @@ from web.server.data.data_access import (
     Transaction,
 )
 from web.server.errors import ItemNotFound
-from web.server.potion.access import get_id_from_uri
 from web.server.potion.signals import after_user_group_change
 from web.server.routes.views.users import try_get_user
 from web.server.routes.views.core import try_get_role_and_resource
@@ -312,21 +310,6 @@ def update_group_users(group, new_users, session=None, flush=True, commit=True):
         after_user_group_change.send(group_user, group=group)
 
     return updated_users
-
-
-def build_group(group_obj):
-    '''Builds a group model dictionary with an input group dictionary from the
-    frontend, to add into the db.
-    '''
-    roles = []
-    # NOTE: We don't update users here because self.manager.update cannot
-    # hash users list. Users will be updated separately.
-    with Transaction() as transaction:
-        for role_uri in group_obj.get('roles'):
-            role = transaction.find_by_id(Role, get_id_from_uri(role_uri))
-            if role:
-                roles.append(role)
-    return {'name': group_obj.get('name'), 'roles': roles}
 
 
 def update_group_acls(group, acls):

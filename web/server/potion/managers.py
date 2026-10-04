@@ -304,14 +304,18 @@ class AuthorizationResourceManager(SQLAlchemyManager, metaclass=ABCMeta):
         pass
 
 
+def roles_held_by(user, query):
+    '''Narrows a `Role` query to the roles `user` holds, directly or through a
+    group. Superusers hold every role.
+    '''
+    if user.is_superuser():
+        return query
+    return query.filter(Role.id.in_([role.id for role in user.get_all_roles()]))
+
+
 class RoleResourceManager(SQLAlchemyManager):
     def _query(self):
-        query = super()._query()
-        user = current_user
-        if not user.is_superuser():
-            role_ids = [role.id for role in user.get_all_roles()]
-            return query.filter(getattr(self.model, 'id').in_(role_ids))
-        return query
+        return roles_held_by(current_user, super()._query())
 
 
 class GroupResourceManager(SQLAlchemyManager):

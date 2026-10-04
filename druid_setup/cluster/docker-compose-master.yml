@@ -110,8 +110,10 @@ services:
       - zookeeper
       - postgres
       - extension_loader
+    # Druid runs without authentication: private address only, firewalled to
+    # the other Druid hosts, web and the pipeline.
     ports:
-      - "8081:8081"
+      - "${DRUID_MASTER_HOST:?set DRUID_MASTER_HOST to this host's private IP}:8081:8081"
     command:
       - coordinator
     env_file:

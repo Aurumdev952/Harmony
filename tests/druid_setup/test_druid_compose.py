@@ -21,7 +21,10 @@ needs_docker = pytest.mark.skipif(
 # caller's shell or an operator's druid_setup/.env leaks in.
 BASE_ENV = {
     'DRUID_POSTGRES_PASSWORD': 'test-druid-postgres-password',
+    'DRUID_BIND_ADDRESS': '10.0.0.20',
     'DRUID_MASTER_HOST': '10.0.0.10',
+    'DRUID_DATA_HOST': '10.0.0.11',
+    'DRUID_QUERY_HOST': '10.0.0.12',
 }
 
 # (directory, env file the Makefile passes, compose file)
@@ -126,35 +129,74 @@ def test_password_reaches_postgres_and_coordinator(tmp_path, setup):
 
 # Druid's own HTTP ports stay published: the web app and the indexing scripts
 # reach Druid from other hosts.
-DRUID_PROCESS_PORTS = {
-    'coordinator': {8081},
-    'broker': {8082},
-    'historical': {8083},
-    'middlemanager': {8091, *range(8100, 8106)},
-    'router': {8888},
+def published(services):
+    return {
+        (name, port.get('host_ip', ''), port['target'])
+        for name, service in services.items()
+        for port in service.get('ports', [])
+    }
+
+
+def bound(variable, ports):
+    return {(name, BASE_ENV[variable], target) for name, target in ports}
+
+
+MIDDLEMANAGER_PORTS = [('middlemanager', p) for p in (8091, *range(8100, 8106))]
+
+# Druid has no authenticator configured, and JavaScript is enabled until
+# WP-8a. Single mode publishes only what web and the pipeline call (coordinator
+# for indexing, broker and router for queries). Cluster mode binds each host's
+# ports to that host's private address, because the other hosts call them.
+EXPECTED_PORTS = {
+    'single/docker-compose.yml': bound(
+        'DRUID_BIND_ADDRESS',
+        [('coordinator', 8081), ('broker', 8082), ('router', 8888)],
+    ),
+    'cluster/docker-compose-master.yml': bound(
+        'DRUID_MASTER_HOST',
+        [('coordinator', 8081), ('postgres', 5432), ('zookeeper', 2181)],
+    ),
+    'cluster/docker-compose-data.yml': bound(
+        'DRUID_DATA_HOST', [('historical', 8083), *MIDDLEMANAGER_PORTS]
+    ),
+    'cluster/docker-compose-query.yml': bound(
+        'DRUID_QUERY_HOST', [('broker', 8082), ('router', 8888)]
+    ),
 }
-# Cluster mode: data and query hosts reach ZooKeeper on the master, and the
-# coordinator reaches Postgres through DRUID_POSTGRES_HOST. Both bind to the
-# master's private address, never to every interface.
-BOUND_TO_MASTER_HOST = {'zookeeper', 'postgres'}
+
+# The variable each file needs to know where to publish.
+BIND_VARIABLES = {
+    'single/docker-compose.yml': 'DRUID_BIND_ADDRESS',
+    'cluster/docker-compose-master.yml': 'DRUID_MASTER_HOST',
+    'cluster/docker-compose-data.yml': 'DRUID_DATA_HOST',
+    'cluster/docker-compose-query.yml': 'DRUID_QUERY_HOST',
+}
 
 
 @needs_docker
 @pytest.mark.parametrize('setup', SETUPS, ids=setup_id)
-def test_only_druid_processes_publish_on_all_interfaces(tmp_path, setup):
+def test_nothing_publishes_on_all_interfaces(tmp_path, setup):
     services = config(tmp_path, setup)['services']
-    is_master = setup[2] == 'docker-compose-master.yml'
-    for name, service in services.items():
-        for port in service.get('ports', []):
-            if name in DRUID_PROCESS_PORTS:
-                assert port['target'] in DRUID_PROCESS_PORTS[name], (name, port)
-            elif is_master and name in BOUND_TO_MASTER_HOST:
-                assert port.get('host_ip') == BASE_ENV['DRUID_MASTER_HOST'], (
-                    name,
-                    port,
-                )
-            else:
-                pytest.fail(f'{setup_id(setup)}: {name} publishes {port}')
+    wildcard = {
+        entry for entry in published(services) if entry[1] in ('', '0.0.0.0', '::')
+    }
+    assert wildcard == set()
+
+
+@needs_docker
+@pytest.mark.parametrize('setup', SETUPS, ids=setup_id)
+def test_publishes_only_the_expected_ports(tmp_path, setup):
+    services = config(tmp_path, setup)['services']
+    assert published(services) == EXPECTED_PORTS[setup_id(setup)]
+
+
+@needs_docker
+@pytest.mark.parametrize('setup', SETUPS, ids=setup_id)
+def test_refuses_to_render_without_bind_address(tmp_path, setup):
+    variable = BIND_VARIABLES[setup_id(setup)]
+    result = render(tmp_path, setup, env={variable: ''})
+    assert result.returncode != 0
+    assert f'required variable {variable}' in result.stderr
 
 
 PINNED_IMAGE = re.compile(r'[\w./-]+:(?!latest@)[\w.-]*\d[\w.-]*@sha256:[0-9a-f]{64}')

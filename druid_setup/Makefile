@@ -6,7 +6,7 @@ LOGS_ARGS ?= -f -n 1000
 
 include $(ENV_FILE)
 # Secrets live in $(ENV_FILE) only; Compose reads them from the environment.
-export DRUID_POSTGRES_PASSWORD DRUID_POSTGRES_IMAGE
+export DRUID_POSTGRES_PASSWORD DRUID_POSTGRES_IMAGE DRUID_BIND_ADDRESS
 
 default:
 	@echo "Please specify a target to make"

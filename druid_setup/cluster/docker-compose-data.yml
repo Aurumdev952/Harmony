@@ -48,8 +48,10 @@ services:
       - zen_extensions:/var/lib/zen/extensions/
     depends_on:
       - extension_loader
+    # Druid runs without authentication: private address only, firewalled to
+    # the other Druid hosts.
     ports:
-      - "8083:8083"
+      - "${DRUID_DATA_HOST:?set DRUID_DATA_HOST to this host's private IP}:8083:8083"
     command:
       - historical
     env_file:
@@ -72,8 +74,8 @@ services:
     depends_on:
       - extension_loader
     ports:
-      - "8091:8091"
-      - "8100-8105:8100-8105"
+      - "${DRUID_DATA_HOST:?set DRUID_DATA_HOST to this host's private IP}:8091:8091"
+      - "${DRUID_DATA_HOST:?set DRUID_DATA_HOST to this host's private IP}:8100-8105:8100-8105"
     command:
       - middleManager
     env_file:

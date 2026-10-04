@@ -19,6 +19,8 @@ dependencies = [
     "Flask-Migrate==2.5.2",
     "Flask-SQLAlchemy==2.4.0",
     "flask-user==0.6.21 ; platform_python_implementation != 'PyPy'",
+    # passlib 1.7.4 (via flask-user) raises on bcrypt >= 5.0; lift with WP-3d/WP-5d.
+    "bcrypt==4.0.1 ; platform_python_implementation != 'PyPy'",
     "WTForms==2.1",
     # Flask 1.0.1 needs Jinja2 2.10.1.
     "Jinja2==2.10.1",

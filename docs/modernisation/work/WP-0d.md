@@ -229,7 +229,13 @@ Command: a grep over the repo, excluding `docs/`, `.claude/` and `node_modules`.
   - `log/config.py:18`, the `segment` logger.
   - npm `*levenshtein` packages in `yarn.lock` and flow-typed stubs. These are unrelated JavaScript packages.
   - Two docstring mentions of "Google Cloud Storage" in `util/dataprep/utils.py`. These are prose, not imports.
-- **The `/graphql` route** is referenced only from `web/server/app.py:61,83,94`. The only client that calls `/graphql` is `zen_environment.js`, and that file is itself unused. No nginx or compose config routes `/graphql`.
+- **The `/graphql` route.** *Corrected 2026-10-04 after QA and reviewer review.* The unit 2 grep searched only module names (`graphql_api`, `GraphqlPageRouter`), never the URL. Those module names occur only in `web/server/app.py:61,83,94`.
+  - `git grep` on `main` for the URL `/graphql` (excluding `/api/graphql` and `/v1/graphql`, `docs/`, `.claude/` and `yarn.lock`) finds three references:
+    - `web/server/routes/graphql_api.py:21`, the route itself;
+    - `web/client/util/graphql/zen_environment.js:22`, which is unused (see below);
+    - `scripts/db/graphql/sync_schema.sh:11`, a developer tool. It introspects `http://0.0.0.0:5000/graphql` into `graphql/v2/schema.graphql`. Its only consumer is the `relay-web` npm script (`package.json:156`, `relay-compiler --schema ./graphql/v2/schema.graphql`).
+  - Without the endpoint the tool chain is dead. It is routed to backend-5 for deletion: `scripts/db/graphql/`, `graphql/v2/` and the `relay-web` script.
+  - No nginx or compose config routes `/graphql`.
 - **`/api/timeout`** is live: see Phase-file corrections.
 - **The Hadoop templates** are reached only through `legacy_task_builder.py`, which only `scripts/run_indexing.py` imports, and nothing references that script.
 - **`zenEnvironment`** is used only by its re-export in `web/client/util/graphql/index.jsx`.

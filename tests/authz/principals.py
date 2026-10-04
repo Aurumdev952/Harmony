@@ -14,7 +14,7 @@ from contextlib import ExitStack, contextmanager
 from dataclasses import dataclass, field
 from functools import lru_cache
 from types import SimpleNamespace
-from typing import Any, Iterator
+from typing import Iterator
 from unittest import mock
 
 import yaml
@@ -104,25 +104,32 @@ def query_policy(dimension: str, value: str | None) -> SimpleNamespace:
     return row
 
 
-def role(name: str, query_policies=None) -> SimpleNamespace:
+def role(name: str) -> SimpleNamespace:
     raw = SEED['roles'][name]
     permissions = []
     for type_name, names in (raw.get('permissions') or {}).items():
         permissions.extend(_permission_rows(type_name, names))
-    policies = (
-        query_policies
-        if query_policies is not None
-        else [query_policy(d, v) for d, v in raw.get('query_policies', [])]
-    )
     return SimpleNamespace(
         name=name,
         permissions=permissions,
-        query_policies=policies,
+        query_policies=[query_policy(d, v) for d, v in raw.get('query_policies', [])],
         dashboard_resource_role=resource_role(raw['dashboard'])
         if 'dashboard' in raw
         else None,
         alert_resource_role=resource_role(raw['alert']) if 'alert' in raw else None,
         enable_data_export=raw.get('enable_data_export', False),
+    )
+
+
+def policy_role(name: str, policies) -> SimpleNamespace:
+    '''A non-admin role that carries only query policies.'''
+    return SimpleNamespace(
+        name=name,
+        permissions=[],
+        query_policies=[query_policy(d, v) for d, v in policies],
+        dashboard_resource_role=None,
+        alert_resource_role=None,
+        enable_data_export=False,
     )
 
 
@@ -163,13 +170,15 @@ class _Transaction:
 class StandInUser(BaseUserMixin):
     '''Stands in for `User` (signed in) and `AnonymousUser` (not signed in).'''
 
-    def __init__(self, spec: PrincipalSpec, extra_roles=()):
+    def __init__(self, spec: PrincipalSpec, policies=(), group_policies=()):
         self.id = SIGNED_IN_USER_ID if spec.signed_in else None
         self.username = f'{spec.name}@authz.invalid'
         self.first_name = 'Authz'
         self.last_name = spec.name
         self._signed_in = spec.signed_in
-        self.roles = [role(r) for r in spec.roles] + list(extra_roles)
+        self.roles = [role(r) for r in spec.roles]
+        if policies:
+            self.roles.append(policy_role('policy_holder', policies))
         self.acls = [_acl(a) for a in spec.acls]
         self.groups = [
             SimpleNamespace(
@@ -178,6 +187,12 @@ class StandInUser(BaseUserMixin):
             )
             for group in spec.groups
         ]
+        if group_policies:
+            self.groups.append(
+                SimpleNamespace(
+                    roles=[policy_role('group_policy_holder', group_policies)], acls=[]
+                )
+            )
         self._transaction = _Transaction([_sitewide_acl(a) for a in spec.sitewide_acls])
         self.from_jwt = spec.jwt is not None
 
@@ -201,10 +216,14 @@ def configuration(public_access: bool) -> Iterator[None]:
         yield
 
 
-def load_identity(spec: PrincipalSpec, extra_roles=()) -> Identity:
+def load_identity(spec: PrincipalSpec, policies=(), group_policies=()) -> Identity:
     '''Loads the identity for `spec` the way a request would, inside a request
-    context. Leaves it on `g.identity`.'''
-    user = StandInUser(spec, extra_roles)
+    context. Leaves it on `g.identity`.
+
+    `policies` go on an extra non-admin role the user holds directly, and
+    `group_policies` on a role held through an extra group.
+    '''
+    user = StandInUser(spec, policies, group_policies)
     identity = Identity(user.id) if spec.signed_in else AnonymousIdentity()
     g.identity = identity
     with ExitStack() as stack:
@@ -217,16 +236,3 @@ def load_identity(spec: PrincipalSpec, extra_roles=()) -> Identity:
         )
         signal_handlers.on_identity_loaded(None, identity)
     return identity
-
-
-@contextmanager
-def signed_in_as(spec: PrincipalSpec, extra_roles=()) -> Iterator[Identity]:
-    '''Loads the identity and keeps the principal's configuration in force.'''
-    identity = load_identity(spec, extra_roles)
-    with configuration(spec.public_access):
-        yield identity
-
-
-def describe(needs: Any) -> list:
-    '''Order-independent printable form of an identity's needs, for messages.'''
-    return sorted(repr(n) for n in needs)

@@ -1,0 +1,157 @@
+# Characterisation of row-level authorisation: the Druid filter that
+# `AuthorizedQueryClient.run_query` (web/server/routes/views/query_policy.py)
+# ANDs into a query, as it is on main (SPEC INV-3, SEC-4).
+#
+# Every case runs a query whose own filter is `field == indicator_1` through
+# AuthorizedQueryClient.run_query and inspects the query the Druid client
+# receives:
+#   expect: null      the query reaches Druid unchanged
+#   expect: <filter>  Druid receives {and: [{eq: [field, indicator_1]}, <filter>]}
+# Filter notation is in tests/authz/druid_filters.py.
+#
+# Principal: `principal` names one from principals.yaml (default: no_roles). The
+# principal additionally holds a non-admin role carrying `policies`, and is a
+# member of a group whose role carries `group_policies`. A policy is
+# [dimension, value]; null means all values, as in the query_policy table.
+#
+# `auth` decides how the principal signed in:
+#   header   X-Username/X-Password; needs are the account's (default for cases
+#            with `jwt`: not used)
+#   session  browser login, JWT {needs: ['*'], query_needs: ['*']}
+# Cases without `jwt` run under both and must give the same filter. Cases with
+# `jwt` run once, with those claims.
+#
+# `config` picks AUTHORIZABLE_DIMENSIONS and HIERARCHICAL_DIMENSIONS (see
+# `configs` below); harmony_demo is the real deployment module.
+
+configs:
+  harmony_demo: real
+  region_district:
+    authorizable: [source, Region, District]
+    hierarchical: [Region, District]
+  flat:
+    authorizable: [source, Program]
+    hierarchical: []
+  no_authorizable_dimensions:   # as config/template
+    authorizable: []
+    hierarchical: []
+
+cases:
+  # harmony_demo: source is a simple dimension, StateName a hierarchical one
+  - name: no_policies_denies_everything
+    policies: []
+    expect: {and: [{eq: [source, __NO_VAL__]}, {eq: [StateName, __NO_VAL__]}]}
+  - name: all_sources_but_no_state_policy_denies_everything
+    policies: [[source, null]]
+    expect: {eq: [StateName, __NO_VAL__]}
+  - name: one_state_but_no_source_policy_denies_everything
+    policies: [[StateName, A]]
+    expect: {and: [{eq: [source, __NO_VAL__]}, {in: [StateName, [A]]}]}
+  - name: all_values_on_every_dimension_is_unrestricted
+    policies: [[source, null], [StateName, null]]
+    expect: null
+  - name: one_source_all_states
+    policies: [[source, S1], [StateName, null]]
+    expect: {in: [source, [S1]]}
+  - name: values_union_within_a_dimension_and_intersect_across
+    policies: [[source, S1], [source, S2], [StateName, A]]
+    expect: {and: [{in: [source, [S1, S2]]}, {in: [StateName, [A]]}]}
+  - name: two_states_union
+    policies: [[source, null], [StateName, A], [StateName, B]]
+    expect: {in: [StateName, [A, B]]}
+  - name: all_values_wins_over_a_specific_value
+    policies: [[source, null], [StateName, A], [StateName, null]]
+    expect: null
+  - name: hierarchical_but_unauthorizable_dimension_is_ignored
+    policies: [[source, null], [MunicipalityName, M1]]
+    expect: {eq: [StateName, __NO_VAL__]}
+  - name: unknown_dimension_is_ignored
+    policies: [[source, null], [StateName, null], [Foo, X]]
+    expect: null
+  - name: empty_string_value_matches_nothing
+    policies: [['source', ''], [StateName, null]]
+    expect: {eq: [source, __NO_VAL__]}
+  - name: group_role_policies_add_to_direct_role_policies
+    policies: [[source, null]]
+    group_policies: [[StateName, B]]
+    expect: {in: [StateName, [B]]}
+
+  # Who bypasses the filter
+  - name: superuser_is_not_filtered
+    principal: role:admin
+    policies: [[source, S1], [StateName, A]]
+    expect: null
+  - name: superuser_via_group_is_not_filtered
+    principal: admin_via_group
+    policies: [[source, S1], [StateName, A]]
+    expect: null
+  - name: anonymous_with_public_access_is_not_filtered
+    principal: anonymous_public
+    policies: []
+    expect: null
+  - name: anonymous_without_public_access_denies_everything
+    principal: anonymous
+    policies: []
+    expect: {and: [{eq: [source, __NO_VAL__]}, {eq: [StateName, __NO_VAL__]}]}
+  - name: default_role_sees_everything
+    principal: role:_default_role
+    policies: []
+    expect: null
+
+  # Explicit-needs tokens drop RoleNeed('admin'), so the policy filter applies
+  - name: render_token_for_admin_is_filtered_by_token_query_needs
+    principal: render_token:admin
+    policies: []
+    expect: null
+  - name: render_token_for_policy_holder_keeps_account_policies
+    principal: render_token:no_roles
+    policies: [[source, S1], [StateName, null]]
+    expect: {in: [source, [S1]]}
+
+  # Other deployment shapes
+  - name: two_hierarchical_dimensions_are_ored
+    config: region_district
+    policies: [[source, null], [Region, R1], [District, D9]]
+    expect: {or: [{in: [Region, [R1]]}, {in: [District, [D9]]}]}
+  - name: missing_hierarchical_dimension_is_ored_with_no_value
+    config: region_district
+    policies: [[source, null], [Region, R1]]
+    expect: {or: [{in: [Region, [R1]]}, {eq: [District, __NO_VAL__]}]}
+  - name: any_all_values_hierarchical_dimension_lifts_the_whole_hierarchy
+    config: region_district
+    policies: [[source, null], [Region, R1], [District, null]]
+    expect: null
+  - name: no_policies_with_two_hierarchical_dimensions
+    config: region_district
+    policies: []
+    expect: {and: [{eq: [source, __NO_VAL__]}, {or: [{eq: [Region, __NO_VAL__]}, {eq: [District, __NO_VAL__]}]}]}
+  - name: flat_dimensions_are_anded
+    config: flat
+    policies: [[source, S1], [Program, P1]]
+    expect: {and: [{in: [source, [S1]]}, {in: [Program, [P1]]}]}
+  - name: flat_dimension_without_policy_denies
+    config: flat
+    policies: [[source, S1]]
+    expect: {and: [{in: [source, [S1]]}, {eq: [Program, __NO_VAL__]}]}
+  - name: no_authorizable_dimensions_means_no_row_level_restriction
+    config: no_authorizable_dimensions
+    policies: []
+    expect: null
+
+  # JWT query_needs other than '*'
+  - name: token_composite_need_is_split_into_single_dimension_needs
+    policies: [[source, null], [StateName, null]]
+    jwt: {needs: ['*'], query_needs: [{source: {include_values: [S1]}, StateName: {include_values: [A]}}]}
+    expect: {and: [{in: [source, [S1]]}, {in: [StateName, [A]]}]}
+  - name: token_exclude_values_are_dropped_and_other_dimensions_lost
+    policies: [[source, null], [StateName, null]]
+    jwt: {needs: ['*'], query_needs: [{source: {exclude_values: [S9]}}]}
+    expect: {eq: [StateName, __NO_VAL__]}
+  - name: token_docstring_key_included_values_is_read_as_all_values
+    policies: [[source, null], [StateName, null]]
+    jwt: {needs: ['*'], query_needs: [{source: {included_values: [S1]}}]}
+    expect: {eq: [StateName, __NO_VAL__]}
+  - name: token_cannot_widen_account_policies
+    policies: [[source, S1], [StateName, A]]
+    jwt: {needs: ['*'], query_needs: [{source: {include_values: [S1, S2]}}, {StateName: {}}]}
+    expect: {and: [{in: [source, [S1]]}, {in: [StateName, [A]]}]}

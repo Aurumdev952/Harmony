@@ -1,4 +1,6 @@
+import hashlib
 import itertools
+import json
 from logging import LoggerAdapter
 from uuid import uuid4
 
@@ -32,12 +34,13 @@ from web.server.routes.views.authorization import (
     WhitelistedPermission,
 )
 from web.server.security.permissions import SuperUserPermission
+from web.server.security.render_tokens import (
+    RENDER_CLAIM,
+    RENDER_POLICY_CLAIM,
+    RENDER_TOKEN_QUERY_NEEDS,
+    is_render_token_live,
+)
 from web.server.util.util import get_user_string, get_remote_ip_address
-
-# Dashboard render tokens keep whatever query policy the account they are issued
-# for holds.
-RENDER_TOKEN_QUERY_NEEDS = ['*']
-
 
 def register_for_signals(app, principals):
     install_user_events_handlers(app)
@@ -173,6 +176,34 @@ def render_token_query_needs():
     return _compute_token_query_needs(RENDER_TOKEN_QUERY_NEEDS)
 
 
+def query_policy_fingerprint():
+    '''A stable digest of the query policy a render made as the current user runs
+    under. Two users share a cached thumbnail only when it is the same, and a
+    render token is refused once its user's digest no longer matches.
+    '''
+    if SuperUserPermission().can():
+        policy = 'superuser'
+    else:
+        policy = sorted(
+            (
+                sorted(
+                    (
+                        [
+                            dimension_filter.dimension_name,
+                            dimension_filter.all_values,
+                            sorted(dimension_filter.include_values, key=str),
+                            sorted(dimension_filter.exclude_values, key=str),
+                        ]
+                        for dimension_filter in need.dimension_filters
+                    ),
+                    key=json.dumps,
+                )
+                for need in render_token_query_needs()
+            ),
+            key=json.dumps,
+        )
+    return hashlib.sha256(json.dumps(policy).encode()).hexdigest()
+
 def _compute_token_provides(claims):
     needs = claims.get('needs', [])
     query_needs = claims.get('query_needs', [])
@@ -202,7 +233,14 @@ def _install_token_needs(identity):
 
     There's also a special dimension name `source` to control what sources are allowed.
     """
-    identity.provides = _compute_token_provides(get_jwt_claims())
+    claims = get_jwt_claims()
+    pinned_policy = claims.get(RENDER_POLICY_CLAIM)
+    if pinned_policy is not None and pinned_policy != query_policy_fingerprint():
+        # The user's policy changed after the render was requested; the render
+        # may be cached under the old digest, so it gets nothing.
+        identity.provides = set()
+        return
+    identity.provides = _compute_token_provides(claims)
 
 
 def on_identity_loaded(sender, identity):
@@ -313,6 +351,8 @@ def install_login_manager_signal_handlers(app, login_manager):
             claims = get_jwt_claims()
             if 'id' in claims:
                 is_token_valid = memoized_check_token_validity(claims['id'])
+            elif RENDER_CLAIM in claims:
+                is_token_valid = is_render_token_live(claims[RENDER_CLAIM])
 
         if auth_email and is_token_valid:
             # NOTE: if we found JWT then we don't need the session

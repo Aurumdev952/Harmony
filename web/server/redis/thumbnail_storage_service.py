@@ -1,46 +1,15 @@
 import base64
-import hashlib
-import json
 import time
 
 from flask import current_app
 from flask_user import current_user
 
 from web.server.routes.views.page_renderer import grid_dashboard_to_thumbnail
-from web.server.security.permissions import SuperUserPermission
-from web.server.security.signal_handlers import render_token_query_needs
+from web.server.security.signal_handlers import query_policy_fingerprint
 
 EXPIRATION_SEC = 1209600  # Update thumbnail image every 2 weeks.
 PENDING = 'PENDING'
 PENDING_STATE_TIMEOUT = 600
-
-
-def query_policy_fingerprint():
-    '''A stable digest of the query policy a render made as the current user runs
-    under. Two users share a cached thumbnail only when it is the same.
-    '''
-    if SuperUserPermission().can():
-        policy = 'superuser'
-    else:
-        policy = sorted(
-            (
-                sorted(
-                    (
-                        [
-                            dimension_filter.dimension_name,
-                            dimension_filter.all_values,
-                            sorted(dimension_filter.include_values, key=str),
-                            sorted(dimension_filter.exclude_values, key=str),
-                        ]
-                        for dimension_filter in need.dimension_filters
-                    ),
-                    key=json.dumps,
-                )
-                for need in render_token_query_needs()
-            ),
-            key=json.dumps,
-        )
-    return hashlib.sha256(json.dumps(policy).encode()).hexdigest()
 
 
 def get_thumbnail_storage_name(dashboard):

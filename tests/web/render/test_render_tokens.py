@@ -14,23 +14,22 @@ import pytest
 from flask import Flask, g, jsonify
 from flask_jwt_extended import JWTManager, create_access_token, decode_token
 from flask_login import LoginManager, UserMixin, current_user
-from flask_principal import Identity
+from flask_principal import Identity, ItemNeed
 from freezegun import freeze_time
 
 from config.loader import import_configuration_module
 from models.python.permissions import DimensionFilter, QueryNeed
 from tests.web.render.fakes import DictCache
-from web.server.routes.views.query_policy import _categorize_query_needs
 from web.server.security.render_tokens import (
     RENDER_CLAIM,
+    RENDER_POLICY_CLAIM,
     is_render_request,
-    pinned_query_needs,
     render_token,
 )
 from web.server.security.signal_handlers import (
-    RENDER_TOKEN_QUERY_NEEDS,
-    _compute_token_query_needs,
+    _install_token_needs,
     install_login_manager_signal_handlers,
+    query_policy_fingerprint,
 )
 
 USERNAME = 'north@tests.invalid'
@@ -92,13 +91,10 @@ def _whoami(app: Flask, token: str) -> dict:
 
 
 @contextmanager
-def _minted(app: Flask, ttl_seconds: int = 60, query_needs=None):
+def _minted(app: Flask, ttl_seconds: int = 60, policy=None):
     with app.test_request_context('/'):
         with render_token(
-            USERNAME,
-            RESOURCE_ID,
-            query_needs=RENDER_TOKEN_QUERY_NEEDS if query_needs is None else query_needs,
-            ttl_seconds=ttl_seconds,
+            USERNAME, RESOURCE_ID, policy=policy, ttl_seconds=ttl_seconds
         ) as token:
             yield token
 
@@ -109,15 +105,14 @@ def _claims(app: Flask, token: str) -> dict:
 
 
 def test_token_signs_in_as_the_requesting_user_for_one_dashboard(app):
-    with _minted(app, query_needs=[{STATE: {'include_values': ['North']}}]) as token:
+    with _minted(app) as token:
         claims = _claims(app, token)
 
     assert claims['identity'] == USERNAME
     assert claims['user_claims']['needs'] == [['view_resource', RESOURCE_ID, 'dashboard']]
-    assert claims['user_claims']['query_needs'] == [
-        {STATE: {'include_values': ['North']}}
-    ]
+    assert claims['user_claims']['query_needs'] == ['*']
     assert claims['user_claims'][RENDER_CLAIM]
+    assert RENDER_POLICY_CLAIM not in claims['user_claims']
 
 
 def test_token_is_short_lived(app):
@@ -191,6 +186,10 @@ def _policy(*include_values: str) -> QueryNeed:
     return QueryNeed([DimensionFilter(STATE, all_values=True)])
 
 
+VIEW_DASHBOARD = ItemNeed('view_resource', RESOURCE_ID, 'dashboard')
+EDIT_DASHBOARD = ItemNeed('edit_resource', RESOURCE_ID, 'dashboard')
+
+
 @contextmanager
 def _signed_in(app: Flask, provides):
     with app.test_request_context('/'), mock.patch(
@@ -199,55 +198,74 @@ def _signed_in(app: Flask, provides):
     ):
         g.identity = Identity(USERNAME)
         g.identity.provides = set(provides)
-        yield
+        yield g.identity
 
 
-def _resolve(app: Flask, provides, token_query_needs) -> dict:
-    """The dimension filter map a render runs under: the token's query needs
-    resolved against the account's current policy, as `login_from_request` does.
+def _policy_digest(app: Flask, provides) -> str:
+    with _signed_in(app, provides):
+        return query_policy_fingerprint()
+
+
+def _page_load(app: Flask, provides, policy) -> set:
+    """What a request signed in with a render token may do, given the account's
+    permissions at the time the page loads.
     """
-    with _signed_in(app, provides):
-        filter_map = _categorize_query_needs(
-            _compute_token_query_needs(token_query_needs)
-        )
-    return {dimension: dict(values) for dimension, values in filter_map.items()}
+    with _minted(app, policy=policy) as token:
+        claims = _claims(app, token)['user_claims']
+    with _signed_in(app, provides) as identity, mock.patch(
+        'web.server.security.signal_handlers.get_jwt_claims', lambda: claims
+    ):
+        _install_token_needs(identity)
+        return identity.provides
 
 
-def _pinned(app: Flask, provides) -> list:
-    with _signed_in(app, provides):
-        return pinned_query_needs()
+NORTH_ACCOUNT = {VIEW_DASHBOARD, EDIT_DASHBOARD, _policy('North')}
+
+
+def test_token_carries_the_policy_digest_it_was_requested_under(app):
+    digest = _policy_digest(app, NORTH_ACCOUNT)
+
+    with _minted(app, policy=digest) as token:
+        claims = _claims(app, token)['user_claims']
+
+    assert claims[RENDER_POLICY_CLAIM] == digest
+    assert claims['query_needs'] == ['*']
+
+
+def test_unchanged_policy_grants_view_and_the_accounts_own_policy(app):
+    provides = _page_load(app, NORTH_ACCOUNT, _policy_digest(app, NORTH_ACCOUNT))
+
+    assert provides == {VIEW_DASHBOARD, _policy('North')}
+
+
+def test_a_token_without_a_digest_resolves_the_accounts_policy(app):
+    provides = _page_load(app, NORTH_ACCOUNT, None)
+
+    assert provides == {VIEW_DASHBOARD, _policy('North')}
 
 
 @pytest.mark.parametrize(
-    'provides',
+    'changed',
     [
-        {_policy('North')},
-        {_policy('North', 'East')},
-        {_policy()},
-        {_policy('North'), _policy('South')},
-        {QueryNeed([DimensionFilter(STATE, exclude_values=['South'])])},
-        set(),
+        {VIEW_DASHBOARD, _policy()},
+        {VIEW_DASHBOARD, _policy('North', 'South')},
+        {VIEW_DASHBOARD, _policy('South')},
+        {VIEW_DASHBOARD},
     ],
-    ids=['one-value', 'two-values', 'all-values', 'two-policies', 'exclude', 'none'],
+    ids=['widened-to-all', 'widened', 'moved', 'removed'],
 )
-def test_pinned_policy_resolves_to_what_the_account_holds_today(app, provides):
-    pinned = _pinned(app, provides)
+def test_a_policy_change_after_the_request_leaves_the_render_with_nothing(
+    app, changed
+):
+    provides = _page_load(app, changed, _policy_digest(app, NORTH_ACCOUNT))
 
-    assert _resolve(app, provides, pinned) == _resolve(
-        app, provides, RENDER_TOKEN_QUERY_NEEDS
+    assert provides == set()
+
+
+def test_viewers_with_the_same_policy_have_the_same_digest(app):
+    assert _policy_digest(app, NORTH_ACCOUNT) == _policy_digest(
+        app, {VIEW_DASHBOARD, _policy('North')}
     )
-
-
-def test_policy_widened_during_a_render_does_not_widen_the_render(app):
-    pinned = _pinned(app, {_policy('North')})
-
-    resolved = _resolve(app, {_policy()}, pinned)
-
-    assert resolved == _resolve(app, {_policy('North')}, RENDER_TOKEN_QUERY_NEEDS)
-    assert resolved[STATE]['include'] == {'North'}
-
-
-def test_policy_narrowed_during_a_render_narrows_the_render(app):
-    pinned = _pinned(app, {_policy('North', 'South')})
-
-    assert _resolve(app, {_policy('North')}, pinned)[STATE]['include'] == {'North'}
+    assert _policy_digest(app, NORTH_ACCOUNT) != _policy_digest(
+        app, {VIEW_DASHBOARD, _policy('South')}
+    )

@@ -59,7 +59,6 @@
     "yup": "^1.2.0"
   },
   "devDependencies": {
-    "@axe-core/playwright": "4.10.2",
     "@babel/core": "^7.12.1",
     "@babel/plugin-proposal-class-properties": "^7.12.1",
     "@babel/plugin-proposal-decorators": "^7.12.1",
@@ -67,7 +66,6 @@
     "@babel/preset-env": "^7.12.1",
     "@babel/preset-flow": "^7.12.1",
     "@babel/preset-react": "^7.12.1",
-    "@playwright/test": "1.56.1",
     "@testing-library/dom": "^7.9.0",
     "@testing-library/jest-dom": "^5.9.0",
     "@testing-library/react": "^10.2.1",
@@ -141,6 +139,7 @@
     "cli-translations": "./scripts/translations/cli_translations.py",
     "coverage": "pytest --cov-config=.coveragerc --cov=data/ --cov=web/ --cov=pipeline/ --ignore=test/",
     "develop": "./node_modules/.bin/concurrently --kill-others-on-fail -n flow,webpack,translations,mypy 'yarn flow --continuous_scroll' 'yarn webpack' 'yarn cli-translations watch' 'yarn mypy --continuous_scroll'",
+    "e2e": "e2e/run.sh",
     "flow": "scripts/watch/watch_flow.py",
     "flow-check": "./node_modules/.bin/flow check",
     "flow-typed-install": "./node_modules/.bin/flow-typed --ignoreDeps dev --libdefDir='web/public/js/vendor/flow-typed' install --overwrite",

@@ -196,6 +196,7 @@ class FlaskConfiguration:
             'HASURA_HOST',
             settings.HASURA_HOST if IS_PRODUCTION else 'http://localhost:8088',
         )
+        self.HASURA_ADMIN_SECRET = getenv('HASURA_ADMIN_SECRET', '')
 
         # NOTE: Flag to switch between dashboard app and new dashboard
         # builder for testing

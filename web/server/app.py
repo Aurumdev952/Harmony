@@ -61,7 +61,6 @@ def _register_routes(app, register_webpack_proxy=False):
     from web.server.routes.embedded_query import EmbeddedQueryPageRouter
     from web.server.routes.index import PageRouter
     from web.server.routes.page_renderer import PageRendererRouter
-    from web.server.routes.graphql_api import GraphqlPageRouter
     from web.server.routes.user_authentication import UserAuthenticationRouter
     from web.server.routes.util import ListConverter
     from web.server.routes.webpack_dev_proxy import webpack_dev_proxy
@@ -83,7 +82,6 @@ def _register_routes(app, register_webpack_proxy=False):
     embedded_query_router = EmbeddedQueryPageRouter(template_renderer, default_locale)
     api_router = ApiRouter(template_renderer, app.zen_config)
     page_renderer_router = PageRendererRouter()
-    graphql_api_router = GraphqlPageRouter()
     user_authentication_router = UserAuthenticationRouter(
         template_renderer, default_locale
     )
@@ -94,7 +92,6 @@ def _register_routes(app, register_webpack_proxy=False):
     app.register_blueprint(embedded_query_router.generate_blueprint())
     app.register_blueprint(api_router.generate_blueprint())
     app.register_blueprint(page_renderer_router.generate_blueprint())
-    app.register_blueprint(graphql_api_router.generate_blueprint())
     app.register_blueprint(main_page_router.generate_blueprint())
     app.register_blueprint(user_authentication_router.generate_blueprint())
     app.page_router = main_page_router

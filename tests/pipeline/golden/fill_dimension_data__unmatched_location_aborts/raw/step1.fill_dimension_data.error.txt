@@ -1,0 +1,2 @@
+AssertionError: Canonical matching failed for row. Dimensions: {'StateName': 'Westfold', 'MunicipalityName': 'Nowhere Creek', 'Age': '19', 'Sex': 'F', 'Death': 'NAO'}
+Input row: {"key": {"StateName": "Westfold", "MunicipalityName": "Nowhere Creek", "Age": "19", "Sex": "F", "Death": "NAO"}, "data": {"demo_malaria_tested": 9}, "Real_Date": "2021-04-12", "source": "demo_tall"}

@@ -238,3 +238,49 @@ def test_unset_zen_env_allows_explicit_imports_and_explains_redirects():
     )
     assert result['name'] == 'config.datatypes'
     assert 'ZEN_ENV' in result['message']
+
+
+@pytest.mark.parametrize(
+    'module',
+    ['config.database', 'config.harmony_demo.database', 'config.template.database'],
+)
+def test_database_config_queries_druid_on_first_access_not_on_import(module):
+    result = probe(
+        f'''
+        import os
+        import types
+
+        os.environ.setdefault('DEFAULT_SECRET_KEY', 'not-a-secret')
+        os.environ.setdefault('DRUID_HOST', 'http://druid.invalid')
+        calls = []
+
+        class DruidMetadata:
+            @staticmethod
+            def get_most_recent_datasource(site):
+                calls.append(site)
+                return 'datasource-for-' + site
+
+        stub = types.ModuleType('db.druid.metadata')
+        stub.DruidMetadata = DruidMetadata
+        sys.modules['db.druid.metadata'] = stub
+
+        import {module} as database
+        on_import = list(calls)
+        first = database.DATASOURCE
+        from {module} import DATASOURCE
+        report(
+            site=database.DEPLOYMENT_NAME,
+            on_import=on_import,
+            first=first,
+            again=DATASOURCE,
+            calls=calls,
+        )
+        '''
+    )
+    site = result.pop('site')
+    assert result == {
+        'on_import': [],
+        'first': f'datasource-for-{site}',
+        'again': f'datasource-for-{site}',
+        'calls': [site],
+    }

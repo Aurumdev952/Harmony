@@ -19,7 +19,12 @@ security_review: false
 - the native Druid queries the app posts;
 - the body the endpoint returns, given recorded Druid responses.
 
-Only `DruidQueryClient_.run_raw_query`, the HTTP call to the broker, is replaced. No Druid, Postgres or container is needed. Usage, the case format, the normalisation rules and the regeneration policy are in `tests/golden/README.md`.
+The production `DruidQueryClient_` runs unchanged. Only the transport is replaced: a `requests` adapter on its pooled session answers each POST from the recording. Three environment patches are listed in the harness docstring and the README:
+- an `app.druid_context` stub;
+- a frozen clock;
+- `is_public_dashboard_user` returning `False`.
+
+No Druid, Postgres or container is needed. Usage, the case format, the normalisation rules and the regeneration policy are in `tests/golden/README.md`.
 
 ## Plan
 
@@ -36,6 +41,18 @@ Units, in order. Each line names the change and the check that ends it.
 3. **Case catalogue (75 cases)** and a catalogue test that fails when a POST route, calculation type, filter type or enabled granularity has no case. Check: `uv run pytest tests/golden` is green in under 60 seconds and passes under many `PYTHONHASHSEED` values. `record.py --check` reports no change.
 4. **README**: what is pinned, how to run, the case format, normalisation, adding a case, and when regeneration is allowed (only with an INV-2 note in the WP file and reviewer acceptance). Check: the README commands run as written.
 5. **Self-verify.** In-memory mutants of the policy filter, query context, date filling, NaN cleaning and metric values turn the suite red. Evidence below.
+6. **Review round 1** (QA and reviewer changes-requested, 9 findings). Changes:
+   - Replace only the transport.
+   - Build JWT needs as production does.
+   - Add a policy case on every route, and a per-route test that the policy changes the posted queries.
+   - Synthesise only real field ids.
+   - Set `testpaths` to `tests/golden`.
+   - Delete the dead branches.
+   - List every case directory.
+   - Document every patch.
+   - Format with black 22.6 and record the lint commands.
+
+   Check: a clean detached checkout reruns the full evidence, and all mutants turn red, including one unwrapped-client mutant per route.
 
 ## Contract changes
 
@@ -44,7 +61,7 @@ None. This WP reads the current query engine and changes no production code.
 ## Requests
 
 None blocking. Two notes for the lead:
-- [ ] infra (WP-2f): this WP adds a minimal root `pyproject.toml` with a `golden` group, `dev` group and `[tool.pytest.ini_options]`. WP-2f should fold it into the `web`/`pipeline`/`dev` groups and keep `uv run pytest tests/golden` working. `psycopg2-binary` is 2.8.6 here, not the 2.8.5 in `requirements.txt`, because 2.8.5 has no CPython 3.9 wheel; only `psycopg2.errorcodes` is imported. `celery` is included only because importing every SQLAlchemy model imports `models.alchemy.schedule`.
+- [ ] infra (WP-2f): this WP adds a minimal root `pyproject.toml` with a `golden` group, `dev` group and `[tool.pytest.ini_options]` (`testpaths = ["tests/golden"]`). WP-2f takes over `pyproject.toml` and `uv.lock`, drops the `golden` group in favour of its `dev` group, and should fold the rest into the `web`/`pipeline`/`dev` groups and keep `uv run pytest tests/golden` working. `psycopg2-binary` is 2.8.6 here, not the 2.8.5 in `requirements.txt`, because 2.8.5 has no CPython 3.9 wheel; only `psycopg2.errorcodes` is imported. `celery` is included only because importing every SQLAlchemy model imports `models.alchemy.schedule`.
 - [ ] qa-2 (WP-2c): if WP-2c also adds a root `pyproject.toml`, merge the two by hand. Do not take one side.
 
 ## Findings for other roles (pinned by golden cases, not fixed here)
@@ -63,6 +80,12 @@ None blocking. Two notes for the lead:
    - `epi_week` and `epi_week_of_year` are not enabled there; `/api2/query` answers 404 from the granularity lookup.
    - WP-8a needs a deployment that enables them, or a core-level unit test, to pin that extraction before removing it.
 4. **core (WP-1e): `data_quality` never runs outliers** (`query_models.py:266`). `dq_data_quality` pins today's three queries. WP-1e will change it with an INV-2 note.
+5. **security (WP-2b): a JWT that only excludes a state gives its holder no data.**
+   - Steps: read `tests/golden/cases/policy_jwt_exclude_values/druid_query.json`.
+   - Caller: the account may see all states and all sources; the token claim is `query_needs: [{"StateName": {"exclude_values": ["Pará"]}}]`.
+   - The intersection in `signal_handlers._compute_token_query_needs` keeps no source need and no Pará exclusion. The posted filter is `source == "__NO_VAL__"`, so the caller gets zero rows.
+   - Pinned as today's behaviour.
+   - Related, recorded by the reviewer and routed by the lead: `models/python/permissions.py:211-218` (`DimensionFilter.__and__` intersects exclude lists when both sides allow all values).
 
 ## Pending regeneration
 
@@ -85,6 +108,22 @@ Not yet executed. Run this only when the lead confirms that WP-0c (branch `mig/W
   4. Update the case description in `case.json` to drop the "a real broker rejects" sentence.
   5. Record the diff here and ask the reviewer to accept it.
 
+## INV-2 notes for fixtures re-recorded in review round 1
+
+None of these fixtures has reached `main`. The notes record why recorded outputs changed inside this WP.
+
+1. **`policy_complex_need` and `policy_exclude_values` are replaced by `policy_jwt_complex_need` and `policy_jwt_exclude_values`.**
+   - Before: the harness added JWT needs on top of the account's needs, with `all_values` false. That is not how production builds them, so the old cases pinned filters no real user receives.
+   - After: the needs are built through `signal_handlers._compute_token_provides`, exactly as `_install_token_needs` does. `all_values` is `not include_values`, and the token needs are intersected with the account's needs.
+   - `policy_jwt_complex_need` posts `StateName in [Pará]` and `source in [yellow_fever]`, and returns Pará's row.
+   - `policy_jwt_exclude_values` posts `source == "__NO_VAL__"` and returns no rows (Findings, item 5).
+   - The case key `query_needs` became `jwt_query_needs`, and the `all_values` key is gone.
+2. **`calc_formula`, `calc_formula_invalid`, `calc_formula_with_filter`, `calc_many_fields` and `calc_special_values`: only `druid_response.json` and `expected_response.json` changed.**
+   - Cause: the synthetic broker now draws facts only for harmony_demo field ids. Per row, it zeroes an aggregator whose filter no fact passes, and decides emptiness once per distinct aggregator filter. These cases have constituents with different filters, which changes the random draw.
+   - Every `druid_query.json` is byte-identical.
+   - `calc_formula_invalid` changes from a row with `broken_formula: 262.0` to `"data": []`. A real Druid has no rows for `field == NON_EXISTANT_FIELD`, so the new output is what production returns.
+3. **12 new policy cases.** These are 10 per-route policy cases plus the two renamed JWT cases. Every other case's five files are byte-identical to before.
+
 ## Log
 
 - 2026-10-04 qa-1 unit 1: uv project on CPython 3.9.25; check: `uv sync` OK, all 12 query and data quality modules import in a bare app context (`IMPORT-OK`).
@@ -92,6 +131,17 @@ Not yet executed. Run this only when the lead confirms that WP-0c (branch `mig/W
 - 2026-10-04 qa-1 unit 3: 75 cases and the catalogue test; check: 226 passed in 1.35 s; 32 `PYTHONHASHSEED` values (0-31) all 226 passed; `record.py --check` under seeds 101, 202 and 303 gives 0 fixture files changed.
 - 2026-10-04 qa-1 unit 4: README; check: `record.py --check`, `record.py <case>` and `uv run pytest tests/golden` run as documented; `ruff check` (F, E, W, B, UP, SIM) clean on `tests/golden`.
 - 2026-10-04 qa-1 unit 5: mutation evidence below; status review.
+- 2026-10-04 qa-1 unit 6 (review round 1): all 9 findings addressed in ee0e95d. Check, from a clean detached checkout of ee0e95d (`git worktree add --detach /tmp/wp2a-clean ee0e95d`, `uv sync --frozen`):
+  - 269 passed;
+  - bare `uv run pytest` gives 269 passed;
+  - 32 seeds all green;
+  - `record.py --check` changes 0 files under 3 seeds;
+  - the tamper check turns red;
+  - an empty case directory fails `test_case_is_complete`;
+  - black and ruff are clean;
+  - every mutant turns red (see Evidence).
+
+  The lint claim in unit 4 did not reproduce: it omitted the command and target. It is replaced by the recorded commands below.
 
 ## Evidence
 
@@ -100,7 +150,55 @@ Not yet executed. Run this only when the lead confirms that WP-0c (branch `mig/W
 - The full `requirements*.txt` was not installed: several of its pins, such as psycopg2-binary 2.8.5, do not build on this host. No container was needed.
 - `uv pip` is blocked by the modern-python hook, so the environment is the uv project above.
 
-**Suite run.**
+**Re-run after review round 1, from a clean detached checkout of ee0e95d (/tmp/wp2a-clean).**
+
+```
+$ git worktree add --detach /tmp/wp2a-clean ee0e95d && cd /tmp/wp2a-clean && uv sync --frozen
+$ time uv run pytest tests/golden -q -p no:cacheprovider
+269 passed, 307 warnings in 4.64s        (24 s wall, first run including uv's cold start)
+$ uv run pytest -q                          # bare run, testpaths = tests/golden
+269 passed in 2.24s
+$ uv run python tests/golden/record.py --check
+85 cases, 0 fixture files would change
+$ for s in 0..31: PYTHONHASHSEED=$s uv run pytest tests/golden -q
+32 × "269 passed"
+$ PYTHONHASHSEED={101,202,303} uv run python tests/golden/record.py --check
+85 cases, 0 fixture files would change      (each)
+$ uvx --python 3.9 --from black==22.6.0 --with click==8.0.4 black -S -t py39 --check tests/golden
+5 files would be left unchanged.
+$ uvx ruff@0.14.0 check --target-version py39 --select F,E,W,B,SIM --line-length 88 tests/golden
+All checks passed!
+```
+
+- **Test count.** 269 = 85 cases × 3 + 13 `test_policy_restricts_every_route` + 1 catalogue test.
+- **Tamper check.** `longSum` changed to `doubleSum` in `druid_query.json`, and 375.0 changed to 375.5 in `expected_response.json`, of `bar_graph_sum_by_state_month`. Both fail with a diff; after restoring, 269 passed.
+- **Empty case directory.** An empty `cases/zz_incomplete/` fails `test_case_is_complete`, `test_druid_queries` and `test_response`.
+- **Mutants** (in-memory pytest plugin, no file edited, run in the clean checkout):
+
+| Mutant | All tests | Query tests only |
+|---|---|---|
+| policy filter disabled | 31 failed | 18 failed |
+| ijson decoding with Decimal (`use_float=False`) | 146 failed | 68 failed |
+| `context.timeout` added to every groupBy | 85 failed | 85 failed |
+| intermediate date filling off | 11 failed | 0 |
+| `clean_df_for_json_export` skipped | 39 failed | 0 |
+| metrics rounded to 1 decimal | 55 failed | 0 |
+| unwrapped client in `BarGraphVisualization` | 3 failed | 2 failed |
+| unwrapped client in `LineGraphVisualization` | 2 failed | 1 failed |
+| unwrapped client in `HierarchyVisualization` | 2 failed | 1 failed |
+| unwrapped client in `Map` | 2 failed | 1 failed |
+| unwrapped client in `TableVisualization` (table and table/disaggregated) | 8 failed | 6 failed |
+| unwrapped client in `DataQualityReport` | 2 failed | 1 failed |
+| unwrapped client in `DataQualityTable` | 2 failed | 1 failed |
+| unwrapped client in `ReportingCompletenessLineGraph` | 2 failed | 1 failed |
+| unwrapped client in `OutliersBoxPlot` | 2 failed | 1 failed |
+| unwrapped client in `OutliersTable` | 2 failed | 1 failed |
+| unwrapped client in `OutliersLineGraph` | 2 failed | 1 failed |
+| unwrapped client in `FieldReportingStatsQuery` | 2 failed | 1 failed |
+
+"Unwrapped client" means `QueryBase.__init__` receives the raw `DruidQueryClient_` instead of the `AuthorizedQueryClient` for that one class. In each such row, the failures are that route's policy case and its `test_policy_restricts_every_route`.
+
+**First run, before review (75 cases; superseded by the re-run above).**
 ```
 $ time uv run pytest tests/golden -q -p no:cacheprovider
 226 passed, 224 warnings in 1.35s        (2.6 s wall, including uv)
@@ -117,7 +215,7 @@ $ time uv run pytest tests/golden -q -p no:cacheprovider
 - `PYTHONHASHSEED={101,202,303} uv run python tests/golden/record.py --check` gave `75 cases, 0 fixture files would change`.
 - Before having specs were canonicalised, seeds 2, 3 and 5 failed on the order of `havingSpecs` in the sketch-optimisation `having` clause of `dq_data_quality_table` and `dq_field_reporting_stats`. That is how the normalisation list in the README was found.
 
-**Mutation check.** A throwaway pytest plugin patched production code in memory only; no file was edited. Results:
+**Mutation check, first run** (superseded above). A throwaway pytest plugin patched production code in memory only; no file was edited. Results:
 
 | Mutant | All tests | Query tests only |
 |---|---|---|

@@ -19,4 +19,8 @@ These are the non-obvious facts behind `tests/golden/` (WP-2a, branch `mig/WP-2a
 - **Hash-seed nondeterminism.** Druid query JSON depends on `PYTHONHASHSEED` in five places: and/or operands, `in` values, the regex `(a)|(b)` alternation, the aggregator list, and the order of having `havingSpecs`. The suite canonicalises these, and the fake client maps array-result columns by name. Any new canonicalisation must be justified as semantically unordered.
   - **How to apply:** whenever you touch the golden suite, sweep seeds with `for s in $(seq 0 31); do PYTHONHASHSEED=$s uv run pytest tests/golden -q; done`.
 - **Verdicts on query-path WPs.** Use in-memory mutants (a pytest plugin that patches functions after collection) rather than editing production files. The ownership hook forbids qa from editing those files.
+- **What the review demanded, and should be kept.** The review (2026-10-04) required three things that the first draft got wrong:
+  - Fake the broker at the requests transport. Mount an adapter on `query_client._get_session(...)`; do not override `run_raw_query`, because that skips gzip and ijson decoding.
+  - Build JWT callers through `signal_handlers._compute_token_provides`.
+  - Give every route a policy case, enforced by an admin-replay diff test. A policy case on only some routes let a per-route unwrapped-client mutant stay green.
 - **What the frontend actually sends.** A missing filter is serialised as `"filter": {}`, never omitted (omitting it gives HTTP 400). Formula constituents carry no `name` field.

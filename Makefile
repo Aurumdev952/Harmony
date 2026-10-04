@@ -36,7 +36,7 @@ build: # Build docker images (for development and production) using docker compo
 	docker compose --env-file $(ENV_FILE) -f docker-compose.build.yaml build $(SERVICE)
 
 push: # Push the images built by `make build` to $DOCKER_NAMESPACE (default ghcr.io/zenysis).
-	docker compose --env-file $(ENV_FILE) -f docker-compose.build.yaml push $(or $(SERVICE),web-client web-server web etl-pipeline)
+	docker compose --env-file $(ENV_FILE) -f docker-compose.build.yaml push $(or $(SERVICE),web-client web-server web renderer etl-pipeline)
 
 convert: # Use the "docker compose config" command to render the compose file. (Useful to see the impact of environment variables.) 
 	$(COMPOSE_COMMAND) config

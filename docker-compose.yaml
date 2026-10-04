@@ -7,6 +7,7 @@
 # hasura: graphql stuff worker and web need hasura.
 # worker: runs the celery worker
 # web: runs the flask web service
+# renderer: renders dashboards to PDF and images for web (headless Chromium)
 ##################################################################################
 
 version: '3.9'
@@ -25,6 +26,12 @@ volumes:
   nginx_vhost:
   nginx_html:
   redis-volume:
+
+networks:
+  # No route out: the renderer reaches web and nothing else, even if the
+  # in-browser egress guard fails.
+  render:
+    internal: true
 
 
 services:
@@ -139,10 +146,13 @@ services:
       - HASURA_ADMIN_SECRET=${HASURA_ADMIN_SECRET:?HASURA_ADMIN_SECRET must be set}
       - SQLALCHEMY_DATABASE_URI=${DATABASE_URL}
       - VIRTUAL_HOST=${WEB_VIRTUAL_HOST}
-      - URLBOX_API_KEY=${URLBOX_API_KEY:-}
-      - RENDERBOT_EMAIL=${RENDERBOT_EMAIL:-}
       - OBJECT_STORAGE_ALIAS=${OBJECT_STORAGE_ALIAS}
       - ZEN_GUNICORN_WORKER_THREADS=${ZEN_GUNICORN_WORKER_THREADS:-4}
+      - RENDERER_URL=http://renderer:8080
+      # The renderer loads dashboards from here, never from the request's Host.
+      - RENDER_WEB_ORIGIN=http://web:5000
+    # Naming a network drops the implicit default, so list both.
+    networks: [default, render]
     volumes:
       # Map minio config folder
       - ${MC_CONFIG_PATH}:/root/.mc
@@ -174,8 +184,6 @@ services:
       - HASURA_HOST=http://hasura:8080
       - DRUID_HOST=${DRUID_HOST}
       - MAPBOX_ACCESS_TOKEN=${MAPBOX_ACCESS_TOKEN}
-      - URLBOX_API_KEY=${URLBOX_API_KEY:-}
-      - RENDERBOT_EMAIL=${RENDERBOT_EMAIL:-}
       - OBJECT_STORAGE_ALIAS=${OBJECT_STORAGE_ALIAS}
     command:
       [
@@ -199,4 +207,35 @@ services:
       timeout: 30s
       start_period: 5s
       retries: 3
+    logging: *default-logging
+  renderer:
+    platform: linux/amd64
+    image: ${DOCKER_NAMESPACE:-ghcr.io/zenysis}/${DOCKER_IMAGE_PREFIX:-harmony}-renderer:${DOCKER_TAG:-latest}
+    # No published port: only web calls it, over the internal render network.
+    networks: [render]
+    environment:
+      - RENDERER_ALLOWED_ORIGIN=http://web:5000
+      - RENDERER_CONCURRENCY=${RENDERER_CONCURRENCY:-2}
+    read_only: true
+    tmpfs:
+      - /tmp
+      - /home/pwuser
+    # Chromium renders through /dev/shm; Docker's 64 MiB default crashes tabs.
+    shm_size: 1gb
+    # Reaps the Chromium helpers left behind when each render's browser closes.
+    init: true
+    cap_drop: [ALL]
+    # Chromium's sandbox chroots inside its own user namespace, and Docker allows
+    # the chroot syscall through the seccomp profile only with this capability.
+    # pwuser never holds it outside that namespace.
+    cap_add: [SYS_CHROOT]
+    security_opt:
+      - no-new-privileges:true
+      # Chromium keeps its sandbox, which needs user namespaces. This is Playwright
+      # v1.63.0's profile: Docker's default plus clone, setns and unshare. Without
+      # it Chromium refuses to start; the renderer never falls back to --no-sandbox.
+      - seccomp=./docker/renderer/seccomp_profile.json
+    mem_limit: 2g
+    pids_limit: 512
+    # The image's HEALTHCHECK probes GET /healthz.
     logging: *default-logging

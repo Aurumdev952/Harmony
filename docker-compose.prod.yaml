@@ -34,3 +34,5 @@ services:
       - ${DATA_PATH}/output/logs:/logs
       - ${DATA_PATH}/ubuntu/.mc/config.json:/root/.mc/config.json
     restart: always
+  renderer:
+    restart: always

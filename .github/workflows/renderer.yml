@@ -1,0 +1,41 @@
+name: Renderer Image
+
+on:
+    # Manual trigger on branches, like the web image, to save GitHub minutes.
+    workflow_dispatch:
+    push:
+      branches:
+        - main
+
+permissions: {}
+
+jobs:
+    build-renderer-image:
+        runs-on: ubuntu-24.04
+        permissions:
+            contents: read
+            packages: write
+        steps:
+            - id: image
+              env:
+                REPO_OWNER: ${{ github.repository_owner }}
+                REPO_NAME: ${{ github.event.repository.name }}
+              run: echo "name=ghcr.io/${REPO_OWNER,,}/${REPO_NAME,,}-renderer" >> "$GITHUB_OUTPUT"
+            - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+              with:
+                persist-credentials: false
+            - name: Login to GitHub Container Registry
+              uses: docker/login-action@dbcb813823bdd20940b903addbd779551569679f # v4.6.0
+              with:
+                registry: ghcr.io
+                username: ${{ github.actor }}
+                password: ${{ secrets.GITHUB_TOKEN }}
+            - name: Build and push the renderer image
+              env:
+                IMAGE: ${{ steps.image.outputs.name }}
+                REF: ${{ github.head_ref || github.ref_name }}
+              run: |
+                # Branch names such as mig/WP-1h-... are not valid image tags.
+                TAG=$(printf '%s' "$REF" | tr -c 'A-Za-z0-9_.-' '-' | cut -c1-128)
+                docker build --platform linux/amd64 -t "$IMAGE:$TAG" -f docker/renderer/Dockerfile --cache-from "$IMAGE:main,$IMAGE:$TAG" --build-arg BUILDKIT_INLINE_CACHE=1 .
+                docker push "$IMAGE:$TAG"

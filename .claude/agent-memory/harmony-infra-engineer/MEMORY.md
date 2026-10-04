@@ -4,3 +4,4 @@
 - [WP-2f next](wp_2f_next.md): starts after WP-0f merges; replace the py3.9 black and pylint job with uv, ruff and mypy on 3.13
 - [Infra tooling traps](infra_tooling_traps.md) — *.log gitignored, mypy.ini plugin, scripts/ vs prod/ ownership, nginx-proxy logs, worktree git
 - [Image verification recipes](image_verification_recipes.md) — unique compose build names, sweep env/PYTHONPATH, overlays, PyPy: import-test wheels, gspread marker
+- [Renderer Chromium sandbox](renderer_chromium_sandbox.md) — cap_drop ALL breaks the sandbox (add SYS_CHROOT), init for zombies, .env.example denied, address pools

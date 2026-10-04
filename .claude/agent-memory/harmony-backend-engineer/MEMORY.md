@@ -12,3 +12,4 @@
 - [JWT key rotation](jwt_key_rotation.md) — old accessKey cookies break every request unless the loader swallows InvalidSignatureError
 - [Celery startup checks](celery_startup_checks.md) — refusals in worker_process_init are swallowed; check at import of the -A module
 - [Hasura roles](hasura-roles.md) — WP-0a user/anonymous role model, what WP-5e still owns, GraphQL parity tools
+- [Gunicorn server checks](gunicorn_server_checks.md) — test web/gunicorn_server.py despite its gevent patch, mypy strict on 3.8, live run with a stub app

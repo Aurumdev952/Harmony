@@ -15,7 +15,7 @@ from data.query.models.query_filter import (
     OrFilter,
     NotFilter,
     QueryFilter,
-    SelectorFilter,
+    RawFilter,
 )
 from db.druid.calculations.base_calculation import BaseCalculation
 from db.druid.calculations.calculation_merger import CalculationMerger
@@ -91,9 +91,10 @@ def get_dimension_value_filters(alert_def: AlertDefinition) -> List[QueryFilter]
 
     # If there is a dimension name and there are no filters on that same dimension,
     # add one to ensure alerts aren't triggered for empty dimension values.
+    # Empty is null: under SQL-compatible nulls `value ''` would let null rows through.
     if not dimension_name_filtered:
         druid_filters.append(
-            NotFilter(SelectorFilter(dimension=dimension_name, value=''))
+            RawFilter(filter=~Filter(dimension=dimension_name, value=None))
         )
 
     return druid_filters

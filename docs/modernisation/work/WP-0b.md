@@ -13,6 +13,7 @@ instances:
       - docker-compose.pipeline.yaml
       - docker/**
       - tests/infra/**
+      - requirements.txt
 branch: "mig/WP-0b-ports-secrets-pins"
 requirements: [SEC-1, SEC-3, SEC-9]
 contracts_consumed: []
@@ -33,7 +34,8 @@ Units, in order. Each line names the change and the check that ends it.
 5. Redis `requirepass`. Check: a throwaway Redis from the compose definition rejects unauthenticated commands, the healthcheck passes, and the worker's broker URL authenticates. Merge-blocked on backend request R2.
 6. Pin Compose images (nginx-proxy, acme-companion, redis, postgres) by tag and digest. Check: test that every `image:` outside our own builds carries `@sha256:`; `docker buildx imagetools inspect` resolves each.
 7. Pin Dockerfile base images by digest and every download by checksum (mc, flow, pypy, CPython). Check: `docker build --check` on each Dockerfile; build the `downloader` stages so checksums are exercised; build the web-server image.
-8. Runtime check: bring up postgres, redis and hasura from the dev overlay under a throwaway project name, confirm `docker compose ps` publishes only `127.0.0.1`, tear down.
+8. Runtime check: bring up postgres and redis from the dev overlay under a throwaway project name, confirm `docker compose ps` publishes only `127.0.0.1`, tear down.
+9. Pin `bcrypt==4.0.1` next to `flask-user` in `requirements.txt` (raised by WP-0a: `scripts/create_user.py` hashes through passlib 1.7.4, and bcrypt was unpinned). Check: `tests/infra/test_requirements.py` fails without a pin and passes with it; web-server image rebuilt and hashes a password.
 
 ## Contract changes
 
@@ -65,6 +67,7 @@ None.
 - 2026-10-04 infra-1 unit 7: Dockerfile bases pinned by digest (python, node, ubuntu); mc moved to its pinned GitHub release (dl.minio.io returns 410) and verified with sha256sum; flow, pypy and CPython verified by checksum; check: `docker build --check` (no new warnings), dev and pipeline `downloader` stages built with every checksum OK, web-server image built (Evidence).
 - 2026-10-04 infra-1 unit 8: dev overlay runtime check; check: postgres 15.19 and redis 8.10.2 healthy, published on 127.0.0.1 only, Redis refuses unauthenticated clients from the host; torn down.
 - 2026-10-04 infra-1 unit 2 (revised on lead request after WP-0c interrogate): the `POSTGRES_DB_URI` line and its "Alembic uses" comment are deleted rather than corrected; the test now asserts the key is absent, and a new test asserts no `environment:` key contains `:` in any Compose file set; check: absence test failed against the corrected line, 39 passed after; the colon check flags `POSTGRES_DB_URI:` when run against main's file.
+- 2026-10-04 infra-1 unit 9: `bcrypt==4.0.1` pinned beside `flask-user` in `requirements.txt` (WP-0a finding: the unpinned resolve gave bcrypt 5.0.0, which breaks passlib 1.7.4); check: `tests/infra/test_requirements.py` failed before, 40 passed after; web-server image rebuilt and hashes a password. Port 5000 (also from WP-0a) was already closed in unit 3; no change.
 
 ## Evidence
 
@@ -176,6 +179,26 @@ down                                  -> containers and network removed
 
 Not run: `make up DEV=1` with web and the pipeline. The dev image takes a long time to build (it compiles CPython), web needs a reachable Druid, and web against the password-protected Redis needs R2. QA should run the full `make up DEV=1` plus the smoke list once R1 to R3 land.
 
+### Unit 9: bcrypt pin
+
+`bcrypt` came in unpinned through `flask-user`, and the web image built on 2026-10-04 resolved **bcrypt 5.0.0**. In that image, passlib's bcrypt self-test raises `ValueError: password cannot be longer than 72 bytes` on the first hash, so `scripts/create_user.py` and every Flask-User password hash fail.
+
+passlib 1.7.4 hash plus verify on Python 3.8, by bcrypt version (`uv run --with passlib==1.7.4 --with bcrypt==X`):
+
+| bcrypt | result |
+|---|---|
+| 4.0.1 | works |
+| 4.1.3, 4.3.0 | works, but passlib logs `(trapped) error reading bcrypt version` because `bcrypt.__about__` is gone |
+| 5.0.0 | `ValueError` on first hash |
+
+So the hard break is 5.0, and 4.1 to 4.3 only add log noise. Following the lead, the pin is the last 4.0.x (4.0.1), which needs neither workaround. It goes in `requirements.txt` beside `flask-user`, with the same PyPy marker, rather than in `requirements-web.txt`: the pipeline and dev images install `requirements.txt` without `requirements-web.txt` and also get flask-user.
+
+Checks: `test_passlib_can_hash_with_the_installed_bcrypt` failed with "bcrypt is not pinned" before the pin and passes after; full `tests/infra` 40 passed. `docker build -f docker/web/Dockerfile_web-server .` exit 0; inside the image: `bcrypt 4.0.1 hash+verify True` (the previous build had bcrypt 5.0.0 and raised `ValueError`).
+
+### Port 5000 (WP-0a finding)
+
+WP-0a reported that the base file publishes `web` on 5000. That was true on `main`; unit 3 (commit 42adab6) already removed it. The dev overlay binds `127.0.0.1:5000`, and `test_only_nginx_publishes_ports` (base, prod, local) and `test_dev_publishes_on_loopback_only` cover it. No further change.
+
 ## Deployment notes (operator action at upgrade)
 
 - Set `DEFAULT_SECRET_KEY`, `JWT_SECRET_KEY` (different values) and `REDIS_PASSWORD` (hex, URL-safe) in the web host's `.env`, generated with `openssl rand -hex 32`. Until they are set, `make up` stops at config time and leaves running containers untouched.
@@ -188,6 +211,7 @@ Not run: `make up DEV=1` with web and the pipeline. The dev image takes a long t
 
 - `curl https://deb.nodesource.com/setup_14.x | bash` in `docker/dev/Dockerfile` stays unpinned. WP-6b replaces Node 14 with Node 24 and deletes it (FE-11).
 - Python requirements are not hash-locked. WP-2f moves them to `uv.lock`.
+- `bcrypt==4.0.1` is held back for passlib 1.7.4 (unit 9). Lift it when passlib goes: WP-3d (Flask 2.3 upgrade) or WP-5d, which retires Flask-User. Keep `tests/infra/test_requirements.py` or replace it with an equivalent hashing test.
 - deadsnakes PPA and apt packages in the pipeline and dev images are not version-pinned. WP-3b rewrites these images.
 - The dev overlay keeps its fixed `postgres`/`zenysis` credentials with `trust` auth. They are dev-only, bound to loopback, and the dev web and pipeline hard-code the same URL.
 - Hasura (port 8088 and image) is WP-0a's (R7). MinIO server image and `mc` successor: R5.

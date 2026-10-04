@@ -28,5 +28,10 @@ WP-3b collapses the lanes with two changes:
 - ruff format is black 24 style, so a touched legacy file gets a whole-file reformat. The lead was asked for one repo-wide format commit.
 - `uv pip` is blocked by a hook; use a small uv project to lock tool sets instead.
 - mypy run from the repo root needs `explicit_package_bases`, because the root has an `__init__.py`.
+- Security wants build tools locked as well as runtime packages. Find them with a fresh-cache `UV_CACHE_DIR=<new> UV_PROJECT_ENVIRONMENT=<new> uv sync --locked -v` and grep `Installing build requirement:`. Pin each one in `[tool.uv] build-constraint-dependencies`. A new sdist dependency can bring in a new build requirement, so re-run that check whenever the lock gains source builds.
+- Diff changed files against the merge-base (`git diff --merge-base <base>`), not two-dot: a moved base otherwise lints and `--fix`es files the branch never touched. Use `-z` with `core.quotePath=false` and a `read -d ''` loop (macOS bash 3.2 has no mapfile), and put `--` before file lists.
+- ruff `S`: ignore S603 and S607 (they fire on every subprocess call); in tests, ignore S101 and S311.
+- To prove "a broken case turns CI red", break one case per suite. A break that touches nothing a test pins stays green: renaming a format tag no offline test covers did exactly that.
+- `CI=true` changes pipeline-suite behaviour (a Hypothesis profile plus one extra test). Set it when replaying CI locally.
 
 Related: [[ci-tooling-and-guards]].

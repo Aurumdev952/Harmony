@@ -1,0 +1,1 @@
+- [Pipeline builds a Flask app](pipeline_builds_flask_app.md) — validate steps construct FlaskConfiguration; put startup checks at settings import

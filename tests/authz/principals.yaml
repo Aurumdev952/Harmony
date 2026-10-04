@@ -1,0 +1,92 @@
+# Principals the authorisation table is evaluated for. Each one is turned into a
+# Flask-Principal identity by the production code path (BaseUserMixin
+# .enumerate_permissions and signal_handlers.on_identity_loaded); see
+# tests/authz/principals.py.
+#
+# Every seeded role in seed.yaml also gets a principal named `role:<name>`: a
+# signed-in user (header auth, so no JWT narrowing) holding only that role, with
+# tags [signed_in] plus [superuser] for admin.
+#
+# Keys:
+#   signed_in      false for an anonymous visitor (default true)
+#   public_access  value of the `public_access` configuration key (default false)
+#   roles          seeded role names held directly
+#   groups         [{roles: [...], acls: [...]}]; the user is a member of each
+#   acls           [{resource: <id>, role: <resource role>}], user ACLs
+#   sitewide_acls  [{resource: <id>, registered: <rr>, unregistered: <rr>}]
+#   jwt            claims of the token the user authenticated with; omitted for
+#                  X-Username/X-Password header auth
+#   tags           names the expectation table may use instead of listing principals
+#
+# Fixture resources: every signed-in principal is user 42. Other ids:
+#   user 43       another user
+#   dashboard 7   a private dashboard (Resource.id 7)
+#   dashboard 8   another private dashboard
+#   dashboard 9   a dashboard with a sitewide ACL (only where a principal says so)
+#   alert 11      an alert definition (Resource.id 11)
+#   group 5, role 3, configuration 1
+
+resources:
+  7: dashboard
+  8: dashboard
+  9: dashboard
+  11: alert
+
+principals:
+  anonymous:
+    signed_in: false
+  anonymous_public:
+    signed_in: false
+    public_access: true
+    sitewide_acls: [{resource: 9, registered: dashboard_editor, unregistered: dashboard_viewer}]
+  signed_in_public:
+    public_access: true
+    sitewide_acls: [{resource: 9, registered: dashboard_editor, unregistered: dashboard_viewer}]
+    tags: [signed_in]
+  no_roles:
+    tags: [signed_in]
+  admin_via_group:
+    groups: [{roles: [admin]}]
+    tags: [signed_in, superuser]
+  dashboard_owner:
+    acls: [{resource: 7, role: dashboard_admin}]
+    tags: [signed_in]
+  dashboard_acl_editor:
+    acls: [{resource: 7, role: dashboard_editor}]
+    tags: [signed_in]
+  dashboard_acl_viewer:
+    acls: [{resource: 7, role: dashboard_viewer}]
+    tags: [signed_in]
+  group_dashboard_admin:
+    groups: [{roles: [dashboard_admin]}]
+    tags: [signed_in]
+  group_acl_viewer:
+    groups: [{acls: [{resource: 7, role: dashboard_viewer}]}]
+    tags: [signed_in]
+  alert_owner:
+    acls: [{resource: 11, role: alert_admin}]
+    tags: [signed_in]
+
+  # Browser sessions: every login issues {needs: ['*'], query_needs: ['*']}.
+  session:admin:
+    roles: [admin]
+    jwt: {needs: ['*'], query_needs: ['*']}
+    tags: [signed_in, superuser]
+  session:dashboard_owner:
+    acls: [{resource: 7, role: dashboard_admin}]
+    jwt: {needs: ['*'], query_needs: ['*']}
+    tags: [signed_in]
+  session:_default_role:
+    roles: [_default_role]
+    jwt: {needs: ['*'], query_needs: ['*']}
+    tags: [signed_in]
+
+  # Export render tokens (page_renderer.py): one dashboard, every query need.
+  render_token:admin:
+    roles: [admin]
+    jwt: {needs: [[view_resource, 7, dashboard]], query_needs: ['*']}
+  render_token:dashboard_acl_viewer:
+    acls: [{resource: 7, role: dashboard_viewer}]
+    jwt: {needs: [[view_resource, 7, dashboard]], query_needs: ['*']}
+  render_token:no_roles:
+    jwt: {needs: [[view_resource, 7, dashboard]], query_needs: ['*']}

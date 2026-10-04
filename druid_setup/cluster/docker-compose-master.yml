@@ -60,7 +60,7 @@ services:
     ports:
       - "5432:5432"
     environment:
-      - POSTGRES_PASSWORD=${DRUID_POSTGRES_PASSWORD}
+      - POSTGRES_PASSWORD=${DRUID_POSTGRES_PASSWORD:?set DRUID_POSTGRES_PASSWORD in druid_setup/.env to a random value, e.g. openssl rand -hex 32}
       - POSTGRES_USER=${DRUID_POSTGRES_USER}
       - POSTGRES_DB=${DRUID_POSTGRES_DB}
     logging: *default-logging
@@ -111,5 +111,5 @@ services:
       - druid_zk_service_host=${DRUID_ZOOKEEPER_HOST}
       - druid_metadata_storage_connector_connectURI=jdbc:postgresql://${DRUID_POSTGRES_HOST}:5432/${DRUID_POSTGRES_DB}
       - druid_metadata_storage_connector_user=${DRUID_POSTGRES_USER}
-      - druid_metadata_storage_connector_password=${DRUID_POSTGRES_PASSWORD}
+      - DRUID_POSTGRES_PASSWORD=${DRUID_POSTGRES_PASSWORD:?set DRUID_POSTGRES_PASSWORD in druid_setup/.env to a random value, e.g. openssl rand -hex 32}
     logging: *default-logging

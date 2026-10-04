@@ -35,6 +35,14 @@ Units, in order. Each line names the change and the check that ends it.
 7. Pin Dockerfile base images by digest and every download by checksum (mc, flow, pypy, CPython). Check: `docker build --check` on each Dockerfile; build the `downloader` stages so checksums are exercised; build the web-server image.
 8. Runtime check: bring up postgres, redis and hasura from the dev overlay under a throwaway project name, confirm `docker compose ps` publishes only `127.0.0.1`, tear down.
 
+Request R4 (data-platform-1, branch `mig/WP-0b-ports-secrets-pins-druid`, files `druid_setup/**`, `tests/druid_setup/**`):
+
+- R4.1 Druid metadata password from a required variable. Check: `tests/druid_setup` fails before, passes after.
+- R4.2 Stop publishing ZooKeeper, memcached and Postgres. Check: port test over all four Druid Compose files.
+- R4.3 Pin postgres, memcached, ZooKeeper, Druid and the extension loader's base image by tag and digest. Check: pin test; `docker buildx imagetools inspect` per tag.
+- R4.4 Pin the extension downloads to a commit and verify each with `sha256sum -c`. Check: checksum-coverage test; build and run the extension loader.
+- R4.5 Runtime check of the single-server setup on throwaway volumes.
+
 ## Contract changes
 
 None.
@@ -64,6 +72,7 @@ None.
 - 2026-10-04 infra-1 unit 6: nginx-proxy, acme-companion, redis and postgres pinned by version tag and digest; check: `pytest tests/infra` pin test failed for 3 file sets before, 34 passed after; each tag re-resolved to its digest with `docker buildx imagetools inspect`.
 - 2026-10-04 infra-1 unit 7: Dockerfile bases pinned by digest (python, node, ubuntu); mc moved to its pinned GitHub release (dl.minio.io returns 410) and verified with sha256sum; flow, pypy and CPython verified by checksum; check: `docker build --check` (no new warnings), dev and pipeline `downloader` stages built with every checksum OK, web-server image built (Evidence).
 - 2026-10-04 infra-1 unit 8: dev overlay runtime check; check: postgres 15.19 and redis 8.10.2 healthy, published on 127.0.0.1 only, Redis refuses unauthenticated clients from the host; torn down.
+- 2026-10-04 data-platform-1 R4.1: `FoolishPassword` removed from `druid_setup`; Compose requires `DRUID_POSTGRES_PASSWORD` (`${VAR:?}`) for postgres and the coordinator, Druid reads it through the `environment` password provider (in 0.23: `core/.../PasswordProvider.java` registers `environment`), the Makefile exports it from `druid_setup/.env`; check: `pytest tests/druid_setup` 9 failed before, 9 passed after.
 
 ## Evidence
 

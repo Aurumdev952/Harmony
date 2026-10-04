@@ -56,7 +56,7 @@ services:
     volumes:
       - metadata_data:/var/lib/postgresql/data
     environment:
-      - POSTGRES_PASSWORD=FoolishPassword
+      - POSTGRES_PASSWORD=${DRUID_POSTGRES_PASSWORD:?set DRUID_POSTGRES_PASSWORD in druid_setup/.env to a random value, e.g. openssl rand -hex 32}
       - POSTGRES_USER=druid
       - POSTGRES_DB=druid
     logging: *default-logging
@@ -104,6 +104,8 @@ services:
     env_file:
       - environment/common.env
       - environment/coordinator.env
+    environment:
+      - DRUID_POSTGRES_PASSWORD=${DRUID_POSTGRES_PASSWORD:?set DRUID_POSTGRES_PASSWORD in druid_setup/.env to a random value, e.g. openssl rand -hex 32}
     logging: *default-logging
 
   broker:

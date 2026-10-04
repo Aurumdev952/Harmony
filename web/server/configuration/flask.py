@@ -9,11 +9,11 @@ import tempfile
 from datetime import timedelta
 from os import path
 from typing import Optional
-from config.settings import getenv
 
 from config.settings import getenv
 from config import settings
 from web.server.environment import IS_PRODUCTION, IS_TEST
+from web.server.configuration.redis_connection import get_redis_password
 
 # Store uploads here.  This is a relative path from the app's instance root.
 DATA_UPLOAD_FOLDER = 'uploads/'
@@ -154,6 +154,7 @@ class FlaskConfiguration:
                 'CACHE_KEY_PREFIX': f'zen-{zen_env}-',
                 'CACHE_TYPE': 'RedisCache',
                 'CACHE_REDIS_HOST': getenv('REDIS_HOST', settings.REDIS_HOST),
+                'CACHE_REDIS_PASSWORD': get_redis_password(),
             },
         }
         # Add options common for all cache backends

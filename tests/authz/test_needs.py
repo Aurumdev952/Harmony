@@ -86,11 +86,12 @@ def test_include_only_intersection_matches_the_set_model(a, b):
         (dim_filter,) = combined.dimension_filters
         assert dim_filter.include_values == expected
     else:
-        # No overlap collapses to an empty include set (deny), which carries no
-        # dimension filter in the resulting QueryNeed.
-        assert combined.dimension_filters == [] or not any(
-            f.include_values for f in combined.dimension_filters
-        )
+        # No overlap is the deny need: one filter on the dimension with an empty
+        # include set and neither all_values nor excludes (the INTERSECTION row
+        # S3 & S1). Equality compares all_values, so a widening to all values fails.
+        assert combined == need(d=[])
+        (dim_filter,) = combined.dimension_filters
+        assert not dim_filter.all_values
 
 
 @given(required=_value_sets, held=_value_sets)

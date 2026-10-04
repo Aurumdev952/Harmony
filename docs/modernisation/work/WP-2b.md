@@ -40,7 +40,7 @@ tests/authz/run.sh -m authz_http       # live-stack layer
 tests/authz/stack.sh down
 ```
 
-`run.sh` is `uv run --with pyyaml --with hypothesis pytest tests/authz` on the root uv project (`pyproject.toml`, from WP-2a). That project pins the legacy web stack (Flask 1.0.1, the Flask-Potion fork) on Python 3.9, so this does not use Python 3.13. PyYAML and Hypothesis are added for the run until WP-2f folds the suites' extra needs into the dev group. `stack.sh` is a thin wrapper around `tests/contract/stack/stack.sh` (WP-2c): it sets `CONTRACT_PROJECT`, `CONTRACT_WEB_PORT` and `CONTRACT_USERNAME` and re-exports the env under `AUTHZ_*`.
+`run.sh` is `uv run --with pyyaml==6.0.3 --with hypothesis==6.141.1 pytest tests/authz` on the root uv project (`pyproject.toml`, from WP-2a). That project pins the legacy web stack (Flask 1.0.1, the Flask-Potion fork) on Python 3.9, so this does not use Python 3.13. PyYAML and Hypothesis are added for the run, pinned, until WP-2f folds the suites' extra needs into the dev group. `stack.sh` is a thin wrapper around `tests/contract/stack/stack.sh` (WP-2c): it sets `CONTRACT_PROJECT`, `CONTRACT_WEB_PORT` and `CONTRACT_USERNAME` and re-exports the env under `AUTHZ_*`.
 
 ## Contract changes
 

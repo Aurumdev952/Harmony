@@ -15,10 +15,6 @@ DEV_CONFIG = {
             'qualname': 'ZenysisLogger',
             'propagate': False,
         },
-        'segment': {
-            'level': 'DEBUG',
-            'handlers': ['console'],
-        },
     },
     'formatters': {
         'standard': {

@@ -1,7 +1,13 @@
 from datetime import timedelta
 from typing import Optional
 from flask import make_response, jsonify, current_app
-from flask_jwt_extended import create_access_token
+from flask_jwt_extended import (
+    create_access_token,
+    get_jwt_claims,
+    verify_jwt_in_request_optional,
+)
+from flask_jwt_extended.exceptions import JWTExtendedException
+from jwt import InvalidTokenError
 from werkzeug.wrappers import Response
 
 REMEMBER_ME_CLAIM = 'remember_me'
@@ -60,3 +66,16 @@ def create_auth_response(
     )
 
     return response
+
+
+def is_session_persisted() -> bool:
+    '''True when the request's token came from a "Remember me" login.
+
+    Browsers never send a cookie's expiry back, so the choice is signed into the
+    token. Reads the same token, header first, that authenticated the request.
+    '''
+    try:
+        verify_jwt_in_request_optional()
+    except (InvalidTokenError, JWTExtendedException):
+        return False
+    return bool(get_jwt_claims().get(REMEMBER_ME_CLAIM))

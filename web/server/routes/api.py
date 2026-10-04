@@ -52,7 +52,8 @@ from web.server.routes.views.validate_data_catalog import (
 )
 from web.server.security.permissions import ROOT_SITE_RESOURCE_ID
 from web.server.util.data_catalog import populate_fields, zip_data_catalog_metadata
-from web.server.util.util import Success, is_session_persisted, unauthorized_error
+from web.server.util.authentication import is_session_persisted
+from web.server.util.util import Success, unauthorized_error
 
 # Endpoints in this file should have minimal logic; serialization should happen elsewhere.
 # TODO: move serializing to upstream files

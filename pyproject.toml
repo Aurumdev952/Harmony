@@ -196,8 +196,9 @@ select = ["E4", "E7", "E9", "F", "S"]
 ignore = ["S603", "S607"]
 
 [tool.ruff.lint.per-file-ignores]
-# Tests assert, and draw synthetic data from `random`.
-"tests/**" = ["S101", "S311"]
+# Tests assert, draw synthetic data from `random`, and use placeholder credentials
+# and fixed temp paths.
+"tests/**" = ["S101", "S105", "S106", "S108", "S311"]
 
 [tool.mypy]
 files = ["web/server", "models", "db"]

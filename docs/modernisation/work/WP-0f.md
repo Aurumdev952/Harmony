@@ -79,13 +79,15 @@ None.
 
   They duplicated `make build` (`docker-compose.build.yaml`), whose namespace already defaults to `ghcr.io/zenysis`. `make web-build` was also broken: it never passed `IMAGE_PREFIX`, so `docker/web/Dockerfile_web` resolved `FROM zengineering/-web-client:latest`.
 
-  A new `make push` pushes `web-client web-server web etl-pipeline`, or `$(SERVICE)`, through the same compose file. It honours `DOCKER_NAMESPACE`, `DOCKER_IMAGE_PREFIX` and `DOCKER_TAG` from `.env`. The local-only `dev` image is not pushed.
+  A new `make push` pushes `web-client web-server web etl-pipeline`, or `$(SERVICE)`, through the same compose file. It honours `DOCKER_NAMESPACE` and `DOCKER_TAG` from `.env`. The local-only `dev` image is not pushed.
 
   I removed the targets rather than retargeting them, because CI (`web.yml`, `pipeline.yml`) is the one system that publishes images. Deployers building their own images keep `make build` plus `make push`.
 - **`--cache-from` (correction).** An earlier draft said `--cache-from "$IMAGE:main,$IMAGE:$TAG"` was a single invalid ref. That was wrong. buildx's `ParseCacheEntry` splits a comma-separated value without `=` into one registry entry per field, so both refs are imported. Reproduced locally: `docker build --cache-from "a:main,b:tag"` logs a separate `importing cache manifest from` line for each. WP-3b must not "fix" this flag.
 - **Left alone (out of scope, noted for later WPs).**
   - Python 3.9 and Node 18.17 in `integration.yml` stay until WP-3 and FE-11 bump them.
   - In the image workflows, a `workflow_dispatch` on a branch with `/` in its name gives an invalid image tag. That was true before this WP too, and it belongs to WP-3b.
+  - `DOCKER_IMAGE_PREFIX` is only half supported. `docker-compose.build.yaml` hardcodes the `harmony-` image names, but it passes `DOCKER_IMAGE_PREFIX` to the `web` build as `IMAGE_PREFIX`. Any prefix other than the default therefore makes `Dockerfile_web` look for `<ns>/<prefix>-web-client` images that `make build` never tagged. For WP-3b.
+  - `docker/build.sh` is referenced nowhere. It is broken the same way `make web-build` was: it passes no `IMAGE_PREFIX`, so the build reads `FROM ghcr.io/zenysis/-web-client:latest`. WP-3b should delete it.
   - There is no Dependabot config to keep SHA pins current. WP-2f should add one for `github-actions`.
 
 ## Evidence

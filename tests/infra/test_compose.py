@@ -22,7 +22,6 @@ BASE_ENV = {
     'ZEN_ENV': 'harmony_demo',
     'DRUID_HOST': 'http://druid.invalid',
     'DATABASE_URL': 'postgresql://u:p@db.invalid:5432/harmony',
-    'POSTGRES_DB_URI': 'postgresql://u:p@db.invalid:5432/harmony',
     'MC_CONFIG_PATH': '/tmp/mc',
     'DATA_PATH': '/tmp/data',
     'NGINX_VHOST': '/tmp/nginx_vhost',
@@ -62,11 +61,26 @@ def config(tmp_path, files, env=None):
     return json.loads(result.stdout)
 
 
-def test_pipeline_passes_postgres_db_uri(tmp_path):
+def test_pipeline_does_not_set_unread_postgres_db_uri(tmp_path):
     cfg = config(tmp_path, ['docker-compose.pipeline.yaml'])
     environment = cfg['services']['etl-pipeline']['environment']
-    assert environment.get('POSTGRES_DB_URI') == BASE_ENV['POSTGRES_DB_URI']
-    assert 'POSTGRES_DB_URI:' not in environment
+    assert not any(key.startswith('POSTGRES_DB_URI') for key in environment)
+
+
+@pytest.mark.parametrize(
+    'files',
+    [
+        ['docker-compose.yaml', 'docker-compose.prod.yaml'],
+        ['docker-compose.yaml', 'docker-compose.dev.yaml'],
+        ['docker-compose.pipeline.yaml'],
+        ['docker-compose.db.yaml'],
+        ['docker-compose.minio.yaml'],
+    ],
+)
+def test_no_environment_key_contains_a_colon(tmp_path, files):
+    for name, service in config(tmp_path, files)['services'].items():
+        bad = [key for key in service.get('environment', {}) if ':' in key]
+        assert not bad, f'{name}: {bad}'
 
 
 # WP-0a removes Hasura's published port; drop it from here when it lands.

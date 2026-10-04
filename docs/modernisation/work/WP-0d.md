@@ -8,6 +8,16 @@ instances:
     files:
       - docs/modernisation/work/WP-0d.md
       - docs/modernisation/work/WP-0d-evidence/**
+  - name: "infra-5"
+    files:
+      - requirements.txt
+      - requirements-web.txt
+      - requirements-pipeline.txt
+      - requirements-dev.txt
+      - mypy.ini
+      - log/config.py
+      - docs/modernisation/work/WP-0d-evidence/infra5*
+      - docs/modernisation/work/WP-0d-evidence/sweep-*infra5*
 branch: "mig/WP-0d-dead-backend-code"
 requirements: []
 contracts_consumed: []
@@ -61,7 +71,7 @@ None.
 
 Each request is the exact change verified in unit 4. The combined diff was applied to a scratch copy, and its build and sweep results are under Evidence. None of these block a core unit, so this WP's own units continue.
 
-- [ ] **infra**: trim the requirements and the configs that refer to removed packages.
+- [x] **infra**: trim the requirements and the configs that refer to removed packages. Done by infra-5 on `mig/WP-0d-dead-backend-code-infra`, including the optional `python-Levenshtein`. **Merge order:** this branch must land together with or after the backend branch. On its own, `_register_routes` fails with `No module named 'flask_graphql'` (Evidence, infra-5).
   - `requirements-web.txt`: delete `Flask-Admin==1.5.3`, `graphene-sqlalchemy==2.3.0`, `Flask-GraphQL==2.0.1` and `segment-analytics-python==2.2.3`.
   - `requirements-pipeline.txt`: delete `fuzzywuzzy`, `jellyfish==0.7.2`, `editdistance` and `dask==2022.2.0 ; platform_python_implementation != 'PyPy'`.
   - `requirements.txt`: delete `google-cloud-logging==1.11.0 ; ...` and the two-line `# There are issues installing these tools with PyPy...` comment above it.
@@ -76,7 +86,7 @@ Each request is the exact change verified in unit 4. The combined diff was appli
   - This WP does not touch `web/server/routes/api.py` (WP-0a and WP-0c).
 - [ ] **data-platform**: delete the Hadoop ingestion path as one change: `db/druid/indexing/resources/task_templates/`, `db/druid/indexing/resources/tuning_configs/on_prem.json` (the directory's only file), `db/druid/indexing/legacy_task_builder.py` and `db/druid/indexing/scripts/run_indexing.py`. `run_native_indexing.py` and `task_runner_util.py` do not depend on them.
 - [ ] **frontend-platform**: delete `web/client/util/graphql/zen_environment.js`. In `web/client/util/graphql/index.jsx`, delete the line `import zenEnvironment from 'util/graphql/zen_environment';` and the `zenEnvironment,` export entry. This can land in WP-0e.
-- [ ] **infra (found during verification; already broken on `main`, not caused by this WP)**: the `etl-pipeline` image does not build.
+- [x] **infra (found during verification; already broken on `main`, not caused by this WP)**: the `etl-pipeline` image does not build. infra-5 on `mig/WP-0d-dead-backend-code-infra`: PyPy failure fixed with `cryptography==41.0.7 ; platform_python_implementation == 'PyPy'` in `requirements-pipeline.txt`. The MinIO 410 is fixed on WP-0b's branch (`mig/WP-0b-ports-secrets-pins`) and is not duplicated here, so this branch's own pipeline build still stops at the `mc` download until WP-0b lands.
   - `docker/pipeline/Dockerfile:29-36` downloads the MinIO client from `https://dl.minio.io/client/mc/release/linux-*/mc`. That URL now returns `HTTP 410 Gone`, so the `downloader` stage fails with `wget` exit 8. This breaks INV-1 for the pipeline image.
   - Suggested fix: pin a versioned `mc` release URL with a SHA-256 check (SEC-9), or copy it from a pinned `minio/mc` image. WP-0b may be the natural home.
   - **Second, independent failure.** Once `mc` is stubbed, the PyPy step fails (`docker/pipeline/Dockerfile:153-159`).
@@ -95,8 +105,55 @@ Each request is the exact change verified in unit 4. The combined diff was appli
 - 2026-10-04 core-2 unit 2: proved targets dead, found `/api/timeout` live; check: `/tmp/wp0d_dead.sh` transcript under Evidence.
 - 2026-10-04 core-2 unit 3: wrote per-owner requests; check: each names files, lines and scope.
 - 2026-10-04 core-2 unit 4: verified combined change in scratch copy; check: web-server base/trim build exit 0, sweep diff = deleted modules only, URL map diff = `/graphql` only (Potion 247/247); pipeline CPython install passes base and trim, trimmed sweep 0 removed-package errors; pipeline image itself broken on `main` (mc 410, PyPy maturin), reported to infra.
+- 2026-10-04 infra-5 unit 1: trimmed the four requirements files, the 4 mypy sections and the `segment` logger (commit `WP-0d: drop requirements, mypy sections and logger for removed packages`); check: removed-package grep 0 importers outside the backend-deleted modules, web-server image built, sweep and URL map match core-2's trim once the backend deletion is overlaid.
+- 2026-10-04 infra-5 unit 2: pinned `cryptography==41.0.7` for PyPy in `requirements-pipeline.txt`; check: scratch pipeline build with WP-0b's Dockerfile exit 0, PyPy step installs the pp38 wheel, PyPy and CPython sweeps have 0 removed-package errors. Real-branch pipeline build stops at the `mc` 410, which WP-0b fixes.
 
 ## Evidence
+
+### infra-5: requirements trim and PyPy pin
+
+Branch `mig/WP-0d-dead-backend-code-infra`, built from the WP branch with `mig/integration` merged. The six-file trim matches core-2's [`combined.diff`](WP-0d-evidence/combined.diff) line for line, plus `python-Levenshtein==0.12.1`.
+
+**Nothing imports a removed package.** [`infra5_grep.sh`](WP-0d-evidence/infra5_grep.sh) excludes `docs/`, `.claude/`, VCS metadata and `node_modules`. Output: [`infra5_grep.out`](WP-0d-evidence/infra5_grep.out).
+- `flask_admin`, `dask`, `google`, `segment`, `analytics`, `paramiko`, `nacl`, `pyasn1`, `fuzzywuzzy`, `jellyfish`, `editdistance`, `Levenshtein`, `fabric` and `cryptography` have 0 importers.
+- `graphene`, `graphene_sqlalchemy`, `flask_graphql` and `graphql` are imported only by `web/server/graphql/` and `web/server/routes/graphql_api.py`, which the backend request deletes.
+- The only other textual mention is `.gitignore:216-217` (`dask-worker-space/`), which is in the lead's optional request.
+
+**`web-server` image.** Built with `DOCKER_NAMESPACE=local/wp0d-infra5 DOCKER_TAG=web docker compose -p wp0d-infra5-web -f docker-compose.build.yaml build web-server`. Exit 0.
+- It prints the same pre-existing `typing-extensions 4.1.1` resolver warning as core-2's base build.
+- Of the removed packages, `pip list` shows only `cryptography 47.0.0` and `pyasn1 0.6.4`. Both arrive transitively through `google-auth`, and nothing in the repo imports either one.
+- **Import sweep** with core-2's [`import_sweep.py`](WP-0d-evidence/import_sweep.py), run as `docker run --rm --network none -e PYTHONPATH=/zenysis -e ZEN_ENV=harmony_demo -e DEFAULT_SECRET_KEY=<dummy> ...`. Output is sorted, with stray stdout lines dropped.
+
+| Run | Modules | OK | Removed-package errors |
+|---|---|---|---|
+| infra branch alone ([tsv](WP-0d-evidence/sweep-web-infra5.tsv)) | 759 | 628 | 3: `web.server.graphql.filters`, `web.server.graphql.schema`, `web.server.routes.graphql_api` |
+| infra branch plus the backend deletion, as a read-only `web/server` bind mount ([tsv](WP-0d-evidence/sweep-web-infra5-backend.tsv)) | 754 | 626 | 0 |
+
+- Against core-2's base sweep, the branch alone differs only in those 3 modules. With the backend deletion overlaid, it differs from core-2's trim sweep only in `db.druid.indexing.legacy_task_builder` and `scripts.run_indexing`. Those two are data-platform's deletion, which was not overlaid.
+- **URL map.** core-2's [`route_map.py`](WP-0d-evidence/route_map.py) also needs dummy `DRUID_HOST`, `POSTGRES_HOST`, `POSTGRES_USER`, `POSTGRES_PASSWORD` and `DATABASE_URL`.
+  - The branch alone exits 1 with `ModuleNotFoundError: No module named 'flask_graphql'`, raised from `_register_routes`. This is why the merge order matters.
+  - With the backend overlay it produces 315 rules, byte-identical to core-2's [`routes-trim.tsv`](WP-0d-evidence/routes-trim.tsv).
+- `log/config.py`: `logging.config.dictConfig(DEV_CONFIG)` loads, `black -S --check` (22.6.0) passes, and `ruff check --select F` passes.
+
+**`etl-pipeline` image.**
+- **This branch as committed:** `DOCKER_NAMESPACE=local/wp0d-infra5 DOCKER_TAG=pipe docker compose -p wp0d-infra5-pipe -f docker-compose.build.yaml build etl-pipeline` stops at step `#8`, the `downloader` stage `mc` download, with `ERROR 410: Gone` (`wget` exit 8). This is the `main` breakage that WP-0b fixes. The build never reaches pip.
+- **Scratch copy** (`git archive HEAD`, never committed) with WP-0b's `docker/pipeline/Dockerfile` swapped in and `ENV PIP_DEFAULT_TIMEOUT=300` added after a transient PyPI read timeout. The harness diff is [`infra5-pipeline-harness.diff`](WP-0d-evidence/infra5-pipeline-harness.diff), and no requirement line differs from this branch. Image built, exit 0:
+  - WP-0b's `mc` download and `sha256sum -c` passed.
+  - CPython venv step `#15 DONE 664.3s`.
+  - PyPy venv step `#17 DONE 276.2s`. It picked `cryptography-41.0.7-pp38-pypy38_pp73-manylinux_2_28_x86_64.whl`, and no maturin build ran.
+  - Installed `cryptography`: CPython 45.0.7 (unpinned, unchanged), PyPy 41.0.7.
+- **Import sweep** over `pipeline data util db config models log` in both venvs, run with `--network none` and dummy environment values:
+
+| Venv | Modules | OK | Removed-package errors |
+|---|---|---|---|
+| CPython ([tsv](WP-0d-evidence/sweep-pipeline-infra5-cpython.tsv)) | 400 | 394 | 0 |
+| PyPy ([tsv](WP-0d-evidence/sweep-pipeline-infra5-pypy.tsv)) | 400 | 386 | 0 |
+
+- The CPython sweep differs from core-2's trim sweep only by the two Hadoop modules (not overlaid) and `config.template.ui` (`MAPBOX_ACCESS_TOKEN` unset in my run).
+- The PyPy sweep has 8 more failures than CPython. Each one is a package that `requirements.txt` already excludes under PyPy: `pandas`, `psycopg2`, and `flask_login` through `flask-user`.
+- This is the first PyPy evidence for WP-0d. Before the pin, core-2 could not build the PyPy venv.
+
+**Why 41.0.7.** PyPI shows `pp38` wheels for cryptography up to 41.0.7 and none for 42.0.0 or later. Ubuntu 22.04's `pypy3` is PyPy 7.3.9 (Python 3.8). 41.0.7 also has `pp39` and `pp310` wheels for x86_64 and aarch64. The pin therefore also suits the dev image's PyPy 7.3.11 (Python 3.9), which installs the same file and would otherwise hit the same maturin build once cryptography passes 43.x. Restricting the pin with a PyPy marker leaves CPython's resolution unchanged.
 
 ### Unit 2: the targets are dead
 

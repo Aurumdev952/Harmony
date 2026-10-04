@@ -6,7 +6,7 @@ REDIS_PORT = 6379
 
 
 def get_redis_password() -> Optional[str]:
-    '''REDIS_PASSWORD, required whenever REDIS_HOST names a Redis server (SEC-1).'''
+    '''REDIS_PASSWORD, required whenever REDIS_HOST names a Redis server (SEC-3).'''
     password = getenv('REDIS_PASSWORD') or None
     if getenv('REDIS_HOST') and not password:
         raise RuntimeError(
@@ -16,6 +16,5 @@ def get_redis_password() -> Optional[str]:
     return password
 
 
-def build_redis_url(host: str, password: Optional[str]) -> str:
-    auth = f':{quote(password, safe="")}@' if password else ''
-    return f'redis://{auth}{host}:{REDIS_PORT}/'
+def build_redis_url(host: str, password: str) -> str:
+    return f'redis://:{quote(password, safe="")}@{host}:{REDIS_PORT}/'

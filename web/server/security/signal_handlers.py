@@ -294,7 +294,8 @@ def install_login_manager_signal_handlers(app, login_manager):
             # bypass jwt-extended's error callbacks for now, our own
             # `auth_decorator` will return JSON for API calls and redirects
             # otherwise, and it's not really feasible with the callback.
-            # A bad signature is a token signed with a previous JWT_SECRET_KEY.
+            # A bad signature (a token signed with a previous JWT_SECRET_KEY, or a
+            # forged one) makes the request anonymous, like an expired token.
             pass
 
         auth_email = get_jwt_identity()

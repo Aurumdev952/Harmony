@@ -42,40 +42,43 @@ services:
       context: ../extensions
     volumes:
       - zen_extensions:/druid/extensions
-    environment:
-      - ZEN_DRUID_VERSION=${DRUID_VERSION}
     logging: *default-logging
 
   postgres:
-    image: postgres:latest
+    # A data volume only starts under the Postgres major that created it
+    # (`docker compose exec postgres cat /var/lib/postgresql/data/PG_VERSION`).
+    # This used to be `postgres:latest`, so existing hosts may be on 14, 15 or
+    # 16; set DRUID_POSTGRES_IMAGE in druid_setup/.env to the matching line:
+    #   postgres:16.15-bookworm@sha256:efedf3595f1d6f415c08568ba171029bf54052e754cc9f030e3f2412b21f3d67
+    #   postgres:15.19-bookworm@sha256:539ceaaae49b3a7c8a04467cf00cc6788d8e3f1675df41860d86eebc4c40524f
+    #   postgres:14.24-bookworm@sha256:dcc2ca942d8518144f387a0c2630188427835f984caaed0418b986928e761809
+    # Keep the Debian variant: Alpine sorts text differently and would
+    # invalidate the existing indexes. 18+ needs a different volume path.
+    image: ${DRUID_POSTGRES_IMAGE:-postgres:17.11-bookworm@sha256:639ab7ceb90e13123085b741fb31ef493fba25463002f6da665352e7b534b652}
     restart: always
-    ports:
-      # expose postgres port to host on a non standard port, to avoid 
-      # possible conflicts with other postgres instances.
-      - "5431:5432"
+    # Not published: only the coordinator connects, over the Compose network.
+    # For psql, use `docker compose exec postgres psql -U druid druid`.
     volumes:
       - metadata_data:/var/lib/postgresql/data
     environment:
-      - POSTGRES_PASSWORD=FoolishPassword
+      - POSTGRES_PASSWORD=${DRUID_POSTGRES_PASSWORD:?set DRUID_POSTGRES_PASSWORD in druid_setup/.env to a random value, e.g. openssl rand -hex 32}
       - POSTGRES_USER=druid
       - POSTGRES_DB=druid
     logging: *default-logging
 
   memcache:
     container_name: memcache
-    image: memcached
+    image: memcached:1.6.45@sha256:405a445c7c81bca205850426288baa5655c72859ae31d3de3fa823e6482be4ad
     restart: always
-    ports:
-      - "11211:11211"
+    # Not published: Druid reaches it as memcache:11211 on the Compose network.
     logging: *default-logging
 
   # Need 3.5 or later for container nodes
   zookeeper:
     container_name: zookeeper
-    image: zookeeper:${ZOOKEEPER_VERSION}
+    image: zookeeper:3.8.6@sha256:6abd40b410986c173db7b262ab429a658d1cfb808f72c0609980a564e284214e
     restart: always
-    ports:
-      - "2181:2181"
+    # Not published: Druid reaches it as zookeeper:2181 on the Compose network.
     volumes:
       - zookeeper_data:/data
       - zookeeper_datalog:/datalog
@@ -86,7 +89,7 @@ services:
 
   coordinator:
     platform: linux/amd64
-    image: apache/druid:${DRUID_VERSION}
+    image: apache/druid:0.23.0@sha256:ed9719968b4be3a2f1643907a1a5a5814e2ee1215f3604da8b2da2ac05f65912
     container_name: coordinator
     restart: always
     volumes:
@@ -104,11 +107,13 @@ services:
     env_file:
       - environment/common.env
       - environment/coordinator.env
+    environment:
+      - DRUID_POSTGRES_PASSWORD=${DRUID_POSTGRES_PASSWORD:?set DRUID_POSTGRES_PASSWORD in druid_setup/.env to a random value, e.g. openssl rand -hex 32}
     logging: *default-logging
 
   broker:
     platform: linux/amd64
-    image: apache/druid:${DRUID_VERSION}
+    image: apache/druid:0.23.0@sha256:ed9719968b4be3a2f1643907a1a5a5814e2ee1215f3604da8b2da2ac05f65912
     container_name: broker
     restart: always
     volumes:
@@ -131,7 +136,7 @@ services:
 
   historical:
     platform: linux/amd64
-    image: apache/druid:${DRUID_VERSION}
+    image: apache/druid:0.23.0@sha256:ed9719968b4be3a2f1643907a1a5a5814e2ee1215f3604da8b2da2ac05f65912
     container_name: historical
     restart: always
     volumes:
@@ -156,7 +161,7 @@ services:
 
   middlemanager:
     platform: linux/amd64
-    image: apache/druid:${DRUID_VERSION}
+    image: apache/druid:0.23.0@sha256:ed9719968b4be3a2f1643907a1a5a5814e2ee1215f3604da8b2da2ac05f65912
     container_name: middlemanager
     restart: always
     volumes:
@@ -181,7 +186,7 @@ services:
 
   router:
     platform: linux/amd64
-    image: apache/druid:${DRUID_VERSION}
+    image: apache/druid:0.23.0@sha256:ed9719968b4be3a2f1643907a1a5a5814e2ee1215f3604da8b2da2ac05f65912
     container_name: router
     restart: always
     volumes:

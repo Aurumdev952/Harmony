@@ -35,12 +35,10 @@ services:
       context: ../extensions
     volumes:
       - zen_extensions:/druid/extensions
-    environment:
-      - ZEN_DRUID_VERSION=${DRUID_VERSION}
     logging: *default-logging
 
   historical:
-    image: apache/druid:${DRUID_VERSION}
+    image: apache/druid:0.23.0@sha256:ed9719968b4be3a2f1643907a1a5a5814e2ee1215f3604da8b2da2ac05f65912
     container_name: historical
     restart: always
     volumes:
@@ -63,7 +61,7 @@ services:
     logging: *default-logging
 
   middlemanager:
-    image: apache/druid:${DRUID_VERSION}
+    image: apache/druid:0.23.0@sha256:ed9719968b4be3a2f1643907a1a5a5814e2ee1215f3604da8b2da2ac05f65912
     container_name: middlemanager
     restart: always
     volumes:

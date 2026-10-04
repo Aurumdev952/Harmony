@@ -14,6 +14,11 @@ instances:
       - docker/**
       - tests/infra/**
       - requirements.txt
+  - name: "data-platform-1"
+    branch: "mig/WP-0b-ports-secrets-pins-druid"
+    files:
+      - druid_setup/**
+      - tests/druid_setup/**
 branch: "mig/WP-0b-ports-secrets-pins"
 requirements: [SEC-1, SEC-3, SEC-9]
 contracts_consumed: []
@@ -38,6 +43,14 @@ Units, in order. Each line names the change and the check that ends it.
 9. Pin `bcrypt==4.0.1` next to `flask-user` in `requirements.txt` (raised by WP-0a: `scripts/create_user.py` hashes through passlib 1.7.4, and bcrypt was unpinned). Check: `tests/infra/test_requirements.py` fails without a pin and passes with it; web-server image rebuilt and hashes a password.
 10. R8: the worker gets `REDIS_HOST=redis` and `REDIS_PASSWORD` instead of a hand-built `BROKER_URL`, so `get_broker_url` builds and URL-encodes the URL, and the "must be URL-safe" note on `redis` goes. Check: `test_redis_requires_auth_and_clients_carry_the_password` asserts both clients get host and password and neither gets `BROKER_URL`.
 
+Request R4 (data-platform-1, branch `mig/WP-0b-ports-secrets-pins-druid`, files `druid_setup/**`, `tests/druid_setup/**`):
+
+- R4.1 Druid metadata password from a required variable. Check: `tests/druid_setup` fails before, passes after.
+- R4.2 Stop publishing ZooKeeper, memcached and Postgres. Check: port test over all four Druid Compose files.
+- R4.3 Pin postgres, memcached, ZooKeeper, Druid and the extension loader's base image by tag and digest. Check: pin test; `docker buildx imagetools inspect` per tag.
+- R4.4 Pin the extension downloads to a commit and verify each with `sha256sum -c`. Check: checksum-coverage test; build and run the extension loader.
+- R4.5 Runtime check of the single-server setup on throwaway volumes.
+
 ## Contract changes
 
 None.
@@ -48,7 +61,7 @@ None.
   - core-3 note for R3: `flask.py` reads `getenv('SECRET_KEY', settings.DEFAULT_SECRET_KEY)`, so an env `SECRET_KEY` overrides the checked key and is itself unchecked. R3 should read every signing key through `config.settings.require_secret(name)` (same rule and message as R1) or drop the `SECRET_KEY` override.
 - [x] R2 backend (backend-4, branch `mig/WP-0b-ports-secrets-pins-backend`, done): Redis password. `web/server/configuration/celery.py:get_broker_url`: when `REDIS_HOST` is set, build `redis://:{quote(REDIS_PASSWORD, safe="")}@{host}:6379/` if `REDIS_PASSWORD` is set (unchanged URL otherwise). `web/server/configuration/flask.py` `CACHES['redis']`: add `'CACHE_REDIS_PASSWORD': getenv('REDIS_PASSWORD') or None`. Compose (unit 5) passes `REDIS_PASSWORD` to web and worker. Without this change the web container's cache and Celery client fail auth against the new Redis, so **WP-0b must not merge before R2 lands** (same stack). (blocks merge of unit 5)
 - [x] R3 backend (backend-4, branch `mig/WP-0b-ports-secrets-pins-backend`, done): split the JWT key (`web/server/configuration/flask.py:34`). `SECRET_KEY = getenv('SECRET_KEY', settings.DEFAULT_SECRET_KEY)`; `JWT_SECRET_KEY = getenv('JWT_SECRET_KEY')`; raise at startup if `JWT_SECRET_KEY` is empty, `changeme`, or equal to `SECRET_KEY`. Compose already passes a required `JWT_SECRET_KEY` to web and worker (unit 4). Existing `accessKey` cookies and API tokens become invalid once, so users sign in again; say so in the release note. SEC-3. (blocks WP close)
-- [ ] R4 data-platform (data-platform-1, branch `mig/WP-0b-ports-secrets-pins-druid`): Druid setup items from phase 0b, all in `druid_setup/**`:
+- [x] R4 data-platform: done by data-platform-1 on `mig/WP-0b-ports-secrets-pins-druid` (units R4.1 to R4.5 below). Druid setup items from phase 0b, all in `druid_setup/**`:
   - replace `FoolishPassword` (`single/docker-compose.yml:59`, `single/environment/common.env:25`, `cluster/cluster.env:8`) with a required variable (`${DRUID_POSTGRES_PASSWORD:?...}` in Compose, and read it from the env in `common.env`);
   - stop publishing ZooKeeper 2181, memcached 11211 and Postgres (5431/5432) in `single/docker-compose.yml` and `cluster/docker-compose-master.yml`; bind to `127.0.0.1` where a host tool needs them, or to a private interface variable where another host does (cluster mode);
   - pin `postgres:latest` and `memcached` by tag and digest (current: `postgres:15.19-alpine@sha256:f7d23353e1b15400d22ebe31189f4d314b87a4c129cc400c8c2d8d4ca127bf81`; check the major matches the existing metadata volume before choosing), and `zookeeper:${ZOOKEEPER_VERSION}` / `apache/druid:${DRUID_VERSION}` defaults by digest;
@@ -74,9 +87,15 @@ None.
 - 2026-10-04 infra-1 unit 9: `bcrypt==4.0.1` pinned beside `flask-user` in `requirements.txt` (WP-0a finding: the unpinned resolve gave bcrypt 5.0.0, which breaks passlib 1.7.4); check: `tests/infra/test_requirements.py` failed before, 40 passed after; web-server image rebuilt and hashes a password. Port 5000 (also from WP-0a) was already closed in unit 3; no change.
 - 2026-10-04 infra-1 merge: `mig/WP-0b-ports-secrets-pins-backend` (629734b, which carries core-3's R1) merged; WP-file conflict resolved keeping every tick, log line and evidence section; check: `tests/web` + `tests/infra` on Python 3.8 59 passed, `tests/core` + `tests/infra` 47 passed.
 - 2026-10-04 infra-1 unit 10 (R8): worker gets `REDIS_HOST=redis` in place of `BROKER_URL=redis://:<pw>@redis:6379/0`; check: updated test failed (`KeyError: 'REDIS_HOST'`) before, 40 passed after; with the worker's env and the password `p@ss:w/rd%#?&= x`, `CeleryConfig.broker_url` parses back to host `redis`, port 6379, the exact password and db 0 (the same db as before).
+- 2026-10-04 infra-1 merge: `mig/WP-0b-ports-secrets-pins-druid` (6c6d61a, R4) merged; WP-file conflicts resolved keeping every tick, log line, evidence section, deployment note and deferral; added the `postgres:latest` = 18 finding to the Druid deployment notes and the Druid HTTP ports to "For the security reviewer"; check: `tests/core` + `tests/infra` + `tests/druid_setup` 69 passed; `tests/web` + `tests/infra` + `tests/druid_setup` on Python 3.8 81 passed.
 - 2026-10-04 core-3 R1: `config/settings.py` refuses an unset, blank or `changeme` (case-insensitive, stripped) `DEFAULT_SECRET_KEY` at import with a `RuntimeError` naming the variable and `openssl rand -hex 32`; a real key passes through unchanged. Kept at import, not at the Flask read, because pipeline validate steps (`fetch_fields_from_database.py`, `update_db_datasource.py`) build a Flask app, so a lazy check would fail after indexing; no importer ran without the key before (it was `os.environ[...]`). Check: `uv run --no-project --with pytest pytest tests/core` 6 failed before, 7 passed after.
 - 2026-10-04 backend-4 R2: `get_broker_url` and the Flask Redis cache send `REDIS_PASSWORD` (URL-encoded in the broker URL, passed as `CACHE_REDIS_PASSWORD` to the cache); both refuse to start with a `RuntimeError` naming `REDIS_PASSWORD` when `REDIS_HOST` is set and the password is unset or empty; an explicit `BROKER_URL` and the no-Redis default are unchanged; check: `pytest tests/web/test_redis_password.py` 6 failed before, 9 passed after; Celery broker, result backend and Flask cache authenticated against a throwaway `redis:8.10.2` with password `p@ss:w/rd%#?&= x` (Evidence).
 - 2026-10-04 backend-4 R3: `JWT_SECRET_KEY` split from the session key. `FlaskConfiguration.SECRET_KEY` is `settings.DEFAULT_SECRET_KEY` only (the unchecked `SECRET_KEY` env override is gone, per core-3's note on R1). `initialize_jwt_manager` reads `JWT_SECRET_KEY` through `settings.require_secret` and refuses one equal to the session key, then sets it before `JWTManager(app)`; web calls it first in startup, before the database and Druid steps; the worker already calls it. Pipeline scripts build a `FlaskConfiguration` but never reach it, so the pipeline needs no JWT key. The request loader now treats a bad-signature token (an old cookie or API token) as anonymous, as it already did for an expired one; without that, every request carrying an old `accessKey` cookie failed with flask-jwt-extended's 422 "Signature verification failed", `/login` included; check: `pytest tests/web/test_jwt_secret_key.py` 9 failed before (8 for the split, 1 for the old cookie), 10 passed after; `create_app` under `SERVER_SOFTWARE=gunicorn` refuses unset, `ChangeMe` and equal keys and gets past the check with a valid one (Evidence).
+- 2026-10-04 data-platform-1 R4.1: `FoolishPassword` removed from `druid_setup`; Compose requires `DRUID_POSTGRES_PASSWORD` (`${VAR:?}`) for postgres and the coordinator, Druid reads it through the `environment` password provider (in 0.23: `core/.../PasswordProvider.java` registers `environment`), the Makefile exports it from `druid_setup/.env`; check: `pytest tests/druid_setup` 9 failed before, 9 passed after.
+- 2026-10-04 data-platform-1 R4.2: single mode publishes no ZooKeeper, memcached or Postgres port; cluster master drops memcached and binds ZooKeeper and Postgres to `${DRUID_MASTER_HOST}`; check: port test failed for single and master before, 13 passed after; port summary under Evidence.
+- 2026-10-04 data-platform-1 R4.3: Druid 0.23.0, ZooKeeper 3.8.6, memcached 1.6.45 and Postgres 17.11-bookworm pinned by tag and digest; `DRUID_POSTGRES_IMAGE` selects a pinned 14/15/16 image for hosts whose metadata volume predates 17; `ZOOKEEPER_VERSION` removed; check: pin test failed for all four files before, 17 passed after; every tag re-resolved with `docker buildx imagetools inspect`.
+- 2026-10-04 data-platform-1 R4.4: extension jars pinned to commit URLs with a SHA-256 table in `load_extensions.sh`, verified with `sha256sum -c` in a staging directory before the volume is replaced; loader base `alpine:3.24.2@sha256`; `DRUID_VERSION`/`ZEN_DRUID_VERSION` removed (the table names the version, a test ties it to the Druid image tag); check: 2 extension tests failed before, 22 passed after; loader built and run (Evidence).
+- 2026-10-04 data-platform-1 R4.5: single-server runtime check on throwaway project `wp0b-druid-check`; check: pinned images up, coordinator authenticated to Postgres 17.11 through the password provider, an inline `index_parallel` task published a segment (peon without the password variable), password absent from container logs; torn down without `-v`.
 
 ## Evidence
 
@@ -251,14 +270,82 @@ docker compose --env-file /dev/null -f docker-compose.yaml -f docker-compose.dev
 
 Not run: web and worker containers against the password-protected Redis, and a browser carrying an old `accessKey` cookie through `/login`. Both need a built image and a database; QA should include them in the `make up DEV=1` smoke run.
 
+### R4: Druid setup (data-platform-1)
+
+Tests: `uv run --no-project --with pytest pytest tests/druid_setup` gives 22 passed (`test_druid_compose.py` renders all four Druid Compose files with dummy values and a scrubbed environment; `test_druid_extensions.py` parses `load_extensions.sh`). Together with `tests/infra`: 56 passed.
+
+Missing password, single mode (`docker compose --env-file environment/common.env config -q`, exit 1):
+
+```
+error while interpolating services.coordinator.environment.[]: required variable DRUID_POSTGRES_PASSWORD is missing a value: set DRUID_POSTGRES_PASSWORD in druid_setup/.env to a random value, e.g. openssl rand -hex 32
+error while interpolating services.postgres.environment.[]: required variable DRUID_POSTGRES_PASSWORD is missing a value: ...
+```
+
+Published ports (`docker compose config`, dummy env):
+
+```
+## single/docker-compose.yml        (before: also postgres 0.0.0.0:5431, memcache 0.0.0.0:11211, zookeeper 0.0.0.0:2181)
+broker 0.0.0.0:8082, coordinator 0.0.0.0:8081, historical 0.0.0.0:8083,
+middlemanager 0.0.0.0:8091 + 8100-8105, router 0.0.0.0:8888
+## cluster/docker-compose-master.yml (before: postgres 0.0.0.0:5432, memcache 0.0.0.0:11211, zookeeper 0.0.0.0:2181)
+coordinator 0.0.0.0:8081, postgres 10.0.0.10:5432, zookeeper 10.0.0.10:2181   (10.0.0.10 = DRUID_MASTER_HOST)
+```
+
+Images (each tag re-resolved with `docker buildx imagetools inspect` on 2026-10-04; each equals what the floating tag resolves to today):
+
+| Before | After |
+|---|---|
+| `postgres:latest` | `postgres:17.11-bookworm@sha256:639ab7ce…b534b652`, overridable with `DRUID_POSTGRES_IMAGE` (pinned 16.15, 15.19, 14.24 refs in the Compose comment) |
+| `memcached` | `memcached:1.6.45@sha256:405a445c…e6482be4ad` |
+| `zookeeper:${ZOOKEEPER_VERSION}` (3.8) | `zookeeper:3.8.6@sha256:6abd40b4…e284214e` |
+| `apache/druid:${DRUID_VERSION}` (0.23.0) | `apache/druid:0.23.0@sha256:ed971996…f65912` |
+| extension loader `alpine:latest` | `alpine:3.24.2@sha256:294b683c…eaec77e6` |
+
+Extension downloads (`raw/master` before, commit URLs after). The Zenysis repositories have no tags or releases. For each jar, the pinned commit and `raw/master` served the same bytes today, and git history shows each 0.23.0 jar unchanged since August 2022, so hosts already have these bytes. druid-datasketches matches the `.sha1` the Apache repository publishes (`46b2daac…`). Maven Central did not resolve from this host, so it was not cross-checked there.
+
+Extension loader, built and run into throwaway volume `wp0b-druid-ext-check`:
+
+```
+druid-aggregatable-first-last-0.23.0.jar: OK
+druid-arbitrary-granularity-0.23.0.jar: OK
+druid-nested-json-parser-0.23.0.jar: OK
+druid-tuple-sketch-expansion-0.23.0.jar: OK
+druid-datasketches-0.23.0.jar: OK                 exit 0, same directory layout as before
+one hex digit changed in the table -> FAILED, "1 of 1 computed checksums did NOT match", exit 1; the jars already in the volume stay in place
+```
+
+Runtime check (throwaway project `wp0b-druid-check`: postgres, zookeeper, memcache, extension_loader, coordinator, middlemanager; an overlay moved the coordinator to `127.0.0.1:18081` and removed the middlemanager ports because this host already uses 8081, 8082 and 8888):
+
+```
+images              all running from the pinned digests above
+postgres            5432/tcp (not published); memcache 11211/tcp; zookeeper 2181/tcp
+coordinator logs    "druid.metadata.storage.connector.password: <masked>", the provider JSON in runtime.properties, 0 hits for the password, 0 PSQLException
+metadata tables     druid_audit … druid_tasks created by the coordinator
+inline index_parallel task      SUCCESS; druid_segments has wp0b_check 2026-09-01 used=t
+middlemanager       no DRUID_POSTGRES_PASSWORD variable; peons publish through the overlord
+down                containers and network removed, volumes kept (see Leftovers)
+```
+
+`postgres:18.6` with the existing `/var/lib/postgresql/data` mount refuses to start ("The suggested container configuration for 18+ is to place a single mount at /var/lib/postgresql…"). `postgres:latest` has resolved to 18 since late 2025, so on `main` a fresh Druid host cannot start its metadata store, and an existing host breaks the next time it pulls.
+
 ## For the security reviewer
 
 - **Auth behaviour change (backend-4, R3):** `login_from_request` now treats a JWT with a bad signature as anonymous, as it already did for an expired one, instead of letting flask-jwt-extended return 422 "Signature verification failed". Without this, every request carrying a pre-upgrade `accessKey` cookie failed, including `/login`. Please confirm that a forged or tampered token can never authenticate this way: it must fall through to the anonymous path, with no partial identity. Test: `tests/web/test_jwt_secret_key.py`.
 - `SECRET_KEY` from the environment no longer overrides the checked `DEFAULT_SECRET_KEY`.
 - Web and worker refuse to start with an unset or empty `REDIS_PASSWORD` when `REDIS_HOST` is set, and with a `JWT_SECRET_KEY` that is unset, `changeme` or equal to the session key.
+- **Needs your ruling (deferred, see Deferrals):** Druid's own HTTP ports (8081, 8082, 8083, 8091, 8100-8105, 8888) stay published on every interface, with no authentication and with JavaScript enabled. WP-8a disables JavaScript. Binding Druid to a private interface may need a deployment decision, because the web host can sit on a different machine.
+- Druid's metadata password is now read from the environment rather than the Druid config, so it never reaches the Docker logs (R4).
 
 ## Deployment notes (operator action at upgrade)
 
+Druid hosts (R4):
+- `druid_setup` on `main` already fails today: `postgres:latest` has resolved to 18 since late 2025, and 18 refuses the existing `/var/lib/postgresql/data` mount. A fresh Druid host cannot start its metadata store, and an existing host breaks the next time it pulls. WP-0b pins Postgres 17.11, with `DRUID_POSTGRES_IMAGE` for hosts on 14, 15 or 16 (next bullet).
+- Before upgrading, read the metadata store's major: `docker compose -p druid exec postgres cat /var/lib/postgresql/data/PG_VERSION`. If it is not 17, set `DRUID_POSTGRES_IMAGE` in `druid_setup/.env` to the matching pinned line in the Compose comment. Otherwise Postgres refuses to start. It does not touch the data.
+- Set `DRUID_POSTGRES_PASSWORD` in `druid_setup/.env` (hex, e.g. `openssl rand -hex 32`; the Makefile `include`s that file, so `$` would be expanded). The Postgres image applies its password only when it creates a volume. On an existing host, first run `docker compose -p druid exec postgres psql -U druid -d druid -c "ALTER USER druid WITH PASSWORD '<new>'"`, then `make single_server_up` (or the cluster target). Setting `DRUID_POSTGRES_PASSWORD=FoolishPassword` also works but keeps the known password.
+- Anything that used host ports 5431 (single Postgres), 2181 or 11211 has to use `docker compose exec` now. In cluster mode, ZooKeeper and Postgres listen on `DRUID_MASTER_HOST` only. That address must be the one data and query hosts use for `DRUID_ZOOKEEPER_HOST`, and the one the coordinator uses for `DRUID_POSTGRES_HOST`.
+- `DRUID_VERSION` and `ZOOKEEPER_VERSION` are gone from the env files. The versions live in the Compose image references and in the checksum table in `load_extensions.sh`.
+
+Web hosts:
 - Set `DEFAULT_SECRET_KEY`, `JWT_SECRET_KEY` (different values) and `REDIS_PASSWORD` in the web host's `.env`, generated with `openssl rand -hex 32`. Until they are set, `make up` stops at config time and leaves running containers untouched.
 - The README's production `.env` sample never listed `DEFAULT_SECRET_KEY`, so most deployments run on `changeme`. Setting a real key, and the JWT split (R3), signs every user out once.
 - After the JWT split (R3), every `accessKey` cookie and every API token issued before the upgrade stops verifying. Users are sent to the login page once and sign in again; nothing needs clearing in the browser. **API tokens must be reissued**: they are 20-year JWTs signed with the old key, used by `web/python_client` and integrations. Tell token holders before the upgrade, and revoke the old tokens afterwards.
@@ -276,11 +363,16 @@ Not run: web and worker containers against the password-protected Redis, and a b
 - deadsnakes PPA and apt packages in the pipeline and dev images are not version-pinned. WP-3b rewrites these images.
 - The dev overlay keeps its fixed `postgres`/`zenysis` credentials with `trust` auth. They are dev-only, bound to loopback, and the dev web and pipeline hard-code the same URL.
 - Hasura (port 8088 and image) is WP-0a's (R7). MinIO server image and `mc` successor: R5.
+- Druid's own HTTP ports (8081, 8082, 8083, 8091, 8100-8105, 8888) stay published on every interface with no authentication, and `druid_javascript_enabled=true`. Anyone who reaches 8081 or 8888 can submit tasks and run JavaScript. This is outside phase 0b's list, and the web host may sit elsewhere, so binding these needs a deployment decision (a `DRUID_BIND_ADDRESS`, or a firewall rule). WP-8a disables JavaScript. **Awaiting the security reviewer's ruling:** accept until WP-8a, or require a bind address or firewall rule now.
+- Cluster mode: Postgres stays published on `DRUID_MASTER_HOST` because the coordinator reaches it through `DRUID_POSTGRES_HOST`. WP-8b, which rewrites the cluster files for ZooKeeper removal, should point the coordinator at the `postgres` service and drop the port.
+- The loader's `apk add bash` is not version-pinned; the base image digest is.
+- Phase 0b cites `load_extensions.sh:286`; the file had 35 lines, and the downloads were at lines 26-35.
 
 ## Leftovers on the build host
 
 - Test images `wp0b-web-server:check` (2.4 GB), `wp0b-pipeline-downloader:check` and `wp0b-dev-downloader:check`, kept so reviewers can inspect them. Remove with `docker rmi` when done.
 - The throwaway projects were torn down with `docker compose down` (no `-v`). Postgres and Redis declare `VOLUME`, so a few anonymous volumes may remain (for example `385c87b4…`, created 2026-10-04 17:32). The host also holds anonymous volumes from other agents, so I did not remove any.
+- data-platform-1 (R4): image `wp0b-druid-extensions:check` and project image `wp0b-druid-check-extension_loader`; volumes `wp0b-druid-ext-check` and `wp0b-druid-check_{coordinator_var,metadata_data,middle_var,zen_extensions,zookeeper_data,zookeeper_datalog,zookeeper_logs}` (test data only); scratch dirs `/tmp/dp1_druid`. Remove with `docker rmi` and `docker volume rm` when the review is done.
 
 ## Verdicts
 

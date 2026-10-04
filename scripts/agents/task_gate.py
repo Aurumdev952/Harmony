@@ -61,14 +61,14 @@ def spec_roles(root: Path, wp: str) -> list[str]:
     return []
 
 
-INSTANCE = re.compile(
-    r'\b(core|backend|frontend-platform|frontend-design|visualization|data-platform|pipeline|infra|qa)-\d+\b'
-)
+ROLES = 'core|backend|frontend-platform|frontend-design|visualization|data-platform|pipeline|infra|qa'
+INSTANCE_DECL = re.compile(rf'^\s*-\s*name:\s*"?({ROLES})-\d+"?', re.M)
+LOG_LINE = re.compile(rf'^\d{{4}}-\d{{2}}-\d{{2}}\s+({ROLES})-\d+\b', re.M)
 
 
 def contributing_roles(text: str) -> list[str]:
-    """Roles whose instances (e.g. backend-3) the WP file names in instances, log or requests."""
-    return sorted(set(INSTANCE.findall(text)))
+    """Roles whose instances the WP file declares (front matter) or that wrote a dated log line."""
+    return sorted(set(INSTANCE_DECL.findall(text)) | set(LOG_LINE.findall(text)))
 
 
 def problems_for(root: Path, wp: str) -> list[str]:

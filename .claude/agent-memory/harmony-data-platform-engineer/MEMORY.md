@@ -1,1 +1,3 @@
 - [Running db/druid Python checks](running_druid_python_checks.md): mount worktree at /src in the pipeline image, set dummy env vars, pip install pytest in the container; guard traps
+- [Druid setup traps](druid-setup-traps.md) — password provider, Postgres major pinning, cluster binds, extension checksum table
+- [Worktree tooling traps](worktree-tooling-traps.md) — Bash guard rejections, Write-tool workaround, pytest basename clash

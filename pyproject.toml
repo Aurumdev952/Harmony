@@ -253,7 +253,8 @@ ignore_missing_imports = true
 
 [tool.pytest.ini_options]
 pythonpath = ["."]
-# CI runs everything under tests/, so a new suite needs no workflow change.
+# CI runs every directory under tests/ (ci/pytest_suites.sh, one process each),
+# so a new suite needs no workflow change.
 testpaths = ["tests"]
 # Plugins pinned in the dev group that no suite uses and that break suites:
 # pytest-selenium 4.0.1 raises an INTERNALERROR on pytest 8 whenever a test fails,

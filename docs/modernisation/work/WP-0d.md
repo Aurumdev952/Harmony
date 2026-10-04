@@ -421,6 +421,6 @@ Branch `mig/WP-0d-dead-backend-code-druid`. It was created from `mig/WP-0d-dead-
 
 | Role | Verdict | Notes |
 |---|---|---|
-| qa | changes-requested | 2026-10-04 qa-0d at 5f3e040: every deletion verified (grep, reverse deps, web image import sweep and 315-rule route map, 540 contract replays on the trimmed image, yarn build, pipeline image with WP-0b's Dockerfile). Blocker: the cryptography==41.0.7 PyPy pin installs but importing it aborts the pipeline image's PyPy 7.3.9 (Fatal RPython error); latent since nothing imports gspread/google.auth under PyPy. Fix evidence and either exclude gspread from PyPy with a marker (its only reverse dep) or track for WP-3b. Note: mypy.ini still has [mypy-graphql_relay.*]. |
+| qa | approved | 2026-10-05 qa-0d at 51cd30e: files lists cover the diff and do not overlap; code identical to the eb2d023 tree fully re-verified (images, sweeps, 315-rule route map, suites, 540 contract replays, PyPy installs no cryptography and imports fail cleanly); merges cleanly into integration. |
 | reviewer | approved | 2026-10-05 rev-0d final check at 51cd30e: all eight original and three re-review findings closed; code unchanged since eb2d023; branch merges cleanly with integration. Open, non-blocking: WP-2f must update its porting note before whichever of 0d/2f merges second. |
 | security | n/a | |

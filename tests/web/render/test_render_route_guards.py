@@ -1,6 +1,7 @@
 """WP-0i: the dashboard render routes and the thumbnail cache (N1, N2, N7).
 
-The outbound urlbox call is replaced by `FakeRenderer`; nothing leaves the process.
+The call to the renderer service is replaced by `FakeRenderer`; nothing leaves the
+process.
 """
 import base64
 import json
@@ -94,8 +95,10 @@ def test_request_args_cannot_redirect_the_minted_token(client, renderer, route):
 
     assert response.status_code == 200
     [call] = renderer.calls
-    assert call.params['force'] == 'true'
-    assert call.params['url'].startswith('http://harmony.tests.invalid/')
+    assert set(call.params) == {
+        'url', 'token', 'format', 'viewport', 'full_page', 'pdf', 'timeout_seconds'
+    }
+    assert call.params['url'].startswith('http://web:5000/')
     assert call.params['url'].split('?')[0].endswith(f'/dashboard/{SLUG}')
     assert call.identity == VIEWER
 
@@ -173,7 +176,7 @@ def test_failed_thumbnail_render_does_not_leave_the_cache_pending(
 ):
     failed = FakeRenderResponse(b'')
     failed.status_code = 500
-    monkeypatch.setattr(renderer, 'get', lambda *args, **kwargs: failed)
+    monkeypatch.setattr(renderer, 'post', lambda *args, **kwargs: failed)
 
     assert retrieve_thumbnail(client, VIEWER) == ''
     assert 'PENDING' not in app.cache.values.values()
@@ -220,13 +223,13 @@ def test_slug_reused_by_another_dashboard_does_not_serve_the_old_thumbnail(
     [
         (
             'https://attacker.invalid/fr/dashboard/elsewhere#h=a1b2c3',
-            f'http://harmony.tests.invalid/fr/dashboard/{SLUG}?screenshot=1&pdf=1#h=a1b2c3',
+            f'http://web:5000/fr/dashboard/{SLUG}?screenshot=1&pdf=1#h=a1b2c3',
         ),
         (
             'https://attacker.invalid/steal',
-            f'http://harmony.tests.invalid/dashboard/{SLUG}?screenshot=1&pdf=1',
+            f'http://web:5000/dashboard/{SLUG}?screenshot=1&pdf=1',
         ),
-        (None, f'http://harmony.tests.invalid/dashboard/{SLUG}?screenshot=1&pdf=1'),
+        (None, f'http://web:5000/dashboard/{SLUG}?screenshot=1&pdf=1'),
     ],
 )
 def test_emailed_render_loads_this_apps_dashboard_whatever_link_is_sent(

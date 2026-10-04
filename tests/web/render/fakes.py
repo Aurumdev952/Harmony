@@ -1,7 +1,9 @@
-"""Fakes for the render-route tests: users, dashboards, the cache and urlbox."""
+"""Fakes for the render-route tests: users, dashboards, the cache and the renderer
+service."""
 from dataclasses import dataclass, field
-from typing import Dict, FrozenSet, Iterator, List, Optional
+from typing import Dict, FrozenSet, List, Optional
 
+import requests
 from flask import Flask
 from flask_jwt_extended import decode_token
 from flask_principal import ItemNeed
@@ -126,41 +128,45 @@ class DictCache:
         self.values.pop(key, None)
 
 
+CONTENT_TYPES = {'pdf': 'application/pdf', 'png': 'image/png', 'jpeg': 'image/jpeg'}
+
+
 @dataclass
 class RenderCall:
     url: str
     params: dict
     identity: Optional[str]
     claims: dict
+    timeout: object
+    token_was_live: bool
+    token_lifetime: Optional[int]
 
 
 class FakeRenderResponse:
     status_code = 200
 
-    def __init__(self, body: bytes) -> None:
+    def __init__(self, body: bytes, content_type: str = 'image/png') -> None:
         self.content = body
-        self.url = 'https://renderer.invalid/'
-
-    def iter_content(self, chunk_size=2048) -> Iterator[bytes]:
-        yield self.content
+        self.headers = {'Content-Type': content_type, 'Server-Timing': 'render;dur=42'}
 
 
 class FakeRenderer:
-    """Replaces the `requests` module the renderer calls urlbox with.
+    """Replaces the `requests` module the web app calls the renderer service with.
 
     The body names the identity the minted `accessKey` token logs in as, so a
     test can tell whose data a render (and any cached copy of it) shows.
     """
 
+    RequestException = requests.RequestException
+
     def __init__(self, app: Flask) -> None:
         self._app = app
         self.calls: List[RenderCall] = []
 
-    def get(self, url, params=None, stream=False, timeout=None):
-        params = dict(params or {})
-        cookie = params.get('cookie', '')
-        token = cookie[len('accessKey='):] if cookie.startswith('accessKey=') else ''
-        identity, claims = None, {}
+    def post(self, url, json=None, timeout=None):
+        params = dict(json or {})
+        token = params.get('token', '')
+        identity, claims, lifetime = None, {}, None
         if token:
             try:
                 with self._app.app_context():
@@ -169,5 +175,12 @@ class FakeRenderer:
                 decoded = {'identity': f'undecodable:{token}'}
             identity = decoded.get('identity')
             claims = decoded.get('user_claims', {})
-        self.calls.append(RenderCall(url, params, identity, claims))
-        return FakeRenderResponse(f'render-as:{identity}'.encode())
+            if 'exp' in decoded:
+                lifetime = decoded['exp'] - decoded['iat']
+        render_id = claims.get('render')
+        live = bool(render_id) and bool(self._app.cache.get(f'render-token:{render_id}'))
+        self.calls.append(RenderCall(url, params, identity, claims, timeout, live, lifetime))
+        return FakeRenderResponse(
+            f'render-as:{identity}'.encode(),
+            CONTENT_TYPES.get(params.get('format'), 'application/octet-stream'),
+        )

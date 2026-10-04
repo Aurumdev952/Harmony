@@ -2,7 +2,7 @@
 `/api2/storage/retrieve` resource behind the same Potion decorator as
 `web/server/app.py`. Only the edges are faked (`tests/web/render/fakes.py`): the
 dashboard table, the configuration store, the cache, the login loader and the
-outbound urlbox call.
+call to the renderer service.
 """
 import logging
 import os

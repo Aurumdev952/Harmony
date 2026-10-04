@@ -56,7 +56,7 @@ def make_client(monkeypatch, user, admin_secret=ADMIN_SECRET, public_access=Fals
     app = Flask(__name__, root_path=here, instance_path=here)
     app.config['HASURA_HOST'] = 'http://hasura:8080'
     app.config['HASURA_ADMIN_SECRET'] = admin_secret
-    router = api.ApiRouter(None, None, fields_api=object())
+    router = api.ApiRouter(None, None)
     app.add_url_rule(
         '/api/graphql', 'graphql', router.proxy_graphql_hasura, methods=['POST']
     )

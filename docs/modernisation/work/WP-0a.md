@@ -151,6 +151,6 @@ Not done: a browser `verify` of the three pages (see the qa request) and `pstack
 
 | Role | Verdict | Notes |
 |---|---|---|
-| qa | pending | |
+| qa | changes-requested | 2026-10-04 qa-0a at f4db7c1: every functional claim reproduced, including the browser check on Data Catalog, Field Setup and Data Upload (saves worked). Fix: docker-compose.yaml:105 and WP-0a.md:53 wrongly say an empty admin secret means no secret; an empty value grants admin to an empty header. Notes: wait_for_hasura retries only on ConnectionError; sync_graphql_schema.sh secret on the command line; move replay_relay_operations.py to tests/contract. |
 | reviewer | pending | |
 | security | changes-requested | 2026-10-04 sec-0a at f4db7c1: lockdown holds against every bypass, header-injection, secret and exposure probe. Blocking: pin graphql-core in check_role_permissions.py (SEC-9). Low: anonymous reads all columns of dimension tables; secret on gq command line in sync_graphql_schema.sh; use the -ce image tag; HASURA_GRAPHQL_ENABLED_APIS graphql,metadata; runserver reuses a secret file without checking mode; rollback plan should name 2.11.5+. Human must record INV-3 acceptance (signed-in users lose GraphQL access to 28 tables). |

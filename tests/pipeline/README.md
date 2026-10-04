@@ -47,6 +47,7 @@ uvx ruff@0.14.0 format --check --line-length 88 --config 'format.quote-style="pr
 | `test_golden_outputs.py` | Every case against every layer, plus hash-seed and input-format checks |
 | `test_properties.py` | Invariants any implementation keeps: ISO dates, the location join, Druid rows, rollup sums |
 | `test_pinned_behaviours.py` | Today's quirks that WP-8d keeps or changes on purpose |
+| `mutation_check.py` | Applies production mutants to a scratch copy and fails if any survives: `uv run --no-project python tests/pipeline/mutation_check.py` |
 | `pipeline_inprocess.py` | In-process access to `_get_date`, `Aggregator`, `BaseRow` and the join, for the two test files above |
 
 A case whose last step is expected to fail pins only its error text (`step<N>.<script>.error.txt`), because partial outputs depend on pipe buffering.

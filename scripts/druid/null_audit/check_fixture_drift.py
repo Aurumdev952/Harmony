@@ -7,7 +7,6 @@ For each golden case, the queries the current builder posts are compared with
 `druid_query.json` after rewriting the fixture's `''` selectors to null. Exits
 non-zero if any case differs in any other way, or if a body would change.
 '''
-import json
 import sys
 from pathlib import Path
 from typing import Any
@@ -40,7 +39,7 @@ def main() -> int:
     for case in load_cases():
         recorded = case.read('druid_query.json')
         responses = iter(case.read('druid_response.json'))
-        posted, body = run_case(case, lambda _query: next(responses))
+        posted, body = run_case(case, lambda _query, r=responses: next(r))
         posted_queries = [canonical_query(query) for query, _ in posted]
         recorded_queries = [canonical_query(query) for query in recorded]
         expected = [canonical_query(_null_selectors(q)) for q in recorded]

@@ -108,6 +108,6 @@ None.
 
 | Role | Verdict | Notes |
 |---|---|---|
-| qa | pending | |
+| qa | approved | 2026-10-04 qa-0e: lockfile drops only the four packages; JS bundles identical except navbar source-map line; CSS loses exactly 111 plugin-only rules; rendered pages lose only dead script tags; every script URL resolves; headless Chromium console identical except removed 404s. Running-app check deferred to WP-2e; Alerts to the human. Note: auth/layout.html also extends layout.html (20 templates, not 18). |
 | reviewer | pending | |
 | security | n/a | |

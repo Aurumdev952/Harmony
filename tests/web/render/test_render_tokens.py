@@ -109,7 +109,9 @@ def test_token_signs_in_as_the_requesting_user_for_one_dashboard(app):
         claims = _claims(app, token)
 
     assert claims['identity'] == USERNAME
-    assert claims['user_claims']['needs'] == [['view_resource', RESOURCE_ID, 'dashboard']]
+    assert claims['user_claims']['needs'] == [
+        ['view_resource', RESOURCE_ID, 'dashboard']
+    ]
     assert claims['user_claims']['query_needs'] == ['*']
     assert claims['user_claims'][RENDER_CLAIM]
     assert RENDER_POLICY_CLAIM not in claims['user_claims']
@@ -254,9 +256,7 @@ def test_a_token_without_a_digest_resolves_the_accounts_policy(app):
     ],
     ids=['widened-to-all', 'widened', 'moved', 'removed'],
 )
-def test_a_policy_change_after_the_request_leaves_the_render_with_nothing(
-    app, changed
-):
+def test_a_policy_change_after_the_request_leaves_the_render_with_nothing(app, changed):
     provides = _page_load(app, changed, _policy_digest(app, NORTH_ACCOUNT))
 
     assert provides == set()

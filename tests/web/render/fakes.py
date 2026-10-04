@@ -46,9 +46,15 @@ USERS: Dict[str, FakeUser] = {
     for user in (
         FakeUser(1, 'admin@tests.invalid', frozenset({SUPERUSER_NEED})),
         FakeUser(2, 'viewer@tests.invalid', frozenset({VIEW_DASHBOARD, _policy()})),
-        FakeUser(3, 'north@tests.invalid', frozenset({VIEW_DASHBOARD, _policy('North')})),
-        FakeUser(4, 'north2@tests.invalid', frozenset({VIEW_DASHBOARD, _policy('North')})),
-        FakeUser(5, 'south@tests.invalid', frozenset({VIEW_DASHBOARD, _policy('South')})),
+        FakeUser(
+            3, 'north@tests.invalid', frozenset({VIEW_DASHBOARD, _policy('North')})
+        ),
+        FakeUser(
+            4, 'north2@tests.invalid', frozenset({VIEW_DASHBOARD, _policy('North')})
+        ),
+        FakeUser(
+            5, 'south@tests.invalid', frozenset({VIEW_DASHBOARD, _policy('South')})
+        ),
         FakeUser(6, 'outsider@tests.invalid', frozenset({_policy()})),
     )
 }
@@ -178,8 +184,12 @@ class FakeRenderer:
             if 'exp' in decoded:
                 lifetime = decoded['exp'] - decoded['iat']
         render_id = claims.get('render')
-        live = bool(render_id) and bool(self._app.cache.get(f'render-token:{render_id}'))
-        self.calls.append(RenderCall(url, params, identity, claims, timeout, live, lifetime))
+        live = bool(render_id) and bool(
+            self._app.cache.get(f'render-token:{render_id}')
+        )
+        self.calls.append(
+            RenderCall(url, params, identity, claims, timeout, live, lifetime)
+        )
         return FakeRenderResponse(
             f'render-as:{identity}'.encode(),
             CONTENT_TYPES.get(params.get('format'), 'application/octet-stream'),

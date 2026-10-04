@@ -42,6 +42,7 @@ from web.server.security.render_tokens import (
 )
 from web.server.util.util import get_user_string, get_remote_ip_address
 
+
 def register_for_signals(app, principals):
     install_user_events_handlers(app)
     install_identity_loader(principals)
@@ -203,6 +204,7 @@ def query_policy_fingerprint():
             key=json.dumps,
         )
     return hashlib.sha256(json.dumps(policy).encode()).hexdigest()
+
 
 def _compute_token_provides(claims):
     needs = claims.get('needs', [])

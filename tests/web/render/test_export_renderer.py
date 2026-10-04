@@ -2,6 +2,7 @@
 
 `FakeRenderer` stands in for the service; nothing leaves the process.
 """
+import logging
 from urllib.parse import parse_qs, urlsplit
 
 import pytest
@@ -14,7 +15,8 @@ from web.server.routes.views.dashboard import get_email_attachments
 SLUG = DASHBOARD_SLUG
 VIEWER = 'viewer@tests.invalid'
 NORTH = 'north@tests.invalid'
-STATE = 'StateName'
+NORTH_2 = 'north2@tests.invalid'
+SOUTH = 'south@tests.invalid'
 
 PDF = ('pdf', 'application/pdf')
 JPEG = ('jpeg', 'image/jpeg')
@@ -177,41 +179,52 @@ def test_output_over_the_size_limit_is_refused(client, renderer, monkeypatch):
     assert response.status_code == 500
 
 
+@pytest.fixture(name='app_log')
+def fixture_app_log(caplog):
+    # The app logger does not propagate to the root logger caplog listens on.
+    logger = logging.getLogger('ZenysisLogger')
+    logger.addHandler(caplog.handler)
+    yield caplog
+    logger.removeHandler(caplog.handler)
+
+
 def test_a_failed_render_is_logged_without_the_token(
-    client, renderer, monkeypatch, caplog
+    client, renderer, monkeypatch, app_log
 ):
     _fail_with(monkeypatch, renderer, _response(status=504))
 
     client.get(f'/dashboard/{SLUG}/pdf', headers=as_user(VIEWER))
 
-    assert 'render' in caplog.text.lower()
-    assert 'eyJ' not in caplog.text
+    assert 'status 504' in app_log.text
+    assert 'eyJ' not in app_log.text
 
 
 def test_restricted_viewer_render_carries_their_policy(client, renderer):
-    _, call = render(client, renderer, f'/dashboard/{SLUG}/pdf', NORTH)
+    _, north = render(client, renderer, f'/dashboard/{SLUG}/pdf', NORTH)
+    _, north_2 = render(client, renderer, f'/dashboard/{SLUG}/pdf', NORTH_2)
+    _, south = render(client, renderer, f'/dashboard/{SLUG}/pdf', SOUTH)
+    _, viewer = render(client, renderer, f'/dashboard/{SLUG}/pdf', VIEWER)
 
-    assert call.identity == NORTH
-    assert call.claims['needs'] == [['view_resource', 7, 'dashboard']]
-    assert call.claims['query_needs'] == [{STATE: {'include_values': ['North']}}]
-
-
-def test_unrestricted_viewer_render_carries_their_all_values_policy(client, renderer):
-    _, call = render(client, renderer, f'/dashboard/{SLUG}/pdf', VIEWER)
-
-    assert {STATE: {}} in call.claims['query_needs']
-    assert '*' not in call.claims['query_needs']
+    assert north.identity == NORTH
+    assert north.claims['needs'] == [['view_resource', 7, 'dashboard']]
+    assert north.claims['query_needs'] == ['*']
+    assert north.claims['policy'] == north_2.claims['policy']
+    assert north.claims['policy'] not in (
+        south.claims['policy'],
+        viewer.claims['policy'],
+    )
 
 
 def test_emailed_render_resolves_the_recipients_own_policy(app, renderer):
-    # The sender is not the recipient, so the sender's policy is not pinned;
-    # the recipient's account decides when the page loads.
+    # The sender is not the recipient, so no digest of the sender's policy is
+    # pinned; the recipient's account decides when the page loads.
     with app.test_request_context('/'):
         get_email_attachments(NORTH, SLUG, should_attach_pdf=True)
 
     [call] = renderer.calls
     assert call.identity == NORTH
     assert call.claims['query_needs'] == ['*']
+    assert 'policy' not in call.claims
 
 
 def test_emailed_render_with_a_failed_renderer_attaches_nothing(

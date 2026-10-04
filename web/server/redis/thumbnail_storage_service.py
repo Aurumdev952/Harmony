@@ -17,12 +17,12 @@ def get_thumbnail_storage_name(dashboard):
 
 
 def render_thumbnail(dashboard):
-    response = grid_dashboard_to_thumbnail(
+    rendered = grid_dashboard_to_thumbnail(
         name=dashboard.slug, auth_user_email=current_user.username
     )
-    if not response or response.status_code != 200:
+    if rendered is None:
         return ''
-    return base64.b64encode(response.content).decode()
+    return base64.b64encode(rendered.content).decode()
 
 
 def retrieve_item(dashboard):

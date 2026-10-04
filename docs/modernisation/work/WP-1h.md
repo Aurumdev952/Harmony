@@ -43,9 +43,10 @@ Phase 1 section 1h; 03-target-architecture (render path); decision 0004. Builds 
 - **Web side** (`web/server/routes/views/page_renderer.py`). The urlbox call becomes `POST {RENDERER_URL}/render` with JSON `{url, token, format, viewport, full_page, pdf, timeout_seconds}`.
   - The URL is `RENDER_WEB_ORIGIN` plus the `url_for` path. It never uses the request's Host header, so a forged Host can no longer send the token elsewhere.
   - The response is checked for status, content type and size. Callers get `RenderedDashboard(content, content_type)` or `None`. The routes keep their URLs, auth (WP-0i) and content types: `application/pdf`, `image/png` and `image/jpeg`.
+  - The routes pass `width`, `height`, `full_page`, `pdf_page_size` and `pdf_orientation` from the request args; a value outside the renderer's ranges falls back to the default. The other urlbox args (`delay`, `wait_timeout` and so on) are gone. Thumbnails and emailed renders take no args (before, an emailed render read the share request's args).
 - **Render token** (`web/server/security/render_tokens.py`, SEC-7).
   - It is an HS256 `accessKey` JWT in the existing flask-jwt-extended 3 layout. `identity` is the requesting user, never a bot. `needs` is `[["view_resource", <resource_id>, "dashboard"]]`.
-  - `query_needs` is the caller's policy, resolved when the request arrives rather than `'*'`. A policy change during the render can therefore only narrow it (WP-0i carried risk 2).
+  - `query_needs` stays `['*']`, so each page request resolves the account's own policy. When the caller renders as themselves (the routes and the thumbnail), a `policy` claim pins the digest of their policy at request time (`query_policy_fingerprint`, the thumbnail cache key). If the account's digest differs when the page loads, `_install_token_needs` grants nothing, so a policy change during the render fails the render instead of widening it or caching it under the old key (WP-0i carried risk 2). A caller signed in with a narrowed API token pins the narrowed digest, which the account's digest never matches, so that render fails closed. Emailed renders run as the recipient, so no digest is pinned and the recipient's account decides.
   - It carries a `render` claim holding a random id that is registered in `app.cache` for the render's lifetime and deleted when the renderer returns. `login_from_request` refuses a render token whose id is no longer live. The token is therefore usable for exactly one render: short-lived (deadline + 15 s) and single-use per render.
   - The browser needs it for every request the page makes, so "single use" means one render, not one HTTP request.
 - **Deferred to WP-5f:** moving renders to a Celery `exports` queue with `RenderJob` rows and `202 {job_id}` (phase 1h data structure; WP-0i carried risk 4). That changes the client contract (download links, `ThumbnailStorageService`), so it lands with the FastAPI export port and frontend-platform. The sidecar API is the same one a Celery task would call.
@@ -61,3 +62,28 @@ Phase 1 section 1h; 03-target-architecture (render path); decision 0004. Builds 
 6. End to end on the disposable stack (WP-2c `tests/contract/stack` plus the renderer): real PDF, PNG and JPEG through the Flask routes for a seeded dashboard, with pixel dimensions and byte sizes recorded, a second use of the token refused, and a non-viewer refused. Check: evidence file.
 7. Render page loads stop counting as dashboard views (WP-0i carried risk 5). Check: unit test.
 8. `pstack:interrogate` on the token and the renderer, then deslop, then review. Check: findings addressed; status `review`.
+
+## Contract changes
+
+C-5 (session and JWT format, owned by backend). Old: a render token was a plain `accessKey` JWT (`needs`, `query_needs: ['*']`) valid for 120 s. New: two optional `user_claims`, `render` (a random id that must be live in `app.cache`) and `policy` (a sha256 hex digest). Consumers: Flask `login_from_request` and `_install_token_needs` (this WP), and the FastAPI `PrincipalDep` (WP-5a/5f, backend). Ordinary session and API tokens carry neither claim and are unchanged. The `PrincipalDep` must refuse a token with a `render` claim whose id is not live, and apply the `policy` check, until the renderer signs in through FastAPI.
+
+## Requests
+
+- [ ] infra: `docker/renderer/Dockerfile`, the `renderer` Compose service on an `internal: true` network, `RENDERER_URL`/`RENDER_WEB_ORIGIN` on `web`, and removal of `URLBOX_API_KEY` from `docker-compose.yaml` and `.env.example`. The exact files will be under `WP-1h-evidence/infra-request/` (blocks unit 5's merge, not its local build).
+- [ ] core: remove `URLBOX_API_KEY` and `RENDERBOT_EMAIL` from `config/settings.py` once this lands; nothing reads them after unit 3 (blocks nothing).
+
+## Log
+
+- 2026-10-04 backend-8 unit 1: failing tests for tokens, routes and the sidecar; check: red on the base (missing `render_tokens`, `harmony.worker.renderer`, sidecar call).
+- 2026-10-04 backend-8 unit 2: render tokens, liveness and policy-digest checks in `login_from_request` and `_install_token_needs`; check: `uv run pytest tests/web/render/test_render_tokens.py` 17 passed.
+- 2026-10-04 backend-8 unit 3: web client for the sidecar (`render_dashboard`, `RenderedDashboard`), routes, thumbnail and email callers; check: `uv run pytest tests/web` 196 passed, 1 failed (pre-existing `flask_migrate` import in `test_graphql_endpoint_removed.py`).
+
+## Evidence
+
+## Verdicts
+
+| Role | Verdict | Notes |
+|---|---|---|
+| qa | pending | |
+| reviewer | pending | |
+| security | pending | |

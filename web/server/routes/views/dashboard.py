@@ -397,31 +397,31 @@ def get_email_attachments(
     image_name = None
     locale, session_hash = dashboard_page_args(dashboard_url)
     if should_attach_pdf:
-        render_response = grid_dashboard_to_pdf(
+        rendered_pdf = grid_dashboard_to_pdf(
             locale,
             slug,
             auth_user_email=auth_user_email,
             session_hash=session_hash,
         )
-        if render_response.status_code != 200:
-            g.request_logger.error(f'Failed to render dashboard: "{slug}" to PDF')
+        if rendered_pdf is None:
+            LOG.error(f'Failed to render dashboard: "{slug}" to PDF')
             return None, None
         attachments.append(
             (
                 'attachment',
-                (f'{slug}.pdf', base64.encodebytes(render_response.content).decode()),
+                (f'{slug}.pdf', base64.encodebytes(rendered_pdf.content).decode()),
             )
         )
 
     if should_embed_image:
-        image_render_response = grid_dashboard_to_image(
+        rendered_image = grid_dashboard_to_image(
             locale,
             slug,
             auth_user_email=auth_user_email,
             session_hash=session_hash,
         )
-        if image_render_response.status_code != 200:
-            g.request_logger.error(f'Failed to render dashboard: "{slug}" to JPEG')
+        if rendered_image is None:
+            LOG.error(f'Failed to render dashboard: "{slug}" to JPEG')
             return None, None
         image_name = f'{slug}.jpeg'
         attachments.append(
@@ -429,7 +429,7 @@ def get_email_attachments(
                 "inline",
                 (
                     f'{slug}.jpeg',
-                    base64.encodebytes(image_render_response.content).decode(),
+                    base64.encodebytes(rendered_image.content).decode(),
                 ),
             )
         )

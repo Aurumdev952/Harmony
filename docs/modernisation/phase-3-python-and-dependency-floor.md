@@ -15,7 +15,7 @@ Back to [overview](overview.md).
 
 - **Changes.**
   - Base every image on `python:3.13-slim-bookworm`, installed with `uv sync --frozen`.
-  - Delete the PyPy setup (`SetupEnvForPyPy`, `venv_pypy3`) and every PyPy-only requirement line, whole line not just the marker: the `cryptography==41.0.7 ; platform_python_implementation == 'PyPy'` pin from WP-0d (41.0.7 has known advisories and exists only for the PyPy wheel), plus the numpy and shapely markers. Pipeline steps run on CPython until phase 8 makes them columnar, and the phase 1 baseline is used to check that the slowdown is acceptable.
+  - Delete the PyPy setup (`SetupEnvForPyPy`, `venv_pypy3`) and every PyPy-only requirement marker and line: the numpy and shapely markers, and the `gspread ... ; platform_python_implementation != 'PyPy'` exclusion WP-0d added (gspread pulls cryptography, which has no PyPy wheel and aborts PyPy on import; under CPython 3.13 the marker simply goes). Pipeline steps run on CPython until phase 8 makes them columnar, and the phase 1 baseline is used to check that the slowdown is acceptable.
   - Lift `numpy` and `shapely` off their PyPy pins.
 - **Verification.** Run the pipeline end to end for `harmony_demo` and record the wall-clock time against the PyPy run.
 

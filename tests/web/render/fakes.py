@@ -1,4 +1,5 @@
 """Fakes for the render-route tests: users, dashboards, the cache and urlbox."""
+
 from dataclasses import dataclass, field
 from typing import Dict, FrozenSet, Iterator, List, Optional
 
@@ -9,6 +10,9 @@ from jwt import PyJWTError
 
 from models.python.permissions import DimensionFilter, QueryNeed
 from web.server.security.permissions import SUPERUSER_NEED
+
+# The deployment's configured origin (DEPLOYMENT_BASE_URL) in these tests.
+DEPLOYMENT_ORIGIN = 'https://harmony.tests.invalid'
 
 DASHBOARD_SLUG = 'malaria-overview'
 DASHBOARD_RESOURCE_ID = 7
@@ -34,9 +38,13 @@ class FakeUser:
     is_authenticated: bool = True
     is_active: bool = True
     is_anonymous: bool = False
+    from_jwt: bool = False
 
     def get_id(self) -> str:
         return str(self.id)
+
+    def get_permissions(self) -> set:
+        return set(self.provides)
 
 
 USERS: Dict[str, FakeUser] = {
@@ -44,9 +52,15 @@ USERS: Dict[str, FakeUser] = {
     for user in (
         FakeUser(1, 'admin@tests.invalid', frozenset({SUPERUSER_NEED})),
         FakeUser(2, 'viewer@tests.invalid', frozenset({VIEW_DASHBOARD, _policy()})),
-        FakeUser(3, 'north@tests.invalid', frozenset({VIEW_DASHBOARD, _policy('North')})),
-        FakeUser(4, 'north2@tests.invalid', frozenset({VIEW_DASHBOARD, _policy('North')})),
-        FakeUser(5, 'south@tests.invalid', frozenset({VIEW_DASHBOARD, _policy('South')})),
+        FakeUser(
+            3, 'north@tests.invalid', frozenset({VIEW_DASHBOARD, _policy('North')})
+        ),
+        FakeUser(
+            4, 'north2@tests.invalid', frozenset({VIEW_DASHBOARD, _policy('North')})
+        ),
+        FakeUser(
+            5, 'south@tests.invalid', frozenset({VIEW_DASHBOARD, _policy('South')})
+        ),
         FakeUser(6, 'outsider@tests.invalid', frozenset({_policy()})),
     )
 }
@@ -159,7 +173,7 @@ class FakeRenderer:
     def get(self, url, params=None, stream=False, timeout=None):
         params = dict(params or {})
         cookie = params.get('cookie', '')
-        token = cookie[len('accessKey='):] if cookie.startswith('accessKey=') else ''
+        token = cookie[len('accessKey=') :] if cookie.startswith('accessKey=') else ''
         identity, claims = None, {}
         if token:
             try:

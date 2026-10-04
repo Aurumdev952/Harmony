@@ -4,6 +4,8 @@
 dashboard table, the configuration store, the cache, the login loader and the
 outbound urlbox call.
 """
+
+import dataclasses
 import logging
 import os
 from typing import Iterator
@@ -17,13 +19,18 @@ os.environ.setdefault('ZEN_ENV', 'harmony_demo')
 
 # pylint: disable=wrong-import-position
 from flask import Blueprint, Flask, g, request
-from flask_jwt_extended import JWTManager
+from flask_jwt_extended import (
+    JWTManager,
+    get_jwt_identity,
+    verify_jwt_in_request_optional,
+)
 from flask_login import LoginManager, current_user
 from flask_potion import Api
 from flask_principal import AnonymousIdentity, Identity, Principal, identity_loaded
 
 from config.loader import import_configuration_module
 from tests.web.render.fakes import (
+    DEPLOYMENT_ORIGIN,
     PUBLIC_ACCESS,
     USERS,
     VIEW_DASHBOARD,
@@ -32,15 +39,13 @@ from tests.web.render.fakes import (
     FakeTransaction,
     fake_get_dashboard,
 )
-from web.server.api import thumbnail_storage_models
 from web.server.api.thumbnail_storage_models import ThumbnailStorageResource
-from web.server.routes import page_renderer as page_renderer_routes
 from web.server.routes.page_renderer import PageRendererRouter
 from web.server.routes.views import authentication
 from web.server.routes.views import dashboard as dashboard_views
 from web.server.routes.views import page_renderer as page_renderer_views
 from web.server.routes.views.authentication import authentication_required
-from web.server.security import permissions
+from web.server.security import permissions, signal_handlers
 
 
 @pytest.fixture(name='app', scope='session')
@@ -50,7 +55,6 @@ def fixture_app() -> Flask:
     app = Flask('tests.web', root_path=here, instance_path=here)
     app.config.update(
         TESTING=True,
-        SERVER_NAME='harmony.tests.invalid',
         JWT_SECRET_KEY='tests-web-jwt-placeholder',
         JWT_TOKEN_LOCATION=['headers', 'cookies'],
         JWT_ACCESS_COOKIE_NAME='accessKey',
@@ -58,10 +62,20 @@ def fixture_app() -> Flask:
     JWTManager(app)
     app.zen_config = import_configuration_module('harmony_demo')
 
+    # Registered before Principal's own hook, which loads the identity and logs.
+    @app.before_request
+    def _request_logger():
+        g.request_logger = logging.LoggerAdapter(logging.getLogger('tests.web'), {})
+
     login_manager = LoginManager(app)
 
     @login_manager.request_loader
     def _load_user(_request):
+        # An accessKey cookie signs its user in, as `login_from_request` does.
+        verify_jwt_in_request_optional()
+        jwt_user = USERS.get(get_jwt_identity() or '')
+        if jwt_user:
+            return dataclasses.replace(jwt_user, from_jwt=True)
         return USERS.get(request.headers.get('X-Test-User', ''))
 
     principals = Principal(app, use_sessions=False)
@@ -73,15 +87,13 @@ def fixture_app() -> Flask:
         return AnonymousIdentity()
 
     @identity_loaded.connect_via(app)
-    def _on_identity_loaded(_sender, identity):
-        if current_user.is_authenticated:
+    def _on_identity_loaded(sender, identity):
+        if getattr(current_user, 'from_jwt', False):
+            signal_handlers.on_identity_loaded(sender, identity)
+        elif current_user.is_authenticated:
             identity.provides |= set(current_user.provides)
         elif PUBLIC_ACCESS['enabled']:
             identity.provides.add(VIEW_DASHBOARD)
-
-    @app.before_request
-    def _request_logger():
-        g.request_logger = logging.LoggerAdapter(logging.getLogger('tests.web'), {})
 
     # The renderer builds the page URL with url_for('dashboard.grid_dashboard').
     def grid_dashboard(locale=None, name=None):
@@ -103,7 +115,9 @@ def fixture_app() -> Flask:
         class Meta:
             name = 'storage'
 
-    api = Api(app, decorators=[authentication_required(is_api_request=True)], prefix='/api2')
+    api = Api(
+        app, decorators=[authentication_required(is_api_request=True)], prefix='/api2'
+    )
     api.add_resource(Storage)
     return app
 
@@ -122,14 +136,11 @@ def fixture_renderer(app: Flask, monkeypatch, public_access) -> FakeRenderer:
 
     monkeypatch.setattr(authentication, 'get_configuration', get_configuration)
     monkeypatch.setattr(permissions, 'get_configuration', get_configuration)
-    for module in (
-        page_renderer_routes,
-        page_renderer_views,
-        thumbnail_storage_models,
-        dashboard_views,
-    ):
-        monkeypatch.setattr(module, 'Transaction', FakeTransaction, raising=False)
-        monkeypatch.setattr(module, 'get_dashboard', fake_get_dashboard, raising=False)
+    monkeypatch.setattr(page_renderer_views, 'Transaction', FakeTransaction)
+    monkeypatch.setattr(dashboard_views, 'get_dashboard', fake_get_dashboard)
+    monkeypatch.setattr(
+        app.zen_config.general, 'DEPLOYMENT_BASE_URL', DEPLOYMENT_ORIGIN
+    )
 
     monkeypatch.setattr(app, 'cache', DictCache(), raising=False)
     renderer = FakeRenderer(app)

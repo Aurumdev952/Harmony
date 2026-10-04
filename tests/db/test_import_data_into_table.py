@@ -23,8 +23,6 @@ from db.postgres.utils import (
     import_data_into_table,
 )
 from models.alchemy.base import Base
-from models.alchemy.data_upload import model as data_upload_models
-from models.alchemy.query import model as query_models
 from scripts.data_catalog.export_db_tables import (
     DATA_CATALOG_TABLE_NAMES as EXPORTED_TABLES,
 )
@@ -87,13 +85,8 @@ INSERT INTO source_config (config, source_id, is_active) VALUES ('{}', 1, true);
 @pytest.fixture(name="database")
 def fixture_database(postgres_database: str) -> Iterator[str]:
     engine = sa.create_engine(postgres_database)
-    tables = [
-        model.__table__
-        for module in (query_models, data_upload_models)
-        for model in vars(module).values()
-        if isinstance(model, type) and issubclass(model, Base) and model is not Base
-    ]
-    Base.metadata.create_all(engine, tables=tables)
+    names = (*IMPORTED_TABLES, *DEPENDENT_TABLES, "unpublished_field")
+    Base.metadata.create_all(engine, tables=[Base.metadata.tables[n] for n in names])
     engine.dispose()
     with psycopg2.connect(postgres_database) as conn, conn.cursor() as cursor:
         cursor.execute(

@@ -141,7 +141,7 @@ PYTHONPATH=$PWD uv run --no-project -p 3.8 --with-requirements /tmp/reqs.txt --w
 
 C-5's token claims gain `user_claims.remember_me: bool`. The change is additive, and only `is_session_persisted` reads it. backend owns C-5, so backend-2 should acknowledge here when applying the patch:
 
-- [ ] backend acknowledgement:
+- [x] backend acknowledgement: backend-2, 2026-10-04. backend owns C-5 and is also its only consumer here. Old shape: `user_claims = {needs, query_needs}`. New shape: `user_claims = {needs, query_needs, remember_me: bool}`, written only by `create_user_access_token` (login, and the non-cookie login that returns the token in JSON with `remember_me` False). Readers: `is_session_persisted` reads `remember_me`; `_compute_token_provides` (`signal_handlers.py`) and `api.py` read only `needs`/`query_needs`, so authorisation is unchanged (INV-3). API tokens and the export-render token (`page_renderer.py`) carry no claim and read as not persisted. No migration: tokens without the claim read as False, which is today's behaviour. The FastAPI `PrincipalDep` (WP-5a) must ignore unknown `user_claims` keys.
 
 ## Requests
 

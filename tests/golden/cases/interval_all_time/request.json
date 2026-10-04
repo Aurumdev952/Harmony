@@ -1,0 +1,24 @@
+{
+  "fields": [
+    {
+      "id": "yellow_fever_cases",
+      "calculation": {
+        "type": "SUM",
+        "filter": {
+          "type": "FIELD",
+          "fieldId": "yellow_fever_cases"
+        }
+      }
+    }
+  ],
+  "filter": {},
+  "groups": [
+    {
+      "dimension": "StateName",
+      "includeAll": false,
+      "includeNull": false,
+      "includeTotal": false
+    }
+  ],
+  "type": "GROUP_BY"
+}

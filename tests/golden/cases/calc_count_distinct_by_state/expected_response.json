@@ -1,0 +1,22 @@
+{
+  "data": [
+    {
+      "StateName": "Acre",
+      "municipalities_reporting": 172.37
+    },
+    {
+      "StateName": "Pará",
+      "municipalities_reporting": 85.0
+    },
+    {
+      "StateName": "Roraima",
+      "municipalities_reporting": 245.77
+    }
+  ],
+  "dimensions": [
+    "StateName"
+  ],
+  "fields": [
+    "municipalities_reporting"
+  ]
+}

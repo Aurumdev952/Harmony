@@ -1,0 +1,5 @@
+{
+  "description": "includeAll on every group: aggregator filters are no longer pushed into the query filter.",
+  "endpoint": "table",
+  "policy": null
+}

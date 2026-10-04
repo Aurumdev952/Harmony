@@ -1,0 +1,2 @@
+- [Local yarn build](local-yarn-build.md) — ipv4first, --ignore-scripts for node-pty, Docker node:18.17 build, 19 pre-existing Flow errors
+- [Full-stack page check](full-stack-page-check.md) — Flask startup needs Druid with data; use bundle diffs when runtime cannot change

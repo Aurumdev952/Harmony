@@ -11,8 +11,9 @@ on:
 
 permissions: {}
 
-# A new push to a PR cancels the run still going for the previous one. Runs on
-# main are grouped by ref and never cancelled, so every commit there gets a result.
+# A new push to a PR cancels the run still going for the previous one. A run on
+# main is never cancelled once it starts. GitHub keeps only one pending run per
+# group, though, so of several quick pushes to main the middle ones are skipped.
 concurrency:
   group: integration-${{ github.event.pull_request.number || github.ref }}
   cancel-in-progress: ${{ github.event_name == 'pull_request' }}

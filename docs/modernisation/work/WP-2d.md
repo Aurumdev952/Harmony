@@ -1,7 +1,7 @@
 ---
 wp: "2d"
 title: "Pipeline fixture suite"
-status: review
+status: ready
 owner_role: "qa"
 instances:
   - name: "qa-4"

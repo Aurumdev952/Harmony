@@ -21,17 +21,17 @@ security_review: false
 
 Units, in order. Each line names the change and the check that ends it.
 
-1. Harness: run each step in a subprocess as Zeus does (`ZEN_ENV=harmony_demo`, PYTHONPATH at the repo root, a `pigz` to `gzip` shim when pigz is absent). Capture every output decompressed. Canonicalise Druid rows into sorted rows, a schema and the Druid rollup facts. Add `run.sh` and the `regenerate` command. Check: `run.sh regenerate --print` runs every case on CPython 3.9.
-2. Fixtures and goldens: 25 cases covering:
-   - harmony_demo yellow_fever, run end to end against the real static mapping;
-   - self-serve, with no sources and through the wrapper;
-   - every input format: plain, gzip, lz4, tab-delimited, tall `field,val`, `*field_` wildcard columns;
-   - every `process_csv` flag;
-   - the `fill_dimension_data` join on synthetic mappings: unmatched, metadata-less and state-level rows, multi-valued dimensions, zero collapse, sharding, the experimental parser, and the abort paths.
-
-   Check: `run.sh` passes; a tampered golden value fails.
-3. Hypothesis properties: date parsing, the location join (oracle), Druid row writing (every value carried, zeros collapsed), and process_csv rollup (oracle). Check: 100 examples each, under 6% rejected.
-4. README with the regeneration rule; deslop; ruff. Check: `ruff check`, `ruff format --check`, and the full suite on CPython 3.9 and PyPy 3.9.
+1. Harness: run each step in a subprocess as Zeus does (`ZEN_ENV=harmony_demo`, PYTHONPATH at the repo root, a `pigz` to `gzip` shim when pigz is absent). Capture every output decompressed and canonicalise it. Add `run.sh` and the `regenerate` command. Check: none that runs on its own commit, because no case exists until unit 2 (see Log).
+2. Fixtures and goldens for 25 cases. Check: `run.sh` passes, and a tampered golden value fails.
+3. Hypothesis properties: date parsing, the location join (oracle), Druid row writing, and process_csv rollup (oracle). Check: 100 examples each.
+4. README with the regeneration rule; deslop; ruff. Check: suite on CPython 3.9 and PyPy 3.9.
+5. Review round 1 (QA and reviewer changes-requested). Check: suite green from a clean export on CPython, PyPy and `CI=1`; black 22.6.0 and ruff format at the repo config; all seven production mutants killed in `contract/`.
+   - Every completing case runs through `fill_dimension_data` and pins a `contract/` layer: the INV-2 rollup facts and the column set.
+   - New cases: `--value`, tall `--disaggregate` (including `*`), `--disaggregate` with `--exclude_zeros` and a standalone zero, and the two-source self-serve run through the real merge.
+   - Pinned behaviours: `__` rollup-key and join-key collisions, partial dates, slash dates.
+   - Druid row-count assertion; hypothesis derandomized under `CI`; pinned dependencies; `ZEN_ENV` exported by `run.sh`.
+6. README for the three layers, coverage gaps and pinned behaviours. Check: as unit 5.
+7. `mutation_check.py`, so reviewers can rerun the mutant evidence. Check: exits 0 on a clean export.
 
 ## Contract changes
 
@@ -39,39 +39,69 @@ None.
 
 ## Requests
 
+- [ ] infra (WP-2f): put the suite's pinned dependencies into the root `dev` dependency group: `hypothesis==6.91.0`, `contextlib2==21.6.0`, `unidecode==1.1.1`, `python-slugify==8.0.4`, `python-dateutil==2.9.0.post0`, `related==0.7.3`, `attrs==21.4.0`, `six==1.17.0`, `future==0.18.3`, `pytest==8.4.2`, and `pylib` at py77 `70280110ec342a6f6db1c102e96756fcc3c3c01b`. All are listed in `tests/pipeline/requirements.txt`.
+  - Next to WP-2a's or WP-2f's root `pyproject.toml` (`testpaths = ["tests"]`), a plain `uv run pytest` collects `tests/pipeline` and fails at collection without them. hypothesis, contextlib2 and unidecode are missing from the `golden` group, and unidecode 1.1.1 is what keeps slugified field ids stable.
+  - Today's CI pylint (`integration.yml`, the requirements*.txt venv) reports E0401 `Unable to import 'hypothesis'` for `conftest.py`, `test_properties.py` and `test_pinned_behaviours.py`. With the pins installed, pylint 2.17.4 reports no errors or warnings.
+  - Add a CI job that runs `CI=1 tests/pipeline/run.sh` on Python 3.9 with `lz4` installed (`pigz` optional). The lead lands WP-2f first.
 - [ ] core: make `config/__init__.py`'s `ConfigImporter` implement `find_spec` / `exec_module`. It implements only `find_module` / `load_module`, which CPython 3.12 removed. On 3.13 the suite fails at import with `ModuleNotFoundError: No module named 'config.datatypes'`. This blocks running `tests/pipeline` on 3.13 (WP-3a), not this WP.
-- [ ] infra (WP-2f): fold `tests/pipeline/requirements.txt` into the `pipeline` dependency group. Add a CI job that runs `tests/pipeline/run.sh` on Python 3.9 with `lz4` installed (`pigz` optional). qa-2a's root `pyproject.toml` (`requires-python ==3.9.*`) collects `tests/`. This suite keeps its own requirements file so the two branches do not conflict in `pyproject.toml` / `uv.lock`.
-- [ ] pipeline (WP-8d, for information): the README's "Behaviour pinned here" section lists current quirks that the Polars rewrite must keep or change on purpose, with a WP note:
-  - rollup on raw (uncleaned) dimension values;
-  - day/month ambiguity in dateutil parsing;
-  - blank cells counting as 1 under `--flatten_string_categories`;
-  - `__` join-key collisions;
-  - digest counts that include unmatched rows;
-  - one shard per row when `--shard_size` is omitted;
-  - an empty digest under `--use_experimental_parser`.
+- [ ] pipeline (WP-8d, for information):
+  - `contract/` is the INV-2 contract. `canonical/` and `raw/` are layout that WP-8d may change with a recorded note.
+  - The README's "Behaviour pinned here" section lists the quirks to keep or change on purpose.
+  - `pipeline_inprocess.py` imports internals WP-8d deletes. WP-8d rewrites `test_properties.py` and `test_pinned_behaviours.py`, keeping each property.
 
 ## Log
 
 - 2026-10-04 qa-4 unit 0: claimed WP-2d; merged `mig/integration`; branched `mig/WP-2d-pipeline-fixtures`.
-- 2026-10-04 qa-4 unit 1: harness, `run.sh`, `regenerate.py` (17890b7); check: `tests/pipeline/run.sh regenerate --print` ran every case, exit 0.
-- 2026-10-04 qa-4 unit 2: 25 fixture cases with raw and canonical goldens (b832f93); check: `tests/pipeline/run.sh` 57 passed. Changing one golden value from `0.30000000000000004` to `0.3` failed `test_canonical_outputs_match_golden[fill_dimension_data__tall_synthetic_join]`.
+- 2026-10-04 qa-4 unit 1: harness, `run.sh`, `regenerate.py` (17890b7). Correction: this commit is not green on its own. `regenerate.py` imports `pipeline_cases`, which arrives in b832f93, so the check could not run at 17890b7. The `run.sh regenerate --print` check first passed at b832f93 and is part of unit 2's evidence.
+- 2026-10-04 qa-4 unit 2: 25 fixture cases with raw and canonical goldens (b832f93); check: `tests/pipeline/run.sh` 57 passed. Changing one golden value from `0.30000000000000004` to `0.3` failed the synthetic-join canonical test.
 - 2026-10-04 qa-4 unit 3: property tests (c4b20eb); check: 7 passed, 100 examples each, 6 of 106 location tables rejected.
-- 2026-10-04 qa-4 unit 4: README, deslop, ruff (62eb926); check: ruff 0.14.0 `check` and `format --check` clean. `run.sh` passed 64 on CPython 3.9.25 (14 s) and 64 on PyPy 3.9.19 (27 s).
+- 2026-10-04 qa-4 unit 4: README, deslop, ruff (62eb926); check: `run.sh` passed 64 on CPython 3.9.25 and 64 on PyPy 3.9.19.
+- 2026-10-04 qa-4 unit 5: review round 1 (322eb4c); check: see Evidence. Goldens were regenerated deliberately in this unit:
+  - every completing case gained the join and a `contract/` layer;
+  - the wide fixture gained one standalone zero row, so 11 wide cases changed;
+  - `mapped_locations.csv` gained one many-to-one row (`Cedar Point, East`);
+  - `demo__self_serve_wrapper` became `demo__self_serve_two_sources`.
+
+  No pipeline code changed, so these are new pins, not changed results.
+- 2026-10-04 qa-4 unit 6: README (267d916); check: as unit 5.
+- 2026-10-04 qa-4 unit 7: `tests/pipeline/mutation_check.py`, the reproducible mutant battery (7921b22); check: exits 0, no mutant survives. The full evidence was re-run at this head.
 
 ## Evidence
 
-All commands run from the worktree root at 62eb926.
+Every command ran on a clean `git archive` export of 7921b22, outside the repository.
 
-- **Suite, CPython:** `tests/pipeline/run.sh -q -W ignore::DeprecationWarning` reported `64 passed in 14.17s`.
-- **Suite, PyPy (the interpreter Zeus uses today):** `PIPELINE_FIXTURE_PYTHON=pypy3.9 tests/pipeline/run.sh -q` reported `64 passed in 26.73s`.
-- **PyPy parity:** `regenerate.py --print` under PyPy 3.9.19 and under CPython 3.9.25 gave byte-identical output for all 25 cases (1442 lines each, `diff` empty). The CPython goldens are therefore what production writes.
-- **Determinism:** `test_outputs_do_not_depend_on_hash_seed` runs the yellow_fever and synthetic-join cases with `PYTHONHASHSEED=1` and `2` and finds identical outputs.
-- **Broken code turns the suite red (phase 2 exit check).** Both mutations ran in a scratch copy of the tree, outside the repository:
-  - Rollup changed from sum to `max` in `process_csv.py` `_store_values`: 37 failed, 27 passed, including `test_rollup_sums_each_field_per_dimensions_and_date`.
-  - Metadata attachment disabled in `FullRowDimensionDataCollector.collect_hierarchical_canonical_dimensions`: 13 failed, 51 passed, including `test_location_join_returns_canonical_names_and_their_metadata`.
+- **Suite:** 28 cases, 104 tests.
+
+  | Mode | Command | Result |
+  |---|---|---|
+  | CPython 3.9.25 | `tests/pipeline/run.sh -q` | `103 passed, 1 skipped` |
+  | CI profile | `CI=1 tests/pipeline/run.sh -q` | `104 passed` (the derandomize check runs only under CI) |
+  | PyPy 3.9.19, the interpreter Zeus uses today | `PIPELINE_FIXTURE_PYTHON=pypy3.9 tests/pipeline/run.sh -q` | `103 passed, 1 skipped` |
+  | Hostile shell `ZEN_ENV` | `ZEN_ENV=et tests/pipeline/run.sh -q` | `103 passed, 1 skipped` |
+
+- **PyPy parity:** `run.sh regenerate --print` under PyPy and under CPython gave byte-identical output for all 28 cases and 341 output files (`cmp` identical, 4415 lines).
+- **Formatting and lint:**
+  - `uvx --from black==22.6.0 --with click==8.0.4 black --skip-string-normalization -t py39 --check tests/pipeline/*.py` left 9 files unchanged.
+  - `uvx ruff@0.14.0 format --check --line-length 88 --config 'format.quote-style="preserve"' tests/pipeline/*.py` reported 9 files already formatted.
+  - pylint 2.17.4 with `.pylintrc`, with the suite's pins installed, reported no errors and no warnings (9.83/10). Without hypothesis it reports only the E0401s listed under Requests.
+- **Production mutants:** `uv run --no-project python tests/pipeline/mutation_check.py` applies each mutant alone to a scratch copy of the tree and exits non-zero if any survives. It exited 0, and every mutant fails at least one `contract/` test:
+
+  | Mutant | Failed | Includes |
+  |---|---|---|
+  | `--value` ignored | 3 | `process_csv__tall_value_column` |
+  | Disaggregation keeps zeros under `--exclude_zeros` | 3 | `process_csv__wide_disaggregate_exclude_zeros` |
+  | Tall `*` disaggregation ignored | 3 | `process_csv__tall_disaggregate` |
+  | Non-zero Druid rows written twice | 70 | `test_druid_rows_carry_every_value_once_and_collapse_zeros_into_one_row` |
+  | Rollup key delimiter `__` changed to `\|` | 1 | `test_rollup_keys_collide_when_names_contain_the_key_delimiter` |
+  | Rollup max instead of sum | 65 | `test_rollup_sums_each_field_per_dimensions_and_date` |
+  | Join metadata not attached | 73 | `test_location_join_returns_canonical_names_and_their_metadata` |
+
+- **Determinism:** `test_outputs_do_not_depend_on_hash_seed` passes with `PYTHONHASHSEED` 1 and 2. Under `CI`, hypothesis is derandomized (`test_ci_draws_the_same_examples_every_run`).
 - **Python 3.12+ blocker:** `PIPELINE_FIXTURE_PYTHON=3.13 tests/pipeline/run.sh` fails with `ModuleNotFoundError: No module named 'config.datatypes'`. See Requests.
-- **Pipeline surface (`run`):** the suite drives the real `pipeline/harmony_demo/process/run/00_yellow_fever/10_process` and `90_shared/10_fill_dimension_data` command lines, with the real `static_data` mapping. The fetch steps (curl to S3, `mc`) were not run, because they need network and object storage.
-- **INV-6:** the fixtures are synthetic. Place names (Northvale, Ashford, ...) and every value are invented. The yellow_fever fixture uses four public IBGE municipality codes so that the real demo mapping matches.
+- **Pipeline surface (`run`):** the suite drives the real command lines of `00_yellow_fever/10_process`, `00_self_serve/10_process` (no sources, and two sources through `MergeDimensionsAndFields` from the real `common.sh`) and `90_shared/10_fill_dimension_data`. The yellow_fever cases use the real `static_data` mapping.
+  - Not run: the fetch steps (curl or `mc` from object storage, `gunzip`, `RemoveBOM`) and `20_sync_digest_files`, which need the network and object storage. The self-serve fixtures start from the fetch step's output layout.
+  - Not exercised: `--policy` (parsed, never read) and the non-hierarchical flags, which harmony_demo does not use.
+- **INV-6:** the fixtures are synthetic. Place names and every value are invented. The yellow_fever fixture uses four public IBGE municipality codes so that the real demo mapping matches.
 
 ## Verdicts
 

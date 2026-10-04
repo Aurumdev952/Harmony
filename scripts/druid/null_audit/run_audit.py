@@ -38,6 +38,7 @@ from tests.druid.epi_week import epi_week_of_year_extraction, js_epi_week_of_yea
 from tests.golden.harness import (
     DEPLOYMENT,
     DATASOURCE_DATE,
+    Case,
     bootstrap,
     load_cases,
     run_case,
@@ -46,6 +47,19 @@ from tests.golden.harness import (
 
 TASK_TIMEOUT_S = 900
 QUERY_TIMEOUT_S = 120
+AUDIT_CASES_DIR = Path(__file__).parent / 'cases'
+
+
+def audit_cases() -> List[Case]:
+    '''Null shapes the golden catalogue does not reach: a negated filter on a
+    dimension that is null on some rows and not grouped, count distinct over such
+    a dimension, and a kept null group. Same format as tests/golden/cases, minus
+    the recorded fixtures.'''
+    return [
+        Case(path.name, path)
+        for path in sorted(AUDIT_CASES_DIR.iterdir())
+        if path.is_dir()
+    ]
 
 
 def _router(port: int) -> str:
@@ -59,16 +73,19 @@ def _datasource() -> str:
     return SiteDruidDatasource(DEPLOYMENT, DATASOURCE_DATE).name
 
 
-def index_task(datasource: str) -> dict:
+def index_task(datasource: str, raw: bool) -> dict:
     # pylint: disable=import-outside-toplevel
     from db.druid.indexing.common import build_data_schema
 
+    data_schema = build_data_schema(
+        datasource, datetime(2018, 1, 1), datetime(2026, 1, 1)
+    )
+    if raw:
+        del data_schema['transformSpec']
     return {
         'type': 'index_parallel',
         'spec': {
-            'dataSchema': build_data_schema(
-                datasource, datetime(2018, 1, 1), datetime(2026, 1, 1)
-            ),
+            'dataSchema': data_schema,
             'ioConfig': {
                 'type': 'index_parallel',
                 'inputSource': {
@@ -98,9 +115,9 @@ def _wait(what: str, check, timeout_s: int) -> Any:
     raise TimeoutError(f'timed out waiting for {what}')
 
 
-def index(port: int) -> None:
+def index(port: int, raw: bool) -> None:
     datasource = _datasource()
-    _run_index_task(_router(port), datasource, index_task(datasource))
+    _run_index_task(_router(port), datasource, index_task(datasource, raw))
 
 
 def _sql(base: str, query: str, *parameters: str) -> list:
@@ -166,17 +183,38 @@ def _run_index_task(base: str, datasource: str, task: dict) -> None:
     print(f'{datasource} version {version} served: {counts}')
 
 
-def null_selectors(node: Any) -> Any:
-    '''The builder fix WP-8a requests from core: the "has no value" test is
-    `selector value null`, not `selector value ''`, which under SQL-compatible
-    nulls matches only the empty string.'''
+_VALUE_LEAVES = {'selector', 'in', 'bound', 'regex', 'search', 'like'}
+
+
+def _two_valued(node: Any) -> Any:
+    '''Inside a `not`, make every value comparison false rather than unknown on a
+    null dimension: `leaf AND NOT dimension IS NULL`. Druid 28+ evaluates native
+    filters with three-valued logic, so `not(Sex = F)` drops null-Sex rows that
+    legacy Druid kept. On 0.23 the wrapper changes nothing.'''
     if isinstance(node, list):
-        return [null_selectors(item) for item in node]
+        return [_two_valued(item) for item in node]
+    if not isinstance(node, dict):
+        return node
+    if node.get('type') in _VALUE_LEAVES and node.get('value', '') is not None:
+        is_null = {'type': 'selector', 'dimension': node['dimension'], 'value': None}
+        return {'type': 'and', 'fields': [node, {'type': 'not', 'field': is_null}]}
+    return {key: _two_valued(value) for key, value in node.items()}
+
+
+def candidate_filters(node: Any) -> Any:
+    '''The builder fixes WP-8a requests from core, applied to a posted query:
+    - the "has no value" test is `selector value null`, not `selector value ''`,
+      which under SQL-compatible nulls matches only the empty string;
+    - a negated filter keeps rows where the dimension is null (`_two_valued`).'''
+    if isinstance(node, list):
+        return [candidate_filters(item) for item in node]
     if not isinstance(node, dict):
         return node
     if node.get('type') == 'selector' and node.get('value') == '':
         return {**node, 'value': None}
-    return {key: null_selectors(value) for key, value in node.items()}
+    if node.get('type') == 'not':
+        return {**node, 'field': _two_valued(candidate_filters(node['field']))}
+    return {key: candidate_filters(value) for key, value in node.items()}
 
 
 def _broker(port: int, session: requests.Session, candidate: bool):
@@ -184,7 +222,7 @@ def _broker(port: int, session: requests.Session, candidate: bool):
 
     def answer(query: dict) -> list:
         if candidate:
-            query = null_selectors(query)
+            query = candidate_filters(query)
         response = session.post(url, json=query, timeout=QUERY_TIMEOUT_S)
         if response.status_code != 200:
             raise RuntimeError(f'Druid {response.status_code}: {response.text[:1000]}')
@@ -197,7 +235,9 @@ def replay(port: int, out: Path, names: List[str], candidate: bool) -> None:
     bootstrap()
     out.mkdir(parents=True, exist_ok=True)
     session = requests.Session()
-    cases = [case for case in load_cases() if not names or case.name in names]
+    cases = [
+        case for case in load_cases() + audit_cases() if not names or case.name in names
+    ]
     failures = 0
     for case in cases:
         record: dict
@@ -377,6 +417,11 @@ def main() -> int:
     commands = parser.add_subparsers(dest='command', required=True)
     index_parser = commands.add_parser('index')
     index_parser.add_argument('--port', type=int, required=True)
+    index_parser.add_argument(
+        '--raw',
+        action='store_true',
+        help="index without the ingest transform that stores '' as null",
+    )
     replay_parser = commands.add_parser('replay')
     replay_parser.add_argument('--port', type=int, required=True)
     replay_parser.add_argument('--out', type=Path, required=True)
@@ -397,7 +442,7 @@ def main() -> int:
 
     if args.command == 'index':
         bootstrap()
-        index(args.port)
+        index(args.port, args.raw)
     elif args.command == 'replay':
         replay(args.port, args.out, args.cases, args.candidate)
     elif args.command == 'parity':

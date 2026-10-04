@@ -1,0 +1,10 @@
+## calc_last_value
+- error: 1 differing values
+    error: null -> "AssertionError: calc_last_value: HTTP 500\n<!DOCTYPE HTML PUBLIC \"-//W3C//DTD HTML 3.2 Final//EN\">\n<title>500 Internal Server Error</title>\n<h1>Internal Se
+- druid_query: 1 differing values
+    druid_query: [{"aggregations": [{"aggregator": {"aggregator": {"fieldName": "sum", "name": "yellow_fever_cases", "type": "doubleSum"}, "name": "yellow_fever_cases", "type":  -> null
+- druid_response: 1 differing values
+    druid_response: [[[1704067200000, "Acre", 82.0, 298], [1704067200000, "Par\u00e1", 26.0, 196], [1704067200000, "Roraima", 46.0, 202], [1706745600000, "Acre", 134.0, 274], [1706 -> null
+- body: 1 differing values
+    body: {"data": [{"StateName": "Acre", "timestamp": "2024-01-01", "yellow_fever_cases": 82.0}, {"StateName": "Par\u00e1", "timestamp": "2024-01-01", "yellow_fever_case -> null
+1 cases differ between /tmp/wp8a/out/legacy2 and /tmp/wp8a/out/druid38-tc3

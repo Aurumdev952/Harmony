@@ -1,12 +1,15 @@
-"""Run the harmony_demo per-row pipeline steps on fixtures and canonicalise their outputs.
+"""Run harmony_demo's per-row pipeline steps on fixtures; canonicalise the outputs.
 
-Two layers of golden output are kept per case:
+Three layers of golden output are kept per case:
 
-- ``raw/``: every file the steps wrote, decompressed, byte for byte. This pins today's
-  serialisation (key order, CRLF line endings, shard boundaries, zero-field collapse).
-- ``canonical/``: the same data with ordering and container format removed. This is
-  the layer a reimplementation (WP-8d, Polars and Parquet) must reproduce. The
-  ``canonical_*`` functions take plain rows so a Parquet reader can feed them.
+- ``contract/``: what Druid serves after ingest (rollup facts) and the Druid column
+  set. This is the INV-2 contract every reimplementation (WP-8d) must reproduce.
+- ``canonical/``: every output with ordering removed, still in today's JSON row
+  layout (zero-field collapse, int or float ``val``, intermediates).
+- ``raw/``: every file the steps wrote, decompressed, byte for byte.
+
+The ``canonical_*`` and ``contract_*`` functions take plain rows, so a Parquet reader
+can feed them.
 """
 
 from __future__ import annotations
@@ -50,13 +53,17 @@ FIELD_COLUMN = 'field'
 # fill_dimension_data --use_experimental_parser writes non-zero values as one
 # {"data": {field: val}} row for Druid's nestedJson parser.
 NESTED_DATA_COLUMN = 'data'
+ERROR_SUFFIX = '.error.txt'
 
 
 @dataclasses.dataclass(frozen=True)
 class Step:
+    """A Python step script, or with ``shell`` a bash script, and its arguments."""
+
     script: Path
     args: tuple[str, ...]
     expect_returncode: int = 0
+    shell: bool = False
 
 
 @dataclasses.dataclass(frozen=True)
@@ -72,13 +79,12 @@ class Case:
     inputs: dict[str, str] = dataclasses.field(default_factory=dict)
 
     def __post_init__(self) -> None:
-        assert all(
-            step.expect_returncode == 0 for step in self.steps[:-1]
-        ), f'{self.name}: only the last step may be expected to fail'
+        if any(step.expect_returncode for step in self.steps[:-1]):
+            raise ValueError(f'{self.name}: only the last step may be expected to fail')
 
     @property
     def aborts(self) -> bool:
-        """An aborting case pins only the error: partial outputs depend on pipe buffering."""
+        """An aborting case pins only its error; partial outputs depend on buffering."""
         return self.steps[-1].expect_returncode != 0
 
 
@@ -113,6 +119,7 @@ def step_env(bin_dir: Path, hash_seed: str | None = None) -> dict[str, str]:
         {
             'ZEN_ENV': 'harmony_demo',
             'PYTHONPATH': str(REPO_ROOT),
+            'PIPELINE_SRC_ROOT': str(REPO_ROOT),
             'PYTHONUTF8': '1',
             'LC_ALL': 'C.UTF-8',
             'TZ': 'UTC',
@@ -170,10 +177,16 @@ def run_case(case: Case, base: Path, hash_seed: str | None = None) -> Path:
     _stage_inputs(case, work)
     env = step_env(tool_dir(base), hash_seed)
     for index, step in enumerate(case.steps):
-        command = [sys.executable, str(step.script)]
+        command = ['bash' if step.shell else sys.executable, str(step.script)]
         command.extend(_expand(arg, work, out) for arg in step.args)
         result = subprocess.run(
-            command, cwd=work, env=env, capture_output=True, text=True, timeout=300
+            command,
+            cwd=work,
+            env=env,
+            capture_output=True,
+            text=True,
+            timeout=300,
+            check=False,
         )
         if result.returncode != step.expect_returncode:
             raise AssertionError(
@@ -184,7 +197,7 @@ def run_case(case: Case, base: Path, hash_seed: str | None = None) -> Path:
         if step.expect_returncode != 0:
             for path in out.iterdir():
                 path.unlink()
-            (out / f'step{index}.{step.script.stem}.error.txt').write_text(
+            (out / f'step{index}.{step.script.stem}{ERROR_SUFFIX}').write_text(
                 _failure_text(result.stderr)
             )
     return out
@@ -274,7 +287,7 @@ def _druid_facts(row: dict) -> list[tuple[str, float]]:
     ]
 
 
-def canonical_rollup(rows: Iterable[dict]) -> str:
+def contract_rollup(rows: Iterable[dict]) -> str:
     """What Druid stores per query-visible key after ingest rollup.
 
     Mirrors ``db/druid/indexing``: queryGranularity none, metrics count, doubleSum,
@@ -306,6 +319,17 @@ def canonical_rollup(rows: Iterable[dict]) -> str:
             )
         )
     return ''.join(f'{line}\n' for line in sorted(lines))
+
+
+def contract_columns(rows: Iterable[dict]) -> str:
+    """The Druid column set, one name per line, with the field and value columns named
+    as Druid ingests them whatever the row layout."""
+    columns = set()
+    for row in rows:
+        columns.update(k for k in row if k != NESTED_DATA_COLUMN)
+        if NESTED_DATA_COLUMN in row:
+            columns.update((FIELD_COLUMN, VALUE_COLUMN))
+    return ''.join(f'{column}\n' for column in sorted(columns))
 
 
 def _canonical_csv(data: bytes) -> str:
@@ -342,8 +366,19 @@ def canonicalise(raw: dict[str, bytes]) -> dict[str, str]:
     if has_druid_shards:
         canonical['druid_rows.jsonl'] = canonical_rows(druid_rows)
         canonical['druid_schema.json'] = canonical_schema(druid_rows)
-        canonical['druid_rollup.jsonl'] = canonical_rollup(druid_rows)
     return canonical
+
+
+def contract(raw: dict[str, bytes]) -> dict[str, str]:
+    """The INV-2 contract: Druid rollup facts and the Druid column set."""
+    if any(name.endswith(ERROR_SUFFIX) for name in raw):
+        return {}
+    shards = [data for name, data in raw.items() if DRUID_ROWS_PATTERN.match(name)]
+    druid_rows = [row for data in shards for row in _json_lines(data)]
+    return {
+        'druid_rollup.jsonl': contract_rollup(druid_rows),
+        'druid_columns.txt': contract_columns(druid_rows),
+    }
 
 
 def golden_files(case_name: str, layer: str) -> dict[str, bytes]:
@@ -353,16 +388,24 @@ def golden_files(case_name: str, layer: str) -> dict[str, bytes]:
     return {path.name: path.read_bytes() for path in sorted(directory.iterdir())}
 
 
-def write_golden(
-    case_name: str, raw: dict[str, bytes], canonical: dict[str, str]
-) -> None:
+def layers(raw: dict[str, bytes]) -> dict[str, dict[str, bytes]]:
+    """Every golden layer of one case's captured outputs."""
+
+    def encode(files: dict[str, str]) -> dict[str, bytes]:
+        return {name: text.encode('utf-8') for name, text in files.items()}
+
+    return {
+        'contract': encode(contract(raw)),
+        'canonical': encode(canonicalise(raw)),
+        'raw': raw,
+    }
+
+
+def write_golden(case_name: str, case_layers: dict[str, dict[str, bytes]]) -> None:
     case_dir = GOLDEN_DIR / case_name
     if case_dir.exists():
         shutil.rmtree(case_dir)
-    for layer, files in (
-        ('raw', raw),
-        ('canonical', {k: v.encode('utf-8') for k, v in canonical.items()}),
-    ):
+    for layer, files in case_layers.items():
         if not files:
             continue
         layer_dir = case_dir / layer

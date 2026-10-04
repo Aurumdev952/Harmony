@@ -16,12 +16,7 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 
 from pipeline_cases import CASES  # noqa: E402
-from pipeline_fixtures import (
-    canonicalise,
-    capture_raw,
-    run_case,
-    write_golden,
-)  # noqa: E402
+from pipeline_fixtures import capture_raw, layers, run_case, write_golden  # noqa: E402
 
 
 def main() -> int:
@@ -36,16 +31,19 @@ def main() -> int:
         parser.error(f'unknown cases: {unknown}')
     for name in args.cases or sorted(CASES):
         with tempfile.TemporaryDirectory(prefix=f'wp2d-{name}-') as base:
-            raw = capture_raw(run_case(CASES[name], Path(base)))
-            canonical = canonicalise(raw)
+            case_layers = layers(capture_raw(run_case(CASES[name], Path(base))))
             if args.print:
-                for layer, files in (('raw', raw), ('canonical', canonical)):
+                for layer, files in case_layers.items():
                     for file_name, data in files.items():
-                        text = data.decode('utf-8') if isinstance(data, bytes) else data
-                        print(f'===== {name}/{layer}/{file_name}\n{text}', end='')
+                        print(
+                            f'===== {name}/{layer}/{file_name}\n{data.decode()}', end=''
+                        )
             else:
-                write_golden(name, raw, canonical)
-                print(f'wrote {name}: {len(raw)} raw, {len(canonical)} canonical files')
+                write_golden(name, case_layers)
+                counts = ', '.join(
+                    f'{len(f)} {layer}' for layer, f in case_layers.items()
+                )
+                print(f'wrote {name}: {counts}')
     return 0
 
 

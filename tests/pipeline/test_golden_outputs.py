@@ -14,41 +14,53 @@ from pipeline_fixtures import (
     PROCESS_CSV,
     Case,
     Step,
-    canonical_rollup,
     canonical_rows,
-    canonicalise,
     capture_raw,
+    contract_rollup,
     golden_files,
+    layers,
     run_case,
 )
 
 CASE_NAMES = sorted(CASES)
+LAYERS = ('contract', 'canonical', 'raw')
+
+CaseLayers = dict[str, dict[str, bytes]]
 
 
-@pytest.fixture(scope='session')
-def case_outputs(
-    tmp_path_factory,
-) -> Callable[[str], tuple[dict[str, bytes], dict[str, str]]]:
+@pytest.fixture(name='case_layers', scope='session')
+def fixture_case_layers(tmp_path_factory) -> Callable[[str], CaseLayers]:
     """Run each case once per session; tests share its outputs."""
-    cache: dict[str, tuple[dict[str, bytes], dict[str, str]]] = {}
+    cache: dict[str, CaseLayers] = {}
 
-    def outputs(name: str) -> tuple[dict[str, bytes], dict[str, str]]:
+    def outputs(name: str) -> CaseLayers:
         if name not in cache:
-            raw = capture_raw(run_case(CASES[name], tmp_path_factory.mktemp(name)))
-            cache[name] = (raw, canonicalise(raw))
+            cache[name] = layers(
+                capture_raw(run_case(CASES[name], tmp_path_factory.mktemp(name)))
+            )
         return cache[name]
 
     return outputs
 
 
-def _assert_same_files(case: str, layer: str, actual: dict[str, bytes]) -> None:
+def test_every_case_has_a_golden_and_every_golden_a_case():
+    golden_cases = {path.name for path in GOLDEN_DIR.iterdir() if path.is_dir()}
+    assert golden_cases == set(CASES)
+
+
+def test_every_case_that_completes_pins_druid_rows():
+    for name, case in CASES.items():
+        if not case.aborts:
+            assert golden_files(name, 'contract'), f'{name} has no contract layer'
+
+
+@pytest.mark.parametrize('layer', LAYERS)
+@pytest.mark.parametrize('case', CASE_NAMES)
+def test_outputs_match_golden(case, layer, case_layers):
+    actual = case_layers(case)[layer]
     expected = golden_files(case, layer)
-    assert (
-        expected
-    ), f'no golden for {case}/{layer}; run tests/pipeline/run.sh regenerate'
-    assert sorted(actual) == sorted(
-        expected
-    ), f'{case}/{layer}: output file set changed'
+    file_set_changed = f'{case}/{layer}: output file set changed'
+    assert sorted(actual) == sorted(expected), file_set_changed
     for name in sorted(expected):
         if actual[name] == expected[name]:
             continue
@@ -61,30 +73,6 @@ def _assert_same_files(case: str, layer: str, actual: dict[str, bytes]) -> None:
         pytest.fail(f'{case}/{layer}/{name} differs:\n{"".join(diff)}'[:20000])
 
 
-def test_every_case_has_a_golden_and_every_golden_a_case():
-    golden_cases = {path.name for path in GOLDEN_DIR.iterdir() if path.is_dir()}
-    assert golden_cases == set(CASES)
-
-
-@pytest.mark.parametrize('case', CASE_NAMES)
-def test_raw_outputs_match_golden(case, case_outputs):
-    raw, _ = case_outputs(case)
-    _assert_same_files(case, 'raw', raw)
-
-
-@pytest.mark.parametrize('case', CASE_NAMES)
-def test_canonical_outputs_match_golden(case, case_outputs):
-    _, canonical = case_outputs(case)
-    if CASES[case].aborts:
-        assert canonical == {}
-        return
-    _assert_same_files(
-        case,
-        'canonical',
-        {name: text.encode('utf-8') for name, text in canonical.items()},
-    )
-
-
 @pytest.mark.parametrize(
     'case',
     ['demo__yellow_fever_end_to_end', 'fill_dimension_data__tall_synthetic_join'],
@@ -95,10 +83,8 @@ def test_outputs_do_not_depend_on_hash_seed(case, tmp_path):
     assert first == second
 
 
-def test_gzip_and_lz4_inputs_read_the_same_rows(case_outputs):
-    gz_raw, _ = case_outputs('process_csv__tall_gzip')
-    lz4_raw, _ = case_outputs('process_csv__tall_lz4')
-    assert gz_raw == lz4_raw
+def test_gzip_and_lz4_inputs_read_the_same_rows(case_layers):
+    assert case_layers('process_csv__tall_gzip') == case_layers('process_csv__tall_lz4')
 
 
 def test_without_date_column_rows_are_dated_today(tmp_path):
@@ -129,14 +115,14 @@ def test_canonical_rows_keep_integer_and_float_apart():
     assert canonical_rows([{'val': 1}]) != canonical_rows([{'val': 1.0}])
 
 
-def test_canonical_rollup_explodes_collapsed_zero_fields():
+def test_contract_rollup_explodes_collapsed_zero_fields():
     rows = [
         {'StateName': 'Northvale', 'field': ['demo_a', 'demo_b'], 'val': 0},
         {'StateName': 'Northvale', 'field': 'demo_a', 'val': 2},
         {'StateName': 'Northvale', 'data': {'demo_c': 0.5}},
     ]
     facts = {}
-    for line in canonical_rollup(rows).splitlines():
+    for line in contract_rollup(rows).splitlines():
         fact = json.loads(line)
         assert fact['dimensions']['StateName'] == 'Northvale'
         facts[fact['dimensions']['field']] = (

@@ -95,8 +95,16 @@ def fixture_app() -> Flask:
     app.register_blueprint(dashboard_page)
     app.register_blueprint(PageRendererRouter().generate_blueprint())
 
+    # Other suites register the production class with their own Api; a Potion
+    # resource class binds to one Api, so this app serves a subclass.
+    class Storage(ThumbnailStorageResource):
+        api = None
+
+        class Meta:
+            name = 'storage'
+
     api = Api(app, decorators=[authentication_required(is_api_request=True)], prefix='/api2')
-    api.add_resource(ThumbnailStorageResource)
+    api.add_resource(Storage)
     return app
 
 

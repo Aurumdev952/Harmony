@@ -1,7 +1,7 @@
 ---
 wp: "0c"
 title: "Fix the pure-mistake bugs"
-status: claimed           # handover to backend-2 (decision 0001). core-1 wrote the tests, the patches and the SEC-4 decision.
+status: building          # backend-2 builds on mig/WP-0c-pure-mistake-bugs-backend (decision 0001). core-1 wrote the tests, the patches and the SEC-4 decision.
 owner_role: "backend"
 instances:
   - name: "core-1"
@@ -19,6 +19,11 @@ instances:
       - web/server/util/authentication.py
       - web/server/util/util.py
       - web/server/util/template_renderer.py
+      - web/server/routes/views/field.py
+      - tests/web/test_timeout_route.py
+      - tests/web/test_field_info_route.py
+      - tests/web/test_no_raw_queries_from_routes.py
+      - docs/modernisation/work/WP-0c.md
 branch: "mig/WP-0c-pure-mistake-bugs"
 requirements: [SEC-4, QA-1]
 contracts_consumed: [C-5]

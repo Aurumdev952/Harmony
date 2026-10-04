@@ -1,0 +1,4 @@
+{"count": "1", "end_date": "2021-06-01", "indicator_id": "demo_referral_reason_fever", "start_date": "2021-06-01"}
+{"count": "1", "end_date": "2021-06-01", "indicator_id": "demo_referral_reason_rash", "start_date": "2021-06-01"}
+{"count": "1", "end_date": "2021-06-02", "indicator_id": "demo_referral_reason_other_reason", "start_date": "2021-06-02"}
+{"count": "2", "end_date": "2021-06-02", "indicator_id": "demo_malaria_positive", "start_date": "2021-06-01"}

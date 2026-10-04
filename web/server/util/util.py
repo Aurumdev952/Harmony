@@ -29,7 +29,6 @@ INTERNAL_SERVER_ERROR = 'INTERNAL_SERVER_ERROR'
 ISO_DATETIME_FORMAT = '%Y-%m-%dT%H:%M:%S'
 SELECTIONS_DATETIME_FORMAT = '%Y-%m-%d'
 DATE_TIME_NOW = '@now'
-REMEMBER_COOKIE_NAME = 'remember_token'
 
 Node = collections.namedtuple('Node', ['original_dictionary', 'new_dictionary', 'key'])
 
@@ -309,9 +308,9 @@ def assert_string(value, argument_name=None, pattern=None):
             value_string = (
                 f'The value for \'{argument_name}\'' if argument_name else 'The value'
             )
-            message = (
-                '{prefix} does not match pattern ' '\'{pattern_string}\''
-            ).format(prefix=value_string, pattern_string=pattern_value)
+            message = '{prefix} does not match pattern \'{pattern_string}\''.format(
+                prefix=value_string, pattern_string=pattern_value
+            )
             raise ValueError(message)
 
 
@@ -477,7 +476,7 @@ def assert_equals(
             else str(that_value)
         )
         message = (
-            'Expected value {this_argument} to match value ' '{that_argument}.'
+            'Expected value {this_argument} to match value {that_argument}.'
         ).format(this_argument=this_argument, that_argument=that_argument)
         raise ValueError(message)
 
@@ -617,11 +616,6 @@ def assert_users_exist(value):
 
 def construct_recursive_dictionary():
     return collections.defaultdict(construct_recursive_dictionary)
-
-
-def is_session_persisted():
-    cookie_name = current_app.config.get('REMEMBER_COOKIE_NAME', REMEMBER_COOKIE_NAME)
-    return cookie_name in request.cookies
 
 
 class CachedRoute(Route):

@@ -1,0 +1,5 @@
+{
+  "description": "MAP with a time group: one datedData block per month.",
+  "endpoint": "map",
+  "policy": null
+}

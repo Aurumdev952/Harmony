@@ -1,0 +1,3 @@
+indicator_id,count,start_date,end_date
+demo_malaria_positive,1,2021-06-01,2021-06-01
+demo_malaria_tested,2,2021-06-01,2021-06-02

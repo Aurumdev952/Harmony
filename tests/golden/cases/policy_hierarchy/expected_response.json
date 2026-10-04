@@ -1,0 +1,40 @@
+{
+  "levels": [
+    "StateName",
+    "Sex"
+  ],
+  "root": {
+    "children": [
+      {
+        "children": [
+          {
+            "children": [],
+            "dimension": "Sex",
+            "metrics": {
+              "yellow_fever_cases": 329.0
+            },
+            "name": "F"
+          },
+          {
+            "children": [],
+            "dimension": "Sex",
+            "metrics": {
+              "yellow_fever_cases": null
+            },
+            "name": "M"
+          }
+        ],
+        "dimension": "StateName",
+        "metrics": {
+          "yellow_fever_cases": 304.9
+        },
+        "name": "Pará"
+      }
+    ],
+    "dimension": "",
+    "metrics": {
+      "yellow_fever_cases": 201.97
+    },
+    "name": "Overall"
+  }
+}

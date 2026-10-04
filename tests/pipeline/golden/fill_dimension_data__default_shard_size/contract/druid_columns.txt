@@ -1,0 +1,15 @@
+Age
+Death
+MunicipalityID
+MunicipalityLat
+MunicipalityLon
+MunicipalityName
+Real_Date
+Sex
+StateID
+StateLat
+StateLon
+StateName
+field
+source
+val

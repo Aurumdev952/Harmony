@@ -1,7 +1,7 @@
 '''Regenerate golden fixtures from each case's `case.json` and `request.json`.
 
     uv run python tests/golden/record.py              # every case
-    uv run python tests/golden/record.py bar_graph_sum  # named cases
+    uv run python tests/golden/record.py bar_graph_sum_by_state_month  # named cases
     uv run python tests/golden/record.py --check      # verify, write nothing
 
 Recording runs the current code and answers each Druid query with

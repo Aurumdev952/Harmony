@@ -150,9 +150,10 @@ def canonical_query(query: dict) -> dict:
 
     The query builder and the policy filter build several lists from Python sets,
     so their order follows PYTHONHASHSEED: `and`/`or` filter and having operands,
-    `in` values, regex alternatives and the aggregator list. Druid treats each of these as unordered;
-    the aggregator order only fixes the column order of array result rows, which
-    `CannedDruidClient` maps by name. Nothing else is reordered.'''
+    `in` values, regex alternatives and the aggregator list. Druid treats each of
+    these as unordered; the aggregator order only fixes the column order of array
+    result rows, which `CannedDruidClient` maps by name. Nothing else is
+    reordered.'''
     output = _canonical(json.loads(json.dumps(query)))
     if isinstance(output.get('aggregations'), list):
         output['aggregations'] = sorted(output['aggregations'], key=_aggregator_name)

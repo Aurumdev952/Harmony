@@ -23,3 +23,4 @@ A refused command runs nothing. Any follow-up command that depends on it then ru
 - For a clean checkout, use `git archive --format=tar -o /tmp/x.tar <sha>` alone, then extract it in a separate call.
 - Run one plain git command per call.
 - `python3 x.py` is blocked; use `uv run python x.py`.
+- To split a commit without `rebase -i`: `git switch -c tmp <parent>`, then for each new commit `git checkout <old-sha> -- <paths>` and commit. Check `git diff --cached --quiet <old-sha>`, run `git cherry-pick <old-sha>..<tip>`, check `git diff --quiet <old-tip>`, then `git branch -f <wp-branch> tmp`. Only on unpushed branches.

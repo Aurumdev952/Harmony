@@ -19,6 +19,19 @@ instances:
     files:
       - druid_setup/**
       - tests/druid_setup/**
+  - name: "core-3"
+    branch: "mig/WP-0b-ports-secrets-pins-core"
+    files:
+      - config/settings.py
+      - tests/core/test_settings_secret_key.py
+  - name: "backend-4"
+    branch: "mig/WP-0b-ports-secrets-pins-backend"
+    files:
+      - web/background_worker.py
+      - web/server/app.py
+      - web/server/configuration/**
+      - web/server/security/signal_handlers.py
+      - tests/web/**
 branch: "mig/WP-0b-ports-secrets-pins"
 requirements: [SEC-1, SEC-3, SEC-9]
 contracts_consumed: []
@@ -93,6 +106,7 @@ None.
 - 2026-10-04 infra-1 merge (review round 1): `mig/WP-0b-ports-secrets-pins-druid` 45de11e (fast-forward) and `mig/WP-0b-ports-secrets-pins-backend` 881138b merged; log conflict resolved keeping both sides.
 - 2026-10-04 infra-1 unit 11: dev Dockerfile frontend pinned to `docker/dockerfile:1.27.1@sha256:4edf897a3ffa55b89f906fc8cc78afdb3f1834cc9c7083565e611a8a7d5fe99e` (resolved with `docker buildx imagetools inspect`); check: new `test_dockerfiles.py` failed on the floating line, 5 passed on the pin; scratch build through the pinned frontend: correct `ADD --checksum` exit 0, one changed hex digit exit 1 `digest mismatch`; the built-in frontend (no `# syntax` line, Docker 29.8.2) behaves the same, but the pin keeps older developer Docker installs on a frontend that has `ADD --checksum`; `docker build --check` unchanged (2 pre-existing `LegacyKeyValueFormat`); dev `downloader` stage builds through the pinned frontend.
 - 2026-10-04 infra-1 unit 12: "Pipeline hosts" deployment note (required `DEFAULT_SECRET_KEY`; scheduled runs fail at Compose config time until it is set); check: all suites after units 11 and 12: `tests/core` + `tests/infra` + `tests/druid_setup` 104 passed; `tests/web` + `tests/infra` + `tests/druid_setup` on Python 3.8 123 passed.
+- 2026-10-04 infra-1 merge: `mig/integration` merged (agent-memory add/add conflicts resolved, keeping every entry; the stale "Druid ports still on 0.0.0.0" memory line dropped in favour of R4.6's). Declared core-3 and backend-4 as instances with their files in the front matter. The gate only counts log lines that begin with the date, and these log lines are bullets, so it was flagging their files as outside the owner role. Check: `task_gate.py WP-0b` lists only status and verdicts (Evidence). Suites: `tests/core` + `tests/infra` + `tests/druid_setup` 183 passed (this includes WP-0g's `tests/infra/test_browser_share.py`, now on the branch); on Python 3.8, `tests/web` + `tests/infra` + `tests/druid_setup` 123 passed with `--ignore=tests/infra/test_browser_share.py`. That file imports `enum.StrEnum`, which needs Python 3.11, so a 3.8 run cannot collect it. It is WP-0g's file and test; WP-2f's CI must run `tests/infra` on 3.13 and `tests/web` on 3.8 until WP-3b.
 - 2026-10-04 core-3 R1: `config/settings.py` refuses an unset, blank or `changeme` (case-insensitive, stripped) `DEFAULT_SECRET_KEY` at import with a `RuntimeError` naming the variable and `openssl rand -hex 32`; a real key passes through unchanged. Kept at import, not at the Flask read, because pipeline validate steps (`fetch_fields_from_database.py`, `update_db_datasource.py`) build a Flask app, so a lazy check would fail after indexing; no importer ran without the key before (it was `os.environ[...]`). Check: `uv run --no-project --with pytest pytest tests/core` 6 failed before, 7 passed after.
 - 2026-10-04 backend-4 R2: `get_broker_url` and the Flask Redis cache send `REDIS_PASSWORD` (URL-encoded in the broker URL, passed as `CACHE_REDIS_PASSWORD` to the cache); both refuse to start with a `RuntimeError` naming `REDIS_PASSWORD` when `REDIS_HOST` is set and the password is unset or empty; an explicit `BROKER_URL` and the no-Redis default are unchanged; check: `pytest tests/web/test_redis_password.py` 6 failed before, 9 passed after; Celery broker, result backend and Flask cache authenticated against a throwaway `redis:8.10.2` with password `p@ss:w/rd%#?&= x` (Evidence).
 - 2026-10-04 backend-4 R3: `JWT_SECRET_KEY` split from the session key. `FlaskConfiguration.SECRET_KEY` is `settings.DEFAULT_SECRET_KEY` only (the unchecked `SECRET_KEY` env override is gone, per core-3's note on R1). `initialize_jwt_manager` reads `JWT_SECRET_KEY` through `settings.require_secret` and refuses one equal to the session key, then sets it before `JWTManager(app)`; web calls it first in startup, before the database and Druid steps; the worker already calls it. Pipeline scripts build a `FlaskConfiguration` but never reach it, so the pipeline needs no JWT key. The request loader now treats a bad-signature token (an old cookie or API token) as anonymous, as it already did for an expired one; without that, every request carrying an old `accessKey` cookie failed with flask-jwt-extended's 422 "Signature verification failed", `/login` included; check: `pytest tests/web/test_jwt_secret_key.py` 9 failed before (8 for the split, 1 for the old cookie), 10 passed after; `create_app` under `SERVER_SOFTWARE=gunicorn` refuses unset, `ChangeMe` and equal keys and gets past the check with a valid one (Evidence).
@@ -338,6 +352,20 @@ down                containers and network removed, volumes kept (see Leftovers)
 ```
 
 `postgres:18.6` with the existing `/var/lib/postgresql/data` mount refuses to start ("The suggested container configuration for 18+ is to place a single mount at /var/lib/postgresql…"). `postgres:latest` has resolved to 18 since late 2025, so on `main` a fresh Druid host cannot start its metadata store, and an existing host breaks the next time it pulls.
+
+### Task gate (after merging `mig/integration`, 2026-10-04)
+
+`uv run python scripts/agents/task_gate.py WP-0b`:
+
+```
+status is "review", expected ready or done
+qa verdict is "changes-requested", expected approved
+reviewer verdict is "pending", expected approved
+security verdict is "changes-requested", expected approved
+exit=1
+```
+
+No ownership findings remain. The verdict rows are round 1, against c03a86d; round 2 is running against the fixes.
 
 ## For the security reviewer
 

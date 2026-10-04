@@ -1,0 +1,133 @@
+[
+  {
+    "aggregations": [
+      {
+        "aggregator": {
+          "fieldName": "count",
+          "name": "non_sketch_agg_count_for_having",
+          "type": "longSum"
+        },
+        "filter": {
+          "dimension": "field",
+          "type": "selector",
+          "value": "yellow_fever_cases"
+        },
+        "type": "filtered"
+      },
+      {
+        "aggregator": {
+          "fieldName": "count",
+          "name": "yellow_fever_cases_count",
+          "type": "longSum"
+        },
+        "filter": {
+          "dimension": "field",
+          "type": "selector",
+          "value": "yellow_fever_cases"
+        },
+        "type": "filtered"
+      },
+      {
+        "aggregator": {
+          "fieldName": "Real_Date",
+          "isInputThetaSketch": false,
+          "name": "yellow_fever_cases_date_count",
+          "size": 8192,
+          "type": "thetaSketch"
+        },
+        "filter": {
+          "dimension": "field",
+          "type": "selector",
+          "value": "yellow_fever_cases"
+        },
+        "type": "filtered"
+      },
+      {
+        "aggregator": {
+          "fieldName": "__time",
+          "name": "yellow_fever_cases_first_report",
+          "type": "doubleMin"
+        },
+        "filter": {
+          "dimension": "field",
+          "type": "selector",
+          "value": "yellow_fever_cases"
+        },
+        "type": "filtered"
+      },
+      {
+        "aggregator": {
+          "fieldName": "__time",
+          "name": "yellow_fever_cases_last_report",
+          "type": "doubleMax"
+        },
+        "filter": {
+          "dimension": "field",
+          "type": "selector",
+          "value": "yellow_fever_cases"
+        },
+        "type": "filtered"
+      }
+    ],
+    "context": {
+      "resultAsArray": true
+    },
+    "dataSource": "harmony_demo_20260101",
+    "dimensions": [
+      "StateName"
+    ],
+    "filter": {
+      "fields": [
+        {
+          "dimension": "StateName",
+          "type": "in",
+          "values": [
+            "Pará"
+          ]
+        },
+        {
+          "dimension": "__time",
+          "intervals": [
+            "2024-03-04/2024-03-18"
+          ],
+          "type": "interval"
+        },
+        {
+          "dimension": "field",
+          "type": "selector",
+          "value": "yellow_fever_cases"
+        },
+        {
+          "field": {
+            "dimension": "StateName",
+            "type": "selector",
+            "value": ""
+          },
+          "type": "not"
+        }
+      ],
+      "type": "and"
+    },
+    "granularity": "all",
+    "having": {
+      "havingSpecs": [
+        {
+          "aggregation": "non_sketch_agg_count_for_having",
+          "type": "greaterThan",
+          "value": 0
+        },
+        {
+          "aggregation": "yellow_fever_cases_date_count",
+          "type": "greaterThan",
+          "value": 0
+        }
+      ],
+      "type": "or"
+    },
+    "intervals": [
+      "2024-03-04/2024-03-18"
+    ],
+    "postAggregations": [],
+    "queryType": "groupBy"
+  }
+]

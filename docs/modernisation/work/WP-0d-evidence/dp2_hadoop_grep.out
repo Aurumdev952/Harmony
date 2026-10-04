@@ -1,0 +1,58 @@
+pipeline: 0
+prod: 0
+docker: 0
+Makefile: 0
+scripts: 0
+.github: 0
+.gitlab-ci.yml: absent
+.circleci: absent
+druid_setup: 0
+config: 0
+web: 0
+data: 0
+db: 0
+util: 0
+models: 0
+log: 0
+--- whole repo (excluding docs, .claude, .git, node_modules, the deleted files) ---
+./tests/druid/test_hadoop_ingestion_removed.py:15:            'db.druid.indexing.legacy_task_builder',
+./tests/druid/test_hadoop_ingestion_removed.py:16:            'db.druid.indexing.scripts.run_indexing',
+--- symbols defined in legacy_task_builder used elsewhere ---
+./db/druid/errors.py:11:class BadIndexingPathException(BaseDruidException):
+./db/druid/indexing/task_runner_util.py:14:from db.druid.errors import BadIndexingPathException, MissingDatasourceException
+./db/druid/indexing/task_runner_util.py:155:def _validate_file_path(path):
+./db/druid/indexing/task_runner_util.py:165:        raise BadIndexingPathException(f'{error_str} Path: {path}')
+./db/druid/indexing/task_runner_util.py:181:            _validate_file_path(absolute_path)
+./db/druid/indexing/task_runner_util.py:185:        raise BadIndexingPathException('No matching paths found for indexing!')
+--- docs mentions (informational, excluded from the check) ---
+docs/modernisation/work/WP-0d.md:30:| `db/druid/indexing/resources/**`, `db/druid/indexing/legacy_task_builder.py`, `db/druid/indexing/scripts/run_indexing.py` | data-platform |
+docs/modernisation/work/WP-0d.md:49:- **The Hadoop templates cannot be deleted on their own.** `db/druid/indexing/legacy_task_builder.py:17-22,64-66` reads `task_templates/index_hadoop.json.tmpl` and 
+docs/modernisation/work/WP-0d.md:77:- [ ] **data-platform**: delete the Hadoop ingestion path as one change: `db/druid/indexing/resources/task_templates/`, `db/druid/indexing/resources/tuning_configs/
+docs/modernisation/work/WP-0d.md:89:  - Note that the Hadoop deletion includes `legacy_task_builder.py` and `scripts/run_indexing.py`.
+docs/modernisation/work/WP-0d.md:116:- **The Hadoop templates** are reached only through `legacy_task_builder.py`, which only `scripts/run_indexing.py` imports, and nothing references that script.
+docs/modernisation/work/WP-0d.md:144:  - `db.druid.indexing.legacy_task_builder`
+docs/modernisation/work/WP-0d.md:145:  - `db.druid.indexing.scripts.run_indexing`, which already failed on base with `KeyError: 'DRUID_HOST'`
+docs/modernisation/work/WP-0d-evidence/sweep-web-base.tsv:193:db.druid.indexing.legacy_task_builder	OK
+docs/modernisation/work/WP-0d-evidence/sweep-web-base.tsv:199:db.druid.indexing.scripts.run_indexing	ERR KeyError: 'DRUID_HOST'
+docs/modernisation/work/WP-0d-evidence/wp0d_dead.out:65:## Hadoop task templates / on_prem.json / legacy builder
+docs/modernisation/work/WP-0d-evidence/wp0d_dead.out:66:./db/druid/indexing/scripts/run_indexing.py:4:# ZEN_ENV='something' ./run_indexing.py \
+docs/modernisation/work/WP-0d-evidence/wp0d_dead.out:67:./db/druid/indexing/scripts/run_indexing.py:19:from db.druid.indexing.legacy_task_builder import DruidIndexingTaskBuilder
+docs/modernisation/work/WP-0d-evidence/wp0d_dead.out:68:./db/druid/indexing/scripts/run_indexing.py:44:) -> DruidIndexingTaskBuilder:
+docs/modernisation/work/WP-0d-evidence/wp0d_dead.out:69:./db/druid/indexing/scripts/run_indexing.py:60:    return DruidIndexingTaskBuilder(
+docs/modernisation/work/WP-0d-evidence/wp0d_dead.out:70:./db/druid/indexing/legacy_task_builder.py:18:    'db/druid/indexing/resources/task_templates/index_hadoop.json.tmpl'
+docs/modernisation/work/WP-0d-evidence/wp0d_dead.out:71:./db/druid/indexing/legacy_task_builder.py:22:    'db/druid/indexing/resources/tuning_configs/on_prem.json'
+docs/modernisation/work/WP-0d-evidence/wp0d_dead.out:72:./db/druid/indexing/legacy_task_builder.py:63:class DruidIndexingTaskBuilder:
+docs/modernisation/work/WP-0d-evidence/wp0d_dead.sh:18:echo "## Hadoop task templates / on_prem.json / legacy builder"
+docs/modernisation/work/WP-0d-evidence/wp0d_dead.sh:19:"${G[@]}" "task_templates|on_prem\.json|legacy_task_builder|DruidIndexingTaskBuilder|scripts/run_indexing|scripts\.run_indexing|run_indexing\.py"
+docs/modernisation/work/WP-0d-evidence/combined.diff:1:Only in base/db/druid/indexing: legacy_task_builder.py
+docs/modernisation/work/WP-0d-evidence/combined.diff:2:Only in base/db/druid/indexing/resources: task_templates
+docs/modernisation/work/WP-0d-evidence/combined.diff:3:Only in base/db/druid/indexing/resources: tuning_configs
+docs/modernisation/work/WP-0d-evidence/combined.diff:4:Only in base/db/druid/indexing/scripts: run_indexing.py
+docs/modernisation/work/WP-0d-evidence/dp2_hadoop_grep.out:18:./tests/druid/test_hadoop_ingestion_removed.py:15:            'db.druid.indexing.legacy_task_builder',
+docs/modernisation/work/WP-0d-evidence/dp2_hadoop_grep.out:19:./tests/druid/test_hadoop_ingestion_removed.py:16:            'db.druid.indexing.scripts.run_indexing',
+docs/modernisation/work/WP-0d-evidence/dp2_hadoop_grep.out:20:--- symbols defined in legacy_task_builder used elsewhere ---
+docs/modernisation/work/WP-0d-evidence/dp2_hadoop_grep.sh:4:P='legacy_task_builder|run_indexing\b|task_templates|index_hadoop|on_prem\.json|tuning_configs|DruidIndexingTaskBuilder|index_hadoop_nested_
+docs/modernisation/work/WP-0d-evidence/dp2_hadoop_grep.sh:5:SELF='^(\./)?db/druid/indexing/(legacy_task_builder\.py|scripts/run_indexing\.py|resources/task_templates/)'
+docs/modernisation/work/WP-0d-evidence/dp2_hadoop_grep.sh:14:echo '--- symbols defined in legacy_task_builder used elsewhere ---'
+docs/modernisation/work/WP-0d-evidence/dp2_hadoop_grep.sh:15:grep -rnE "BadIndexingPathException|build_input_spec|_validate_file_path|STATIC_FILE_SPEC|MULTI_INPUT_SPEC" --include='*.py' . --exclude-di
+docs/modernisation/phase-0-security-and-subtraction.md:52:  - Delete the Hadoop task templates (`db/druid/indexing/resources/task_templates`, `tuning_configs/on_prem.json`) together with `legacy_task_

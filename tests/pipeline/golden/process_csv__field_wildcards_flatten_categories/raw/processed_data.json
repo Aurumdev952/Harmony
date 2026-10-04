@@ -1,0 +1,2 @@
+{"key": {"StateName": "Northvale", "MunicipalityName": "Ashford"}, "data": {"demo_malaria_positive": 6, "demo_referral_reason_fever": 2, "demo_referral_reason_rash": 1}, "Real_Date": "2021-06-01", "source": "demo_wildcard"}
+{"key": {"StateName": "Southmere", "MunicipalityName": "Cedar Point"}, "data": {"demo_malaria_positive": 1, "demo_referral_reason_other_reason": 1}, "Real_Date": "2021-06-02", "source": "demo_wildcard"}

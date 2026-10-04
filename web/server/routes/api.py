@@ -15,17 +15,15 @@ from flask import (
     send_file,
 )
 from flask_login import current_user, logout_user
-from flask_jwt_extended import get_jwt_claims
+from flask_jwt_extended import get_jwt_claims, unset_jwt_cookies
 from pylib.file.file_utils import FileUtils
 
 # pylint: disable=E0611
 # werkzeug does contain the secure_filename function.
 from werkzeug import secure_filename
-from werkzeug.exceptions import InternalServerError
 
 import web.server.routes.views.aggregate
 import web.server.routes.views.authorization
-import web.server.routes.views.dimension
 from log import LOG
 from db.postgres.utils import make_temp_directory
 from models.alchemy.query import Field
@@ -42,7 +40,7 @@ from web.server.routes.views.authorization import (
     authorization_required,
     is_authorized_api,
 )
-from web.server.routes.views.field import FieldsApi
+from web.server.routes.views.field import get_field_summaries
 from web.server.routes.views.validate_data_catalog import (
     update_data_catalog_import_date,
     validate_import_file,
@@ -52,7 +50,9 @@ from web.server.routes.views.validate_data_catalog import (
 )
 from web.server.security.permissions import ROOT_SITE_RESOURCE_ID
 from web.server.util.data_catalog import populate_fields, zip_data_catalog_metadata
-from web.server.util.util import Success, is_session_persisted, unauthorized_error
+from web.server.util.authentication import is_session_persisted
+from web.server.util.hasura import build_hasura_headers
+from web.server.util.util import Success, unauthorized_error
 
 # Endpoints in this file should have minimal logic; serialization should happen elsewhere.
 # TODO: move serializing to upstream files
@@ -62,21 +62,9 @@ MAX_DATA_CATALOG_UPLOAD_SIZE_BYTES = 5 * 1024**2  # disallow files larger than 5
 
 
 class ApiRouter:
-    def __init__(
-        self,
-        template_renderer,
-        configuration_module,
-        fields_api=None,
-    ):
+    def __init__(self, template_renderer, configuration_module):
         self.template_renderer = template_renderer
         self.configuration_module = configuration_module
-
-        if not fields_api:
-            row_count_lookup = current_app.druid_context.row_count_lookup
-
-            fields_api = FieldsApi(row_count_lookup)
-
-        self.fields_api = fields_api
 
     @authentication_required(is_api_request=True)
     def api_is_authorized(self):
@@ -111,22 +99,13 @@ class ApiRouter:
         return web.server.routes.views.aggregate.health_check()
 
     @authentication_required(is_api_request=True)
-    def api_dimension_info(self, dimension_name, dimension_value):
-        response = current_app.druid_context.data_time_boundary.get_dimension_summary(
-            dimension_name, dimension_value
-        )
-        if response:
-            return jsonify(Success(response))
-        raise InternalServerError('Dimension lookup failed.')
-
-    @authentication_required(is_api_request=True)
     def api_field_info(self, field_ids):
-        field_ids_sep = set(field_ids.split(','))
-        ret = {}
-        for field_id in field_ids_sep:
-            summary = self.fields_api.get_field_summary(field_id)
-            ret[field_id] = summary.to_json()
-        return jsonify(Success(ret))
+        summaries = get_field_summaries(set(field_ids.split(',')))
+        return jsonify(
+            Success(
+                {field_id: summary.to_json() for field_id, summary in summaries.items()}
+            )
+        )
 
     def timeout_user_session(self):
         automatic_signout_enabled = get_configuration(AUTOMATIC_SIGN_OUT_KEY)
@@ -137,7 +116,9 @@ class ApiRouter:
             and automatic_signout_enabled
         ):
             logout_user()
-            return jsonify({'data': {'timeout': True}})
+            response = jsonify({'data': {'timeout': True}})
+            unset_jwt_cookies(response)
+            return response
         return jsonify({'data': {'timeout': False}})
 
     @authentication_required(is_api_request=True)
@@ -171,7 +152,17 @@ class ApiRouter:
             if not query.startswith('query patchDimensionServiceQuery'):
                 return Response('You are not authorized to perform this query', 401)
 
-        resp = requests.post(hasura_relay_endpoint, json=data, timeout=120)
+        admin_secret = current_app.config.get('HASURA_ADMIN_SECRET')
+        if not admin_secret:
+            LOG.error('HASURA_ADMIN_SECRET is not set; refusing to proxy to Hasura')
+            return Response('GraphQL endpoint is not configured', 503)
+
+        resp = requests.post(
+            hasura_relay_endpoint,
+            json=data,
+            headers=build_hasura_headers(current_user, admin_secret),
+            timeout=120,
+        )
         return Response(resp.content, resp.status_code)
 
     def proxy_hasura_health(self):
@@ -379,13 +370,6 @@ class ApiRouter:
             self.api_is_authorized_multi,
             methods=['POST'],
         )
-        api.add_url_rule(
-            '/api/dimension/<dimension_name>/<dimension_value>',
-            'dimension_info',
-            self.api_dimension_info,
-            methods=['GET'],
-        )
-
         api.add_url_rule(
             '/api/field/<field_ids>',
             'api_field_ids',

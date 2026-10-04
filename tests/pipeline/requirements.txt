@@ -1,0 +1,11 @@
+pylib @ git+https://github.com/room77/py77.git@70280110ec342a6f6db1c102e96756fcc3c3c01b
+python-slugify==8.0.4
+unidecode==1.1.1
+python-dateutil==2.9.0.post0
+related==0.7.3
+attrs==21.4.0
+six==1.17.0
+future==0.18.3
+contextlib2==21.6.0
+pytest==8.4.2
+hypothesis==6.91.0

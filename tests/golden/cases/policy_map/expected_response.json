@@ -1,0 +1,33 @@
+{
+  "adminBoundaryExcludeLocations": [],
+  "adminBoundaryIncludeLocations": [],
+  "data": [
+    {
+      "date": "2024-01-01",
+      "datedData": [
+        {
+          "dimensions": {
+            "MunicipalityName": "Belém",
+            "StateName": "Pará"
+          },
+          "lat": "-1.4558",
+          "lng": "-48.4902",
+          "metrics": {
+            "yellow_fever_cases": null
+          }
+        },
+        {
+          "dimensions": {
+            "MunicipalityName": "Conceição do Araguaia",
+            "StateName": "Pará"
+          },
+          "lat": "-8.2578",
+          "lng": "-49.2647",
+          "metrics": {
+            "yellow_fever_cases": 243.0
+          }
+        }
+      ]
+    }
+  ]
+}

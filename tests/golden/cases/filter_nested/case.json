@@ -1,0 +1,5 @@
+{
+  "description": "Nested AND, OR, NOT and IN filters.",
+  "endpoint": "table",
+  "policy": null
+}

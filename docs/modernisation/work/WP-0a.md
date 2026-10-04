@@ -7,6 +7,8 @@ instances:
   - name: "backend-1"
     files:
       - graphql/hasura/metadata/versions/latest/tables.yaml
+      - graphql/schema.graphql
+      - tests/graphql/test_hasura_permissions.py
       - web/server/routes/api.py
       - web/server/configuration/flask.py
       - web/server/util/hasura.py
@@ -47,15 +49,35 @@ All five units are done.
 ## Decisions and deviations
 
 - **Roles.** The proxy sends `user` for every signed-in user (session, API token with `*` needs, or header login) and `anonymous` for public-access visitors. Site admins also get `user`: the UI needs nothing more, and only the admin secret alone (scripts, console) reaches the `admin` role.
-- **`user` permissions** cover the 17 tables the 51 compiled Relay operations touch, with the operations they use (insert, select with aggregations, update for upserts, delete), all columns, no row filter. That preserves what signed-in users can do today (INV-3) in the UI, and removes their access to the other 28 tracked tables, for example `dashboard`, `alert_definitions`, `case*` and `pipeline_entity*`, which the UI never reads through GraphQL.
+- **`user` permissions** cover the 17 tables the 51 compiled Relay operations touch, with the operations they use (insert, select, update for upserts, delete), all columns, no row filter. Aggregations are allowed only on `category`, `field_category_mapping` and `unpublished_field_pipeline_datasource_mapping`, the three whose aggregates a compiled operation reads. `tests/graphql/test_hasura_permissions.py` pins the full (role, table, operation) set, the `anonymous` columns and the aggregation tables without needing Hasura. That preserves what signed-in users can do today (INV-3) in the UI, and removes their access to the other 28 tracked tables, for example `dashboard`, `alert_definitions`, `case*` and `pipeline_entity*`, which the UI never reads through GraphQL.
 - **Not tightened here (deliberate).** A signed-in user without `can_view_data_catalog`, `can_view_fields_setup` or `can_upload_data` can still edit catalog, field setup and upload rows through `/api/graphql`, as on main. Hasura takes one role per request, so per-permission enforcement needs either one role per permission combination or Flask-side parsing of every operation. WP-5e ports the catalog to FastAPI with `can()` checks and retires Hasura; tightening belongs there.
 - **`HASURA_GRAPHQL_UNAUTHORIZED_ROLE` is not set (deviation from the phase file).** With it set, a request without the secret is served as that role instead of being refused, which contradicts the phase's own check ("a direct curl to Hasura fails without the secret"). Public-access visitors reach Hasura only through the proxy, which sends the secret plus `X-Hasura-Role: anonymous`.
-- **Fail closed.** The proxy returns 503 when `HASURA_ADMIN_SECRET` is empty instead of calling Hasura unauthenticated. Web and worker processes still start, because the worker builds the same Flask config and never calls Hasura. The Compose file refuses to render without the secret (requested below). Hasura treats an empty `HASURA_GRAPHQL_ADMIN_SECRET` as unset, which is why the `:?` guard matters.
+- **Fail closed.** The proxy returns 503 when `HASURA_ADMIN_SECRET` is empty instead of calling Hasura unauthenticated. Web and worker processes still start, because the worker builds the same Flask config and never calls Hasura. The Compose file refuses to render without the secret (requested below). The `:?` guard matters because Hasura does not treat an empty `HASURA_GRAPHQL_ADMIN_SECRET` as unset: the empty string becomes the secret, and a request carrying an empty `X-Hasura-Admin-Secret` header gets admin. Reproduced on v2.45.8 with the secret set to `''`, on `/v1/metadata`: no header 401, wrong header 401, empty header 200.
 - **Metadata stays in the v2 format** under `versions/latest`. I did not copy the old `latest` into a versioned folder as `create_metadata_snapshot.sh` would. Git keeps the history, and phase 5 deletes the folder.
 - **Dev secret.** `runserver.py` creates a random secret once in `~/.config/harmony/hasura_admin_secret` (mode 0600) unless `HASURA_ADMIN_SECRET` is set. `start_hasura.sh` recreates the container when the image or secret changes, and binds 127.0.0.1 only.
-- **Upgrade and rollback.** v2.45.8 upgrades the v2.11 catalog in place (hdb_catalog version 47 to 48, metadata kept and consistent). There is no `downgrade` command in v2.45 CE. Metadata has no event triggers or actions, so hdb_catalog holds only metadata. Rollback: stop Hasura, `DROP SCHEMA hdb_catalog CASCADE`, start v2.11.3, and rerun main's `apply_metadata_snapshot.py`.
+- **Upgrade and rollback.** v2.45.8 upgrades the v2.11 catalog in place (hdb_catalog version 47 to 48, metadata kept and consistent). There is no `downgrade` command in v2.45 CE. Metadata has no event triggers or actions, so hdb_catalog holds only metadata. Rollback:
+  1. Stop Hasura, then run `DROP SCHEMA hdb_catalog CASCADE`.
+  2. Start Hasura **2.11.5 or later in the 2.11 line, not 2.11.3**. Keep `HASURA_GRAPHQL_ADMIN_SECRET` set from the same `HASURA_ADMIN_SECRET`, and keep the port unpublished. Rolling back the version must not roll back the lockdown.
+  3. Reapply this branch's metadata with this branch's `apply_metadata_snapshot.py`, so the `user` and `anonymous` roles survive.
+  4. Keep this branch's proxy code. It works unchanged on 2.11 (Evidence 4, the v2.11.3 run).
+- **Anonymous can still smuggle a read.** The proxy's prefix check (`query patchDimensionServiceQuery`) lets a signed-out visitor append a second *query* operation, chosen with `operationName`. Hasura now limits that operation to the `anonymous` columns: dimension `id`, `name` and `description`, dimension-category `id` and `name`, and mapping `id`. That is the data the public query already returns, but the nesting can be arbitrarily deep, because there is no depth or node limit. Two pre-WP-5e options:
+  - Have the proxy accept only the hashes of the compiled operation texts, which would also close the prefix check.
+  - Use Hasura's allowlist. This does not work here: it rejects the Relay `*_connection` queries the UI sends.
+  
+  I did neither here. Both change which documents the UI may send, so they need frontend-platform agreement. WP-5e removes the path.
 - **Lead-owned files in the diff.** `docs/modernisation/SPEC.md`, `scripts/agents/ownership.py` and decision 0001 come from merging `mig/decisions-0001-ownership`, as the lead instructed. `task_gate.py` flags them until that branch reaches `main`.
 - **Deploy order.** The branch code, the Compose change and a `HASURA_ADMIN_SECRET` in each deployment's `.env` must ship together. If the code ships alone, `initialize_new_container.sh` exits on the metadata step (no secret), and the proxy answers 503. This is intended: it fails closed.
+
+## Invariant impact (INV-2, INV-3)
+
+| Area | Before (main) | After (this branch) | Invariant | Status |
+|---|---|---|---|---|
+| Query results | Druid queries do not pass through Hasura | unchanged | INV-2 | no change |
+| Signed-in UI operations (all 51 compiled) | Hasura admin | role `user`; identical responses (Evidence 4) | INV-3 | no change |
+| Signed-in access to 28 tables the UI never uses (`dashboard`, `alert_definitions`, `case*`, `pipeline_entity*`, ...) | read and write as admin | none | INV-3 | **tightened on purpose; human acceptance requested** |
+| Signed-out visitors, public access on | any query or mutation via a smuggled second operation | reads of 6 public columns only | INV-3 | **tightened on purpose** |
+| Error bodies | admin errors can carry `extensions.internal` (SQL and statement detail) | users are not admin, so it is withheld | INV-3 (information) | reported by the reviewer. My probes (constraint violation, data exception, invalid regex) showed the same body on both sides, so the difference only shows for error classes Hasura reports with `internal` |
+| Per-permission checks (`can_view_data_catalog` and others) on GraphQL edits | not enforced | not enforced | INV-3 | unchanged; WP-5e |
 
 ## Contract changes
 
@@ -87,7 +109,47 @@ None.
 - [ ] infra: add `HASURA_ADMIN_SECRET=` to `.env.example`, with a note to generate it (for example `openssl rand -base64 32`) and that it must differ from the other secrets. I could not read `.env.example` (settings deny `.env*`), so check placement yourself.
   - infra-4: not done. Agents cannot read `.env.example` either, so this is left for the human. Every deployment's `.env`, and every developer's for `make up DEV=1`, needs `HASURA_ADMIN_SECRET` before this branch lands, because Compose now refuses to render without it.
 - [ ] infra (WP-0b, for whichever branch lands second): `tests/infra/test_compose.py` on `mig/WP-0b-ports-secrets-pins` needs `'HASURA_ADMIN_SECRET'` in `BASE_ENV` and `hasura` removed from `PUBLISHED_UNTIL_WP_0A` and `UNPINNED_UNTIL_DECIDED`. A trial merge of the two branches is clean, and with those three edits both suites pass (56 passed). Without them, 12 WP-0b tests fail because the config does not render.
-- [ ] qa: run `verify` on Data Catalog, Field Setup and Data Upload (load and save) on a running stack. This environment has no built web client. Every compiled Relay operation was replayed through the real Flask proxy instead (Evidence 4). Consider adopting `scripts/db/hasura/replay_relay_operations.py` into `tests/contract/`.
+- [x] qa: run `verify` on Data Catalog, Field Setup and Data Upload (load and save) on a running stack. Done by qa-0a at f4db7c1: all three pages load and save. The remaining suggestion, moving `scripts/db/hasura/replay_relay_operations.py` into `tests/contract/`, is open for qa.
+- [ ] infra (round 2, blocks the security fix for item 9; the ownership hook blocked my edit): in `docker-compose.yaml`, switch to the CE image, enable only the graphql and metadata APIs, and correct the empty-secret comment. Update the digest in `tests/infra/test_compose_hasura.py` in the same commit:
+
+  ```diff
+     hasura:
+  -    image: hasura/graphql-engine:v2.45.8.cli-migrations-v2@sha256:c23e41af28e4c8e27bf6b6e82a5ecdd5b3ba3bb373833f92f5136e25b0ad45c6
+  +    image: hasura/graphql-engine:v2.45.8-ce.cli-migrations-v2@sha256:18b39122f207afa4fe7116acaa6484ddac69c2160fde0571e3a27abf924e0bec
+       # No published port: only web reaches Hasura, over the Compose network.
+       environment:
+         HASURA_GRAPHQL_ENABLE_TELEMETRY: 'false'
+         HASURA_GRAPHQL_ENABLE_CONSOLE: 'false'
+         HASURA_GRAPHQL_DEV_MODE: 'false'
+  +      # Relay (/v1beta1/relay) is part of the graphql API; metadata is for apply_metadata_snapshot.py.
+  +      HASURA_GRAPHQL_ENABLED_APIS: graphql,metadata
+         HASURA_GRAPHQL_MIGRATIONS_SERVER_TIMEOUT: 500
+         HASURA_GRAPHQL_DATABASE_URL: ${DATABASE_URL}
+  -      # Hasura treats an empty secret as no secret, so refuse to start without one.
+  +      # An empty value would make the empty string the secret, so that a request with an
+  +      # empty X-Hasura-Admin-Secret header gets admin. Refuse to start without a real one.
+         HASURA_GRAPHQL_ADMIN_SECRET: ${HASURA_ADMIN_SECRET:?...unchanged...}
+  ```
+
+  ```diff
+   # tests/infra/test_compose_hasura.py, lines 20-21
+  -    'hasura/graphql-engine:v2.45.8.cli-migrations-v2'
+  -    '@sha256:c23e41af28e4c8e27bf6b6e82a5ecdd5b3ba3bb373833f92f5136e25b0ad45c6'
+  +    'hasura/graphql-engine:v2.45.8-ce.cli-migrations-v2'
+  +    '@sha256:18b39122f207afa4fe7116acaa6484ddac69c2160fde0571e3a27abf924e0bec'
+  ```
+
+  Also consider asserting `HASURA_GRAPHQL_ENABLED_APIS == 'graphql,metadata'` in that test. I verified the exact values on the CE image (Evidence 10): relay, `/v1/graphql` and metadata apply all work, and `/v1/config`, `/v2/query`, pg_dump, `/dev/*`, `/v1/metrics` and `/console` return 404. The parity replay passes with them. `start_hasura.sh` (dev, mine) already uses the CE digest.
+- [ ] frontend-platform: regenerate six Relay artifacts against the new `graphql/schema.graphql` (role `user`):
+  - `useBatchParentCategoryChangeMutation`
+  - `CreateCalculationIndicatorViewMutation`
+  - `UpdateCategoryActionMutation`
+  - `UnpublishedFieldRowMutation`
+  - `useSelfServeMutation`
+  - `BatchPublishModalMutation`
+  
+  Only their Flow input-type declarations change: nested-insert paths into tables `user` cannot write are removed, and v2.45 adds aggregate filters. The operation text, AST, `cacheID` and runtime behaviour are identical (Evidence 11). Nothing breaks meanwhile: no CI step runs `relay-compiler`, and the build reads the committed artifacts. This does not block review.
+- [ ] human: accept the deliberate INV-3 change in the "Invariant impact" table. Signed-in users lose GraphQL access to 28 tables the UI never uses, and signed-out visitors lose the smuggled-operation path. Security asked for this acceptance to be recorded.
 - [ ] lead (for routing, outside this WP):
   - The base Compose file also publishes `web` on 5000 (SEC-1). WP-0b's list covers redis, worker and postgres only.
   - Locally, `scripts/create_user.py` fails with bcrypt 4.1+ and passlib ("password cannot be longer than 72 bytes"). bcrypt is unpinned, so a fresh image build can hit it. Pinning it belongs to infra or core.
@@ -100,8 +162,13 @@ None.
 - 2026-10-04 backend-1 unit 4: dev Hasura v2.45.8 on 127.0.0.1 with secret; check: no secret exit 1; started bound to `127.0.0.1:8088` with the pinned digest; rerun kept the container; a rotated secret recreated it; dev secret helper stable, mode 0600, env wins.
 - 2026-10-04 backend-1 unit 5: compose request verified on scratch copy; check: config refuses missing secret, Hasura publishes no port, host curl to 8088 fails, in-network requests without or with a wrong secret are refused, with the secret answer.
 - 2026-10-04 infra-4 compose request applied to `docker-compose.yaml` on `mig/WP-0a-lock-down-hasura-infra`; check: `tests/infra/test_compose_hasura.py` 17 passed (17 failed before the change), real bring-up of hasura plus a throwaway Postgres refused requests without the secret.
-
 - 2026-10-04 backend-1 merged `mig/WP-0a-lock-down-hasura-infra` (fast-forward to e01ab9b, no conflict); check: `pytest tests/web/server/test_hasura_proxy.py` 5 passed, `pytest tests/infra/test_compose_hasura.py` 17 passed.
+- 2026-10-04 backend-1 round 2, review fixes 1 to 11 except the Compose half of 2 and 9 (requested from infra). Checks:
+  - `test_hasura_proxy.py` plus `test_hasura_permissions.py`: 12 passed in a clean environment with only PATH and PYTHONPATH set.
+  - `check_role_permissions.py`: 0 failures on v2.11.3, v2.45.8 and v2.45.8-ce, each loaded with the branch metadata.
+  - Parity replay: 57 steps, 0 failures, 0 differences on both versions.
+  - `test_compose_hasura.py`: 17 passed.
+  - Relay compiler 10.1.0: validates every operation against the `user` schema.
 
 ## Evidence
 
@@ -145,7 +212,32 @@ Environment: throwaway Postgres 16 with all 142 Alembic revisions applied (`flas
      
      The project was torn down with `docker compose down`, and the containers and network were removed.
 
-Not done: a browser `verify` of the three pages (see the qa request) and `pstack:interrogate`. The proxy change touches no identity flow.
+10. **Round 2: CE image and enabled APIs.** `hasura/graphql-engine:v2.45.8-ce.cli-migrations-v2@sha256:18b39122f207afa4fe7116acaa6484ddac69c2160fde0571e3a27abf924e0bec` with `HASURA_GRAPHQL_ENABLED_APIS=graphql,metadata`:
+    - `/v1/version` returns `{"server_type":"ce","version":"v2.45.8-ce"}`. The startup log has no `license_info` line, which the non-CE tag logs.
+    - As `user`, `/v1beta1/relay` and `/v1/graphql` both answer `{"__typename":"query_root"}`, and `apply_metadata_snapshot.py` applies (it uses `/v1/metadata`).
+    - `/v1/config`, `/v2/query`, `/v1alpha1/pg_dump`, `/dev/plan_cache`, `/v1/metrics` and `/console` all return 404.
+    - `get_inconsistent_metadata` returns `is_consistent: true`. `check_role_permissions.py` reports 0 failures.
+    - Parity replay against this exact configuration, compared with main on v2.11.3: `57 steps, 0 failed`, `0 differences`. The v2.11.3 run with the branch metadata and the same enabled-APIs setting gives the same result.
+    - `start_hasura.sh` starts the CE digest bound to `127.0.0.1:8088`.
+11. **Round 2: Relay schema as `user`.** `sync_graphql_schema.sh` now runs `check_role_permissions.py --print-schema user`. The secret stays in `HASURA_ADMIN_SECRET`, and the command line carries only `--hasura_host` and `--print-schema`. The regenerated `graphql/schema.graphql` is byte-identical whether it comes from the CE image or the non-CE one.
+    - relay-compiler 10.1.0 with graphql 15.3.0, the yarn.lock versions, installed in a scratch directory and run on a copy of `web/client` with `--validate`:
+      - against main's schema: exit 0, so the artifacts are current;
+      - against the `user` schema: no validation errors, and 6 artifacts are out of date.
+    - Regenerating those 6 in the scratch copy changes only Flow input-type lines. No `text`, `cacheID`, `kind`, `concreteType` or `selections` line changes. See the frontend-platform request.
+12. **Round 2: the other fixes.**
+    - `check_role_permissions.py` pins `graphql-core==3.3.0`, with `check_role_permissions.py.lock` from `uv lock --script` (sha256 for the sdist and wheel).
+    - The strengthened `anonymous` assertion fired on the first run: it caught `EditableCalculationQuery`, which reads only public columns and is now an explicit, documented exemption. 0 failures after that.
+    - `tests/graphql/test_hasura_permissions.py`: 5 passed. Against main's metadata, 4 fail; the fifth (`backend_only`) passes vacuously because main has no inserts.
+    - `anonymous` asking for `dimension.authorizable` gets `field 'authorizable' not found in type: 'dimension'`.
+    - Public-access probe on the CE stack: the allowed query returns data, the smuggled mutation gets `no mutations exist`, and the probe row is kept.
+    - `apply_metadata_snapshot.py` against a fake Hasura on 127.0.0.1:
+      - the first two `/healthz` calls time out (ReadTimeout) and are retried;
+      - the POST times out and the script logs `Could not apply metadata ... Read timed out`, then exits 1. Before this fix it crashed with a traceback.
+    - `replay_relay_operations.py` refuses, with exit 2 and no rows written, when the flag is missing, when the database is unmarked, and when the database has another comment. The recipe id is now `-424242`.
+    - `runserver.py`: a new secret file is created with mode 0600. A 0644 file is refused with a `chmod 600` hint, and the environment is left unset. `HASURA_ADMIN_SECRET` from the environment still wins.
+    - pylint 10.00, black `-S` and ruff are clean on every changed Python file.
+
+`pstack:interrogate` was run by the reviewer (rev-0a), with three reviewers, on the proxy and role model. Its findings are folded into the round 2 fixes above.
 
 ## Verdicts
 

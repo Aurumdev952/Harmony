@@ -1,7 +1,7 @@
 ---
 wp: "2g"
 title: "Structured logging"
-status: building
+status: review
 owner_role: "infra"
 instances:
   - name: "infra-6"
@@ -16,6 +16,10 @@ instances:
       - "docker-compose.yaml"
       - "docker-compose.dev.yaml"
       - "docker-compose.pipeline.yaml"
+      - "docker/entrypoint_web.sh"
+      - "docker/web/scripts/initialize_new_container.sh"
+      - "docker/web/scripts/run_web_gunicorn.sh"
+      - "tests/infra/test_web_scripts_log_json.py"
       - "docs/modernisation/work/WP-2g.md"
   # Resumed by infra-7 after the host reboot; same branch, same files.
   - name: "backend-1"
@@ -71,6 +75,8 @@ None.
 ## Requests
 
 - [x] backend: in `web/gunicorn_server.py`, add `'logconfig_dict': logging_config()` (from `log.config`) to `options` in `main()`. Without it gunicorn keeps its own stderr handler and writes no access lines at all; with it, `gunicorn.error` and `gunicorn.access` go through the WP-2g handler as JSON, carrying the response's request id (proven live in unit 4). `GunicornApplication.load_config` overrides `Application.load_config`, so `GUNICORN_CMD_ARGS` cannot set it from Compose. (blocks the production effect of unit 4; units 5 and 6 proceed)
+- [ ] backend: wire unit 3 into the app. Today nothing outside tests calls it, so production requests get no `X-Request-ID` and tasks carry none. (a) In `web/server/app.py` `create_app()`, call `install_request_logging(app)` (from `log.flask_request`) last, so the middleware wraps every other `wsgi_app` wrapper. (b) In `web/server/workers/__init__.py` `create_celery()`, call `connect_celery_logging()` (from `log.celery_signals`). It runs in the web process, which publishes tasks, and in the worker, which runs them; `dispatch_uid` makes repeated calls harmless. (c) In `web/server/security/signal_handlers.py` `initialize_request_logger`, take the id from `log.context.current_request_id()` (falling back to `new_request_id()`) instead of `uuid4()`, so `g.request_id` and the `g.request_logger` field match the response header and the JSON lines. Proof: a `create_app()` test-client request returns `X-Request-ID` and its log lines carry it; a task published inside that request carries the id in its headers. (blocks `ready`, not review of the infra units)
+- [ ] core: in `web/server/migrations/env.py`, drop `fileConfig(config.config_file_name, disable_existing_loggers=False)`, and the `[loggers]`, `[handlers]` and `[formatters]` sections of `alembic.ini` that only it reads. During `flask db upgrade` in `initialize_new_container.sh` it swaps the root handler for a plain-text stderr handler, so the web container's first lines break the phase check `docker compose logs web | jq`. `log` is already configured when `web.server.app` is imported. Keep `sqlalchemy.engine` at WARNING and `alembic` at INFO with `logging.getLogger(...).setLevel(...)`, as the ini did. The ini's root WARN gives way to `LOG_LEVEL`. Proof: `flask db upgrade` against a scratch database writes only JSON lines with `LOG_FORMAT=json`. (blocks `ready` for the startup lines; request and worker lines are already JSON)
 
 ## Log
 
@@ -83,7 +89,21 @@ None.
 - 2026-10-04 infra-7 unit 4b (security review follow-up on the gunicorn wiring): reading gunicorn 20.0.4 turned up three leaks. `Error handling request <uri>` logs at ERROR with the client's whole query string. `NoMoreData`, `InvalidChunkSize` and `ChunkMissingTerminator` put raw request body bytes into messages and tracebacks. In text mode, access lines used gunicorn's own format: request line with query, referer, and the basic-auth user. Fixes in `log/config.py`: query strings stripped from every line `gunicorn.*` writes; the body echoes redacted everywhere, since they also surface in app tracebacks; text access lines built from the same method, path and status fields as JSON, with the response request id. Tests written first and seen failing (10 of 19): `tests/web/test_gunicorn_logging.py::test_access_lines_carry_no_query_header_or_cookie_secrets` (json and text; `token`, `api_key`, `password` and an arbitrary query value, `Authorization` Bearer and Basic with its user, `Cookie` with `session` and `accessKey`, a `Referer` with a token, `Set-Cookie`), `::test_error_lines_drop_query_strings`, `::test_error_lines_do_not_echo_request_bodies_or_headers` (five gunicorn errors, json and text), `::test_text_access_lines_carry_the_response_request_id`, plus body-echo cases in `tests/infra/test_log_format.py::test_redact_removes_secret_values`; check: 62 passed in those two files, `tests/web` plus `tests/infra/test_log_format.py` 173 passed on the 3.8 web env, ruff and mypy --strict clean (3.13 and 3.8), unit 4 live run unchanged (40 of 40, no query token, nothing on stderr).
 - 2026-10-04 infra-7 unit 5: Compose sets `LOG_FORMAT=json` and `LOG_STREAM=stdout` for web and worker, `LOG_FORMAT=json` for `etl-pipeline` (logs stay on stderr), and `LOG_FORMAT=text` for web, worker and pipeline in the dev overlay. nginx gets `LOG_FORMAT_ESCAPE=json` and a `LOG_FORMAT` with the app's top-level keys plus `http.host`, `client_ip` and `user_agent`; it uses `$uri`, so there are no query strings, and the request id comes from the upstream's response header. `prod/browser_share` reads the JSON lines next to the old `vhost` lines, so sessions continue across the switch. The live run also showed that nginx-proxy runs nginx under forego, which puts `nginx.1     | ` in ANSI colours before every line, also in `docker logs` without a TTY. WP-0g's parser read no line of real `docker logs <nginx>` output in either format; it now strips that prefix as well as Compose's. Tests first, seen failing: `tests/infra/test_compose_logging.py` (9 failed), the JSON tests in `tests/infra/test_browser_share.py` (3 failed), and the forego test (2 failed). Check: `tests/infra` 119 passed on the host env, `tests/infra/test_browser_share.py` 93 passed on 3.13; ruff, ruff format and mypy --strict add no findings (WP-0g's existing EXE001/ISC004/RUF100 findings are unchanged); shellcheck clean. The rendered `docker compose config` diff against HEAD shows only the logging variables ([unit5_compose_config_diff.txt](WP-2g-evidence/unit5_compose_config_diff.txt)). A throwaway nginx built from the production service definition (`extends`, loopback port only) proxied to a stub upstream: 3 JSON access lines, each with the upstream's request id and a numeric status, a quoted user agent escaped correctly, no `SEKRIT` query value anywhere in the raw output, and `browser_share.py` on the raw `docker logs` output counts 2 sessions (Chrome 126, Firefox 115) ([unit5_nginx_check.sh](WP-2g-evidence/unit5_nginx_check.sh), [unit5_nginx_access.jsonl](WP-2g-evidence/unit5_nginx_access.jsonl), [rendered log_format](WP-2g-evidence/unit5_nginx_log_format.txt)). Deferred to the nginx routing WPs (WP-5a/5h): nginx lines still carry Flask-User reset and confirm tokens in `$uri`. Redacting them needs an http-level `map`, which nginx-proxy only takes from a `conf.d` file on the host. The old `vhost` format logged the same paths plus every query string.
 
+- 2026-10-04 infra-7 unit 5b: the phase check is `docker compose logs web | jq`, and the web container's own startup scripts printed plain text. `docker/entrypoint_web.sh`, `docker/web/scripts/initialize_new_container.sh` and `docker/web/scripts/run_web_gunicorn.sh` now print JSON lines (`timestamp`, `level`, `logger` = script name, `message`) through a small `log_json` function. Tests first, seen failing (7 of 7): `tests/infra/test_web_scripts_log_json.py` (no plain `echo` left, each `log_json` writes one JSON line, and `run_web_gunicorn.sh` run through WP-0b's harness prints only JSON); check: those plus `tests/infra/test_run_web_gunicorn.py` 10 passed, shellcheck clean. Alembic's own text handler during `flask db upgrade` is requested from core under Requests.
+- 2026-10-04 infra-7 unit 6: wiring requests filed under Requests: backend for the Flask install, Celery signals and one request id in `signal_handlers`; core for Alembic's logging config. Status set to review.
+
 ## Evidence
+
+Each link below is cited with its check in the Log above.
+- Formats and redaction: `tests/infra/test_log_format.py`; a pipeline step's lines in [unit2_pipeline_step.jsonl](WP-2g-evidence/unit2_pipeline_step.jsonl).
+- Request ids, Flask and Celery: `tests/web/test_request_id_logging.py`; a real `create_app()` request in [unit3_real_app_request.jsonl](WP-2g-evidence/unit3_real_app_request.jsonl).
+- gunicorn: `tests/web/test_gunicorn_logging.py`, including the leak tests from unit 4b; live gevent run [unit4_run_live.sh](WP-2g-evidence/unit4_run_live.sh) with [unit4_gunicorn_gevent_live.jsonl](WP-2g-evidence/unit4_gunicorn_gevent_live.jsonl); backend's `web/gunicorn_server.py` run [before](WP-2g-evidence/backend_gunicorn_server_base.txt) and [after](WP-2g-evidence/backend_gunicorn_server_live.txt).
+- Compose and nginx: `tests/infra/test_compose_logging.py`, [unit5_compose_config_diff.txt](WP-2g-evidence/unit5_compose_config_diff.txt), live nginx [unit5_nginx_check.sh](WP-2g-evidence/unit5_nginx_check.sh) with [unit5_nginx_access.jsonl](WP-2g-evidence/unit5_nginx_access.jsonl).
+- Browser share: `tests/infra/test_browser_share.py`.
+
+Environments: the host env is `uv sync` on 3.9, run with `--with 'gunicorn[gevent]==20.0.4' --with 'setuptools<70'` for gunicorn. The 3.8 web env is `uv venv --seed --python 3.8`, then the venv's own `pip install -r requirements.txt -r requirements-web.txt 'pytest<8.4' freezegun`. `requirements-dev.txt` does not install on 3.8, and a hook blocks `uv pip`. The browser-share tests run on `uvx --python 3.13 --with pytest==8.4.2`.
+
+Deferrals: OpenTelemetry traces and `/metrics` go with FastAPI in WP-5a (BE-8's other half), and the liveness and readiness endpoints too, since they live under `/api/v3`. Flask-User tokens in nginx `$uri` go to WP-5a/5h (see unit 5).
 
 ## Verdicts
 

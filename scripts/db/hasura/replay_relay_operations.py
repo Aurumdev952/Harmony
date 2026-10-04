@@ -20,6 +20,7 @@ Environment: ZEN_ENV, DATABASE_URL, HASURA_HOST, HASURA_ADMIN_SECRET (branch
 code only), SERVER_SOFTWARE=gunicorn so the app registers its routes, and
 REPLAY_USERNAME / REPLAY_PASSWORD for an active user.
 '''
+
 import argparse
 import base64
 import glob
@@ -152,127 +153,181 @@ def steps(state):
         'timeWindow': '2020-01-01T00:00:00',
         'unsuccessfulFilter': {},
     }
-    yield 'CreateGroupModalMutation', {
-        'id': 'wp0a_group',
-        'name': 'Group',
-        'parentCategoryId': 'root',
-    }
-    yield 'CreateGroupModalMutation', {
-        'id': 'wp0a_group2',
-        'name': 'Group 2',
-        'parentCategoryId': 'root',
-    }
-    yield 'EditGroupModalMutation', {
-        'dbCategoryId': 'wp0a_group',
-        'newCategoryName': 'Group renamed',
-    }
-    yield 'CategoryGroupRowValueMutation', {
-        'dbId': 'wp0a_group',
-        'newName': 'Group',
-        'newVisibilityStatus': 'VISIBLE',
-    }
-    yield 'CreateCalculationIndicatorViewMutation', {
-        'id': 'wp0a_field',
-        'name': 'Field',
-        'shortName': 'F',
-        'description': 'd',
-        'calculation': CALC,
-        'categoryObj': [{'category_id': 'wp0a_group'}],
-        'isCopy': False,
-        'isNotCopy': True,
-        'copiedFromFieldId': '',
-    }
-    yield 'CreateCalculationIndicatorViewMutation', {
-        'id': 'wp0a_copy',
-        'name': 'Copy',
-        'shortName': 'C',
-        'description': 'd',
-        'calculation': CALC,
-        'categoryObj': [{'category_id': 'wp0a_group'}],
-        'isCopy': True,
-        'isNotCopy': False,
-        'copiedFromFieldId': 'wp0a_field',
-    }
+    yield (
+        'CreateGroupModalMutation',
+        {
+            'id': 'wp0a_group',
+            'name': 'Group',
+            'parentCategoryId': 'root',
+        },
+    )
+    yield (
+        'CreateGroupModalMutation',
+        {
+            'id': 'wp0a_group2',
+            'name': 'Group 2',
+            'parentCategoryId': 'root',
+        },
+    )
+    yield (
+        'EditGroupModalMutation',
+        {
+            'dbCategoryId': 'wp0a_group',
+            'newCategoryName': 'Group renamed',
+        },
+    )
+    yield (
+        'CategoryGroupRowValueMutation',
+        {
+            'dbId': 'wp0a_group',
+            'newName': 'Group',
+            'newVisibilityStatus': 'VISIBLE',
+        },
+    )
+    yield (
+        'CreateCalculationIndicatorViewMutation',
+        {
+            'id': 'wp0a_field',
+            'name': 'Field',
+            'shortName': 'F',
+            'description': 'd',
+            'calculation': CALC,
+            'categoryObj': [{'category_id': 'wp0a_group'}],
+            'isCopy': False,
+            'isNotCopy': True,
+            'copiedFromFieldId': '',
+        },
+    )
+    yield (
+        'CreateCalculationIndicatorViewMutation',
+        {
+            'id': 'wp0a_copy',
+            'name': 'Copy',
+            'shortName': 'C',
+            'description': 'd',
+            'calculation': CALC,
+            'categoryObj': [{'category_id': 'wp0a_group'}],
+            'isCopy': True,
+            'isNotCopy': False,
+            'copiedFromFieldId': 'wp0a_field',
+        },
+    )
     yield 'NameRowMutation', {'dbId': 'wp0a_field', 'newName': 'Field 2'}
     yield 'DescriptionRowMutation', {'dbId': 'wp0a_field', 'newDescription': 'd2'}
     yield 'ShortNameRowMutation', {'dbId': 'wp0a_field', 'newShortName': 'F2'}
     yield 'CalculationRowMutation', {'dbId': 'wp0a_field', 'newCalculation': CALC}
-    yield 'FieldCalculationSectionMutation', {
-        'dbId': 'wp0a_field',
-        'newCalculation': CALC,
-    }
-    yield 'VisibilityRowMutation', {
-        'dbCategoryId': 'wp0a_group',
-        'dbFieldId': 'wp0a_field',
-        'newVisibilityStatus': 'VISIBLE',
-    }
-    yield 'FieldRowValueMutation', {
-        'categoryId': 'wp0a_group',
-        'dbId': 'wp0a_field',
-        'newDescription': 'd3',
-        'newName': 'Field 3',
-        'newVisibilityStatus': 'VISIBLE',
-    }
-    yield 'useParentCategoryChangeForFieldMutation', {
-        'dbFieldId': 'wp0a_field',
-        'dbNewParentCategoryId': 'wp0a_group2',
-        'dbOriginalParentCategoryId': 'wp0a_group',
-        'insertNewMapping': False,
-    }
-    yield 'useParentCategoryChangeForFieldMutation', {
-        'dbFieldId': 'wp0a_copy',
-        'dbNewParentCategoryId': 'wp0a_group2',
-        'dbOriginalParentCategoryId': None,
-        'insertNewMapping': True,
-    }
-    yield 'useParentCategoryChangeForCategoryMutation', {
-        'dbCategoryId': 'wp0a_group2',
-        'dbNewParentCategoryId': 'wp0a_group',
-    }
-    yield 'useBatchParentCategoryChangeMutation', {
-        'dbCategoryIds': ['wp0a_group2'],
-        'dbFieldIds': ['wp0a_field'],
-        'dbNewParentCategoryId': 'wp0a_group3',
-        'dbOriginalParentCategoryId': 'root',
-        'insertNewCategory': True,
-        'insertNewMapping': False,
-        'newFieldMappingObjects': [],
-        'newParentCategoryName': 'Group 3',
-    }
-    yield 'useSelfServeMutation', {
-        'fileSummariesToUnlink': [],
-        'insertNewSource': True,
-        'selfServeSource': self_serve_source(
-            'wp0a_src', ['wp0a_unpub', 'wp0a_unpub2'], False
-        ),
-    }
-    yield 'useSelfServeMutation', {
-        'fileSummariesToUnlink': [],
-        'insertNewSource': True,
-        'selfServeSource': self_serve_source('wp0a_prep', ['wp0a_unpub3'], True),
-    }
-    yield 'useSelfServeMutation', lambda: {
-        'fileSummariesToUnlink': [state['file_summary']],
-        'insertNewSource': False,
-        'selfServeSource': self_serve_source(
-            'wp0a_src', ['wp0a_unpub'], False, state['source_pk']
-        ),
-    }
+    yield (
+        'FieldCalculationSectionMutation',
+        {
+            'dbId': 'wp0a_field',
+            'newCalculation': CALC,
+        },
+    )
+    yield (
+        'VisibilityRowMutation',
+        {
+            'dbCategoryId': 'wp0a_group',
+            'dbFieldId': 'wp0a_field',
+            'newVisibilityStatus': 'VISIBLE',
+        },
+    )
+    yield (
+        'FieldRowValueMutation',
+        {
+            'categoryId': 'wp0a_group',
+            'dbId': 'wp0a_field',
+            'newDescription': 'd3',
+            'newName': 'Field 3',
+            'newVisibilityStatus': 'VISIBLE',
+        },
+    )
+    yield (
+        'useParentCategoryChangeForFieldMutation',
+        {
+            'dbFieldId': 'wp0a_field',
+            'dbNewParentCategoryId': 'wp0a_group2',
+            'dbOriginalParentCategoryId': 'wp0a_group',
+            'insertNewMapping': False,
+        },
+    )
+    yield (
+        'useParentCategoryChangeForFieldMutation',
+        {
+            'dbFieldId': 'wp0a_copy',
+            'dbNewParentCategoryId': 'wp0a_group2',
+            'dbOriginalParentCategoryId': None,
+            'insertNewMapping': True,
+        },
+    )
+    yield (
+        'useParentCategoryChangeForCategoryMutation',
+        {
+            'dbCategoryId': 'wp0a_group2',
+            'dbNewParentCategoryId': 'wp0a_group',
+        },
+    )
+    yield (
+        'useBatchParentCategoryChangeMutation',
+        {
+            'dbCategoryIds': ['wp0a_group2'],
+            'dbFieldIds': ['wp0a_field'],
+            'dbNewParentCategoryId': 'wp0a_group3',
+            'dbOriginalParentCategoryId': 'root',
+            'insertNewCategory': True,
+            'insertNewMapping': False,
+            'newFieldMappingObjects': [],
+            'newParentCategoryName': 'Group 3',
+        },
+    )
+    yield (
+        'useSelfServeMutation',
+        {
+            'fileSummariesToUnlink': [],
+            'insertNewSource': True,
+            'selfServeSource': self_serve_source(
+                'wp0a_src', ['wp0a_unpub', 'wp0a_unpub2'], False
+            ),
+        },
+    )
+    yield (
+        'useSelfServeMutation',
+        {
+            'fileSummariesToUnlink': [],
+            'insertNewSource': True,
+            'selfServeSource': self_serve_source('wp0a_prep', ['wp0a_unpub3'], True),
+        },
+    )
+    yield (
+        'useSelfServeMutation',
+        lambda: {
+            'fileSummariesToUnlink': [state['file_summary']],
+            'insertNewSource': False,
+            'selfServeSource': self_serve_source(
+                'wp0a_src', ['wp0a_unpub'], False, state['source_pk']
+            ),
+        },
+    )
     yield 'NameInputMutation', {'fieldId': 'wp0a_unpub', 'name': 'Unpub'}
     yield 'ShortNameInputMutation', {'fieldId': 'wp0a_unpub', 'shortName': 'U'}
     yield 'DescriptionInputMutation', {'fieldId': 'wp0a_unpub', 'description': 'ud'}
     yield 'CalculationInputMutation', {'fieldId': 'wp0a_unpub', 'calculation': CALC}
     yield 'UpdateCalculationActionMutation', {'id': 'wp0a_unpub', 'calculation': CALC}
-    yield 'CategoryInputMutation', {
-        'categoryId': 'wp0a_group',
-        'unpublishedFieldId': 'wp0a_unpub',
-    }
-    yield 'UpdateCategoryActionMutation', {
-        'fieldCategoryMappingObjs': [
-            {'unpublished_field_id': 'wp0a_unpub2', 'category_id': 'wp0a_group'}
-        ],
-        'fieldIds': ['wp0a_unpub2'],
-    }
+    yield (
+        'CategoryInputMutation',
+        {
+            'categoryId': 'wp0a_group',
+            'unpublishedFieldId': 'wp0a_unpub',
+        },
+    )
+    yield (
+        'UpdateCategoryActionMutation',
+        {
+            'fieldCategoryMappingObjs': [
+                {'unpublished_field_id': 'wp0a_unpub2', 'category_id': 'wp0a_group'}
+            ],
+            'fieldIds': ['wp0a_unpub2'],
+        },
+    )
     for name in [
         'BatchPublishModalContentsQuery',
         'UnpublishedFieldsTableContainerQuery',
@@ -282,36 +337,47 @@ def steps(state):
     ]:
         yield name, {}
     yield 'UnpublishedFieldTableRowsQuery', {'pageSize': 10, 'searchText': ''}
-    yield 'UnpublishedFieldTableRowsPaginationQuery', {
-        'first': 10,
-        'after': None,
-        'searchText': 'wp0a',
-    }
-    yield 'BatchPublishModalMutation', {
-        'fieldIds': ['wp0a_unpub'],
-        'fieldObjects': [
-            {
-                'id': 'wp0a_unpub',
-                'name': 'Unpub',
-                'short_name': 'U',
-                'description': 'ud',
-                'calculation': CALC,
-                'field_category_mappings': {'data': [{'category_id': 'wp0a_group'}]},
-                'field_pipeline_datasource_mappings': {
-                    'data': [{'pipeline_datasource_id': 'wp0a_src'}]
-                },
-            }
-        ],
-    }
-    yield 'UnpublishedFieldRowMutation', {
-        'id': 'wp0a_unpub2',
-        'name': 'Unpub 2',
-        'shortName': 'U2',
-        'description': None,
-        'calculation': CALC,
-        'fieldCategoryMappings': [{'category_id': 'wp0a_group'}],
-        'fieldPipelineDatasourceMappings': [{'pipeline_datasource_id': 'wp0a_src'}],
-    }
+    yield (
+        'UnpublishedFieldTableRowsPaginationQuery',
+        {
+            'first': 10,
+            'after': None,
+            'searchText': 'wp0a',
+        },
+    )
+    yield (
+        'BatchPublishModalMutation',
+        {
+            'fieldIds': ['wp0a_unpub'],
+            'fieldObjects': [
+                {
+                    'id': 'wp0a_unpub',
+                    'name': 'Unpub',
+                    'short_name': 'U',
+                    'description': 'ud',
+                    'calculation': CALC,
+                    'field_category_mappings': {
+                        'data': [{'category_id': 'wp0a_group'}]
+                    },
+                    'field_pipeline_datasource_mappings': {
+                        'data': [{'pipeline_datasource_id': 'wp0a_src'}]
+                    },
+                }
+            ],
+        },
+    )
+    yield (
+        'UnpublishedFieldRowMutation',
+        {
+            'id': 'wp0a_unpub2',
+            'name': 'Unpub 2',
+            'shortName': 'U2',
+            'description': None,
+            'calculation': CALC,
+            'fieldCategoryMappings': [{'category_id': 'wp0a_group'}],
+            'fieldPipelineDatasourceMappings': [{'pipeline_datasource_id': 'wp0a_src'}],
+        },
+    )
     for name in [
         'BreadcrumbPathQuery',
         'CreateCalculationIndicatorViewQuery',
@@ -337,23 +403,32 @@ def steps(state):
         yield name, {'id': group}
     yield 'usePipelineTimesHistoricalPipelinesQuery', pipeline
     yield 'usePipelineTimesLastPipelineQuery', {'allSourcesName': 'All sources'}
-    yield 'usePipelineTimesLastSuccessfulPipelineQuery', {
-        'allSourcesName': 'All sources',
-        'unsuccessfulFilter': {},
-    }
+    yield (
+        'usePipelineTimesLastSuccessfulPipelineQuery',
+        {
+            'allSourcesName': 'All sources',
+            'unsuccessfulFilter': {},
+        },
+    )
     yield 'DeleteFieldModalMutation', {'dbFieldId': 'wp0a_copy'}
-    yield 'useDeleteSourceMutation', lambda: {
-        'selfServeSourceId': state['prep_pk'],
-        'sourceId': 'wp0a_prep',
-        'isDataprep': True,
-        'dataprepFlowId': state['prep_flow'],
-    }
-    yield 'useDeleteSourceMutation', lambda: {
-        'selfServeSourceId': state['source_pk'],
-        'sourceId': 'wp0a_src',
-        'isDataprep': False,
-        'dataprepFlowId': 0,
-    }
+    yield (
+        'useDeleteSourceMutation',
+        lambda: {
+            'selfServeSourceId': state['prep_pk'],
+            'sourceId': 'wp0a_prep',
+            'isDataprep': True,
+            'dataprepFlowId': state['prep_flow'],
+        },
+    )
+    yield (
+        'useDeleteSourceMutation',
+        lambda: {
+            'selfServeSourceId': state['source_pk'],
+            'sourceId': 'wp0a_src',
+            'isDataprep': False,
+            'dataprepFlowId': 0,
+        },
+    )
     yield 'DeleteCategoryModalMutation', {'dbCategoryId': 'wp0a_group3'}
 
 

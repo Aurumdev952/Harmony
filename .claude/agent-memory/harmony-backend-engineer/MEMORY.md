@@ -8,3 +8,4 @@
 - [Flask web tests](flask_web_tests.md) — run tests/web on py3.8, call handlers directly, worktree-guard and auth/policy traps
 - [Potion route test harness](potion_route_test_harness.md) — test /api2 routes through the real app on a throwaway Postgres; WP-0h authz traps
 - [Flask route tests in-process](flask-route-tests-in-process.md) — conftest double import, subclass Potion resources, AUTHORIZABLE_DIMENSIONS, urlbox recorder
+- [Post-WP-2f tooling](post_wp2f_tooling.md) — tests/web on plain uv py3.9, lint-gate and noqa traps, guard workarounds, graphql stub

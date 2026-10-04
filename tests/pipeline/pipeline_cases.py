@@ -234,7 +234,7 @@ def _cases() -> tuple[Case, ...]:
             steps=(
                 _self_serve_wrapper('clinic_survey'),
                 _self_serve_wrapper('outreach_log'),
-                Step(SUITE_DIR / 'self_serve_merge.sh', ('{out}',), shell=True),
+                Step(SUITE_DIR / 'self_serve_merge.sh', ('{out}',), bash=True),
                 SYNTHETIC_FILL,
             ),
         ),

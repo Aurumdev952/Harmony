@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 from datetime import timedelta
 from http.cookies import SimpleCookie
 
@@ -28,9 +30,13 @@ def fixture_app(app_signing_with) -> Flask:
     return app_signing_with('tests-web-placeholder-jwt-key')
 
 
-def _cookie_header_after_login(app: Flask, remember_me: bool) -> str:
+def _cookie_header_after_login(
+    app: Flask, remember_me: bool, expires: timedelta | None = None
+) -> str:
     with app.test_request_context('/api/login', method='POST'):
-        response = login_user('login_successful', 'analyst@example.org', remember_me)
+        response = login_user(
+            'login_successful', 'analyst@example.org', remember_me, expires
+        )
     jar: SimpleCookie = SimpleCookie()
     for header in response.headers.getlist('Set-Cookie'):
         jar.load(header)
@@ -63,3 +69,10 @@ def test_access_cookie_signed_with_another_key_is_not_persisted(app, app_signing
     assert not _persisted(
         app_signing_with('a-different-placeholder-key'), cookie_header
     )
+
+
+def test_expired_remember_me_token_is_not_persisted(app):
+    cookie_header = _cookie_header_after_login(
+        app, remember_me=True, expires=timedelta(seconds=-60)
+    )
+    assert not _persisted(app, cookie_header)

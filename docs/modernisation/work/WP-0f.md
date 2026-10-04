@@ -1,7 +1,7 @@
 ---
 wp: "0f"
 title: "One CI system, `main` branch, least-privilege Actions"
-status: review
+status: ready
 owner_role: "infra"
 instances:
   - name: "infra-2"
@@ -49,7 +49,7 @@ None.
   - **Targets it called.** It called underscore targets (`web_client_build`, ..., `etl_pipeline_push`), and no commit of the Makefile has ever defined those (`git log -S web_client_build -- Makefile` is empty). Hyphenated equivalents (`web-client-build`, ..., `all-push`) did exist, with `DOCKER_NAMESPACE?=zengineering`. So the Jenkinsfile as committed could not run. Someone may have run the hyphenated targets by hand.
   - **When the images last changed.** The Docker Hub API (`hub.docker.com/v2/repositories/zengineering/`) shows `harmony-web`, `harmony-web-client`, `harmony-web-server` and `harmony-etl-pipeline` last updated on 2023-11-16, the day the Jenkinsfile was added, and never since.
   - **Retiring the Jenkins credential.** If Jenkins still holds `docker-io-credentials`, retire it (security note).
-- [ ] lead: update README.md. Line 390 tells deployers to set `DOCKER_NAMESPACE=zengineering`, which makes `docker-compose.yaml` pull images frozen on 2023-11-16. Line 429 points "pre-built images" at hub.docker.com/zengineering. Change them to `ghcr.io/zenysis`, the compose default and the namespace CI pushes to, or drop the line so the default applies. Under "Custom Builds", mention `make push`. README is lead-owned. This is deferred from this WP and blocks nothing in it.
+- [x] lead: update README.md (done on `mig/integration` in `091e1eb`; README:390 now `ghcr.io/zenysis`, :439 mentions `make push`). Line 390 tells deployers to set `DOCKER_NAMESPACE=zengineering`, which makes `docker-compose.yaml` pull images frozen on 2023-11-16. Line 429 points "pre-built images" at hub.docker.com/zengineering. Change them to `ghcr.io/zenysis`, the compose default and the namespace CI pushes to, or drop the line so the default applies. Under "Custom Builds", mention `make push`. README is lead-owned. This is deferred from this WP and blocks nothing in it.
 
 ## Log
 
@@ -111,6 +111,12 @@ None.
   - `config --images` lists `ghcr.io/zenysis/harmony-{web-client,web-server,web,etl-pipeline}:latest` plus the local `harmony-dev-web:latest`, which `make push` does not push.
   - `make help` shows `push`.
   - Before the change, `make -n web-build` printed a build with `--build-arg NAMESPACE=zengineering` and no `IMAGE_PREFIX`.
+- **Task gate.** I ran it after merging `mig/integration` and setting `status: ready`:
+  ```
+  $ uv run python scripts/agents/task_gate.py WP-0f
+  WP-0f meets the definition of done gates
+  ```
+  Exit code 0.
 - **Not verified this session.** No PR run has happened yet: the branch is unpushed. The phase check ("every workflow goes green on a PR") stays open until the PR is opened. The image workflows run only on `push` to `main` and `workflow_dispatch`, so the only way to run them before merge is a manual dispatch. A dispatch on `mig/WP-0f-one-ci-system` would fail at `docker build -t`, because the branch name contains `/` (the pre-existing tag issue above). To exercise them before merge, dispatch from a branch name without a slash. Otherwise the first push to `main` after merge is the first run.
 
 ## Verdicts

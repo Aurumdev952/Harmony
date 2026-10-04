@@ -48,9 +48,9 @@ Each unit is one PR.
 - **Changes.**
   - Remove from the requirements files: Flask-Admin, graphene-sqlalchemy, Flask-GraphQL, dask, google-cloud-logging, segment-analytics-python, paramiko and its pins, fuzzywuzzy, jellyfish, editdistance.
   - Delete the empty `/graphql` route and its module (`web/server/routes/graphql_api.py`, `web/server/graphql/`).
-  - Delete the unused `/api/timeout` route.
-  - Delete the Hadoop task templates (`db/druid/indexing/resources/task_templates`, `tuning_configs/on_prem.json`).
-  - Point `web/client/util/graphql/zen_environment.js` at the Hasura environment, or delete it.
+  - `/api/timeout` is live (the client's inactivity sign-out posts to it); keep it.
+  - Delete the Hadoop task templates (`db/druid/indexing/resources/task_templates`, `tuning_configs/on_prem.json`) together with `legacy_task_builder.py`, which reads them at import, and `scripts/run_indexing.py`, which nothing references.
+  - Delete `web/client/util/graphql/zen_environment.js` and its re-export in `index.jsx`; nothing uses it.
 - **Verification.** Images build. Every page and every Potion resource still responds; use the smoke list in [testing.md](testing.md). `grep` confirms no imports of the removed packages.
 
 ## 0e. Delete dead frontend code and dependencies

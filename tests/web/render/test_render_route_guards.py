@@ -7,7 +7,7 @@ import json
 
 import pytest
 
-from tests.web.fakes import DASHBOARDS, DASHBOARD_SLUG, FakeDashboard, FakeRenderResponse
+from tests.web.render.fakes import DASHBOARDS, DASHBOARD_SLUG, FakeDashboard, FakeRenderResponse
 from web.server.routes.views.dashboard import get_email_attachments
 
 SLUG = DASHBOARD_SLUG

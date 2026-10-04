@@ -1,1 +1,3 @@
 - [Template render diff](template_render_diff.md) — prove Jinja template edits without a running app; known baseline failures
+- [JWT key rotation](jwt_key_rotation.md) — old accessKey cookies 422 every request unless bad signatures mean anonymous; JWT checks not in FlaskConfiguration
+- [Python 3.8 web tests](py38_web_tests.md) — running tests/web with uv on Flask 1.0; wrapper script for the worktree guard; loopback ports

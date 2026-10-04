@@ -214,7 +214,6 @@ scripts/druid/query/output/[^.]*
 playground/
 
 #Dask
-dask-worker-space/
 
 #mypy
 .dmypy.*

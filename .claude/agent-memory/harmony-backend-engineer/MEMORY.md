@@ -1,0 +1,1 @@
+- [Template render diff](template_render_diff.md) — prove Jinja template edits without a running app; known baseline failures

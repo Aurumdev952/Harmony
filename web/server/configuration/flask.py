@@ -22,8 +22,12 @@ DEFAULT_DATABASE_NAME = 'zenysis'
 DEFAULT_DB_URI = f'postgresql:///{DEFAULT_DATABASE_NAME}'
 
 
+JWT_SECRET_KEY_MIN_LENGTH = 32
+
+
 def require_jwt_secret_key(secret_key: str) -> str:
-    '''JWT_SECRET_KEY, refused when unset, blank, `changeme` or equal to `secret_key`.
+    '''JWT_SECRET_KEY, refused when unset, blank, `changeme`, equal to `secret_key`
+    or shorter than JWT_SECRET_KEY_MIN_LENGTH characters.
 
     Called when the JWT manager starts rather than in FlaskConfiguration, because
     pipeline scripts build a FlaskConfiguration but never sign or verify tokens.
@@ -33,6 +37,11 @@ def require_jwt_secret_key(secret_key: str) -> str:
         raise RuntimeError(
             'JWT_SECRET_KEY equals DEFAULT_SECRET_KEY; refusing to start. Set '
             'JWT_SECRET_KEY to a different random value, e.g. `openssl rand -hex 32`.'
+        )
+    if len(jwt_secret_key) < JWT_SECRET_KEY_MIN_LENGTH:
+        raise RuntimeError(
+            f'JWT_SECRET_KEY is shorter than {JWT_SECRET_KEY_MIN_LENGTH} characters; '
+            'refusing to start. Set it to a random value, e.g. `openssl rand -hex 32`.'
         )
     return jwt_secret_key
 

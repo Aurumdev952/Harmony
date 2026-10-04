@@ -1,3 +1,5 @@
+- [Running legacy Python tests](running-legacy-python-tests.md): uv ephemeral env for Flask 1.0 / py3.8 tests, hook workarounds, Flask-in-pytest trap
+- [WP-0c findings](wp-0c-findings.md): /api/timeout is live; system-client raw queries reachable from /api/field; remember_me JWT claim
 - [Phase-file dead claims](project_phase_file_dead_claims.md) — "unused" routes may be live via ZenClient (no /api/ in the call); verify before deleting
 - [Worktree shell guard](feedback_worktree_shell_guard.md) — command forms the isolation guard refuses and the workarounds that pass
 - [Pipeline builds a Flask app](pipeline_builds_flask_app.md) — validate steps run create_app, so Flask startup checks hit pipeline runs

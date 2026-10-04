@@ -1,0 +1,4 @@
+{"Real_Date": "2021-09-01", "data": {"clinic_survey_referrals": 1, "clinic_survey_visits_total": 20}, "key": {"MunicipalityName": "Ashford", "Sex": "F", "StateName": "Northvale"}, "source": "clinic_survey"}
+{"Real_Date": "2021-09-01", "data": {"outreach_log_households_reached": 40}, "key": {"MunicipalityName": "Ashford", "StateName": "Northvale"}, "source": "outreach_log"}
+{"Real_Date": "2021-09-02", "data": {"clinic_survey_visits_total": 5}, "key": {"MunicipalityName": "Cedar Point", "Sex": "M", "StateName": "Southmere"}, "source": "clinic_survey"}
+{"Real_Date": "2021-09-03", "data": {"outreach_log_households_reached": 15.5}, "key": {"MunicipalityName": "Brookline", "StateName": "Northvale"}, "source": "outreach_log"}

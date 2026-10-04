@@ -1,5 +1,5 @@
 {
-  "description": "Policy with an otherwise empty query filter (includeAll and includeNull, no interval filter): pins how the policy AND serialises. Today the posted filter is {\"type\": \"and\", \"fields\": [null, <policy>]}, which a real broker rejects; the recorded response is only what replay feeds the shaping code.",
+  "description": "Policy with an otherwise empty query filter (includeAll and includeNull, no interval filter): the posted filter is the policy filter alone (WP-0c and_policy_filter).",
   "endpoint": "table",
   "policy": {
     "query_policies": [

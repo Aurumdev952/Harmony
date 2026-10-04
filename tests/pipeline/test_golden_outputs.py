@@ -50,10 +50,17 @@ def test_every_case_has_a_golden_and_every_golden_a_case():
     assert golden_cases == set(CASES)
 
 
-def test_every_case_that_completes_pins_druid_rows():
+def test_every_case_that_completes_pins_druid_rows_and_the_digest():
+    """The digest is an interface: the data digest UI, populate_pipeline_run_metadata.py
+    and 20_sync_digest_files read it, so WP-8d must keep writing it."""
+    expected = {
+        'druid_rollup.jsonl',
+        'druid_columns.txt',
+        'metadata_digest_file.csv.jsonl',
+    }
     for name, case in CASES.items():
         if not case.aborts:
-            assert golden_files(name, 'contract'), f'{name} has no contract layer'
+            assert set(golden_files(name, 'contract')) == expected, name
 
 
 @pytest.mark.parametrize('layer', LAYERS)

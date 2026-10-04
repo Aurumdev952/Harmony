@@ -54,6 +54,7 @@ FIELD_COLUMN = 'field'
 # {"data": {field: val}} row for Druid's nestedJson parser.
 NESTED_DATA_COLUMN = 'data'
 ERROR_SUFFIX = '.error.txt'
+DIGEST_NAME = 'metadata_digest_file.csv'
 _ABSENT = object()
 
 
@@ -403,15 +404,19 @@ def canonicalise(raw: dict[str, bytes]) -> dict[str, str]:
 
 
 def contract(raw: dict[str, bytes]) -> dict[str, str]:
-    """The INV-2 contract: Druid rollup facts and the Druid column set."""
+    """The INV-2 contract: Druid rollup facts, the Druid column set, and the metadata
+    digest, which the data digest UI and populate_pipeline_run_metadata.py read."""
     if any(name.endswith(ERROR_SUFFIX) for name in raw):
         return {}
     shards = [data for name, data in raw.items() if DRUID_ROWS_PATTERN.match(name)]
     druid_rows = [row for data in shards for row in _json_lines(data)]
-    return {
+    files = {
         'druid_rollup.jsonl': contract_rollup(druid_rows),
         'druid_columns.txt': contract_columns(druid_rows),
     }
+    if DIGEST_NAME in raw:
+        files[f'{DIGEST_NAME}.jsonl'] = _canonical_csv(raw[DIGEST_NAME])
+    return files
 
 
 def golden_files(case_name: str, layer: str) -> dict[str, bytes]:

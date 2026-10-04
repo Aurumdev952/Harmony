@@ -6,8 +6,11 @@ owner_role: "backend"
 instances:
   - name: "core-1"
     files:
-      - tests/web/**
-      - tests/infra/test_compose_environment_names.py
+      - tests/web/test_api_routes.py
+      - tests/web/test_authorized_query_client.py
+      - tests/web/test_dashboard_unauthorized_redirect.py
+      - tests/web/test_session_persistence.py
+      - tests/web/conftest.py
       - web/server/data/time_boundary.py
       - docs/modernisation/work/WP-0c/**
   - name: "backend-2"
@@ -39,11 +42,7 @@ security_review: true
 - proved every fix in a scratch copy of the tree;
 - settled the `run_raw_query` question with `pstack:interrogate`.
 
-The fixes for paths core does not own are ready as patches:
-- `docs/modernisation/work/WP-0c/backend.patch` covers 7 files, including the deletion of the empty `views/dimension.py`.
-- `docs/modernisation/work/WP-0c/infra.patch` covers `docker-compose.pipeline.yaml`.
-
-Both pass `git apply --check` on branch head. Once both are applied, all 22 tests pass.
+core-1 left the fixes for paths core does not own as patches. backend-2 applied `docs/modernisation/work/WP-0c/backend.patch` in one commit per fix (units 2-5); the index matched the whole patch afterwards (`git apply -R --check --cached`). The compose fix (`infra.patch`) moved to WP-0b with its test (unit 1).
 
 ## How to run the tests
 
@@ -53,7 +52,7 @@ There is no `pyproject.toml` yet. The web server pins Python 3.8, Flask 1.0.1 an
 sed -E 's/^-e (git\+.*#egg=(.*))$/\2 @ \1/; s/#egg=.*$//' requirements.txt requirements-web.txt \
   | grep -v 'segment-analytics\|google-cloud-logging\|Flask-Admin\|graphene\|Flask-GraphQL' > /tmp/reqs.txt
 PYTHONPATH=$PWD uv run --no-project -p 3.8 --with-requirements /tmp/reqs.txt --with 'pytest<8' \
-  python -m pytest tests/web tests/infra -q -p no:cacheprovider -W ignore
+  python -m pytest tests/web -q -p no:cacheprovider -W ignore
 ```
 
 `tests/web/conftest.py` sets placeholder `DEFAULT_SECRET_KEY` and `DRUID_HOST`, and `ZEN_ENV=harmony_demo`, because the config modules read them at import time. It also provides `bare_flask_app`. Flask 1.0 cannot locate a test module loaded by pytest's rewrite hook, so the fixture passes the app's paths explicitly.
@@ -62,11 +61,14 @@ PYTHONPATH=$PWD uv run --no-project -p 3.8 --with-requirements /tmp/reqs.txt --w
 
 | Unit | Change | Owner | Regression test | State |
 |---|---|---|---|---|
-| 1 | `docker-compose.pipeline.yaml`: delete `POSTGRES_DB_URI:=${POSTGRES_DB_URI}` and its comment. Nothing reads that variable: Alembic's `env.py` uses `SQLALCHEMY_DATABASE_URI`, which the same service already sets from `DATABASE_URL`. | infra | `tests/infra/test_compose_environment_names.py` | test committed; `infra.patch` |
-| 2 | `dashboard.py:44`: redirect to `url_for('auth.unauthorized', locale=locale)`. The old code named the nonexistent `index.unauthorized` and returned a 500. It also forwarded `request.args` into `url_for`, so it must not be reintroduced (see the decision below). | backend | `tests/web/test_dashboard_unauthorized_redirect.py` (4 cases) | test committed; `backend.patch` |
-| 3 | `is_session_persisted` moves into `web/server/util/authentication.py`. It reads a signed `remember_me` claim from the token that authenticated the request, and `login_user` signs that claim. | backend | `tests/web/test_session_persistence.py` (8 cases) | test committed; `backend.patch` |
-| 4 | SEC-4: delete `AuthorizedQueryClient.run_raw_query` and make the wrapped client private (`_query_client`). | backend | `tests/web/test_authorized_query_client.py` | test committed; `backend.patch` |
-| 5 | Delete `/api/dimension/<name>/<value>`, which returns 500 on every call because it calls a method that never existed. Also delete its empty `views/dimension.py` and the unused `get_dimension_time_boundary`. | backend (route); core (time_boundary) | `tests/web/test_api_routes.py` | core part committed (`bd71d45`); route in `backend.patch` |
+| 1 | `docker-compose.pipeline.yaml`: delete `POSTGRES_DB_URI:=${POSTGRES_DB_URI}` and its comment. Nothing reads that variable: Alembic's `env.py` uses `SQLALCHEMY_DATABASE_URI`, which the same service already sets from `DATABASE_URL`. | infra | `tests/infra/test_compose_environment_names.py` (removed here; recoverable from `32dca82`) | **moved to WP-0b** (lead routing). Test and `infra.patch` removed from this branch. |
+| 2 | `dashboard.py:44`: redirect to `url_for('auth.unauthorized', locale=locale)`. The old code named the nonexistent `index.unauthorized` and returned a 500. It also forwarded `request.args` into `url_for`, so it must not be reintroduced (see the decision below). | backend | `tests/web/test_dashboard_unauthorized_redirect.py` (4 cases) | done (`638b9e4`) |
+| 3 | `is_session_persisted` moves into `web/server/util/authentication.py`. It reads a signed `remember_me` claim from the token that authenticated the request, and `login_user` signs that claim. | backend | `tests/web/test_session_persistence.py` (8 cases) | done: claim `68aa48d`, reader `ce12e99` |
+| 4 | SEC-4: delete `AuthorizedQueryClient.run_raw_query` and make the wrapped client private (`_query_client`). | backend | `tests/web/test_authorized_query_client.py` | done (`0cc1c6a`) |
+| 5 | Delete `/api/dimension/<name>/<value>`, which returns 500 on every call because it calls a method that never existed. Also delete its empty `views/dimension.py` and the unused `get_dimension_time_boundary`. | backend (route); core (time_boundary) | `tests/web/test_api_routes.py` | done: core `bd71d45`, route `abf1fa9` |
+| 6 | `/api/timeout` ends the session for real: unset the JWT cookies and log out of Flask-Login. Before, it only called `logout_user()`, and the next request signed the user back in from the 365-day `accessKey`. | backend | `tests/web/test_timeout_route.py` | planned |
+| 7 | SEC-4 open item 1: `/api/field/<ids>` validates ids, caps their number, and stops returning whole-datasource numbers to restricted users. | backend (route); core (lookups, by request) | `tests/web/test_field_info_route.py` | planned |
+| 8 | Structural guard: routes and Potion APIs do not reach the system query client, `run_raw_query` or `druid_context` lookups outside a justified allowlist. | backend | `tests/web/test_no_raw_queries_from_routes.py` | planned |
 
 ### Unit 3 design
 
@@ -145,8 +147,8 @@ C-5's token claims gain `user_claims.remember_me: bool`. The change is additive,
 
 ## Requests
 
-- [ ] **backend (backend-2):** apply `docs/modernisation/work/WP-0c/backend.patch` with `git apply`. Run the tests (see "How to run"), commit per unit, run `verify` (see Evidence), then set `status: review`. Blocks units 2-5. Note that WP-0a (backend-0a) edits the Hasura proxy in `api.py`. This patch touches `api.py` only at its imports and at the dimension handler and route, so a rebase should merge cleanly.
-- [ ] **infra:** apply `docs/modernisation/work/WP-0c/infra.patch`, which deletes `docker-compose.pipeline.yaml` lines 16-17. Also remove `POSTGRES_DB_URI` from `.env.example` if nothing else documents it. Blocks unit 1.
+- [x] **backend (backend-2):** apply `docs/modernisation/work/WP-0c/backend.patch`, commit per unit. Done 2026-10-04 (units 2-5). Note that WP-0a (backend-0a) edits the Hasura proxy in `api.py`; this branch touches `api.py` at its imports, the dimension handler and route, `timeout_user_session` and `api_field_info`.
+- [x] **infra (moved to WP-0b by the lead):** delete `docker-compose.pipeline.yaml` lines 16-17 and drop `POSTGRES_DB_URI` from `.env.example` if nothing else documents it. The regression test `tests/infra/test_compose_environment_names.py` and `infra.patch` are no longer on this branch; infra-0b can take them from `32dca82` (`git show 32dca82:tests/infra/test_compose_environment_names.py`, `git show 32dca82:docs/modernisation/work/WP-0c/infra.patch`).
 - [ ] **lead:** route the "Open SEC-4 items" above (item 1 is critical) and the `/api/timeout` cookie gap.
 - [ ] **lead:** the phase docs say "Alembic uses POSTGRES_DB_URI" (`phase-0-security-and-subtraction.md` 0c). That is wrong and should become "delete the unused variable".
 - [ ] **qa:** for WP-2b, add an authz case showing a non-superuser's `run_query` carries their policy filter.
@@ -159,6 +161,9 @@ C-5's token claims gain `user_claims.remember_me: bool`. The change is additive,
 - 2026-10-04 core-1, interrogate: A on opus, B on fable, C on sonnet. Decision recorded above, and tests tightened (`978d61c`).
 - 2026-10-04 core-1, unit 5 core part (`bd71d45`): deleted the unused `get_dimension_time_boundary`. Check: the module and `druid_context` import, black is clean, and no references remain.
 - 2026-10-04 core-1, patches v2: proved in a scratch tree, which is branch head plus both patches. Check: `pytest tests/web tests/infra` gives 22 passed. App modules import. The pipeline import check passes with JWT blocked. `docker compose config` no longer emits `POSTGRES_DB_URI:`.
+- 2026-10-04 backend-2: took over on `mig/WP-0c-pure-mistake-bugs-backend` (from `32dca82`, merged `mig/integration`). Status `building`.
+- 2026-10-04 backend-2, units 2-5 (`638b9e4`, `68aa48d`, `ce12e99`, `0cc1c6a`, `abf1fa9`): applied `backend.patch` one fix per commit. Check: `pytest tests/web` 14 passed; the index matches the whole patch (`git apply -R --check --cached`); the claim decodes as `remember_me: true/false` from a real login response; `web.server.util.util`, `models.python.base` and `data.alerts.send_alert_notifications` import with `jwt` and `flask_jwt_extended` blocked. C-5 acknowledged.
+- 2026-10-04 backend-2, unit 1: moved to WP-0b by the lead. Removed `tests/infra/test_compose_environment_names.py` and `WP-0c/infra.patch` from this branch; both stay recoverable from `32dca82`.
 
 ## Evidence
 

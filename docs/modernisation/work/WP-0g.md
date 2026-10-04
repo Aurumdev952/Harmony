@@ -90,5 +90,5 @@ All of this was re-run on 2026-10-04 from a clean detached clone of the branch t
 | Role | Verdict | Notes |
 |---|---|---|
 | qa | approved | 2026-10-04 qa-0g re-review at 1365183: 79 tests from a clean checkout; gate boundaries (500/501/504 of 10,000), adversarial set and four CLI modes verified; no addresses in output. Low: truncated .gz exits 1 with a traceback; TelegramBot/WhatsApp/kube-probe pass the bot filter into unknown-engine. |
-| reviewer | changes-requested | 2026-10-04 rev-0g: fixture not committed (gitignored *.log); gate compares a rounded share (5.04% passes) and passes with 0 sessions; runbook copies raw access log to /tmp; bot pattern too broad; deployment inference from folder; UC Browser labelled Chrome. Consolidated findings sent to the builder. |
+| reviewer | approved | 2026-10-04 rev-0g re-review at 1365183: all seven findings and QA's three fixes verified from a clean checkout; 79 tests, ruff and mypy strict clean. Low: Slackbot 1.0 and TelegramBot now count as unknown-engine sessions; minor overlap in gate tests. |
 | security | n/a | |

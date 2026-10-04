@@ -1,0 +1,1 @@
+- [Hasura runtime facts](hasura_runtime_facts.md) — v2.45.8 status codes, image tools, dev-mode scope; required secret couples WP-0a and WP-0b compose fixtures

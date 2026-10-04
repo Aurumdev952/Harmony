@@ -13,6 +13,10 @@ instances:
       - web/runserver.py
       - scripts/db/hasura/**
       - tests/web/server/test_hasura_proxy.py
+  - name: "infra-4"
+    files:
+      - docker-compose.yaml
+      - tests/infra/test_compose_hasura.py
 branch: "mig/WP-0a-lock-down-hasura"
 requirements: [SEC-1, SEC-2, SEC-9]
 contracts_consumed: []
@@ -53,7 +57,7 @@ None.
 
 ## Requests
 
-- [ ] infra: apply this diff to `docker-compose.yaml` (blocks unit 5 landing, verified on a scratch copy; evidence below):
+- [x] infra: apply this diff to `docker-compose.yaml` (blocks unit 5 landing, verified on a scratch copy; evidence below). Done by infra-4 on `mig/WP-0a-lock-down-hasura-infra` (Evidence 9), with `HASURA_GRAPHQL_ENABLE_CONSOLE` and `HASURA_GRAPHQL_DEV_MODE` set to `'false'` explicitly and the healthcheck switched from a TCP probe to `curl /healthz`:
 
   ```diff
      hasura:
@@ -75,6 +79,8 @@ None.
 
   The worker does not need the secret. `docker-compose.dev.yaml` needs no change: it inherits both. If developers want the console under dev Compose, add `ports: ["127.0.0.1:8088:8080"]` to its `hasura` service only.
 - [ ] infra: add `HASURA_ADMIN_SECRET=` to `.env.example`, with a note to generate it (for example `openssl rand -base64 32`) and that it must differ from the other secrets. I could not read `.env.example` (settings deny `.env*`), so check placement yourself.
+  - infra-4: not done. Agents cannot read `.env.example` either, so this is left for the human. Every deployment's `.env`, and every developer's for `make up DEV=1`, needs `HASURA_ADMIN_SECRET` before this branch lands, because Compose now refuses to render without it.
+- [ ] infra (WP-0b, for whichever branch lands second): `tests/infra/test_compose.py` on `mig/WP-0b-ports-secrets-pins` needs `'HASURA_ADMIN_SECRET'` in `BASE_ENV` and `hasura` removed from `PUBLISHED_UNTIL_WP_0A` and `UNPINNED_UNTIL_DECIDED`. A trial merge of the two branches is clean, and with those three edits both suites pass (56 passed). Without them, 12 WP-0b tests fail because the config does not render.
 - [ ] qa: run `verify` on Data Catalog, Field Setup and Data Upload (load and save) on a running stack. This environment has no built web client. Every compiled Relay operation was replayed through the real Flask proxy instead (Evidence 4). Consider adopting `scripts/db/hasura/replay_relay_operations.py` into `tests/contract/`.
 - [ ] lead (for routing, outside this WP):
   - The base Compose file also publishes `web` on 5000 (SEC-1). WP-0b's list covers redis, worker and postgres only.
@@ -87,6 +93,7 @@ None.
 - 2026-10-04 backend-1 unit 3: metadata script reads secret from env; check: no secret exit 1, wrong secret exit 1 (401 access-denied), right secret exit 0 on v2.11.3 and v2.45.8.
 - 2026-10-04 backend-1 unit 4: dev Hasura v2.45.8 on 127.0.0.1 with secret; check: no secret exit 1; started bound to `127.0.0.1:8088` with the pinned digest; rerun kept the container; a rotated secret recreated it; dev secret helper stable, mode 0600, env wins.
 - 2026-10-04 backend-1 unit 5: compose request verified on scratch copy; check: config refuses missing secret, Hasura publishes no port, host curl to 8088 fails, in-network requests without or with a wrong secret are refused, with the secret answer.
+- 2026-10-04 infra-4 compose request applied to `docker-compose.yaml` on `mig/WP-0a-lock-down-hasura-infra`; check: `tests/infra/test_compose_hasura.py` 17 passed (17 failed before the change), real bring-up of hasura plus a throwaway Postgres refused requests without the secret.
 
 ## Evidence
 
@@ -117,6 +124,18 @@ Environment: throwaway Postgres 16 with all 142 Alembic revisions applied (`flas
    - In-network: no secret is `access-denied`; a wrong secret is `invalid x-hasura-admin-secret`; the right secret returns `{"data":{"__typename":"query_root"}}`; `/v1/version` returns `v2.45.8`.
 7. **Metadata script**: no secret gives `HASURA_ADMIN_SECRET must be set`, exit 1. A wrong secret gives `status code 401 ... access-denied`, exit 1. The right secret gives `Successfully applied metadata to .../v1/metadata`, exit 0, and `get_inconsistent_metadata` returns `is_consistent: true` on both versions.
 8. **Lint**: black (`-S`) clean. pylint 10.00 on `web/server/util/hasura.py`, `apply_metadata_snapshot.py`, `replay_relay_operations.py`, `runserver.py` and the test. The remaining pylint findings in `api.py` (lines 242, 254, and the unused `ROOT_SITE_RESOURCE_ID`) predate this branch. ruff is clean on the new files. mypy could not run locally: `mypy.ini` loads the `sqlmypy` plugin, which is not installed.
+9. **Compose, applied** (infra-4, `docker-compose.yaml` on `mig/WP-0a-lock-down-hasura-infra`, dummy env only, `--env-file /dev/null` so no `.env` is read):
+   - `uv run --with pytest pytest tests/infra/test_compose_hasura.py`: `17 passed`; `17 failed` on the unchanged file. Across the base, prod, dev and local overlays it checks that Hasura publishes no port, that an unset or empty `HASURA_ADMIN_SECRET` fails rendering with `HASURA_ADMIN_SECRET must be set`, and that hasura and web receive the same secret. It also checks the pinned image and that the console and dev mode are off. ruff and black `-S` are clean.
+   - `docker compose -f docker-compose.yaml config` without the secret exits 1 with `required variable HASURA_ADMIN_SECRET is missing a value: HASURA_ADMIN_SECRET must be set to a random value, e.g. openssl rand -hex 32`, for both hasura and web. With it, published ports are `hasura: []`. The others are unchanged here (WP-0b handles them). The worker gets no secret. Base plus dev plus prod also passes `config --quiet`.
+   - Bring-up of the real base `hasura` service with a throwaway `postgres:16-alpine` overlay, project `infra4-wp0a-hasura`, random secrets in 0600 files: both healthy, and the healthcheck is `curl /healthz`. `docker compose port hasura 8080` gives `no port`, and host `curl 127.0.0.1:8088` fails to connect. In-network results:
+     - `/v1/graphql` without the secret: `access-denied` ("x-hasura-admin-secret required, but not found"). Hasura answers HTTP 200 with a GraphQL error here, not 401.
+     - `/v1/graphql` with a wrong secret: `access-denied`, `invalid x-hasura-admin-secret`.
+     - `/v1/metadata` without the secret: HTTP 401, `access-denied`.
+     - `/console`: HTTP 404.
+     - With the right secret: `{"data":{"__typename":"query_root"}}`.
+     - `/v1/version`: `v2.45.8`.
+     
+     The project was torn down with `docker compose down`, and the containers and network were removed.
 
 Not done: a browser `verify` of the three pages (see the qa request) and `pstack:interrogate`. The proxy change touches no identity flow.
 

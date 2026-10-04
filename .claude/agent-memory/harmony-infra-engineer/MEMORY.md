@@ -1,3 +1,5 @@
+- [Compose testing traps](compose_testing_traps.md) — dummy env files, worktree Bash guard, host port clashes, anonymous volumes, redis-cli exit codes
+- [Upstream artifacts gone](upstream_artifacts_gone.md) — MinIO images gone, mc downloads 410; pinned GitHub release; R5 pending
 - [Hasura runtime facts](hasura_runtime_facts.md) — v2.45.8 status codes, image tools, dev-mode scope; required secret couples WP-0a and WP-0b compose fixtures
 - [CI tooling and Bash guards](ci_tooling_and_guards.md): actionlint and shellcheck install, action SHA lookup, worktree guard, Actions default shell
 - [WP-0f open items](wp_0f_open_items.md): Docker Hub path removal awaits the human; slash-tag bug for WP-3b; comma `--cache-from` is fine

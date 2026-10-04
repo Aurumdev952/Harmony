@@ -1,0 +1,5 @@
+{"Real_Date": "2021-05-01", "data": {"demo_malaria_positive": 5, "demo_malaria_tested": 19}, "key": {"Age": "30", "Death": "NAO", "MunicipalityName": "Ashford", "Sex": "F", "StateName": "Northvale"}, "source": "demo_wide"}
+{"Real_Date": "2021-05-20", "data": {"demo_malaria_positive": 1.75, "demo_malaria_tested": 2}, "key": {"Age": "41", "Death": "SIM", "MunicipalityName": "Brookline", "Sex": "M", "StateName": "Northvale"}, "source": "demo_wide"}
+{"Real_Date": "2021-06-30", "data": {"demo_malaria_positive": 7, "demo_malaria_tested": 7}, "key": {"Age": "5", "Death": "NAO", "MunicipalityName": "Cedar Point", "Sex": "F", "StateName": "Southmere"}, "source": "demo_wide"}
+{"Real_Date": "2021-07-04", "data": {"demo_malaria_positive": 1, "demo_malaria_tested": 3}, "key": {"Age": "62", "Death": "NAO", "MunicipalityName": "Lagoa Áurea", "Sex": "M", "StateName": "Southmere"}, "source": "demo_wide"}
+{"Real_Date": "2021-07-05", "data": {"demo_malaria_tested": 6}, "key": {"Age": "62", "Death": "NAO", "MunicipalityName": "Lagoa Áurea", "Sex": "F", "StateName": "Southmere"}, "source": "demo_wide"}

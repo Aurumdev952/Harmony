@@ -1,0 +1,14 @@
+{
+  "date_column": "Visit Date",
+  "source": "clinic_survey",
+  "data_filename": "clinic_survey.csv.gz",
+  "dimensions": [
+    {"input_name": "Province", "output_name": "StateName"},
+    {"input_name": "Facility", "output_name": "MunicipalityName"},
+    {"input_name": "Sex", "output_name": "Sex"}
+  ],
+  "fields": [
+    {"input_name": "Visits: Total", "output_name": "clinic_survey_visits_total"},
+    {"input_name": "clinic_survey_referrals", "output_name": "clinic_survey_referrals"}
+  ]
+}

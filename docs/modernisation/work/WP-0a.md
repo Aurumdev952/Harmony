@@ -153,4 +153,4 @@ Not done: a browser `verify` of the three pages (see the qa request) and `pstack
 |---|---|---|
 | qa | pending | |
 | reviewer | pending | |
-| security | pending | |
+| security | changes-requested | 2026-10-04 sec-0a at f4db7c1: lockdown holds against every bypass, header-injection, secret and exposure probe. Blocking: pin graphql-core in check_role_permissions.py (SEC-9). Low: anonymous reads all columns of dimension tables; secret on gq command line in sync_graphql_schema.sh; use the -ce image tag; HASURA_GRAPHQL_ENABLED_APIS graphql,metadata; runserver reuses a secret file without checking mode; rollback plan should name 2.11.5+. Human must record INV-3 acceptance (signed-in users lose GraphQL access to 28 tables). |

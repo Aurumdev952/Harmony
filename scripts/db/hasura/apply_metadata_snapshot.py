@@ -48,7 +48,7 @@ def wait_for_hasura(hasura_host):
         try:
             if requests.get(f'{hasura_host}/healthz', timeout=10).ok:
                 return True
-        except requests.exceptions.ConnectionError:
+        except requests.exceptions.RequestException:
             pass
         LOG.info(
             'Waiting for hasura at %s (attempt %s of %s)',
@@ -78,12 +78,20 @@ def main():
         return 1
 
     LOG.info('Starting hasura metadata processing.')
-    res = requests.post(
-        hasura_metadata_api_endpoint,
-        headers={'X-Hasura-Admin-Secret': hasura_admin_secret},
-        json={'type': 'replace_metadata', 'args': build_metadata_dict()},
-        timeout=120,
-    )
+    try:
+        res = requests.post(
+            hasura_metadata_api_endpoint,
+            headers={'X-Hasura-Admin-Secret': hasura_admin_secret},
+            json={'type': 'replace_metadata', 'args': build_metadata_dict()},
+            timeout=120,
+        )
+    except requests.exceptions.RequestException as error:
+        LOG.error(
+            'Could not apply metadata to %s: %s',
+            hasura_metadata_api_endpoint,
+            error,
+        )
+        return 1
     if res.status_code != 200:
         LOG.error(
             'Failed to apply metadata to %s with status code %s: %s',

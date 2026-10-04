@@ -7,8 +7,11 @@ mutations included. The normalised responses are written to `--out`. Pass
 `--compare` with an earlier output to diff two runs, for example main's proxy on
 Hasura v2.11 against this branch's proxy on Hasura v2.45.
 
-Run it against a throwaway database only: it creates, edits and deletes
-catalog, field setup and data upload rows.
+It creates, edits and deletes catalog, field setup and data upload rows, so it
+refuses to run unless `--disposable-database` is passed and the database is
+marked disposable:
+
+    COMMENT ON DATABASE "<name>" IS 'harmony-disposable';
 
 Environment: ZEN_ENV, DATABASE_URL, HASURA_HOST, HASURA_ADMIN_SECRET (branch
 code only), SERVER_SOFTWARE=gunicorn so the app registers its routes, and
@@ -26,6 +29,9 @@ import psycopg2
 
 from web.server.app import create_app
 
+DISPOSABLE_MARKER = 'harmony-disposable'
+# Dataprep recipe ids are positive, so a negative one cannot match a real flow.
+REPLAY_RECIPE_ID = -424242
 TEXT = re.compile(r'"text": ("(?:[^"\\]|\\.)*")')
 NAME = re.compile(r'^(?:query|mutation)\s+(\w+)')
 TIMESTAMP_KEY = re.compile(r'(^created$|last_?modified)', re.IGNORECASE)
@@ -97,7 +103,11 @@ def self_serve_source(source_id, unpublished_ids, dataprep, source_pk=None):
             },
         },
         'dataprep_flow': {
-            'data': {'appendable': True, 'expected_columns': [], 'recipe_id': 4242},
+            'data': {
+                'appendable': True,
+                'expected_columns': [],
+                'recipe_id': REPLAY_RECIPE_ID,
+            },
             'on_conflict': {
                 'constraint': 'dataprep_flow_recipe_id_key',
                 'update_columns': ['appendable', 'expected_columns', 'recipe_id'],
@@ -350,6 +360,15 @@ def lookup(sql, *args):
         return cur.fetchone()[0]
 
 
+def database_is_marked_disposable():
+    comment = lookup(
+        'select shobj_description(oid, %s) from pg_database '
+        'where datname = current_database()',
+        'pg_database',
+    )
+    return comment == DISPOSABLE_MARKER
+
+
 class GeneratedIds(dict):
     '''Serial ids the UI would read from earlier responses, fetched on demand.'''
 
@@ -432,7 +451,21 @@ def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('--out', required=True)
     parser.add_argument('--compare', help='an earlier --out file to diff against')
+    parser.add_argument(
+        '--disposable-database',
+        action='store_true',
+        help='confirm that DATABASE_URL points at a throwaway database',
+    )
     args = parser.parse_args()
+
+    if not args.disposable_database or not database_is_marked_disposable():
+        print(
+            'Refusing to run: this replay writes and deletes rows. Pass '
+            '--disposable-database and mark the database with '
+            f'COMMENT ON DATABASE "<name>" IS \'{DISPOSABLE_MARKER}\'.',
+            file=sys.stderr,
+        )
+        return 2
 
     results = replay(args.out)
     if any(r['status'] != 200 or 'errors' in r['body'] for r in results):

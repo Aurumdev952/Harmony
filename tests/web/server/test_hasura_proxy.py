@@ -7,6 +7,7 @@ import pytest
 from flask import Flask
 from flask_login import AnonymousUserMixin
 
+os.environ.setdefault('ZEN_ENV', 'harmony_demo')
 os.environ.setdefault('DEFAULT_SECRET_KEY', 'test-only-not-a-secret')
 os.environ.setdefault('DRUID_HOST', 'http://druid.invalid')
 
@@ -25,6 +26,11 @@ class SignedInUser:
     username = 'analyst@example.org'
     first_name = 'Ana'
     last_name = 'Lyst'
+
+
+class ApiTokenUser(SignedInUser):
+    from_jwt = True
+    id = 7
 
 
 @pytest.fixture(name='hasura_calls')
@@ -100,6 +106,32 @@ def test_client_cannot_choose_its_hasura_role(monkeypatch, hasura_calls):
 
     assert hasura_calls[0].headers['X-Hasura-Role'] == 'user'
     assert hasura_calls[0].headers['X-Hasura-Admin-Secret'] == ADMIN_SECRET
+
+
+def test_full_access_api_token_is_sent_as_user_role(monkeypatch, hasura_calls):
+    monkeypatch.setattr(api, 'get_jwt_claims', lambda: {'needs': {'*': True}})
+    client = make_client(monkeypatch, ApiTokenUser())
+
+    response = client.post(
+        '/api/graphql', json={'query': '{ field_connection { edges { node { id } } } }'}
+    )
+
+    assert response.status_code == 200
+    assert hasura_calls[0].headers == {
+        'X-Hasura-Admin-Secret': ADMIN_SECRET,
+        'X-Hasura-Role': 'user',
+        'X-Hasura-User-Id': '7',
+    }
+
+
+def test_scoped_api_token_never_reaches_hasura(monkeypatch, hasura_calls):
+    monkeypatch.setattr(api, 'get_jwt_claims', lambda: {'needs': {'view_query': True}})
+    client = make_client(monkeypatch, ApiTokenUser())
+
+    response = client.post('/api/graphql', json={'query': '{ __typename }'})
+
+    assert response.status_code == 401
+    assert not hasura_calls
 
 
 def test_proxy_refuses_when_no_admin_secret_is_configured(monkeypatch, hasura_calls):

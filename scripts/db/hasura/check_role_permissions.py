@@ -1,9 +1,9 @@
 #!/usr/bin/env -S uv run --script
 # /// script
 # requires-python = ">=3.11"
-# dependencies = ["graphql-core>=3.2,<4"]
+# dependencies = ["graphql-core==3.3.0"]
 # ///
-'''Check that Hasura's role permissions cover every compiled Relay operation.
+'''Check that Hasura's role permissions match the compiled Relay operations.
 
 The Flask proxy sends `x-hasura-role: user` for signed-in users and
 `x-hasura-role: anonymous` for public-access visitors. This script introspects
@@ -12,10 +12,15 @@ frontend ships (`web/client/**/__generated__/*.graphql.js`) against it:
 
 - every operation must validate for `user`;
 - the public-access operations must validate for `anonymous`;
-- no mutation may validate for `anonymous`.
+- every other operation must fail to validate for `anonymous`, except those
+  in ANONYMOUS_SUBSET_OPERATIONS, which read only public columns.
 
-Usage: HASURA_ADMIN_SECRET=... scripts/db/hasura/check_role_permissions.py \
-    --hasura_host http://localhost:8088
+With `--print-schema ROLE` it prints that role's schema as SDL instead, which
+is what Relay compiles against (`scripts/db/hasura/dev/sync_graphql_schema.sh`).
+
+The admin secret is read from HASURA_ADMIN_SECRET, never from the command line.
+
+Usage: scripts/db/hasura/check_role_permissions.py --hasura_host http://localhost:8088
 '''
 import argparse
 import json
@@ -26,12 +31,12 @@ import urllib.request
 from pathlib import Path
 
 from graphql import (
-    OperationDefinitionNode,
-    OperationType,
+    GraphQLSchema,
     OverlappingFieldsCanBeMergedRule,
     build_client_schema,
     get_introspection_query,
     parse,
+    print_schema,
     specified_rules,
     validate,
 )
@@ -39,6 +44,11 @@ from graphql import (
 SRC_ROOT = Path(__file__).resolve().parents[3]
 ARTIFACT_GLOB = 'web/client/**/__generated__/*.graphql.js'
 PUBLIC_OPERATIONS = frozenset({'patchDimensionServiceQuery'})
+# Reads only dimension and dimension-category ids and names, a subset of what
+# the public query returns, so Hasura cannot tell them apart. The proxy still
+# refuses it for signed-out visitors by operation name.
+ANONYMOUS_SUBSET_OPERATIONS = frozenset({'EditableCalculationQuery'})
+ROLES = ('user', 'anonymous')
 TEXT_PATTERN = re.compile(r'"text": ("(?:[^"\\]|\\.)*")')
 # Relay documents select one root field twice under mutually exclusive
 # @include/@skip, which Hasura runs but the spec's field-merge rule rejects.
@@ -57,7 +67,7 @@ def load_operations(src_root: Path) -> dict[str, str]:
     return operations
 
 
-def fetch_schema(hasura_host: str, admin_secret: str, role: str):
+def fetch_schema(hasura_host: str, admin_secret: str, role: str) -> GraphQLSchema:
     request = urllib.request.Request(
         f'{hasura_host}/v1beta1/relay',
         data=json.dumps({'query': get_introspection_query()}).encode(),
@@ -74,15 +84,11 @@ def fetch_schema(hasura_host: str, admin_secret: str, role: str):
     return build_client_schema(body['data'])
 
 
-def is_mutation(text: str) -> bool:
-    return any(
-        isinstance(definition, OperationDefinitionNode)
-        and definition.operation == OperationType.MUTATION
-        for definition in parse(text).definitions
-    )
-
-
-def check(operations: dict[str, str], user_schema, anonymous_schema) -> list[str]:
+def check(
+    operations: dict[str, str],
+    user_schema: GraphQLSchema,
+    anonymous_schema: GraphQLSchema,
+) -> list[str]:
     failures = []
     for name, text in operations.items():
         document = parse(text)
@@ -95,28 +101,36 @@ def check(operations: dict[str, str], user_schema, anonymous_schema) -> list[str
             failures.append(
                 f'anonymous cannot run {name}: {anonymous_errors[0].message}'
             )
-        if is_mutation(text) and not anonymous_errors:
-            failures.append(f'anonymous can run mutation {name}')
+        allowed = PUBLIC_OPERATIONS | ANONYMOUS_SUBSET_OPERATIONS
+        if name not in allowed and not anonymous_errors:
+            failures.append(f'anonymous can run non-public operation {name}')
 
-    missing = PUBLIC_OPERATIONS - operations.keys()
+    missing = (PUBLIC_OPERATIONS | ANONYMOUS_SUBSET_OPERATIONS) - operations.keys()
     failures.extend(f'public operation {name} not found' for name in missing)
     return failures
 
 
 def main() -> int:
-    parser = argparse.ArgumentParser(description=__doc__)
+    parser = argparse.ArgumentParser(
+        description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter
+    )
     parser.add_argument('--hasura_host', required=True)
+    parser.add_argument('--print-schema', choices=ROLES, dest='print_schema_role')
     args = parser.parse_args()
     admin_secret = os.environ.get('HASURA_ADMIN_SECRET', '')
     if not admin_secret:
         print('HASURA_ADMIN_SECRET must be set', file=sys.stderr)
         return 2
 
+    if args.print_schema_role:
+        schema = fetch_schema(args.hasura_host, admin_secret, args.print_schema_role)
+        print(print_schema(schema))
+        return 0
+
     operations = load_operations(SRC_ROOT)
     failures = check(
         operations,
-        fetch_schema(args.hasura_host, admin_secret, 'user'),
-        fetch_schema(args.hasura_host, admin_secret, 'anonymous'),
+        *(fetch_schema(args.hasura_host, admin_secret, role) for role in ROLES),
     )
     for failure in failures:
         print(failure, file=sys.stderr)

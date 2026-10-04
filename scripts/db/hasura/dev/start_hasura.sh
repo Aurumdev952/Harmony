@@ -10,7 +10,7 @@ fi
 
 DB_NAME="$1"
 CONTAINER_NAME='hasura'
-IMAGE_NAME='hasura/graphql-engine:v2.45.8.cli-migrations-v2@sha256:c23e41af28e4c8e27bf6b6e82a5ecdd5b3ba3bb373833f92f5136e25b0ad45c6'
+IMAGE_NAME='hasura/graphql-engine:v2.45.8-ce.cli-migrations-v2@sha256:18b39122f207afa4fe7116acaa6484ddac69c2160fde0571e3a27abf924e0bec'
 ZEN_SRC_ROOT=$(git rev-parse --show-toplevel)
 HASURA_METADATA_DIR="${ZEN_SRC_ROOT}/graphql/hasura/metadata/versions"
 HASURA_CONTAINER_SCRIPTS_DIR="${ZEN_SRC_ROOT}/scripts/db/hasura/dev/container"

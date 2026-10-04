@@ -120,7 +120,12 @@ def cmd_who(paths: list[str]) -> int:
     return 0
 
 
-def cmd_check(role: str, base: str, head: str) -> int:
+def default_base() -> str:
+    probe = subprocess.run(['git', 'rev-parse', '--verify', '-q', 'mig/integration'], capture_output=True)
+    return 'mig/integration' if probe.returncode == 0 else 'main'
+
+
+def cmd_check(roles: list[str], base: str, head: str) -> int:
     root = repo_root(Path.cwd())
     out = subprocess.run(
         ['git', '-C', str(root), 'diff', '--name-only', f'{base}...{head}'],
@@ -128,9 +133,9 @@ def cmd_check(role: str, base: str, head: str) -> int:
     )
     violations = []
     for rel in filter(None, out.stdout.splitlines()):
-        ok, owner = may_edit(root, role, rel)
-        if not ok:
-            violations.append(f'{rel} (owner: {owner or "lead"})')
+        verdicts = [may_edit(root, role, rel) for role in roles]
+        if not any(ok for ok, _ in verdicts):
+            violations.append(f'{rel} (owner: {verdicts[0][1] or "lead"})')
     for v in violations:
         print(v)
     return 1 if violations else 0
@@ -172,15 +177,16 @@ def main() -> int:
     who = sub.add_parser('who')
     who.add_argument('paths', nargs='+')
     check = sub.add_parser('check')
-    check.add_argument('--role', required=True)
-    check.add_argument('--base', default='main')
+    check.add_argument('--role', required=True, action='append',
+                       help='repeat for a WP with supporting roles; a file passes if any listed role owns it')
+    check.add_argument('--base', default=None, help='defaults to mig/integration when it exists, else main')
     check.add_argument('--head', default='HEAD')
     sub.add_parser('hook')
     args = parser.parse_args()
     if args.mode == 'who':
         return cmd_who(args.paths)
     if args.mode == 'check':
-        return cmd_check(args.role, args.base, args.head)
+        return cmd_check(args.role, args.base or default_base(), args.head)
     return cmd_hook()
 
 

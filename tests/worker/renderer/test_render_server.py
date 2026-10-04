@@ -4,13 +4,14 @@ import json
 import logging
 import threading
 import time
+from collections.abc import Iterator
 from contextlib import contextmanager
-from typing import Callable, Iterator, List
+from typing import Callable
 
 import pytest
 
 from harmony.worker.renderer.errors import OutputTooLarge, PageFailed, RenderTimeout
-from harmony.worker.renderer.server import RenderOutput, RendererSettings, build_server
+from harmony.worker.renderer.server import RendererSettings, RenderOutput, build_server
 from harmony.worker.renderer.spec import RenderSpec
 
 ORIGIN = 'http://web:5000'
@@ -69,15 +70,18 @@ def test_health_check_answers():
     assert data == b'ok'
 
 
-@pytest.mark.parametrize('output_format, content_type', [
-    ('pdf', 'application/pdf'),
-    ('png', 'image/png'),
-    ('jpeg', 'image/jpeg'),
-])
+@pytest.mark.parametrize(
+    'output_format, content_type',
+    [
+        ('pdf', 'application/pdf'),
+        ('png', 'image/png'),
+        ('jpeg', 'image/jpeg'),
+    ],
+)
 def test_render_answers_with_the_bytes_and_the_formats_content_type(
     output_format, content_type
 ):
-    seen: List[RenderSpec] = []
+    seen: list[RenderSpec] = []
 
     def render(spec, _settings):
         seen.append(spec)
@@ -105,7 +109,9 @@ def test_render_is_logged_as_one_json_line_without_the_token(caplog):
     with serving(png) as port:
         call(port, body=REQUEST)
 
-    [line] = [r.getMessage() for r in caplog.records if '"event": "render"' in r.getMessage()]
+    [line] = [
+        r.getMessage() for r in caplog.records if '"event": "render"' in r.getMessage()
+    ]
     entry = json.loads(line)
     assert entry['status'] == 200
     assert entry['format'] == 'png'
@@ -116,11 +122,14 @@ def test_render_is_logged_as_one_json_line_without_the_token(caplog):
     assert 'screenshot=1' not in caplog.text
 
 
-@pytest.mark.parametrize('error, status, code', [
-    (RenderTimeout('deadline passed'), 504, 'render_timeout'),
-    (PageFailed('dashboard page answered 500'), 502, 'page_failed'),
-    (OutputTooLarge('30000000 bytes'), 502, 'output_too_large'),
-])
+@pytest.mark.parametrize(
+    'error, status, code',
+    [
+        (RenderTimeout('deadline passed'), 504, 'render_timeout'),
+        (PageFailed('dashboard page answered 500'), 502, 'page_failed'),
+        (OutputTooLarge('30000000 bytes'), 502, 'output_too_large'),
+    ],
+)
 def test_render_failures_map_to_statuses(error, status, code):
     def render(_spec, _settings):
         raise error
@@ -173,22 +182,25 @@ def test_an_oversized_body_is_refused_before_it_is_read():
 
 def test_a_body_without_a_length_is_refused():
     with serving(png) as port:
-        response, _ = call(
-            port, raw=b'', headers={'Transfer-Encoding': 'chunked'}
-        )
+        response, _ = call(port, raw=b'', headers={'Transfer-Encoding': 'chunked'})
 
     assert response.status in (411, 413)
 
 
-@pytest.mark.parametrize('method, path, status', [
-    ('GET', '/render', 405),
-    ('POST', '/healthz', 405),
-    ('GET', '/', 404),
-    ('POST', '/render/../admin', 404),
-])
+@pytest.mark.parametrize(
+    'method, path, status',
+    [
+        ('GET', '/render', 405),
+        ('POST', '/healthz', 405),
+        ('GET', '/', 404),
+        ('POST', '/render/../admin', 404),
+    ],
+)
 def test_only_the_two_endpoints_exist(method, path, status):
     with serving(png) as port:
-        response, _ = call(port, method, path, body=REQUEST if method == 'POST' else None)
+        response, _ = call(
+            port, method, path, body=REQUEST if method == 'POST' else None
+        )
 
     assert response.status == status
 

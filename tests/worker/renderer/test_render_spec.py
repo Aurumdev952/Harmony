@@ -48,7 +48,9 @@ def test_a_valid_request_parses():
 
 
 def test_optional_fields_take_their_defaults():
-    spec = parse({'format': 'png'}, drop=('viewport', 'full_page', 'pdf', 'timeout_seconds'))
+    spec = parse(
+        {'format': 'png'}, drop=('viewport', 'full_page', 'pdf', 'timeout_seconds')
+    )
 
     assert spec.viewport == Viewport(1280, 1024)
     assert spec.full_page is False

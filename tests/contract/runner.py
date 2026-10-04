@@ -105,7 +105,7 @@ class Runner:
             return f"{name}.zip", self.captures[name]
         return Path(source).name, (REPO_ROOT / source).read_bytes()
 
-    def run(self, case: Case) -> dict[str, Any]:
+    def run(self, case: Case, *, recording: bool = False) -> dict[str, Any]:
         missing = [p for p in placeholders(case) if p not in self.captures]
         if missing:
             raise SkipCase(f"{case.id} needs {missing}, which no earlier case captured")
@@ -139,7 +139,12 @@ class Runner:
             else ()
         )
         observation = observe(
-            case, response.status_code, response.headers, response.content, set_cookies
+            case,
+            response.status_code,
+            response.headers,
+            response.content,
+            set_cookies,
+            recording=recording,
         )
         if case.capture_body:
             self.captures[case.capture_body] = response.content

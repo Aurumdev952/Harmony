@@ -27,6 +27,7 @@ recordings.
 
 from __future__ import annotations
 
+import base64
 import json
 import os
 import re
@@ -225,11 +226,15 @@ def _walk(node: Any, tokens: list[str]) -> Iterator[Any]:
 
 def capture_value(document: Any, spec: str) -> Any:
     """``/pointer`` takes the value; ``/pointer#id`` takes the integer id at the
-    end of a resource URI such as ``/api2/dashboard/7``."""
+    end of a resource URI such as ``/api2/dashboard/7``; ``/pointer#relay``
+    takes the database id inside a Hasura Relay node id (base64 of
+    ``[1, "public", "<table>", <id>]``)."""
     pointer, _, transform = spec.partition("#")
     value = resolve_pointer(document, pointer)
     if transform == "id":
         return int(str(value).rstrip("/").rsplit("/", 1)[1])
+    if transform == "relay":
+        return json.loads(base64.b64decode(str(value)))[-1]
     if transform:
         raise ValueError(f"unknown capture transform {transform!r}")
     return value
@@ -282,13 +287,28 @@ def describe_set_cookie(header: str) -> str:
     return "; ".join([name, lifetime, *flags])
 
 
+def _unsafe_pin(values: list[Any]) -> str | None:
+    for v in values:
+        if isinstance(v, (dict, list)):
+            return "not a scalar"
+        fmt = schema.string_format(v) if isinstance(v, str) else None
+        if fmt in ("email", "jwt"):
+            return f"a value looks like {fmt}"
+    return None
+
+
 def observe(
     case: Case,
     status: int,
     headers: Mapping[str, str],
     body: bytes,
     set_cookies: tuple[str, ...] = (),
+    *,
+    recording: bool = False,
 ) -> dict[str, Any]:
+    """``recording`` refuses pins that would store an unsafe value. A replay
+    never raises over a pin: an unsafe value is replaced by a marker, so the
+    mismatch is a diff line that does not echo the new value."""
     lowered = {k.lower(): v for k, v in headers.items()}
     content_type = media_type(lowered.get("content-type"))
     parsed: Any = None
@@ -328,15 +348,10 @@ def observe(
             if isinstance(value, list) and any(t in pointer for t in EACH)
             else [value]
         )
-        for v in values:
-            if isinstance(v, (dict, list)):
-                raise TypeError(f"{case.id}: pin {pointer} must point at scalars")
-            fmt = schema.string_format(v) if isinstance(v, str) else None
-            if fmt in ("email", "jwt"):
-                raise ValueError(
-                    f"{case.id}: refusing to pin {pointer}; a value looks like {fmt}"
-                )
-        observation["pinned"][pointer] = value
+        unsafe = _unsafe_pin(values)
+        if unsafe and recording:
+            raise ValueError(f"{case.id}: refusing to pin {pointer}; {unsafe}")
+        observation["pinned"][pointer] = f"<not shown: {unsafe}>" if unsafe else value
     if missing:
         observation["missing_pins"] = missing
     return observation

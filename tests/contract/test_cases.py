@@ -50,6 +50,19 @@ def test_capture_takes_a_pointer_or_the_id_at_the_end_of_a_uri():
     assert capture_value(node, "/id#relay") == 42
 
 
+@pytest.mark.parametrize(
+    ("doc", "spec"),
+    [
+        ({"$uri": "/api2/user/someone@example.org"}, "/$uri#id"),
+        ({"id": "someone@example.org"}, "/id#relay"),
+    ],
+)
+def test_a_failed_capture_transform_does_not_echo_the_value(doc, spec):
+    with pytest.raises(ValueError) as caught:
+        capture_value(doc, spec)
+    assert "someone" not in str(caught.value)
+
+
 def test_misspelt_case_keys_are_refused():
     with pytest.raises(ValueError, match="pins"):
         make_case(pins=["/id"])

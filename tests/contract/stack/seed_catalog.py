@@ -1,9 +1,12 @@
-"""Seeds the data-catalog rows that only the pipeline writes.
+"""Seeds the data-catalog rows that only the pipeline or the data catalog
+import writes.
 
 No client operation creates dimensions, pipeline datasources, unpublished
-fields, Dataprep flows or self-serve sources, so without these rows the
-Relay queries that read them record empty connections and their item shapes
-go unpinned. Runs once per stack, from init.sh; idempotent.
+fields, Dataprep flows, or a field's datasource and dimension mappings.
+useSelfServeMutation does create a self-serve source, but only for an
+existing pipeline datasource. Without these rows the Relay queries that read
+them record empty lists and their item shapes go unpinned. Runs once per
+stack, from init.sh; idempotent.
 """
 
 import os
@@ -71,6 +74,34 @@ ROWS = [
     (
         "INSERT INTO self_serve_source (source_id, dataprep_flow_id) VALUES (%s, %s)",
         ("contract_source", 9001),
+    ),
+    (
+        (
+            "INSERT INTO field (id, name, short_name, description, calculation)"
+            " VALUES (%s, %s, %s, %s, %s)"
+        ),
+        (
+            "contract_seeded_field",
+            "Contract seeded field",
+            "Contract seeded",
+            "Seeded by the contract stack",
+            '{"type": "SUM"}',
+        ),
+    ),
+    (
+        "INSERT INTO field_category_mapping (field_id, category_id) VALUES (%s, %s)",
+        ("contract_seeded_field", "root"),
+    ),
+    (
+        (
+            "INSERT INTO field_pipeline_datasource_mapping"
+            " (field_id, pipeline_datasource_id) VALUES (%s, %s)"
+        ),
+        ("contract_seeded_field", "contract_source"),
+    ),
+    (
+        "INSERT INTO field_dimension_mapping (field_id, dimension_id) VALUES (%s, %s)",
+        ("contract_seeded_field", "ContractDimension"),
     ),
 ]
 

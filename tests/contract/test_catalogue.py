@@ -1,8 +1,10 @@
 """Offline checks that keep INVENTORY.md, the cases and the recordings in step."""
 
+import json
+
 from . import catalogue
-from .cases import load_cases
-from .inventory import load_inventory, load_relay_operations
+from .cases import RELAY_PREFIX, Case, load_cases
+from .inventory import RelayRow, load_inventory, load_relay_operations
 
 CASES = load_cases()
 ROWS = load_inventory()
@@ -35,3 +37,46 @@ def test_every_case_has_a_matching_recording():
 
 def test_recordings_hold_no_values_that_look_like_secrets_or_pii():
     assert catalogue.leak_problems() == []
+
+
+def test_relay_rows_with_empty_connections_say_so_and_why():
+    assert catalogue.empty_connection_problems(CASES, RELAY_ROWS) == []
+
+
+ARTIFACT = "web/client/x/__generated__/XQuery.graphql.js"
+EMPTY = {"maxItems": 0, "type": "array"}
+FILLED = {"items": {"type": "object"}, "type": "array"}
+
+
+def _relay_fixture(tmp_path, coverage, edges):
+    case = Case.from_json(
+        {
+            "id": "graphql.XQuery",
+            "route": "POST /api/graphql",
+            "body": {"query": RELAY_PREFIX + ARTIFACT, "variables": {}},
+        }
+    )
+    connection = {"properties": {"edges": edges}, "type": "object"}
+    recording = {"response_schema": {"properties": {"c": connection}}}
+    (tmp_path / "graphql.XQuery.json").write_text(json.dumps(recording))
+    return [case], [RelayRow("query", "XQuery", ARTIFACT, coverage, 1)]
+
+
+def test_an_unannotated_empty_connection_is_a_problem(tmp_path):
+    cases, rows = _relay_fixture(tmp_path, "recorded", EMPTY)
+    assert catalogue.empty_connection_problems(cases, rows, tmp_path) == [
+        "XQuery: every recording has an empty connection ($.c.edges); seed rows"
+        " or mark it 'recorded (empty connection, <reason>)'"
+    ]
+
+
+def test_an_annotation_on_a_filled_connection_is_stale(tmp_path):
+    cases, rows = _relay_fixture(tmp_path, "recorded (empty connection, F13)", FILLED)
+    assert catalogue.empty_connection_problems(cases, rows, tmp_path) == [
+        "XQuery: marked empty connection but a recording has items"
+    ]
+
+
+def test_an_annotated_empty_connection_passes(tmp_path):
+    cases, rows = _relay_fixture(tmp_path, "recorded (empty connection, F13)", EMPTY)
+    assert catalogue.empty_connection_problems(cases, rows, tmp_path) == []

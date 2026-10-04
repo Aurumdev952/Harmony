@@ -4,6 +4,8 @@ Endpoint rows are ``| Method | Path | Server route | Called by | Coverage |``.
 Relay rows are ``| Kind | Operation | Artifact | Coverage |``, one per GraphQL
 operation the client sends through ``POST /api/graphql``.
 Coverage is ``recorded`` (at least one case must exist) or ``deferred: <reason>``.
+A Relay row may say ``recorded (empty connection, <reason>)`` when every
+recording of it has an empty connection; ``catalogue`` checks that claim.
 """
 
 from __future__ import annotations
@@ -47,6 +49,17 @@ class RelayRow:
     @property
     def deferred(self) -> bool:
         return self.coverage.startswith("deferred:")
+
+    @property
+    def empty_connection(self) -> bool:
+        return bool(_EMPTY_CONNECTION.fullmatch(self.coverage))
+
+    @property
+    def recorded(self) -> bool:
+        return self.coverage == "recorded" or self.empty_connection
+
+
+_EMPTY_CONNECTION = re.compile(r"recorded \(empty connection, \S.*\)")
 
 
 def _cells(path: Path) -> list[tuple[int, list[str]]]:

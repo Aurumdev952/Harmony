@@ -231,13 +231,17 @@ def capture_value(document: Any, spec: str) -> Any:
     ``[1, "public", "<table>", <id>]``)."""
     pointer, _, transform = spec.partition("#")
     value = resolve_pointer(document, pointer)
-    if transform == "id":
-        return int(str(value).rstrip("/").rsplit("/", 1)[1])
-    if transform == "relay":
-        return json.loads(base64.b64decode(str(value)))[-1]
-    if transform:
-        raise ValueError(f"unknown capture transform {transform!r}")
-    return value
+    if not transform:
+        return value
+    try:
+        if transform == "id":
+            return int(str(value).rstrip("/").rsplit("/", 1)[1])
+        if transform == "relay":
+            return json.loads(base64.b64decode(str(value)))[-1]
+    except (ValueError, IndexError, TypeError, KeyError):
+        # Never put the response value in the message: it may be personal data.
+        raise ValueError(f"value at {pointer} is not a {transform} reference") from None
+    raise ValueError(f"unknown capture transform {transform!r}")
 
 
 def placeholders(case: Case) -> Iterator[str]:

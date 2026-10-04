@@ -12,16 +12,13 @@ WP-0g delivered the measuring tool, `prod/browser_share/browser_share.py`. The r
 
 On one deployment's production host, as a user who can read the nginx logs:
 
-1. Get the access logs. In the Docker deployments nginx-proxy logs to the container's stdout, and the json-file driver keeps about 100 MB (10 files of 10 MB):
+1. Pipe the access log straight into the script, so no copy of it is written anywhere. In the Docker deployments nginx-proxy logs to the container's stdout, and the json-file driver keeps about 100 MB (10 files of 10 MB):
    ```bash
-   docker logs <nginx container> 2>/dev/null > /tmp/<code>-access.log
+   docker logs <nginx container> 2>/dev/null \
+     | uv run prod/browser_share/browser_share.py --deployment <code> -
    ```
-   If the host writes log files instead, use them directly, plain or `.gz`, as many as cover the period.
-2. Run the script with the deployment code. It needs only `uv` and Python's standard library, and it never prints client addresses:
-   ```bash
-   uv run prod/browser_share/browser_share.py --deployment <code> /tmp/<code>-access.log
-   ```
-   Add `--json` for machine-readable output. Delete the copied log afterwards.
+   If the host writes log files instead, pass them in place of `-`, plain or `.gz`, as many as cover the period. The script needs only `uv` and Python's standard library, and it never prints client addresses. Add `--json` for machine-readable output.
+2. If it ends with "Phase 7 gate not evaluated" and exits 1, it found no browser sessions: check the container name and that the input is the access log.
 3. Paste the output below and fill in the table.
 
 A session is one (client address, user agent) pair with no gap over 30 minutes. If the deployment sits behind another proxy or a shared NAT, all users can share one address, which merges sessions that use the same browser. Note that under Measurement if it applies.
@@ -47,7 +44,7 @@ Script output:
 
 ## Options
 
-- **A. At or below 5%: go ahead with Tailwind v4.** Phase 7 starts as planned. Users below the line get a "supported browsers" notice.
+- **A. At or below 5%: go ahead with Tailwind v4.** Phase 7 starts as planned. Sessions below the line may see broken styling; no WP plans a notice for them, so choosing A accepts that.
 - **B. Above 5%: fallback plan first.** Name the browsers involved from the table above, then choose one before phase 7 starts. For example: a browser upgrade drive with the ministry IT team, with a date; or keep the current UI for those users until a re-measurement shows 5% or less.
 
 ## Decision

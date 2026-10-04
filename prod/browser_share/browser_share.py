@@ -3,19 +3,19 @@
 # requires-python = ">=3.13"
 # dependencies = []
 # ///
-"""Browser share per deployment from nginx access logs (WP-0g).
+"""Browser share for one deployment from its nginx access logs (WP-0g).
 
 Tailwind CSS v4 needs Chrome 111, Safari 16.4 or Firefox 128. This reports which
-browsers each deployment's users run and the share of sessions below that line.
+browsers a deployment's users run and the share of sessions below that line.
 
 nginx logs no session id, so a session is one (client address, user agent) pair
 with no gap longer than 30 minutes between requests. Client addresses are only
 used as keys in memory and never printed.
 
-    uv run prod/browser_share/browser_share.py --deployment rw access.log*
     docker logs <nginx> 2>/dev/null | uv run <this script> --deployment rw -
+    uv run prod/browser_share/browser_share.py --deployment rw access.log*
 
-Without --deployment, each file's parent directory names its deployment.
+Exits 1 when no browser sessions were found, so the gate was not evaluated.
 """
 
 import argparse
@@ -29,12 +29,11 @@ from collections.abc import Iterable, Iterator, Sequence
 from dataclasses import asdict, dataclass, field
 from datetime import datetime
 from enum import StrEnum
-from itertools import pairwise
-from pathlib import Path
+from itertools import chain, pairwise
 from typing import cast
 
 SESSION_GAP_SECONDS = 30 * 60
-PHASE_7_GATE_PCT = 5.0
+PHASE_7_GATE_PCT = 5
 
 
 class Engine(StrEnum):
@@ -43,6 +42,12 @@ class Engine(StrEnum):
     WEBKIT = "webkit"
     LEGACY = "legacy"
     UNKNOWN = "unknown"
+
+
+class Gate(StrEnum):
+    WITHIN = "within"
+    ABOVE = "above"
+    NOT_EVALUATED = "not evaluated"
 
 
 BASELINE: dict[Engine, tuple[int, int]] = {
@@ -78,43 +83,49 @@ class Request:
     user_agent: str
 
 
-# Matches nginx `combined` and the nginx-proxy `vhost` format, which adds a
-# `$host ` prefix and an `$upstream_addr` suffix. `search` skips both prefixes
-# and any `docker compose logs` line prefix.
+# Anchored, so a long line that does not match fails in linear time. Accepts an
+# optional `docker compose logs` prefix and the `$host ` that nginx-proxy's
+# `vhost` format puts before the `combined` fields.
 _LINE = re.compile(
+    r"(?:[\w.-]+ +\| )?"
+    r"(?:\S+ )?"
     r"(?P<client>\S+) \S+ \S+ \[(?P<time>[^\]]+)\] "
     r'"(?:[^"\\]|\\.)*" \d{3} \S+ '
     r'"(?:[^"\\]|\\.)*" "(?P<ua>(?:[^"\\]|\\.)*)"'
 )
 
 _AUTOMATED = re.compile(
-    r"bot|crawl|spider|slurp|curl|wget|python|go-http-client|okhttp|java/|"
-    r"libwww|httpclient|axios|node-fetch|monitor|uptime|headless|lighthouse|"
+    r"bot[/;-]|\bbot\b|crawl|spider|slurp|curl|wget|python|go-http-client|okhttp|"
+    r"java/|libwww|httpclient|axios|node-fetch|monitor|uptime|headless|lighthouse|"
     r"pingdom|facebookexternalhit|preview",
     re.IGNORECASE,
 )
 
-_IOS = re.compile(r"\((?:iPhone|iPad|iPod)[^)]*? OS (\d+)_(\d+)")
+# Bounded so int() never sees a number past its digit limit.
+_N = r"(\d{1,5})(?!\d)"
+
+_IOS = re.compile(rf"\((?:iPhone|iPad|iPod)[^)]*? OS {_N}_{_N}")
 _IOS_BRANDS = (
-    (re.compile(r"CriOS/(\d+)"), "Chrome iOS"),
-    (re.compile(r"FxiOS/(\d+)"), "Firefox iOS"),
-    (re.compile(r"EdgiOS/(\d+)"), "Edge iOS"),
+    (re.compile(rf"CriOS/{_N}"), "Chrome iOS"),
+    (re.compile(rf"FxiOS/{_N}"), "Firefox iOS"),
+    (re.compile(rf"EdgiOS/{_N}"), "Edge iOS"),
 )
 _BLINK_BRANDS = (
-    (re.compile(r"EdgA?/(\d+)"), "Edge"),
-    (re.compile(r"OPR/(\d+)"), "Opera"),
-    (re.compile(r"SamsungBrowser/(\d+)"), "Samsung Internet"),
-    (re.compile(r"YaBrowser/(\d+)"), "Yandex"),
+    (re.compile(rf"EdgA?/{_N}"), "Edge"),
+    (re.compile(rf"OPR/{_N}"), "Opera"),
+    (re.compile(rf"SamsungBrowser/{_N}"), "Samsung Internet"),
+    (re.compile(rf"UCBrowser/{_N}"), "UC Browser"),
+    (re.compile(rf"YaBrowser/{_N}"), "Yandex"),
 )
-_CHROME = re.compile(r"Chrom(?:e|ium)/(\d+)")
-_FIREFOX = re.compile(r"Firefox/(\d+)")
-_SAFARI_VERSION = re.compile(r"Version/(\d+)(?:\.(\d+))?")
-_EDGE_HTML = re.compile(r"Edge/(\d+)")
-_IE = re.compile(r"MSIE (\d+)|Trident/.*rv:(\d+)")
+_CHROME = re.compile(rf"Chrom(?:e|ium)/{_N}")
+_FIREFOX = re.compile(rf"Firefox/{_N}")
+_SAFARI_VERSION = re.compile(rf"Version/{_N}(?:\.{_N})?")
+_EDGE_HTML = re.compile(rf"Edge/{_N}")
+_IE = re.compile(rf"MSIE {_N}|Trident/[^)]*rv:{_N}")
 
 
 def parse_line(line: str) -> Request | None:
-    match = _LINE.search(line)
+    match = _LINE.match(line)
     if match is None:
         return None
     try:
@@ -131,16 +142,14 @@ def is_automated(user_agent: str) -> bool:
 def classify(user_agent: str) -> Browser:
     """Brand family and major for people; engine and version for the baseline.
 
-    Every iOS browser is WebKit at the OS's Safari version, and Edge, Opera and
-    Samsung Internet carry the real Chromium version in their `Chrome/` token.
+    Every iOS browser is WebKit, and Edge, Opera, Samsung Internet and UC Browser
+    carry the real Chromium version in their `Chrome/` token.
     """
     if ios := _IOS.search(user_agent):
-        safari = _SAFARI_VERSION.search(user_agent)
-        webkit = (
-            (int(safari[1]), int(safari[2] or 0))
-            if safari
-            else (int(ios[1]), int(ios[2]))
-        )
+        # Safari 26 freezes the OS token at 18_6; Edge iOS truncates Version/.
+        webkit = (int(ios[1]), int(ios[2]))
+        if safari := _SAFARI_VERSION.search(user_agent):
+            webkit = max(webkit, (int(safari[1]), int(safari[2] or 0)))
         for pattern, family in _IOS_BRANDS:
             if brand := pattern.search(user_agent):
                 return Browser(family, int(brand[1]), Engine.WEBKIT, webkit)
@@ -174,6 +183,14 @@ def classify(user_agent: str) -> Browser:
     return Browser("Other", None, Engine.UNKNOWN, None)
 
 
+def phase_7_gate(below: int, total: int) -> Gate:
+    if total == 0:
+        return Gate.NOT_EVALUATED
+    if below * 100 > PHASE_7_GATE_PCT * total:
+        return Gate.ABOVE
+    return Gate.WITHIN
+
+
 @dataclass(frozen=True, slots=True)
 class BrowserShare:
     family: str
@@ -186,10 +203,12 @@ class DeploymentReport:
     deployment: str
     sessions: int
     browsers: tuple[BrowserShare, ...]
+    below_baseline_sessions: int
     below_baseline_pct: float
     unknown_engine_pct: float
     automated_requests: int
     unparsed_lines: int
+    phase_7_gate: Gate
 
 
 @dataclass(slots=True)
@@ -224,11 +243,18 @@ def _pct(part: int, whole: int) -> float:
     return round(100 * part / whole, 1) if whole else 0.0
 
 
-def _report(deployment: str, tally: _Tally) -> DeploymentReport:
+def build_report(deployment: str, lines: Iterable[str]) -> DeploymentReport:
+    """Report for one deployment from its log lines, in any order."""
+    tally = _Tally()
+    for line in lines:
+        tally.add(line)
+
     by_browser: Counter[Browser] = Counter()
     for (_, user_agent), times in tally.request_times.items():
         by_browser[classify(user_agent)] += count_sessions(times)
     total = by_browser.total()
+    below = sum(n for b, n in by_browser.items() if b.below_baseline)
+    unknown = sum(n for b, n in by_browser.items() if b.engine is Engine.UNKNOWN)
 
     by_brand: Counter[tuple[str, int | None]] = Counter()
     for browser, sessions in by_browser.items():
@@ -244,28 +270,13 @@ def _report(deployment: str, tally: _Tally) -> DeploymentReport:
             BrowserShare(family, major, _pct(sessions, total))
             for (family, major), sessions in ranked
         ),
-        below_baseline_pct=_pct(
-            sum(n for b, n in by_browser.items() if b.below_baseline), total
-        ),
-        unknown_engine_pct=_pct(
-            sum(n for b, n in by_browser.items() if b.engine is Engine.UNKNOWN),
-            total,
-        ),
+        below_baseline_sessions=below,
+        below_baseline_pct=_pct(below, total),
+        unknown_engine_pct=_pct(unknown, total),
         automated_requests=tally.automated_requests,
         unparsed_lines=tally.unparsed_lines,
+        phase_7_gate=phase_7_gate(below, total),
     )
-
-
-def build_reports(
-    sources: Iterable[tuple[str, Iterable[str]]],
-) -> list[DeploymentReport]:
-    """Reports per deployment, from (deployment, log lines) pairs in any order."""
-    tallies: defaultdict[str, _Tally] = defaultdict(_Tally)
-    for deployment, lines in sources:
-        tally = tallies[deployment]
-        for line in lines:
-            tally.add(line)
-    return [_report(name, tallies[name]) for name in sorted(tallies)]
 
 
 def read_lines(path: str) -> Iterator[str]:
@@ -280,26 +291,31 @@ def read_lines(path: str) -> Iterator[str]:
 
 
 def format_text(report: DeploymentReport) -> str:
-    excluded = (
-        f"excluded {report.automated_requests} automated requests"
-        f" and {report.unparsed_lines} unparsed lines"
-    )
-    gate = f"the {PHASE_7_GATE_PCT:.0f}% phase 7 gate"
-    gate = (
-        f"within {gate}"
-        if report.below_baseline_pct <= PHASE_7_GATE_PCT
-        else f"above {gate}; phase 7 needs a fallback plan"
-    )
     rows = [
-        f"Deployment {report.deployment}: {report.sessions} sessions; {excluded}",
+        f"Deployment {report.deployment}: {report.sessions} sessions;"
+        f" excluded {report.automated_requests} automated requests"
+        f" and {report.unparsed_lines} unparsed lines",
+    ]
+    if report.phase_7_gate is Gate.NOT_EVALUATED:
+        rows.append(
+            "  Phase 7 gate not evaluated: no browser sessions found."
+            " Check that the input is this deployment's nginx access log."
+        )
+        return "\n".join(rows)
+
+    gate = f"{report.phase_7_gate} the {PHASE_7_GATE_PCT}% phase 7 gate"
+    if report.phase_7_gate is Gate.ABOVE:
+        gate += "; phase 7 needs a fallback plan"
+    rows += [
         f"  {'family':<20} {'major':>5} {'share_pct':>9}",
         *(
             f"  {b.family:<20} {'-' if b.major is None else b.major:>5}"
             f" {b.share_pct:>9.1f}"
             for b in report.browsers
         ),
-        f"  Below Chrome 111, Safari 16.4 or Firefox 128: "
-        f"{report.below_baseline_pct:.1f}% of sessions ({gate})",
+        "  Below Chrome 111, Safari 16.4 or Firefox 128:"
+        f" {report.below_baseline_sessions} of {report.sessions} sessions,"
+        f" {report.below_baseline_pct:.1f}% ({gate})",
         f"  Unknown engine: {report.unknown_engine_pct:.1f}% of sessions",
     ]
     return "\n".join(rows)
@@ -314,30 +330,23 @@ def main(argv: Sequence[str] | None = None) -> int:
         help="access log, plain or gzipped; - for stdin",
     )
     parser.add_argument(
-        "--deployment",
-        help="deployment code for every PATH (default: parent directory)",
+        "--deployment", required=True, help="deployment code, for example rw"
     )
     parser.add_argument("--json", action="store_true", help="print JSON")
     args = parser.parse_args(argv)
 
-    deployments: list[str] = []
-    for path in args.paths:
-        if args.deployment:
-            deployments.append(args.deployment)
-        elif path == "-":
-            parser.error("reading stdin needs --deployment")
-        else:
-            deployments.append(Path(path).resolve().parent.name)
+    try:
+        report = build_report(
+            args.deployment, chain.from_iterable(map(read_lines, args.paths))
+        )
+    except OSError as error:
+        parser.error(str(error))
 
-    reports = build_reports(
-        (deployment, read_lines(path))
-        for deployment, path in zip(deployments, args.paths, strict=True)
-    )
     if args.json:
-        print(json.dumps([asdict(r) for r in reports], indent=2))
+        print(json.dumps(asdict(report), indent=2))
     else:
-        print("\n\n".join(format_text(r) for r in reports))
-    return 0
+        print(format_text(report))
+    return 1 if report.phase_7_gate is Gate.NOT_EVALUATED else 0
 
 
 if __name__ == "__main__":

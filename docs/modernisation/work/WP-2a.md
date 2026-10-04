@@ -138,6 +138,6 @@ Every fixture was recorded from, and replays green against, the current code.
 
 | Role | Verdict | Notes |
 |---|---|---|
-| qa | pending | Self-built by qa-1. Needs an independent qa instance or the lead to re-run. |
+| qa | changes-requested | 2026-10-04 qa-2a-review: suite, determinism, drift check, characterisation and claimed mutants reproduce; but policy cases cover only bar_graph, table, line_graph, so a mutant dropping the policy on the other 9 routes stays green. Also: harness/README understate the patches (is_public_dashboard_user, clock, druid_context stub) and the ruff claim did not reproduce (27 UP findings). |
 | reviewer | pending | |
 | security | n/a | |

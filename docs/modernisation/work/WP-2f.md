@@ -119,10 +119,10 @@ None of these blocks this WP.
 - [x] **WP-2a** (merged into `mig/integration` at `ab4e2f7`, and here in `e7363e7`). I took WP-2f's `pyproject.toml` and `uv.lock`, dropping WP-2a's `golden` group and `testpaths = ["tests/golden"]`. Every package in the `golden` group is in WP-2f's dependencies under the same normalised name. Results:
   - `uv run --locked pytest tests/golden`: 269 passed;
   - `uv run --locked python tests/golden/record.py --check`: "85 cases, 0 fixture files would change", exit 0.
-- [ ] **WP-0b, when it lands on `mig/integration`:**
-  - move `bcrypt==4.0.1` from `requirements.txt` into `[project].dependencies` next to flask-user, then `uv lock` (today's lock resolves bcrypt 5.0.0) and `make requirements`. Its `requirements.txt` edit would otherwise fail the drift test. Until then the lock stays as it is;
-  - `tests/infra/test_requirements.py` reads the generated `requirements.txt` in the 3.13 lane, so it keeps working;
-  - `tests/core`, `tests/web` and `tests/druid_setup` join the 3.9 job automatically. Re-run the full local CI on that merge, and mark anything that needs the stack `stack`.
+- [x] **WP-0b** (on `mig/integration` at `215f03b`, merged here in `a7fd8f1`, ported in `890b36f`):
+  - `bcrypt==4.0.1 ; platform_python_implementation != 'PyPy'` moved from `requirements.txt` into `[project].dependencies` next to flask-user, with its passlib comment. `uv lock` moved bcrypt from 5.0.0 to 4.0.1, and `make requirements` reproduces `requirements.txt` unchanged;
+  - `tests/infra/test_requirements.py` reads the generated `requirements.txt` in the 3.13 lane, and it passes;
+  - `tests/core`, `tests/web` and `tests/druid_setup` joined the 3.9 job automatically. The full local CI passes on the merge, and no test needed the `stack` marker (Log, 2026-10-04).
 - [x] **WP-0d, ported in `1b9f6a7`.** WP-0d reached `mig/integration` first, so I ported it in the merge. The generated files match `mig/integration`'s hand-edited ones, except for this WP's own differences: the two redundant lines and the dev tool swap. That includes `gspread>=5.4.0 ; platform_python_implementation != 'PyPy'`. `uv lock` dropped 33 packages (graphene, google-cloud-logging, grpcio, dask, paramiko and others), and `mypy.ini`'s modify/delete conflict resolved to deleted. `fuzzywuzzy` and `editdistance` left the pin-test allowlist. The porting checklist, kept for the record:
   - the removed packages out of `pyproject.toml` (`[project].dependencies`, `web`, `pipeline`, `dev`), then `uv lock` and `make requirements`;
   - the five removed mypy overrides (`flask_admin`, `flask_graphql`, `graphene`, `graphene_sqlalchemy`, `graphql_relay`) out of `[[tool.mypy.overrides]]`;
@@ -221,6 +221,16 @@ None of these blocks this WP.
   - a broken golden case makes the runner exit 1 with "failed suites: tests/golden";
   - actionlint 0, WP-0f policy OK, zizmor 0;
   - the task gate's SPEC 7.2 claim check passes.
+- 2026-10-04 infra-2 (resumed after the host reboot): WP-0b port in `890b36f`. The pin is in `[project].dependencies`, and `uv.lock` has bcrypt 4.0.1. The isolation hook refused git in the original worktree, so the commit is on the instance branch `mig/WP-2f-uv-ruff-mypy-ci-infra` (from `a7fd8f1`), for the lead to fast-forward `mig/WP-2f-uv-ruff-mypy-ci`. Check:
+  - `uv lock --check` passes for both projects;
+  - after `uv sync --locked`, `make requirements` leaves the tree unchanged;
+  - the drift test fails with "stale, run `make requirements`: requirements.txt" when the pin is reverted in `pyproject.toml` only, and passes with it in place;
+  - `ci/lint_python.sh mig/integration` exits 0 (8 changed files, lint-clean and formatted);
+  - mypy finds no issues in 517 source files;
+  - `CI=true ci/pytest_suites.sh` passes all 8 suites, 613 tests (core 25, druid 1, druid_setup 79, golden 269, graphql 5, pipeline 130, toolchain 9, web 95);
+  - `record.py --check` reports "85 cases, 0 fixture files would change";
+  - the 3.13 job gives 160 passed, and strict mypy is clean;
+  - passlib's bcrypt `CryptContext` hashes and verifies an 80-byte password.
 
 ## Decisions
 

@@ -1,7 +1,7 @@
 ---
 wp: "0g"
 title: "Browser-share report from nginx logs"
-status: building
+status: review
 owner_role: "infra"
 instances:
   - name: "infra-3"
@@ -45,13 +45,33 @@ None.
 
 ## Requests
 
+- [ ] human: run `uv run prod/browser_share/browser_share.py --deployment <code> <logs>` against one deployment's production nginx logs and fill in [decision 0002](../decisions/0002-browser-baseline-for-tailwind-v4.md): the measurement table, the pasted output and the decision. This is the phase 7 decision-log entry, and phase 7 must not start until it is filled. It does not block review of the script.
+
 ## Log
 
 - 2026-10-04 infra-3 unit 1: claimed WP-0g and wrote the plan; check: `ownership.py who` reports infra for `prod/browser_share/**`, shared for `tests/infra/**` and the WP and decision files.
 - 2026-10-04 infra-3 unit 2: log-line parser and engine-based user-agent classifier; check: `pytest tests/infra` 37 passed, `ruff check` and `ruff format --check` clean, `mypy --strict` no issues.
 - 2026-10-04 infra-3 unit 3: 30-minute sessions per (client, user agent), `BrowserShare` report per deployment, CLI over plain, gzipped and stdin logs with a synthetic fixture; check: `pytest tests/infra` 49 passed, ruff and `mypy --strict` clean, `uv run prod/browser_share/browser_share.py` on the fixture (plain, gzipped, stdin) prints the expected 10 sessions and 40.0% below baseline.
+- 2026-10-04 infra-3 unit 4: placeholder [decision 0002](../decisions/0002-browser-baseline-for-tailwind-v4.md) with run instructions and the fields to fill; check: relative links resolve. `task_gate.py WP-0g` refuses on status, the pending verdicts, and `docs/modernisation/SPEC.md` plus `scripts/agents/ownership.py`. Those two come from the lead's `mig/decisions-0001-ownership` merge and drop out of the diff once that branch is on `main` and this branch is rebased.
 
 ## Evidence
+
+- **Tests.** `uv run --no-project -p 3.13 --with pytest==8.4.2 pytest -q tests/infra` gives `49 passed`. They cover:
+  - every classifier branch and each baseline boundary: Chrome 110 and 111, Firefox 127 and 128, Safari 16.3 and 16.4, and iOS judged by its OS version;
+  - the combined, nginx-proxy `vhost` and `docker compose logs` line shapes, plus timezone offsets;
+  - 30-minute session splits and out-of-order rotated gzip files;
+  - separate deployments;
+  - no client address reaching the output.
+- **Static checks.**
+  - `uvx ruff@0.16.10 check --select E,F,I,UP,B,SIM prod/browser_share tests/infra` and `ruff format --check` are clean.
+  - `MYPYPATH=prod/browser_share uvx --python 3.13 --with pytest==8.4.2 mypy@2.4.0 --config-file=/dev/null --strict --explicit-package-bases prod/browser_share/browser_share.py tests/infra/test_browser_share.py` finds no issues.
+  - The repo's `mypy.ini` is bypassed because it loads the legacy `sqlmypy` plugin. WP-2f replaces it.
+- **Runtime.**
+  - `uv run prod/browser_share/browser_share.py tests/infra/testdata/zz/access.log` prints 10 sessions, Chrome 126 at 20.0%, and 40.0% below baseline ("above the 5% phase 7 gate").
+  - A gzipped copy with `--json`, and stdin with `--deployment`, give the same result.
+  - Stdin without `--deployment` exits 2 with a usage error.
+- **Fixture privacy.** It uses only RFC 5737 and RFC 3849 documentation addresses, loopback and `*.example.org` hosts.
+- **Not done.** There is no measurement on real logs, because the repo has none. See Requests.
 
 ## Verdicts
 

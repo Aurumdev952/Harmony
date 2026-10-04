@@ -218,3 +218,9 @@ dask-worker-space/
 
 #mypy
 .dmypy.*
+
+# Claude Code: local-only agent state
+.claude/worktrees/
+.claude/settings.local.json
+.claude/agent-memory-local/
+scripts/agents/__pycache__/

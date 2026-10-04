@@ -1,0 +1,116 @@
+{
+  "$schema": "https://json.schemastore.org/claude-code-settings.json",
+  "env": {
+    "CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS": "1"
+  },
+  "permissions": {
+    "deny": [
+      "Read(./.env)",
+      "Read(./.env.*)",
+      "Bash(git push --force*)",
+      "Bash(git push -f*)",
+      "Bash(git push * main*)",
+      "Bash(gh pr merge *)",
+      "Bash(make deploy*)"
+    ]
+  },
+  "hooks": {
+    "PreToolUse": [
+      {
+        "matcher": "Edit|Write|MultiEdit|NotebookEdit",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "python3 \"${CLAUDE_PROJECT_DIR}/scripts/agents/ownership.py\" hook"
+          }
+        ]
+      }
+    ],
+    "TaskCompleted": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "python3 \"${CLAUDE_PROJECT_DIR}/scripts/agents/task_gate.py\""
+          }
+        ]
+      }
+    ]
+  },
+  "worktree": {
+    "baseRef": "head"
+  },
+  "enabledPlugins": {
+    "frontend-design@claude-plugins-official": true,
+    "playwright@claude-plugins-official": true,
+    "redis-development@claude-plugins-official": true,
+    "security-guidance@claude-plugins-official": true,
+    "claude-security@claude-plugins-official": true,
+    "pstack@pstack-claude": true,
+    "pydantic@pydantic-skills": true,
+    "astral@astral-sh": true,
+    "polars@polars": true,
+    "dagster@dagster": true,
+    "docker-skills@docker": true,
+    "storybook@storybook": true,
+    "differential-review@trailofbits": true,
+    "sharp-edges@trailofbits": true,
+    "insecure-defaults@trailofbits": true,
+    "supply-chain-risk-auditor@trailofbits": true,
+    "static-analysis@trailofbits": true,
+    "fp-check@trailofbits": true,
+    "modern-python@trailofbits": true,
+    "property-based-testing@trailofbits": true,
+    "clickhouse-best-practices@claude-plugins-official": true
+  },
+  "extraKnownMarketplaces": {
+    "pstack-claude": {
+      "source": {
+        "source": "git",
+        "url": "https://github.com/michael-denyer/pstack-claude.git"
+      }
+    },
+    "pydantic-skills": {
+      "source": {
+        "source": "github",
+        "repo": "pydantic/skills"
+      }
+    },
+    "astral-sh": {
+      "source": {
+        "source": "github",
+        "repo": "astral-sh/claude-code-plugins"
+      }
+    },
+    "polars": {
+      "source": {
+        "source": "github",
+        "repo": "polars-inc/skills"
+      }
+    },
+    "dagster": {
+      "source": {
+        "source": "github",
+        "repo": "dagster-io/skills"
+      }
+    },
+    "docker": {
+      "source": {
+        "source": "github",
+        "repo": "docker/skills"
+      }
+    },
+    "trailofbits": {
+      "source": {
+        "source": "github",
+        "repo": "trailofbits/skills"
+      }
+    },
+    "storybook": {
+      "source": {
+        "source": "github",
+        "repo": "storybookjs/mcp"
+      }
+    }
+  }
+}

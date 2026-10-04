@@ -76,6 +76,6 @@ None.
 
 | Role | Verdict | Notes |
 |---|---|---|
-| qa | pending | |
+| qa | approved | 2026-10-04 qa-0f: actionlint 38 to 0 reproduced; SHA pins, permissions, Makefile and hostile-filename simulation verified. PR run of integration.yml deferred until push; human to confirm Jenkinsfile. |
 | reviewer | pending | |
 | security | pending | |

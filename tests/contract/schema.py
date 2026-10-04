@@ -40,7 +40,7 @@ _DATA_KEY = re.compile(
     r"^(-?\d+(\.\d+)?"  # numeric ids
     r"|[0-9a-fA-F-]{32,36}"  # uuids and hex digests
     r"|\d{4}-\d{2}-\d{2}.*"  # dates
-    r"|[^@\s]+@[^@\s]+"  # emails
+    r"|.*@.*"  # anything with an @, emails included
     r"|/api2?/.*"  # resource URIs
     r")$"
 )

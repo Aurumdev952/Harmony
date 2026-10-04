@@ -1,0 +1,70 @@
+{
+  "fields": [
+    {
+      "id": "yellow_fever_cases",
+      "calculation": {
+        "type": "SUM",
+        "filter": {
+          "type": "FIELD",
+          "fieldId": "yellow_fever_cases"
+        }
+      }
+    }
+  ],
+  "filter": {
+    "type": "AND",
+    "fields": [
+      {
+        "type": "INTERVAL",
+        "start": "2024-01-01",
+        "end": "2024-04-01"
+      },
+      {
+        "type": "OR",
+        "fields": [
+          {
+            "type": "IN",
+            "dimension": "StateName",
+            "values": [
+              "Pará",
+              "Roraima"
+            ]
+          },
+          {
+            "type": "AND",
+            "fields": [
+              {
+                "type": "SELECTOR",
+                "dimension": "StateName",
+                "value": "Acre"
+              },
+              {
+                "type": "NOT",
+                "field": {
+                  "type": "SELECTOR",
+                  "dimension": "Age",
+                  "value": "15-49"
+                }
+              }
+            ]
+          }
+        ]
+      }
+    ]
+  },
+  "groups": [
+    {
+      "dimension": "StateName",
+      "includeAll": false,
+      "includeNull": false,
+      "includeTotal": false
+    },
+    {
+      "dimension": "Age",
+      "includeAll": false,
+      "includeNull": false,
+      "includeTotal": false
+    }
+  ],
+  "type": "GROUP_BY"
+}

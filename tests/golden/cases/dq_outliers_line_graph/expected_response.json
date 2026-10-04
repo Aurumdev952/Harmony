@@ -1,0 +1,411 @@
+{
+  "data": [
+    {
+      "dimensions": {
+        "StateName": "Pará"
+      },
+      "extreme_lower_bound": -89.31164646073663,
+      "extreme_upper_bound": 551.3059321750223,
+      "key": "Pará",
+      "mean": 254.43730769230768,
+      "outlier_lower_bound": 17.457949978556513,
+      "outlier_upper_bound": 444.53633573572915,
+      "timestamp": "2024-03-04",
+      "yellow_fever_cases": 226.0
+    },
+    {
+      "dimensions": {
+        "StateName": "Roraima"
+      },
+      "extreme_lower_bound": -80.95191210066864,
+      "extreme_upper_bound": 577.8937302824868,
+      "key": "Roraima",
+      "mean": 254.43730769230768,
+      "outlier_lower_bound": 28.855694963190615,
+      "outlier_upper_bound": 468.08612321862756,
+      "timestamp": "2024-03-04",
+      "yellow_fever_cases": 279.0
+    },
+    {
+      "dimensions": {
+        "StateName": "Acre"
+      },
+      "extreme_lower_bound": 33.206784686059876,
+      "extreme_upper_bound": 533.0957153139401,
+      "key": "Acre",
+      "mean": 254.43730769230768,
+      "outlier_lower_bound": 116.52160645737325,
+      "outlier_upper_bound": 449.78089354262676,
+      "timestamp": "2024-03-05",
+      "yellow_fever_cases": 243.0
+    },
+    {
+      "dimensions": {
+        "StateName": "Pará"
+      },
+      "extreme_lower_bound": -89.31164646073663,
+      "extreme_upper_bound": 551.3059321750223,
+      "key": "Pará",
+      "mean": 254.43730769230768,
+      "outlier_lower_bound": 17.457949978556513,
+      "outlier_upper_bound": 444.53633573572915,
+      "timestamp": "2024-03-05",
+      "yellow_fever_cases": 168.98
+    },
+    {
+      "dimensions": {
+        "StateName": "Roraima"
+      },
+      "extreme_lower_bound": -80.95191210066864,
+      "extreme_upper_bound": 577.8937302824868,
+      "key": "Roraima",
+      "mean": 254.43730769230768,
+      "outlier_lower_bound": 28.855694963190615,
+      "outlier_upper_bound": 468.08612321862756,
+      "timestamp": "2024-03-05",
+      "yellow_fever_cases": 390.21
+    },
+    {
+      "dimensions": {
+        "StateName": "Pará"
+      },
+      "extreme_lower_bound": -89.31164646073663,
+      "extreme_upper_bound": 551.3059321750223,
+      "key": "Pará",
+      "mean": 254.43730769230768,
+      "outlier_lower_bound": 17.457949978556513,
+      "outlier_upper_bound": 444.53633573572915,
+      "timestamp": "2024-03-06",
+      "yellow_fever_cases": 346.0
+    },
+    {
+      "dimensions": {
+        "StateName": "Roraima"
+      },
+      "extreme_lower_bound": -80.95191210066864,
+      "extreme_upper_bound": 577.8937302824868,
+      "key": "Roraima",
+      "mean": 254.43730769230768,
+      "outlier_lower_bound": 28.855694963190615,
+      "outlier_upper_bound": 468.08612321862756,
+      "timestamp": "2024-03-06",
+      "yellow_fever_cases": 341.0
+    },
+    {
+      "dimensions": {
+        "StateName": "Acre"
+      },
+      "extreme_lower_bound": 33.206784686059876,
+      "extreme_upper_bound": 533.0957153139401,
+      "key": "Acre",
+      "mean": 254.43730769230768,
+      "outlier_lower_bound": 116.52160645737325,
+      "outlier_upper_bound": 449.78089354262676,
+      "timestamp": "2024-03-07",
+      "yellow_fever_cases": 271.0
+    },
+    {
+      "dimensions": {
+        "StateName": "Roraima"
+      },
+      "extreme_lower_bound": NaN,
+      "extreme_upper_bound": NaN,
+      "key": "Roraima",
+      "mean": 254.43730769230768,
+      "outlier_lower_bound": NaN,
+      "outlier_upper_bound": NaN,
+      "timestamp": "2024-03-07",
+      "yellow_fever_cases": null
+    },
+    {
+      "dimensions": {
+        "StateName": "Acre"
+      },
+      "extreme_lower_bound": 33.206784686059876,
+      "extreme_upper_bound": 533.0957153139401,
+      "key": "Acre",
+      "mean": 254.43730769230768,
+      "outlier_lower_bound": 116.52160645737325,
+      "outlier_upper_bound": 449.78089354262676,
+      "timestamp": "2024-03-08",
+      "yellow_fever_cases": 183.47
+    },
+    {
+      "dimensions": {
+        "StateName": "Pará"
+      },
+      "extreme_lower_bound": -89.31164646073663,
+      "extreme_upper_bound": 551.3059321750223,
+      "key": "Pará",
+      "mean": 254.43730769230768,
+      "outlier_lower_bound": 17.457949978556513,
+      "outlier_upper_bound": 444.53633573572915,
+      "timestamp": "2024-03-08",
+      "yellow_fever_cases": 379.0
+    },
+    {
+      "dimensions": {
+        "StateName": "Roraima"
+      },
+      "extreme_lower_bound": -80.95191210066864,
+      "extreme_upper_bound": 577.8937302824868,
+      "key": "Roraima",
+      "mean": 254.43730769230768,
+      "outlier_lower_bound": 28.855694963190615,
+      "outlier_upper_bound": 468.08612321862756,
+      "timestamp": "2024-03-08",
+      "yellow_fever_cases": 200.0
+    },
+    {
+      "dimensions": {
+        "StateName": "Acre"
+      },
+      "extreme_lower_bound": NaN,
+      "extreme_upper_bound": NaN,
+      "key": "Acre",
+      "mean": 254.43730769230768,
+      "outlier_lower_bound": NaN,
+      "outlier_upper_bound": NaN,
+      "timestamp": "2024-03-09",
+      "yellow_fever_cases": null
+    },
+    {
+      "dimensions": {
+        "StateName": "Pará"
+      },
+      "extreme_lower_bound": -89.31164646073663,
+      "extreme_upper_bound": 551.3059321750223,
+      "key": "Pará",
+      "mean": 254.43730769230768,
+      "outlier_lower_bound": 17.457949978556513,
+      "outlier_upper_bound": 444.53633573572915,
+      "timestamp": "2024-03-09",
+      "yellow_fever_cases": 270.0
+    },
+    {
+      "dimensions": {
+        "StateName": "Acre"
+      },
+      "extreme_lower_bound": 33.206784686059876,
+      "extreme_upper_bound": 533.0957153139401,
+      "key": "Acre",
+      "mean": 254.43730769230768,
+      "outlier_lower_bound": 116.52160645737325,
+      "outlier_upper_bound": 449.78089354262676,
+      "timestamp": "2024-03-10",
+      "yellow_fever_cases": 353.42
+    },
+    {
+      "dimensions": {
+        "StateName": "Roraima"
+      },
+      "extreme_lower_bound": -80.95191210066864,
+      "extreme_upper_bound": 577.8937302824868,
+      "key": "Roraima",
+      "mean": 254.43730769230768,
+      "outlier_lower_bound": 28.855694963190615,
+      "outlier_upper_bound": 468.08612321862756,
+      "timestamp": "2024-03-10",
+      "yellow_fever_cases": 332.0
+    },
+    {
+      "dimensions": {
+        "StateName": "Acre"
+      },
+      "extreme_lower_bound": 33.206784686059876,
+      "extreme_upper_bound": 533.0957153139401,
+      "key": "Acre",
+      "mean": 254.43730769230768,
+      "outlier_lower_bound": 116.52160645737325,
+      "outlier_upper_bound": 449.78089354262676,
+      "timestamp": "2024-03-11",
+      "yellow_fever_cases": 268.32
+    },
+    {
+      "dimensions": {
+        "StateName": "Pará"
+      },
+      "extreme_lower_bound": -89.31164646073663,
+      "extreme_upper_bound": 551.3059321750223,
+      "key": "Pará",
+      "mean": 254.43730769230768,
+      "outlier_lower_bound": 17.457949978556513,
+      "outlier_upper_bound": 444.53633573572915,
+      "timestamp": "2024-03-11",
+      "yellow_fever_cases": 102.0
+    },
+    {
+      "dimensions": {
+        "StateName": "Roraima"
+      },
+      "extreme_lower_bound": -80.95191210066864,
+      "extreme_upper_bound": 577.8937302824868,
+      "key": "Roraima",
+      "mean": 254.43730769230768,
+      "outlier_lower_bound": 28.855694963190615,
+      "outlier_upper_bound": 468.08612321862756,
+      "timestamp": "2024-03-11",
+      "yellow_fever_cases": 181.0
+    },
+    {
+      "dimensions": {
+        "StateName": "Roraima"
+      },
+      "extreme_lower_bound": -80.95191210066864,
+      "extreme_upper_bound": 577.8937302824868,
+      "key": "Roraima",
+      "mean": 254.43730769230768,
+      "outlier_lower_bound": 28.855694963190615,
+      "outlier_upper_bound": 468.08612321862756,
+      "timestamp": "2024-03-12",
+      "yellow_fever_cases": 109.0
+    },
+    {
+      "dimensions": {
+        "StateName": "Acre"
+      },
+      "extreme_lower_bound": 33.206784686059876,
+      "extreme_upper_bound": 533.0957153139401,
+      "key": "Acre",
+      "mean": 254.43730769230768,
+      "outlier_lower_bound": 116.52160645737325,
+      "outlier_upper_bound": 449.78089354262676,
+      "timestamp": "2024-03-13",
+      "yellow_fever_cases": 178.0
+    },
+    {
+      "dimensions": {
+        "StateName": "Pará"
+      },
+      "extreme_lower_bound": -89.31164646073663,
+      "extreme_upper_bound": 551.3059321750223,
+      "key": "Pará",
+      "mean": 254.43730769230768,
+      "outlier_lower_bound": 17.457949978556513,
+      "outlier_upper_bound": 444.53633573572915,
+      "timestamp": "2024-03-13",
+      "yellow_fever_cases": 125.0
+    },
+    {
+      "dimensions": {
+        "StateName": "Roraima"
+      },
+      "extreme_lower_bound": -80.95191210066864,
+      "extreme_upper_bound": 577.8937302824868,
+      "key": "Roraima",
+      "mean": 254.43730769230768,
+      "outlier_lower_bound": 28.855694963190615,
+      "outlier_upper_bound": 468.08612321862756,
+      "timestamp": "2024-03-13",
+      "yellow_fever_cases": 284.0
+    },
+    {
+      "dimensions": {
+        "StateName": "Acre"
+      },
+      "extreme_lower_bound": 33.206784686059876,
+      "extreme_upper_bound": 533.0957153139401,
+      "key": "Acre",
+      "mean": 254.43730769230768,
+      "outlier_lower_bound": 116.52160645737325,
+      "outlier_upper_bound": 449.78089354262676,
+      "timestamp": "2024-03-14",
+      "yellow_fever_cases": 397.0
+    },
+    {
+      "dimensions": {
+        "StateName": "Roraima"
+      },
+      "extreme_lower_bound": -80.95191210066864,
+      "extreme_upper_bound": 577.8937302824868,
+      "key": "Roraima",
+      "mean": 254.43730769230768,
+      "outlier_lower_bound": 28.855694963190615,
+      "outlier_upper_bound": 468.08612321862756,
+      "timestamp": "2024-03-14",
+      "yellow_fever_cases": 66.97
+    },
+    {
+      "dimensions": {
+        "StateName": "Roraima"
+      },
+      "extreme_lower_bound": -80.95191210066864,
+      "extreme_upper_bound": 577.8937302824868,
+      "key": "Roraima",
+      "mean": 254.43730769230768,
+      "outlier_lower_bound": 28.855694963190615,
+      "outlier_upper_bound": 468.08612321862756,
+      "timestamp": "2024-03-15",
+      "yellow_fever_cases": 170.0
+    },
+    {
+      "dimensions": {
+        "StateName": "Acre"
+      },
+      "extreme_lower_bound": 33.206784686059876,
+      "extreme_upper_bound": 533.0957153139401,
+      "key": "Acre",
+      "mean": 254.43730769230768,
+      "outlier_lower_bound": 116.52160645737325,
+      "outlier_upper_bound": 449.78089354262676,
+      "timestamp": "2024-03-16",
+      "yellow_fever_cases": 371.0
+    },
+    {
+      "dimensions": {
+        "StateName": "Pará"
+      },
+      "extreme_lower_bound": NaN,
+      "extreme_upper_bound": NaN,
+      "key": "Pará",
+      "mean": 254.43730769230768,
+      "outlier_lower_bound": NaN,
+      "outlier_upper_bound": NaN,
+      "timestamp": "2024-03-16",
+      "yellow_fever_cases": null
+    },
+    {
+      "dimensions": {
+        "StateName": "Pará"
+      },
+      "extreme_lower_bound": NaN,
+      "extreme_upper_bound": NaN,
+      "key": "Pará",
+      "mean": 254.43730769230768,
+      "outlier_lower_bound": NaN,
+      "outlier_upper_bound": NaN,
+      "timestamp": "2024-03-17",
+      "yellow_fever_cases": null
+    },
+    {
+      "dimensions": {
+        "StateName": "Roraima"
+      },
+      "extreme_lower_bound": -80.95191210066864,
+      "extreme_upper_bound": 577.8937302824868,
+      "key": "Roraima",
+      "mean": 254.43730769230768,
+      "outlier_lower_bound": 28.855694963190615,
+      "outlier_upper_bound": 468.08612321862756,
+      "timestamp": "2024-03-17",
+      "yellow_fever_cases": 380.0
+    }
+  ],
+  "dates": [
+    "2024-03-04",
+    "2024-03-05",
+    "2024-03-06",
+    "2024-03-07",
+    "2024-03-08",
+    "2024-03-09",
+    "2024-03-10",
+    "2024-03-11",
+    "2024-03-12",
+    "2024-03-13",
+    "2024-03-14",
+    "2024-03-15",
+    "2024-03-16",
+    "2024-03-17"
+  ],
+  "totals": {}
+}

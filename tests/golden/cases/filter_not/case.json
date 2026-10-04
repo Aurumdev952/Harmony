@@ -1,0 +1,5 @@
+{
+  "description": "NOT filter excluding deaths.",
+  "endpoint": "table",
+  "policy": null
+}

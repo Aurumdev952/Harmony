@@ -1,0 +1,5 @@
+{
+  "description": "WINDOW (3-month rolling average): a SUM in Druid, rolled in pandas after the query.",
+  "endpoint": "line_graph",
+  "policy": null
+}

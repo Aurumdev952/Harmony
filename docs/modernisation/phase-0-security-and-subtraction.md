@@ -9,7 +9,7 @@ Each unit is one PR.
 ## 0a. Lock down Hasura
 
 - **Changes.**
-  - Set `HASURA_GRAPHQL_ADMIN_SECRET` and `HASURA_GRAPHQL_UNAUTHORIZED_ROLE` in `docker-compose.yaml` and stop publishing port 8088.
+  - Set `HASURA_GRAPHQL_ADMIN_SECRET` in `docker-compose.yaml` and stop publishing port 8088. Do not set `HASURA_GRAPHQL_UNAUTHORIZED_ROLE`: in admin-secret mode it serves requests without the secret as that role, which defeats the lockdown (WP-0a decision).
   - Have the Flask proxy (`web/server/routes/api.py:144-176`) send the admin secret plus `x-hasura-role` and `x-hasura-user-id` headers from `current_user`.
   - Pass `apply_metadata_snapshot.py` the secret.
   - Upgrade Hasura to v2.45 LTS in the same PR, since v2.11 has been out of support since 2024-09. It is an interim step; phase 5 retires Hasura.
@@ -48,9 +48,9 @@ Each unit is one PR.
 - **Changes.**
   - Remove from the requirements files: Flask-Admin, graphene-sqlalchemy, Flask-GraphQL, dask, google-cloud-logging, segment-analytics-python, paramiko and its pins, fuzzywuzzy, jellyfish, editdistance.
   - Delete the empty `/graphql` route and its module (`web/server/routes/graphql_api.py`, `web/server/graphql/`).
-  - Delete the unused `/api/timeout` route.
-  - Delete the Hadoop task templates (`db/druid/indexing/resources/task_templates`, `tuning_configs/on_prem.json`).
-  - Point `web/client/util/graphql/zen_environment.js` at the Hasura environment, or delete it.
+  - `/api/timeout` is live (the client's inactivity sign-out posts to it); keep it.
+  - Delete the Hadoop task templates (`db/druid/indexing/resources/task_templates`, `tuning_configs/on_prem.json`) together with `legacy_task_builder.py`, which reads them at import, and `scripts/run_indexing.py`, which nothing references.
+  - Delete `web/client/util/graphql/zen_environment.js` and its re-export in `index.jsx`; nothing uses it.
 - **Verification.** Images build. Every page and every Potion resource still responds; use the smoke list in [testing.md](testing.md). `grep` confirms no imports of the removed packages.
 
 ## 0e. Delete dead frontend code and dependencies
@@ -79,3 +79,16 @@ Each unit is one PR.
 - **Changes.** Add a script that summarises user agents from production nginx access logs, sorted by deployment.
 - **Data structure.** `BrowserShare = {family, major, share_pct}` per deployment.
 - **Verification.** It runs against one deployment's logs. The share of sessions below Chrome 111, Safari 16.4 or Firefox 128 is recorded in the phase 7 decision log. If more than 5% of sessions fall below that line, phase 7 needs a fallback plan before it starts.
+
+## 0h. Close the privilege escalations in group and role management
+
+Added by decision 0003 after WP-2b reproduced them.
+
+- **Changes.**
+  - `POST /api2/group` and `PATCH /api2/group/<id>`: resolve role URIs through the `RoleResourceManager` filter, and refuse to attach a role the caller could not grant directly (the admin role needs sitewide admin; resource roles need the matching resource permission).
+  - `POST /api2/role` and `PATCH /api2/role/<id>`: creating or editing a role with permissions or resource roles passes the same `update_permissions` gate as editing permissions directly; the creator is not auto-added unless the caller may grant that role.
+  - Audit log entries for every refused attempt.
+- **Verification.**
+  - The three WP-2b escalation cases flip from pinned to refused (403) in the same change.
+  - The rest of the WP-2b table is unchanged: no other role loses or gains anything.
+  - The INV-3 difference table in the WP file is accepted by security and the human.

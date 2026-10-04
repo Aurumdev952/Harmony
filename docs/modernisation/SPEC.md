@@ -1,6 +1,6 @@
 # Harmony modernisation specification
 
-Version 1.3, 2026-10-04 (decisions 0001, 0003). Status: approved for execution.
+Version 1.4, 2026-10-05 (decisions 0001, 0003, 0004). Status: approved for execution.
 
 This is the binding guide for every agent and engineer working on the Harmony migration. Where this spec and another document disagree, this spec wins. The other documents explain why and describe the work in detail:
 
@@ -155,6 +155,7 @@ Each WP is one pull request, or a short stack of them. Detail lives in the named
 | 0f | One CI system, `main` branch, least-privilege Actions | infra | none | none | yes |
 | 0g | Browser-share report from nginx logs | infra | qa | none | no |
 | 0h | Close privilege escalations in group and role management | backend | core, security, qa | 2b | yes |
+| 0i | Guard the dashboard render and thumbnail routes | backend | security, qa | none | yes |
 | 1a | Performance baseline | qa | core | none | no |
 | 1b | Shared result cache | core | none | 1a | yes |
 | 1c | Columnar parsing | core | none | 1a, golden cases | no |

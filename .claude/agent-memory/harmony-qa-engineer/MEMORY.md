@@ -1,1 +1,1 @@
-- [Review traps](review_traps.md) — gitignored fixtures (*.log), hook limits on shell loops/cd, use uv run python runners
+- [Frontend build and template verification](frontend-build-and-template-verification.md): build diff, CSS rule diff, Jinja render, script URLs, static Playwright smoke, isolated-shell traps

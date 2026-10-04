@@ -1,0 +1,101 @@
+- generic [ref=f8e1]:
+  - generic [ref=f8e2]:
+    - button [ref=f8e3] [cursor=pointer]
+    - generic [ref=f8e6]:
+      - generic [ref=f8e7]:
+        - link [ref=f8e8] [cursor=pointer]:
+          - /url: /advanced-query
+          - button "Analyze" [ref=f8e9]
+        - button "Dashboards" [ref=f8e11] [cursor=pointer]
+        - link [ref=f8e12] [cursor=pointer]:
+          - /url: /data-quality
+          - button "Data Quality" [ref=f8e13]
+      - button "Brow " [ref=f8e17] [cursor=pointer]:
+        - generic [ref=f8e19]:
+          - text: Brow
+          - generic [ref=f8e20]: 
+  - main [aria-hidden] [ref=f8e21]:
+    - generic [ref=f8e103]:
+      - generic [ref=f8e104]:
+        - heading [level=1] [ref=f8e106]: Data Upload
+        - button [ref=f8e108] [cursor=pointer]:
+          - generic [ref=f8e109]:
+            - generic [ref=f8e110]: +
+            - text: Add source
+        - generic [ref=f8e112]:
+          - generic [ref=f8e113]: Estimated next pipeline completion
+          - generic [ref=f8e119]: No Information
+        - generic [ref=f8e128]:
+          - generic [ref=f8e129]: Last successful pipeline completion
+          - generic [ref=f8e135]: No Information
+      - table [ref=f8e140]:
+        - rowgroup [ref=f8e141]:
+          - row [ref=f8e142]:
+            - columnheader [ref=f8e143] [cursor=pointer]:
+              - generic [ref=f8e144]:
+                - generic [ref=f8e145]: Datasource
+                - generic [ref=f8e146]:
+                  - generic [ref=f8e148]: 
+                  - generic [ref=f8e150]: 
+            - columnheader [ref=f8e151] [cursor=pointer]:
+              - generic [ref=f8e152]:
+                - generic [ref=f8e153]: Integration type
+                - generic [ref=f8e154]:
+                  - generic [ref=f8e156]: 
+                  - generic [ref=f8e158]: 
+            - columnheader [ref=f8e159] [cursor=pointer]:
+              - generic [ref=f8e160]:
+                - generic [ref=f8e161]: Last updated
+                - generic [ref=f8e162]:
+                  - generic [ref=f8e164]: 
+                  - generic [ref=f8e166]: 
+            - columnheader [ref=f8e167]:
+              - generic [ref=f8e168]: Time range of data
+            - columnheader [ref=f8e170] [cursor=pointer]:
+              - generic [ref=f8e171]:
+                - generic [ref=f8e172]: New indicator count
+                - generic [ref=f8e173]:
+                  - generic [ref=f8e175]: 
+                  - generic [ref=f8e177]: 
+            - columnheader [ref=f8e178]:
+              - generic [ref=f8e179]: Manage
+        - rowgroup [ref=f8e181]:
+          - row [ref=f8e182]:
+            - cell [ref=f8e183]: There are no data sources at this time.
+  - dialog "Prompt Modal" [active] [ref=f8e185]:
+    - generic [ref=f8e187]:
+      - heading "Add data" [level=2] [ref=f8e188]
+      - generic [ref=f8e189]:
+        - generic [ref=f8e190]: Upload
+        - generic [ref=f8e193]:
+          - generic [ref=f8e194]: 
+          - text: Mapping
+        - generic [ref=f8e196]:
+          - generic [ref=f8e197]: 
+          - text: Review
+    - generic [ref=f8e201]:
+      - generic [ref=f8e203]:
+        - heading "Data Source Type" [level=3] [ref=f8e205]
+        - radiogroup [ref=f8e207]:
+          - generic [ref=f8e208] [cursor=pointer]:
+            - radio "CSV Source" [checked] [ref=f8e209]
+            - text: CSV Source
+          - generic [ref=f8e210] [cursor=pointer]:
+            - radio "Dataprep Source" [ref=f8e211]
+            - text: Dataprep Source
+      - generic [ref=f8e213]:
+        - heading "Data Source Name" [level=3] [ref=f8e215]
+        - textbox "Data Source Name" [ref=f8e217]:
+          - /placeholder: ""
+          - text: QA verify source
+      - generic [ref=f8e219]:
+        - generic [ref=f8e221]:
+          - generic [ref=f8e222]: wp0a_qa_upload.csv
+          - button "Replace File" [ref=f8e224] [cursor=pointer]
+        - generic [ref=f8e232]: File format passes validation
+    - generic [ref=f8e240]:
+      - button "cancel" [ref=f8e242] [cursor=pointer]:
+        - generic [ref=f8e243]: Cancel
+      - button "mapping" [ref=f8e246] [cursor=pointer]:
+        - generic [ref=f8e247]: Mapping
+    - button "×" [ref=f8e248] [cursor=pointer]

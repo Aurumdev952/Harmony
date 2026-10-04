@@ -49,6 +49,7 @@ None. The suite is written against today's Flask path and later re-pointed at `h
 ## Requests
 
 - [ ] lead: merge after WP-2c. The live layer (`tests/authz/http/`) runs the WP-2c stack through `tests/contract/stack/`, which does not exist on `mig/integration` yet. The pure layer has no such dependency. (blocks the live layer only)
+- [ ] infra: add `.hypothesis/` to `.gitignore` (Hypothesis writes its example database there when the suite runs). Not committed here; `.gitignore` is infra-owned. (does not block)
 
 ## Log
 

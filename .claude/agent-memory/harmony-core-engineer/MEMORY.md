@@ -1,0 +1,2 @@
+- [Phase-file dead claims](project_phase_file_dead_claims.md) — "unused" routes may be live via ZenClient (no /api/ in the call); verify before deleting
+- [Worktree shell guard](feedback_worktree_shell_guard.md) — command forms the isolation guard refuses and the workarounds that pass

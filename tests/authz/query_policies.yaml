@@ -147,6 +147,10 @@ cases:
     policies: [[source, null], [StateName, null]]
     jwt: {needs: ['*'], query_needs: [{source: {exclude_values: [S9]}}]}
     expect: {eq: [StateName, __NO_VAL__]}
+  - name: token_state_exclusion_is_dropped_leaving_no_filter
+    policies: [[source, null], [StateName, null]]
+    jwt: {needs: ['*'], query_needs: [{StateName: {exclude_values: [Pará]}, source: {}}]}
+    expect: null
   - name: token_docstring_key_included_values_is_read_as_all_values
     policies: [[source, null], [StateName, null]]
     jwt: {needs: ['*'], query_needs: [{source: {included_values: [S1]}}]}

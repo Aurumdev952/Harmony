@@ -31,7 +31,7 @@ class Row(NamedTuple):
         return f'{self.principal}|{self.permission}|{target}|{verdict}'
 
 
-def _expand(names: list, specs: dict) -> set:
+def expand(names: list, specs: dict) -> set:
     expanded = set()
     for name in names:
         if name.startswith('tag:'):
@@ -58,7 +58,7 @@ def rows() -> list:
         key = (permission, resource_type, resource_id)
         assert key not in seen, f'duplicate check {key}'
         seen.add(key)
-        allowed = _expand(check['allow'], specs)
+        allowed = expand(check['allow'], specs)
         result.extend(
             Row(principal, *key, principal in allowed, check['used_by'])
             for principal in specs

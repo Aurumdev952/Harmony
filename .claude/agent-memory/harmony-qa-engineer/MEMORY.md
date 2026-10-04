@@ -1,0 +1,2 @@
+- [Authz suite harness](authz_suite_harness.md) — how tests/authz runs (uv py3.8, private stack on 58660) and the traps hit building it
+- [Authz escalations found](authz_escalations_found.md) — pinned group_admin/group_moderator/role_administrator escalations; flipping them needs a Sec WP

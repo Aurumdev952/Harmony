@@ -1,7 +1,7 @@
 ---
 wp: "2b"
 title: "Permission and policy suite"
-status: building
+status: review
 owner_role: "qa"
 instances:
   - name: "qa-3"
@@ -60,8 +60,34 @@ None. The suite is written against today's Flask path and later re-pointed at `h
   - the three-dimension `QueryNeed` crash.
 
   Check: `tests/authz/run.sh` gives 2516 passed. Mutation check: a wrong id attribute and a wrong `read_via` type failed exactly those 2 resources.
+- 2026-10-04 qa-3 unit 5: live-stack layer (`tests/authz/http/`, marker `authz_http`; skipped unless `AUTHZ_BASE_URL` is set). It provisions one user per seeded role through the admin API, with a per-run password that is never stored. It covers:
+  - seed drift against `seed.yaml`;
+  - page and `/api2` outcomes for 24 roles plus an anonymous visitor (`requests.yaml`);
+  - Potion list filtering;
+  - escalations H1 to H3;
+  - saved-query exposure;
+  - admin's self-delete deny.
+
+  Check: fresh stack (`stack.sh down && up`), then the whole suite gives 3085 passed. Running the live-stack layer twice more gives 569 passed each time, so provisioning is idempotent.
+- 2026-10-04 qa-3 unit 6: lead requests. Added `token_state_exclusion_is_dropped_leaving_no_filter` (Q8, reported by the WP-2a reviewer), and noted the admin-role convention and the WP-0h hand-off under H. Check: `tests/authz/run.sh -k token_` gives 14 passed. The full pure layer is re-run below.
 
 ## Evidence
+
+- `docs/modernisation/work/WP-2b-evidence/fresh-stack-run.txt`: output of `tests/authz/evidence_run.sh`. It recreates the stack, runs the whole suite with the stack env set (3085 passed), then runs `-m authz_http` twice (569 passed, then 569 passed).
+- Mutation checks for units 1 to 4 are in the log above. Every changed expectation failed exactly its own rows and nothing else.
+- Hash-seed independence: the pure layer passes under PYTHONHASHSEED 0 to 5 and 123 (unit 2).
+- Phase 2b exit check ("every role type in the seed scripts has at least one allow case and one deny case"):
+  - `test_every_seeded_role_has_an_allow_and_a_deny` covers the 23 non-admin roles in the pure table.
+  - admin's deny cases are `test_admin_cannot_delete_their_own_account` (live) and `render_token:admin` (pure).
+- Lead requests answered:
+  - WP-0c: `one_source_all_states[header|session]` and `superuser_is_not_filtered`.
+  - WP-2a reviewer: Q8, `token_state_exclusion_is_dropped_leaving_no_filter`.
+- Not covered, and why:
+  - `AuthorizedQueryClient.run_raw_query`: WP-0c is deciding it.
+  - The `query`, `query/granularities` and `query/dimension_values` Potion resources: they need Druid metadata to register.
+  - Dashboard, alert and share HTTP flows: decided by `is_authorized`, which the pure table covers.
+  - `public_access` on in the live stack: the pure layer covers the identity side (Q2, `anonymous_public`).
+- Property-based testing: `QueryNeed` intersection has a natural invariant, `(a & b) in a and (a & b) in b` for include-only needs. Hypothesis is not a project dependency, so adding it is left to the lead.
 
 ## Findings for security
 
@@ -76,6 +102,12 @@ Recorded as they behave today. None of them was changed (INV-3). Each names the 
 - **Q5. A superuser holding an explicit-needs token loses `RoleNeed('admin')`.** Their query policy then comes from the token's `query_needs`. Export render tokens use `'*'`, which gives all values, so admin renders stay unrestricted. Case: `render_token_for_admin_is_filtered_by_token_query_needs`.
 - **Q6. `_construct_hierarchical_filter` depends on `PYTHONHASHSEED` when a hierarchical need carries excludes.** It mixes `|=` and `&=` in dict order. Database policies never carry excludes, so only explicit JWT `query_needs` reach it. Not pinned: the output is non-deterministic.
 - **Q7. `QueryPermission` and `AuthorizedQuery` have no callers.** No query is gated on a `QueryNeed` superset check today. Row-level authorisation is only the filter injection in `AuthorizedQueryClient.run_query`. `test_query_permission` records the dead semantics in case a port revives them.
+- **Q8. A token's state exclusion is dropped, and the token ends up unrestricted. (Reported by the WP-2a reviewer.)**
+  - **Reproduce:** take an account whose policies allow all values of `source` and `StateName`. Sign in with JWT claims `{needs: ['*'], query_needs: [{StateName: {exclude_values: [Pará]}, source: {}}]}`.
+  - **Result:** Druid receives no authorisation filter at all, so Pará stays visible.
+  - **Cause:** `_compute_token_query_needs` intersects the token need with each account need. `DimensionFilter.__and__` (`models/python/permissions.py:211-218`) handles two all-values filters by intersecting their exclude lists. The account's exclude list is empty, so the intersection is empty and the exclusion is lost.
+  - This is the case where every dimension appears in the token. Compare Q3, which loses the exclusion and denies everything instead.
+  - Pinned by `token_state_exclusion_is_dropped_leaving_no_filter`.
 
 ### Item permissions (`is_authorized`, `decisions.yaml`)
 
@@ -90,6 +122,19 @@ Recorded as they behave today. None of them was changed (INV-3). Each names the 
 - **P1. Six `/api2` resources have no item-level permission.** They are `share`, `metadata`, `data_digest`, `user_query_session`, `storage` and `dashboard_session`. Signing in is the only gate. With public access on, an anonymous request with any `Referer` header also passes. `user_query_session` and `dashboard_session` are plain `ModelResource`s, so any signed-in user can list every saved query (`userId`, `queryBlob`) and every dashboard session. Pinned by `test_unprotected_resources_have_no_item_permissions`.
 - **P2. Meta `permissions` overrides of `read`, `create`, `update` and `delete` are dead.** `ZenysisPrincipalMixin._permissions` always rewires them to the `*_resource` permissions. `UserResource` and `ConfigurationResource` declare `{read: yes}`, but reads are allowed only through the default sitewide `view_resource` every signed-in user holds. Public anonymous visitors cannot read configuration. Pinned by `test_method_permissions[UserResource|ConfigurationResource]`.
 - **P3. A `QueryNeed` over exactly three dimensions makes Potion list filtering raise `TypeError`.** `HybridItemNeed.identity_get_item_needs` matches needs to a 3-tuple prototype by `len()`. The only way to get one is an admin account using a token with an explicit `needs` list, which drops `RoleNeed('admin')`, and a three-dimension composite `query_needs` entry, which is kept verbatim for superusers. Pinned by `test_three_dimension_query_need_breaks_potion_list_filtering`.
+- **P4. Some decisions are only visible over HTTP.** Page routes deny by rendering the unauthorized page with status 200, not 401 or 403. `/api2` denies an anonymous visitor with 401. A non-admin reading an invisible item gets 404. `requests.yaml` records all three as outcomes (`page:unauthorizedPage`, `401`, `404`).
+
+### Live stack (`tests/authz/http/`)
+
+The admin role is `/api2/role/1` by convention: the migrations seed it first, with id 1 and name `admin` (`seed.yaml`, checked by `test_seed.py`). Nothing in the code refers to the id. Superuser status comes from the role *name* (`_build_role_needs`, `User.is_superuser()`), so any role named `admin` would be a superuser role. H1 and H2 attach that row. H3 is held back only by the name being unique. WP-0h (decision 0003) closes H1 to H3. When it is ready, these three tests change to expect 403 on the WP-0h branch, and not before.
+
+- **H1. A `group_admin` can make themselves site admin. (Critical.)** Run `POST /api2/group {"$uri": "", "name": "x", "roles": ["/api2/role/1"], "users": [], "acls": []}`. A non-superuser creator is added as the group's only member, so they inherit `RoleNeed('admin')`. `GET /admin` then renders the admin page. The cause is that `build_group` resolves role URIs with `Transaction.find_by_id`, which bypasses the `RoleResourceManager` filter, and nothing refuses the admin role. Pinned by `test_group_admin_becomes_site_admin_by_creating_a_group_with_the_admin_role`.
+- **H2. A `group_moderator` who belongs to any group can make themselves site admin. (Critical.)** `PATCH /api2/group/<id>` with `roles: [admin]` only needs sitewide `edit_resource` on group. Pinned by `test_group_moderator_becomes_site_admin_through_a_group_it_belongs_to`.
+- **H3. A `role_administrator` can grant themselves any permission except `RoleNeed('admin')`. (High.)** `POST /api2/role` accepts any `permissions`, `dashboardResourceRoleName`, `alertResourceRoleName`, `queryPolicies` and `dataExport`, and `add_current_user_to_role` adds the creator. This bypasses the `update_permissions` gate. By reading the code, `PATCH /api2/role/<id>` (`update_role`) goes through the same `build_role`; that path is not pinned. The unique constraint on `role.name` is the only thing that stops this from reaching `RoleNeed('admin')`. `_build_role_needs` grants superuser to any role whose *name* is `admin`, and `create_role` derives the name from the label (`label.lower().replace(' ', '_')`), so the label `Admin` collides with the seeded row. Pinned by `test_role_administrator_grants_itself_any_permission_through_a_new_role`.
+- **H4. Saved queries have no owner check.** Any signed-in user reads any `/api2/user_query_session/<uuid>` (all 24 seeded roles get 200, anonymous gets 401). `POST /api2/user_query_session/generate_link` stores whatever `userId` the client sends. Pinned by `test_saved_queries.py`.
+- **H5. The user list hides only users who hold the admin role directly.** `UserResourceManager` filters on `user.roles`, so a user who is admin through a group shows up in non-admins' lists. Seen while running H1; not pinned, because a fixture admin-through-group user would also hit H1.
+- **H6. Not authorisation, but these block testing.** `GET /api2/user_query_session` and `GET /api2/dashboard_session` return 500 for everyone (`'Pagination' object is not iterable`). `POST /api2/user/<id>/roles` returns 500 (`role.permissions[0]` on a missing role). The suite reads saved queries item by item and assigns roles through `PATCH /api2/user/<id>`.
+- **Admin's deny case** (phase 2b exit check): `test_admin_cannot_delete_their_own_account` gives 400. A `user_admin` cannot change roles through the user form, because that needs SITE `edit_user`, so the response is 401 (`test_user_admin_cannot_change_roles_through_the_user_form`).
 
 ## Verdicts
 

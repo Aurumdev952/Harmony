@@ -1,0 +1,40 @@
+# What each seeded role and an anonymous visitor get from routes whose
+# decision is only visible over HTTP: page decorators, which render the
+# "unauthorized" page with status 200 instead of failing, and the /api2
+# authentication gate. Recorded against harmony_demo with public_access off.
+#
+# Principals: `anonymous` and `role:<name>` for every role in seed.yaml.
+# Outcomes (tests/authz/http/stack.py `outcome`): `login`, `redirect:<path>`,
+# `page:<last JS bundle>`, or the status code.
+#   allowed     outcome for the principals in `allow` (tags as in decisions.yaml)
+#   denied      outcome for every other signed-in principal
+#   anonymous   outcome for the anonymous visitor
+
+requests:
+  - {request: GET /overview, allow: [tag:signed_in], allowed: page:overviewPage, anonymous: login}
+  - {request: GET /, allow: [tag:signed_in], allowed: redirect:/overview, anonymous: login}
+  - {request: GET /query, allow: [tag:superuser, role:query_analyst, role:_default_role],
+     allowed: redirect:/advanced-query, denied: page:unauthorizedPage, anonymous: login}
+  - {request: GET /advanced-query, allow: [tag:superuser, role:query_analyst, role:_default_role],
+     allowed: page:advancedQuery, denied: page:unauthorizedPage, anonymous: login}
+  - {request: GET /admin, allow: [tag:superuser, role:manager],
+     allowed: page:admin, denied: page:unauthorizedPage, anonymous: login}
+  - {request: GET /data-status, allow: [tag:superuser, role:manager],
+     allowed: page:navbar, denied: page:unauthorizedPage, anonymous: login}
+  - {request: GET /data-digest, allow: [tag:superuser, role:manager],
+     allowed: page:dataDigest, denied: page:unauthorizedPage, anonymous: login}
+  - {request: GET /alerts, allow: [tag:superuser, role:alert_admin, role:alert_creator, role:alert_editor],
+     allowed: page:notFoundPage, denied: page:unauthorizedPage, anonymous: login}
+  - {request: GET /data-quality, allow: [tag:superuser],
+     allowed: page:dataQuality, denied: page:unauthorizedPage, anonymous: login}
+  - {request: GET /data-upload, allow: [tag:superuser, role:data_uploader_f193e47caa08, role:data_upload_admin],
+     allowed: page:dataUpload, denied: page:unauthorizedPage, anonymous: login}
+  - {request: GET /indicator-setup, allow: [tag:superuser, role:field_setup_viewer],
+     allowed: page:fieldSetup, denied: page:unauthorizedPage, anonymous: login}
+  - {request: GET /data-catalog, allow: [tag:superuser, role:data_catalog_viewer],
+     allowed: page:dataCatalog, denied: page:unauthorizedPage, anonymous: login}
+
+  # /api2: signing in is the gate; Potion filters lists instead of refusing
+  - {request: GET /api2/configuration, allow: [tag:signed_in], allowed: '200', anonymous: '401'}
+  - {request: GET /api2/user_acl, allow: [tag:signed_in], allowed: '200', anonymous: '401'}
+  - {request: GET /api2/role/1, allow: [tag:superuser], allowed: '200', denied: '404', anonymous: '401'}

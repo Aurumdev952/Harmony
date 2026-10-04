@@ -1,0 +1,4 @@
+{"count": "1", "end_date": "2021-03-01", "indicator_id": "demo_referrals", "start_date": "2021-03-01"}
+{"count": "2", "end_date": "2021-03-02", "indicator_id": "demo_bed_nets", "start_date": "2021-03-01"}
+{"count": "3", "end_date": "2021-04-10", "indicator_id": "demo_malaria_positive", "start_date": "2021-03-01"}
+{"count": "5", "end_date": "2021-04-12", "indicator_id": "demo_malaria_tested", "start_date": "2021-03-01"}

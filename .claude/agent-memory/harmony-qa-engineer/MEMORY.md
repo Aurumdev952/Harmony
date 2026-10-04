@@ -1,0 +1,5 @@
+- [Pipeline suite runtime](pipeline_suite_runtime.md) — run step scripts on py3.9 or pypy3.9 via tests/pipeline/run.sh; 3.12+ breaks config import
+- [Worktree guard and Bash](worktree_guard_bash.md) — commands the isolation guard refuses and how to phrase them instead
+- [Frontend build and template verification](frontend-build-and-template-verification.md): build diff, CSS rule diff, Jinja render, script URLs, static Playwright smoke, isolated-shell traps
+- [Golden suite harness](golden-suite-harness.md) — offline bootstrap of the legacy query engine, hash-seed traps, mutation-check approach
+- [Golden contract vs layout](golden_contract_vs_layout.md) — goldens guarding a rewrite: store-level contract layer, typed round-trip test, consumed files are contract

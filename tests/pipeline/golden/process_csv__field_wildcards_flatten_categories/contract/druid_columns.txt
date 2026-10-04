@@ -1,0 +1,12 @@
+MunicipalityID
+MunicipalityLat
+MunicipalityLon
+MunicipalityName
+Real_Date
+StateID
+StateLat
+StateLon
+StateName
+field
+source
+val

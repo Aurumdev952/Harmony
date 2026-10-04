@@ -1,0 +1,67 @@
+[
+  {
+    "aggregations": [
+      {
+        "aggregator": {
+          "fieldName": "MunicipalityID",
+          "isInputThetaSketch": false,
+          "name": "municipalities_reporting",
+          "size": 8192,
+          "type": "thetaSketch"
+        },
+        "filter": {
+          "dimension": "field",
+          "type": "selector",
+          "value": "yellow_fever_cases"
+        },
+        "type": "filtered"
+      },
+      {
+        "aggregator": {
+          "fieldName": "count",
+          "name": "municipalities_reporting__count",
+          "type": "longSum"
+        },
+        "filter": {
+          "dimension": "field",
+          "type": "selector",
+          "value": "yellow_fever_cases"
+        },
+        "type": "filtered"
+      }
+    ],
+    "context": {
+      "resultAsArray": true
+    },
+    "dataSource": "harmony_demo_20260101",
+    "dimensions": [],
+    "filter": {
+      "fields": [
+        {
+          "dimension": "__time",
+          "intervals": [
+            "2024-01-01/2024-04-01"
+          ],
+          "type": "interval"
+        },
+        {
+          "dimension": "field",
+          "type": "selector",
+          "value": "yellow_fever_cases"
+        }
+      ],
+      "type": "and"
+    },
+    "granularity": "all",
+    "having": {
+      "aggregation": "municipalities_reporting",
+      "type": "greaterThan",
+      "value": 0
+    },
+    "intervals": [
+      "2024-01-01/2024-04-01"
+    ],
+    "postAggregations": [],
+    "queryType": "groupBy"
+  }
+]

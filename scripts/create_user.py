@@ -346,11 +346,15 @@ def main():
             Flags.ARGS.test_user,
         )
         LOG.info(
-            'Successfully created/updated User \'%s\' with status \'%s\' and password \'%s\'.',
+            'Successfully created/updated User \'%s\' with status \'%s\'.',
             get_user_string(new_user),
             status.name,
-            plaintext_password,
         )
+        if not Flags.ARGS.password:
+            # The operator never saw a generated password; print it once, outside the log.
+            print(
+                f'Generated password for {get_user_string(new_user)}: {plaintext_password}'
+            )
 
     return 0
 

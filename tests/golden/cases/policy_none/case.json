@@ -1,0 +1,7 @@
+{
+  "description": "Non-admin with no policies: default deny on every authorizable dimension.",
+  "endpoint": "table",
+  "policy": {
+    "query_policies": []
+  }
+}

@@ -41,11 +41,6 @@ def test_extraction_has_no_javascript():
     assert 'javascript' not in repr(epi_week_of_year_extraction()).lower()
 
 
-@pytest.mark.xfail(
-    strict=True,
-    reason='WP-8a request to core: replace the JavaScript epi_week_of_year '
-    'extraction with epi_week_of_year_extraction()',
-)
 def test_builder_emits_the_native_extraction():
     from data.query.models.granularity.granularity_extraction import (
         GranularityExtraction,

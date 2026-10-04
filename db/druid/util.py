@@ -3,7 +3,7 @@ from datetime import datetime
 
 import pydruid.query
 import pydruid.utils.aggregators
-from pydruid.utils.dimensions import TimeFormatExtraction
+from pydruid.utils.dimensions import ExtractionFunction, TimeFormatExtraction
 from pydruid.utils.filters import Filter
 from pydruid.utils.postaggregator import Postaggregator
 
@@ -174,10 +174,6 @@ def _recursive_get_post_aggregation_fields(post_aggregation, found_fields):
     if post_agg_type == 'expression':
         formula = post_aggregation['expression']
         found_fields.update(get_constituent_fields(formula))
-        return
-
-    if post_agg_type == 'javascript':
-        found_fields.update(post_aggregation['fieldNames'])
         return
 
     fields = post_aggregation.get('fields')
@@ -398,4 +394,19 @@ class GranularityTimeFormatExtraction(TimeFormatExtraction):
     def build(self):
         output = super().build()
         output['granularity'] = self._granularity
+        return output
+
+
+class CascadeExtraction(ExtractionFunction):
+    '''Applies each extraction function to the output of the one before it.'''
+
+    extraction_type = 'cascade'
+
+    def __init__(self, extraction_functions):
+        super().__init__()
+        self._extraction_functions = extraction_functions
+
+    def build(self):
+        output = super().build()
+        output['extractionFns'] = [fn.build() for fn in self._extraction_functions]
         return output

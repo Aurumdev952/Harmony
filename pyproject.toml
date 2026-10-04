@@ -255,4 +255,11 @@ ignore_missing_imports = true
 
 [tool.pytest.ini_options]
 pythonpath = ["."]
+# CI runs everything under tests/, so a new suite needs no workflow change.
 testpaths = ["tests"]
+# pytest-selenium 4.0.1 (pinned in the dev group, unused by any suite) raises an
+# INTERNALERROR on pytest 8 whenever a test fails, hiding which one.
+addopts = "-p no:selenium"
+markers = [
+    "stack: needs the running docker compose stack; CI's unit job deselects it",
+]

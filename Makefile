@@ -71,6 +71,11 @@ minio-server-down: # Stop the minio server container.
 mypy: # Type-check with the [tool.mypy] settings in pyproject.toml.
 	uv run --locked mypy
 
+test: # Run the Python suites as CI does: tests/ on the uv.lock environment, tests/infra on the 3.13 tools lane.
+	uv run --locked pytest -m 'not stack'
+	uv run --project ci/tools313 --locked mypy --config-file ci/tools313/pyproject.toml
+	uv run --project ci/tools313 --locked pytest tests/infra
+
 postgres-psql:
 	$(COMPOSE_COMMAND) exec postgres psql -h ${POSTGRES_HOST} -U ${POSTGRES_USER} ${POSTGRES_DB}
 

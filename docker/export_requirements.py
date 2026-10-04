@@ -37,10 +37,11 @@ NAME = re.compile(r"^[A-Za-z0-9][A-Za-z0-9._-]*")
 def render(requirements: list[str], sources: dict[str, dict[str, str]]) -> str:
     lines = []
     for requirement in requirements:
-        name = NAME.match(requirement)
-        source = sources.get(name.group(0)) if name else None
+        match = NAME.match(requirement)
+        name = match.group(0) if match else ""
+        source = sources.get(name)
         if source is not None:
-            lines.append(f"-e git+{source['git']}@{source['rev']}#egg={name.group(0)}")
+            lines.append(f"-e git+{source['git']}@{source['rev']}#egg={name}")
         else:
             lines.append(requirement)
     return HEADER + "\n".join(lines) + "\n"

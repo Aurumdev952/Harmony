@@ -33,6 +33,7 @@ BASE_ENV = {
     'MINIO_ROOT_PASSWORD': 'test-minio-password',
     'MINIO_BIND_ADDRESS': '127.0.0.1',
     'REDIS_PASSWORD': 'testredispassword',
+    'HASURA_ADMIN_SECRET': 'test-hasura-admin-secret',
 }
 
 
@@ -83,10 +84,6 @@ def test_no_environment_key_contains_a_colon(tmp_path, files):
         assert not bad, f'{name}: {bad}'
 
 
-# WP-0a removes Hasura's published port; drop it from here when it lands.
-PUBLISHED_UNTIL_WP_0A = {'hasura'}
-
-
 def published(cfg):
     return {
         name: service['ports']
@@ -102,14 +99,12 @@ def published(cfg):
 )
 def test_only_nginx_publishes_ports(tmp_path, overlays):
     cfg = config(tmp_path, ['docker-compose.yaml', *overlays])
-    assert set(published(cfg)) - PUBLISHED_UNTIL_WP_0A == {'nginx'}
+    assert set(published(cfg)) == {'nginx'}
 
 
 def test_dev_publishes_on_loopback_only(tmp_path):
     cfg = config(tmp_path, ['docker-compose.yaml', 'docker-compose.dev.yaml'])
     ports = published(cfg)
-    for name in PUBLISHED_UNTIL_WP_0A:
-        ports.pop(name, None)
     assert set(ports) == {'postgres', 'redis', 'web'}
     for name, entries in ports.items():
         for entry in entries:
@@ -152,9 +147,9 @@ def test_redis_requires_auth_and_clients_carry_the_password(tmp_path):
         assert 'BROKER_URL' not in environment, client
 
 
-# Hasura is upgraded and pinned by WP-0a. MinIO no longer publishes server
-# images, so its replacement waits on a human decision (WP-0b request R5).
-UNPINNED_UNTIL_DECIDED = {'hasura', 'minio'}
+# MinIO no longer publishes server images, so its replacement waits on a
+# human decision (WP-0b request R5).
+UNPINNED_UNTIL_DECIDED = {'minio'}
 OWN_IMAGE_PREFIXES = ('ghcr.io/zenysis/', 'harmony-dev-web:')
 
 
@@ -183,6 +178,7 @@ REQUIRED_SECRETS = [
     (['docker-compose.yaml'], 'DEFAULT_SECRET_KEY'),
     (['docker-compose.yaml'], 'JWT_SECRET_KEY'),
     (['docker-compose.yaml'], 'REDIS_PASSWORD'),
+    (['docker-compose.yaml'], 'HASURA_ADMIN_SECRET'),
     (['docker-compose.yaml', 'docker-compose.dev.yaml'], 'DEFAULT_SECRET_KEY'),
     (['docker-compose.pipeline.yaml'], 'DEFAULT_SECRET_KEY'),
     (['docker-compose.db.yaml'], 'POSTGRES_PASSWORD'),

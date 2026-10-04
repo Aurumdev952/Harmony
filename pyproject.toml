@@ -166,6 +166,17 @@ environments = ["platform_python_implementation == 'CPython'"]
 override-dependencies = [
     "psycopg2-binary==2.8.6 ; platform_python_implementation != 'PyPy'",
 ]
+# `uv sync` builds 29 packages from source (3 git, 26 sdists). Their build tools
+# are pinned here, recorded in uv.lock and enforced by --locked. The list is every
+# build requirement a fresh-cache `uv sync --locked -v` installs.
+build-constraint-dependencies = [
+    "setuptools==82.0.1",
+    "cython==3.3.0",
+    "cffi==2.0.0",
+    "greenlet==3.2.5",
+    "pycparser==2.23",
+    "pytest-runner==6.0.1",
+]
 
 [tool.uv.sources]
 Flask-Potion = { git = "https://github.com/Zenysis/potion.git", rev = "bd398c18e8710a4e7cc87d9abb6ba9a95e7ba792" }

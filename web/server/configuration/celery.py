@@ -3,7 +3,7 @@ from os import getenv
 
 from web.server.configuration.redis_connection import (
     build_redis_url,
-    get_redis_password,
+    require_redis_password,
 )
 
 DEFAULT_BROKER_URL = 'redis://redis:6379/'
@@ -12,7 +12,7 @@ DEFAULT_BROKER_URL = 'redis://redis:6379/'
 def get_broker_url() -> str:
     redis_host = getenv('REDIS_HOST')
     if redis_host:
-        return build_redis_url(redis_host, get_redis_password())
+        return build_redis_url(redis_host, require_redis_password())
     return getenv('BROKER_URL', DEFAULT_BROKER_URL)
 
 

@@ -63,7 +63,9 @@ def spec_roles(root: Path, wp: str) -> list[str]:
 
 ROLES = 'core|backend|frontend-platform|frontend-design|visualization|data-platform|pipeline|infra|qa'
 INSTANCE_DECL = re.compile(rf'^\s*-\s*name:\s*"?({ROLES})-\d+"?', re.M)
-LOG_LINE = re.compile(rf'^\d{{4}}-\d{{2}}-\d{{2}}\s+({ROLES})-\d+\b', re.M)
+LOG_LINE = re.compile(
+    rf'^\s*(?:[-*]\s+)?\d{{4}}-\d{{2}}-\d{{2}}\s+({ROLES})-\d+\b', re.M
+)
 
 
 def contributing_roles(text: str) -> list[str]:

@@ -1,0 +1,26 @@
+{
+  "data": [
+    {
+      "dimensions": {
+        "MunicipalityName": "Belém",
+        "StateName": "Pará"
+      },
+      "metrics": {
+        "yellow_fever_cases": 0.0
+      }
+    },
+    {
+      "dimensions": {
+        "MunicipalityName": "Conceição do Araguaia",
+        "StateName": "Pará"
+      },
+      "metrics": {
+        "yellow_fever_cases": 0.0
+      }
+    }
+  ],
+  "dimensions": [
+    "StateName",
+    "MunicipalityName"
+  ]
+}

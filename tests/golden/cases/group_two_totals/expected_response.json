@@ -1,0 +1,108 @@
+{
+  "data": [
+    {
+      "Age": "15-49",
+      "Sex": "F",
+      "StateName": "Acre",
+      "yellow_fever_cases": 88.0
+    },
+    {
+      "Age": "50+",
+      "Sex": "F",
+      "StateName": "Acre",
+      "yellow_fever_cases": 371.0
+    },
+    {
+      "Age": "15-49",
+      "Sex": "M",
+      "StateName": "Acre",
+      "yellow_fever_cases": 375.0
+    },
+    {
+      "Age": "50+",
+      "Sex": "M",
+      "StateName": "Acre",
+      "yellow_fever_cases": 191.0
+    },
+    {
+      "Age": "15-49",
+      "Sex": "F",
+      "StateName": "Pará",
+      "yellow_fever_cases": 91.0
+    },
+    {
+      "Age": "50+",
+      "Sex": "F",
+      "StateName": "Pará",
+      "yellow_fever_cases": 49.0
+    },
+    {
+      "Age": "15-49",
+      "Sex": "M",
+      "StateName": "Pará",
+      "yellow_fever_cases": 281.0
+    },
+    {
+      "Age": "50+",
+      "Sex": "M",
+      "StateName": "Pará",
+      "yellow_fever_cases": 85.0
+    },
+    {
+      "Age": "15-49",
+      "Sex": "F",
+      "StateName": "Roraima",
+      "yellow_fever_cases": 86.98
+    },
+    {
+      "Age": "50+",
+      "Sex": "F",
+      "StateName": "Roraima",
+      "yellow_fever_cases": 168.0
+    },
+    {
+      "Age": "15-49",
+      "Sex": "M",
+      "StateName": "Roraima",
+      "yellow_fever_cases": null
+    },
+    {
+      "Age": "50+",
+      "Sex": "M",
+      "StateName": "Roraima",
+      "yellow_fever_cases": null
+    },
+    {
+      "Age": "TOTAL",
+      "Sex": null,
+      "StateName": "Acre",
+      "yellow_fever_cases": 210.0
+    },
+    {
+      "Age": "TOTAL",
+      "Sex": null,
+      "StateName": "Pará",
+      "yellow_fever_cases": 327.0
+    },
+    {
+      "Age": "TOTAL",
+      "Sex": null,
+      "StateName": "Roraima",
+      "yellow_fever_cases": 201.59
+    },
+    {
+      "Age": null,
+      "Sex": "TOTAL",
+      "StateName": null,
+      "yellow_fever_cases": null
+    }
+  ],
+  "dimensions": [
+    "StateName",
+    "Sex",
+    "Age"
+  ],
+  "fields": [
+    "yellow_fever_cases"
+  ]
+}

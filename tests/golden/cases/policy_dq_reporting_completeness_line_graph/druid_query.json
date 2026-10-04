@@ -1,0 +1,65 @@
+[
+  {
+    "aggregations": [
+      {
+        "aggregator": {
+          "fieldName": "count",
+          "name": "yellow_fever_cases",
+          "type": "doubleSum"
+        },
+        "filter": {
+          "dimension": "field",
+          "type": "selector",
+          "value": "yellow_fever_cases"
+        },
+        "type": "filtered"
+      }
+    ],
+    "context": {
+      "resultAsArray": true
+    },
+    "dataSource": "harmony_demo_20260101",
+    "dimensions": [
+      "StateName"
+    ],
+    "filter": {
+      "fields": [
+        {
+          "dimension": "StateName",
+          "type": "in",
+          "values": [
+            "Pará"
+          ]
+        },
+        {
+          "dimension": "__time",
+          "intervals": [
+            "2024-03-04/2024-03-18"
+          ],
+          "type": "interval"
+        },
+        {
+          "dimension": "field",
+          "type": "selector",
+          "value": "yellow_fever_cases"
+        },
+        {
+          "field": {
+            "dimension": "StateName",
+            "type": "selector",
+            "value": ""
+          },
+          "type": "not"
+        }
+      ],
+      "type": "and"
+    },
+    "granularity": "day",
+    "having": null,
+    "intervals": [
+      "2024-03-04/2024-03-18"
+    ],
+    "postAggregations": [],
+    "queryType": "groupBy"
+  }
+]

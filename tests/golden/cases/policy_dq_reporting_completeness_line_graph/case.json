@@ -1,0 +1,16 @@
+{
+  "description": "Reporting completeness for a user restricted to Pará.",
+  "endpoint": "reporting_completeness_line_graph",
+  "policy": {
+    "query_policies": [
+      {
+        "dimension": "StateName",
+        "dimension_value": "Pará"
+      },
+      {
+        "dimension": "source",
+        "dimension_value": null
+      }
+    ]
+  }
+}

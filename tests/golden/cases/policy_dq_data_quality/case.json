@@ -1,0 +1,16 @@
+{
+  "description": "Data quality score for a user restricted to Pará: the policy applies to all three queries.",
+  "endpoint": "data_quality",
+  "policy": {
+    "query_policies": [
+      {
+        "dimension": "StateName",
+        "dimension_value": "Pará"
+      },
+      {
+        "dimension": "source",
+        "dimension_value": null
+      }
+    ]
+  }
+}

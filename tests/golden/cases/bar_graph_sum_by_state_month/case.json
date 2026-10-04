@@ -1,0 +1,5 @@
+{
+  "description": "BAR_GRAPH: one SUM indicator grouped by state and month over a quarter.",
+  "endpoint": "bar_graph",
+  "policy": null
+}

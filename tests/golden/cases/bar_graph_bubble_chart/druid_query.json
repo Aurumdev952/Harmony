@@ -1,0 +1,129 @@
+[
+  {
+    "aggregations": [
+      {
+        "aggregator": {
+          "fieldName": "count",
+          "name": "yellow_fever_cases__a3__count",
+          "type": "longSum"
+        },
+        "filter": {
+          "dimension": "field",
+          "type": "selector",
+          "value": "yellow_fever_cases"
+        },
+        "type": "filtered"
+      },
+      {
+        "aggregator": {
+          "fieldName": "count",
+          "name": "yellow_fever_cases__a3_count_for_average",
+          "type": "doubleSum"
+        },
+        "filter": {
+          "dimension": "field",
+          "type": "selector",
+          "value": "yellow_fever_cases"
+        },
+        "type": "filtered"
+      },
+      {
+        "aggregator": {
+          "fieldName": "sum",
+          "name": "yellow_fever_cases__a3_sum_for_average",
+          "type": "doubleSum"
+        },
+        "filter": {
+          "dimension": "field",
+          "type": "selector",
+          "value": "yellow_fever_cases"
+        },
+        "type": "filtered"
+      },
+      {
+        "aggregator": {
+          "fieldName": "count",
+          "name": "yellow_fever_cases__k2",
+          "type": "doubleSum"
+        },
+        "filter": {
+          "dimension": "field",
+          "type": "selector",
+          "value": "yellow_fever_cases"
+        },
+        "type": "filtered"
+      },
+      {
+        "aggregator": {
+          "fieldName": "sum",
+          "name": "yellow_fever_cases__s1",
+          "type": "doubleSum"
+        },
+        "filter": {
+          "dimension": "field",
+          "type": "selector",
+          "value": "yellow_fever_cases"
+        },
+        "type": "filtered"
+      },
+      {
+        "aggregator": {
+          "fieldName": "count",
+          "name": "yellow_fever_cases__s1__count",
+          "type": "longSum"
+        },
+        "filter": {
+          "dimension": "field",
+          "type": "selector",
+          "value": "yellow_fever_cases"
+        },
+        "type": "filtered"
+      }
+    ],
+    "context": {
+      "resultAsArray": true
+    },
+    "dataSource": "harmony_demo_20260101",
+    "dimensions": [
+      "MunicipalityName"
+    ],
+    "filter": {
+      "fields": [
+        {
+          "dimension": "__time",
+          "intervals": [
+            "2024-01-01/2024-04-01"
+          ],
+          "type": "interval"
+        },
+        {
+          "dimension": "field",
+          "type": "selector",
+          "value": "yellow_fever_cases"
+        },
+        {
+          "field": {
+            "dimension": "MunicipalityName",
+            "type": "selector",
+            "value": ""
+          },
+          "type": "not"
+        }
+      ],
+      "type": "and"
+    },
+    "granularity": "all",
+    "having": null,
+    "intervals": [
+      "2024-01-01/2024-04-01"
+    ],
+    "postAggregations": [
+      {
+        "expression": "yellow_fever_cases__a3_sum_for_average / yellow_fever_cases__a3_count_for_average",
+        "name": "yellow_fever_cases__a3",
+        "type": "expression"
+      }
+    ],
+    "queryType": "groupBy"
+  }
+]

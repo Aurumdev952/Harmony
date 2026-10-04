@@ -7,6 +7,7 @@ Run on each supported CPython, for example:
     uv run -p 3.9 --no-project --with pytest pytest tests/core
     uv run -p 3.13 --no-project --with pytest pytest tests/core
 '''
+
 import json
 import os
 import subprocess

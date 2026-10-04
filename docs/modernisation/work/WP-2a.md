@@ -66,10 +66,10 @@ None blocking. Two notes for the lead:
 
 ## Pending regeneration
 
-Not yet executed. Run this only when the lead confirms that WP-0c (branch `mig/WP-0c-pure-mistake-bugs-backend`, test 70ecd0e, fix 64dc60e) is on `mig/integration`. Until then the case keeps characterising today's code, and the suite must keep passing on `mig/integration`.
+Not yet executed. Run this only when the lead confirms that WP-0c (branch `mig/WP-0c-pure-mistake-bugs-backend`, test 70ecd0e, fix a89c55d) is on `mig/integration`. Regenerate only against WP-0c at 60edb27 or later. Never regenerate against 64dc60e alone: its pydruid `&` flattened and-shaped request filters in place, which would show up as unrelated golden diffs. Until then the case keeps characterising today's code, and the suite must keep passing on `mig/integration`.
 
 **INV-2 note for `policy_include_all_all_time`:**
-- **Cause.** WP-0c changes `restrict_query_filter_to_user_permissions` to combine filters as `query_filter & policy`. `EmptyFilter.__and__` returns the policy alone, and a None query filter uses the policy itself.
+- **Cause.** WP-0c changes `restrict_query_filter_to_user_permissions` to combine filters through `and_policy_filter`. A non-empty request filter is posted byte-identically to before. A None or `EmptyFilter` request filter is replaced by the policy filter alone.
 - **Before.** The posted Druid filter is `{"type": "and", "fields": [null, {"type": "in", "dimension": "StateName", "values": ["Acre"]}]}` (Findings, item 1).
 - **After.** The posted filter is the policy filter alone, `{"type": "in", "dimension": "StateName", "values": ["Acre"]}`.
 - **Why the new output is correct.** A real Druid broker rejected the old request, so no user ever saw a result from it. Nothing a user saw changes. The new query restricts rows exactly as the policy intends.

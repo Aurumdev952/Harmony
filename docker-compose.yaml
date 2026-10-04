@@ -94,15 +94,18 @@ services:
       - redis-volume:/data
     logging: *default-logging
   hasura:
-    image: hasura/graphql-engine:v2.11.3.cli-migrations-v2
-    ports:
-      - 8088:8080
+    image: hasura/graphql-engine:v2.45.8.cli-migrations-v2@sha256:c23e41af28e4c8e27bf6b6e82a5ecdd5b3ba3bb373833f92f5136e25b0ad45c6
+    # No published port: only web reaches Hasura, over the Compose network.
     environment:
       HASURA_GRAPHQL_ENABLE_TELEMETRY: 'false'
+      HASURA_GRAPHQL_ENABLE_CONSOLE: 'false'
+      HASURA_GRAPHQL_DEV_MODE: 'false'
       HASURA_GRAPHQL_MIGRATIONS_SERVER_TIMEOUT: 500
       HASURA_GRAPHQL_DATABASE_URL: ${DATABASE_URL}
+      # Hasura treats an empty secret as no secret, so refuse to start without one.
+      HASURA_GRAPHQL_ADMIN_SECRET: ${HASURA_ADMIN_SECRET:?HASURA_ADMIN_SECRET must be set to a random value, e.g. openssl rand -hex 32}
     healthcheck:
-      test: "timeout 10s bash -c ':> /dev/tcp/127.0.0.1/8080'"
+      test: [ "CMD", "curl", "-fsS", "-o", "/dev/null", "http://127.0.0.1:8080/healthz" ]
       interval: 30s
       timeout: 30s
       start_period: 0s
@@ -130,6 +133,7 @@ services:
       - MAPBOX_ACCESS_TOKEN=${MAPBOX_ACCESS_TOKEN}
       - REDIS_HOST=redis
       - HASURA_HOST=http://hasura:8080
+      - HASURA_ADMIN_SECRET=${HASURA_ADMIN_SECRET:?HASURA_ADMIN_SECRET must be set}
       - SQLALCHEMY_DATABASE_URI=${DATABASE_URL}
       - VIRTUAL_HOST=${WEB_VIRTUAL_HOST}
       - URLBOX_API_KEY=${URLBOX_API_KEY:-}

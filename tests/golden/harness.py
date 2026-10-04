@@ -260,10 +260,6 @@ class Case:
         with open(self.path / filename, encoding='utf-8') as handle:
             return json.load(handle)
 
-    def write(self, filename: str, value: Any) -> None:
-        with open(self.path / filename, 'w', encoding='utf-8') as handle:
-            handle.write(to_json_text(value))
-
     @property
     def meta(self) -> dict:
         return self.read('case.json')
@@ -328,10 +324,13 @@ def _caller(app, policy: Optional[dict], raw_client) -> Iterator[None]:
             del app.query_client
 
 
+_CASE_POLICY = object()
+
+
 def run_case(
     case: Case,
     answer: Callable[[dict], list],
-    policy: Any = '<from case.json>',
+    policy: Any = _CASE_POLICY,
 ) -> Tuple[List[Tuple[dict, list]], Any]:
     '''POST the case's request and return the Druid exchanges and the parsed body.
     `policy` overrides the caller described in case.json.'''
@@ -340,7 +339,7 @@ def run_case(
 
     app = bootstrap()
     meta = case.meta
-    if policy == '<from case.json>':
+    if policy is _CASE_POLICY:
         policy = meta.get('policy')
     with ExitStack() as stack:
         stack.enter_context(freeze_time(FROZEN_NOW))

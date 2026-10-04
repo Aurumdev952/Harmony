@@ -1,21 +1,20 @@
 from __future__ import annotations
 
+from contextlib import contextmanager
 from datetime import timedelta
 from http.cookies import SimpleCookie
+from types import SimpleNamespace
 from unittest import mock
 
 import pytest
 from flask import Flask, jsonify
 from flask.testing import FlaskClient
-from flask_jwt_extended import (
-    JWTManager,
-    get_jwt_identity,
-    verify_jwt_in_request_optional,
-)
+from flask_jwt_extended import JWTManager
 from flask_login import LoginManager, UserMixin, current_user
 
 from web.server.configuration.settings import AUTOMATIC_SIGN_OUT_KEY
 from web.server.routes.api import ApiRouter
+from web.server.security.signal_handlers import install_login_manager_signal_handlers
 from web.server.util.authentication import login_user
 
 USERNAME = 'analyst@example.org'
@@ -23,6 +22,14 @@ USERNAME = 'analyst@example.org'
 
 class _User(UserMixin):
     id = USERNAME
+
+
+@contextmanager
+def _users_table():
+    def find_one_by_fields(_model, _case_sensitive, fields):
+        return _User() if fields == {'username': USERNAME} else None
+
+    yield SimpleNamespace(find_one_by_fields=find_one_by_fields)
 
 
 @pytest.fixture(name='app')
@@ -37,24 +44,28 @@ def fixture_app(bare_flask_app) -> Flask:
         JWT_TOKEN_WEB_COOKIE_EXPIRATION=timedelta(days=365),
     )
     JWTManager(app)
+    app.cache = SimpleNamespace(memoize=lambda: lambda function: function)
     login_manager = LoginManager(app)
 
-    # Mirrors web/server/security/signal_handlers.py: a session id first, then
-    # the JWT from the header or the accessKey cookie signs the user in.
+    # A session id signs the user in first (Flask-User's loader in the app).
     @login_manager.user_loader
     def load_user(user_id):
         return _User() if user_id == USERNAME else None
 
-    @login_manager.request_loader
-    def load_user_from_request(_request):
-        verify_jwt_in_request_optional()
-        return _User() if get_jwt_identity() == USERNAME else None
+    # Then the app's own loader: the JWT from the header or the accessKey cookie.
+    install_login_manager_signal_handlers(app, login_manager)
 
     app.register_blueprint(ApiRouter(None, None).generate_blueprint())
     app.add_url_rule(
         '/whoami', 'whoami', lambda: jsonify(current_user.is_authenticated)
     )
     return app
+
+
+@pytest.fixture(autouse=True)
+def fixture_users_table():
+    with mock.patch('web.server.security.signal_handlers.Transaction', _users_table):
+        yield
 
 
 def _signed_in_client(app: Flask, remember_me: bool) -> FlaskClient:

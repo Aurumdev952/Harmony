@@ -11,7 +11,16 @@ export DRUID_POSTGRES_PASSWORD DRUID_POSTGRES_IMAGE DRUID_BIND_ADDRESS
 default:
 	@echo "Please specify a target to make"
 
-single_server_up:
+# Runs before anything starts. Compose's ${VAR:?} only catches an empty value,
+# and the old default password is public.
+check_secrets:
+	@case "$$(printf '%s' "$$DRUID_POSTGRES_PASSWORD" | tr -d '[:space:]' | tr '[:upper:]' '[:lower:]')" in \
+		''|foolishpassword) \
+			echo "DRUID_POSTGRES_PASSWORD in $(ENV_FILE) is empty or the old default; set a random value (openssl rand -hex 32) and change it in Postgres with ALTER USER first" >&2; \
+			exit 1;; \
+	esac
+
+single_server_up: check_secrets
 	@cd single && \
 		DOCKER_HOST=$(SINGLE_SERVER_DOCKER_HOST) \
 		docker compose --project-name $(PROJECT_NAME) \
@@ -29,7 +38,7 @@ single_server_logs:
 		docker compose --project-name $(PROJECT_NAME) \
 		--env-file environment/common.env logs $(LOGS_ARGS)
 
-cluster_server_up:
+cluster_server_up: check_secrets
 	@cd cluster && \
 		DOCKER_HOST=$(CLUSTER_MASTER_SERVER_DOCKER_HOST) \
 		docker compose --project-name $(PROJECT_NAME) \

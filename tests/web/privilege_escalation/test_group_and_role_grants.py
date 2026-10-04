@@ -1,6 +1,6 @@
-'''WP-0h: a caller may attach to a group, or put into a role, only what it could
-grant directly. Each escalation case is paired with the nearby behaviour that
-must not change (SPEC INV-3).
+'''WP-0h (decisions 0003 and 0004): a non-superuser may attach to a group, or put
+into a role, only grants it already holds. Each escalation case is paired with
+the nearby behaviour that must not change (SPEC INV-3).
 '''
 
 from __future__ import annotations
@@ -99,13 +99,18 @@ def _group_body(group_name: str, roles=(), users=(), acls=(), uri='') -> dict:
 
 
 def _role_body(
-    label: str, permissions=(), dashboard_role='', query_policies=(), export=False
+    label: str,
+    permissions=(),
+    dashboard_role='',
+    alert_role='',
+    query_policies=(),
+    export=False,
 ):
     return {
         '$uri': '',
         'name': '',
         'label': label,
-        'alertResourceRoleName': '',
+        'alertResourceRoleName': alert_role,
         'dashboardResourceRoleName': dashboard_role,
         'permissions': [
             {'permission': p, 'resource_type_id': ResourceTypeEnum[t].value}
@@ -132,7 +137,16 @@ def _policy(db, dimension: str, value) -> QueryPolicy:
     )
 
 
-# Escalation 1 (WP-2b): group_admin creates a group holding the admin role.
+def _user_ids(group) -> list:
+    return sorted(user.id for user in group.users)
+
+
+def _role_names(db) -> set:
+    db.session.expire_all()
+    return {role.name for role in db.session.query(Role).all()}
+
+
+# Groups: escalation 1 (WP-2b), group_admin creates a group holding the admin role.
 
 
 def test_group_admin_cannot_create_a_group_holding_the_admin_role(db, make_user):
@@ -183,7 +197,31 @@ def test_group_admin_creates_a_group_with_a_role_it_holds_and_joins_it(db, make_
     assert response.status_code == 200
     group = _group(db, name)
     assert [role.name for role in group.roles] == ['group_admin']
-    assert [user.id for user in group.users] == [actor.id]
+    assert _user_ids(group) == [actor.id]
+
+
+def test_a_role_uri_naming_no_role_is_still_skipped(db, make_user):
+    actor = make_user(['group_admin'])
+    name = _name('group')
+
+    response = actor.request(
+        'POST', '/api2/group', _group_body(name, roles=['/api2/role/999999'])
+    )
+
+    assert response.status_code == 200
+    assert _group(db, name).roles == []
+
+
+def test_a_malformed_role_uri_is_a_bad_request(db, make_user):
+    actor = make_user(['group_admin'])
+    name = _name('group')
+
+    response = actor.request(
+        'POST', '/api2/group', _group_body(name, roles=['/api2/role/admin'])
+    )
+
+    assert response.status_code == 400
+    assert _group(db, name) is None
 
 
 def test_admin_creates_a_group_holding_the_admin_role(db, make_user):
@@ -198,37 +236,106 @@ def test_admin_creates_a_group_holding_the_admin_role(db, make_user):
     assert [role.name for role in _group(db, name).roles] == ['admin']
 
 
-# Escalation 2 (WP-2b): group_moderator patches its group's roles to include admin.
+def test_group_admin_cannot_create_a_group_holding_a_dashboard_it_cannot_share(
+    db, make_user
+):
+    actor = make_user(['group_admin'])
+    dashboard = _make_dashboard(db)
+    name = _name('group')
+
+    response = actor.request(
+        'POST',
+        '/api2/group',
+        _group_body(name, acls=[_acl('dashboard_admin', dashboard)]),
+    )
+
+    assert response.status_code == 403
+    assert _group(db, name) is None
+
+
+def test_an_admin_token_narrowed_to_groups_cannot_grant_admin(app, db, make_user):
+    # pylint: disable=import-outside-toplevel
+    from flask_jwt_extended import create_access_token
+
+    admin = make_user(['admin'])
+    group = _make_group(db, users=[admin])
+    group_id, group_name = group.id, group.name
+    group_needs = [
+        [permission, None, 'group']
+        for permission in ('view_resource', 'edit_resource', 'create_resource')
+    ]
+    with app.test_request_context():
+        token = create_access_token(
+            identity=admin.username,
+            user_claims={'needs': group_needs, 'query_needs': []},
+        )
+    client = app.test_client()
+    client.set_cookie('localhost', 'accessKey', token)
+
+    response = client.patch(
+        f'/api2/group/{group_id}',
+        json=_group_body(group_name, roles=[_role_uri(db, 'admin')], users=[admin]),
+    )
+
+    assert response.status_code == 403
+    assert _group(db, group_name).roles == []
+
+
+# Groups: escalation 2 (WP-2b), a member with edit_resource on group attaches admin.
 
 
 def test_group_moderator_cannot_attach_the_admin_role_to_its_group(db, make_user):
     actor = make_user(['group_moderator'])
+    other = make_user()
     group = _make_group(db, users=[actor])
+    group_id, group_name = group.id, group.name
 
     response = actor.request(
         'PATCH',
-        f'/api2/group/{group.id}',
-        _group_body(group.name, roles=[_role_uri(db, 'admin')], users=[actor]),
+        f'/api2/group/{group_id}',
+        _group_body(group_name, roles=[_role_uri(db, 'admin')], users=[actor, other]),
     )
 
     assert response.status_code == 403
-    assert _group(db, group.name).roles == []
+    group = _group(db, group_name)
+    assert group.roles == []
+    assert _user_ids(group) == [actor.id]
     assert _roles_of(db, actor) == {'group_moderator'}
+
+
+# N5 (decision 0004): the same PATCH with a role carrying query policies.
+
+
+def test_group_moderator_cannot_attach_a_role_carrying_data_it_cannot_read(
+    db, make_user
+):
+    actor = make_user(['group_moderator'])
+    group = _make_group(db, users=[actor])
+    group_id, group_name = group.id, group.name
+
+    response = actor.request(
+        'PATCH',
+        f'/api2/group/{group_id}',
+        _group_body(
+            group_name, roles=[_role_uri(db, 'all_sources_reader')], users=[actor]
+        ),
+    )
+
+    assert response.status_code == 403
+    assert _group(db, group_name).roles == []
 
 
 def test_group_moderator_renames_a_group_keeping_grants_it_could_not_make(
     db, make_user
 ):
+    # A viewer ACL gives members no update_users there, so only the resend
+    # exemption lets it through.
     actor = make_user(['group_moderator'])
     dashboard = _make_dashboard(db)
-    dashboard_admin = (
-        db.session.query(ResourceRole).filter_by(name='dashboard_admin').one()
-    )
+    dashboard_id = dashboard.id
+    viewer = db.session.query(ResourceRole).filter_by(name='dashboard_viewer').one()
     group = _make_group(
-        db,
-        roles=['dashboard_admin'],
-        users=[actor],
-        acls=[(dashboard_admin, dashboard)],
+        db, roles=['all_sources_reader'], users=[actor], acls=[(viewer, dashboard)]
     )
     new_name = _name('renamed')
 
@@ -237,21 +344,42 @@ def test_group_moderator_renames_a_group_keeping_grants_it_could_not_make(
         f'/api2/group/{group.id}',
         _group_body(
             new_name,
-            roles=[_role_uri(db, 'dashboard_admin')],
+            roles=[_role_uri(db, 'all_sources_reader')],
             users=[actor],
-            acls=[_acl('dashboard_admin', dashboard)],
+            acls=[_acl('dashboard_viewer', dashboard)],
         ),
     )
 
     assert response.status_code == 200
     renamed = _group(db, new_name)
-    assert [role.name for role in renamed.roles] == ['dashboard_admin']
+    assert [role.name for role in renamed.roles] == ['all_sources_reader']
     assert [(acl.resource_role.name, acl.resource_id) for acl in renamed.acls] == [
-        ('dashboard_admin', dashboard.id)
+        ('dashboard_viewer', dashboard_id)
     ]
 
 
-# Found while closing escalation 2: the same PATCH grants resource roles on any dashboard.
+def test_group_moderator_reaches_only_groups_it_belongs_to(db, make_user):
+    actor = make_user(['group_moderator'])
+    group = _make_group(db, roles=['admin'])
+    group_id, group_name = group.id, group.name
+
+    responses = [
+        actor.request('GET', f'/api2/group/{group_id}'),
+        actor.request('POST', f'/api2/group/{group_id}/users', actor.username),
+        actor.request('PATCH', f'/api2/group/{group_id}/users', [actor.username]),
+        actor.request(
+            'PATCH',
+            f'/api2/group/{group_id}',
+            _group_body(group_name, roles=[_role_uri(db, 'admin')], users=[actor]),
+        ),
+    ]
+
+    assert [response.status_code for response in responses] == [404] * 4
+    assert _group(db, group_name).users.all() == []
+    assert _roles_of(db, actor) == {'group_moderator'}
+
+
+# Group ACLs (found while closing escalation 2): resource roles on any dashboard.
 
 
 def test_group_moderator_cannot_grant_its_group_admin_of_a_dashboard_it_cannot_share(
@@ -259,74 +387,147 @@ def test_group_moderator_cannot_grant_its_group_admin_of_a_dashboard_it_cannot_s
 ):
     actor = make_user(['group_moderator'])
     group = _make_group(db, users=[actor])
+    group_id, group_name = group.id, group.name
     dashboard = _make_dashboard(db)
 
     response = actor.request(
         'PATCH',
-        f'/api2/group/{group.id}',
+        f'/api2/group/{group_id}',
         _group_body(
-            group.name, users=[actor], acls=[_acl('dashboard_admin', dashboard)]
+            group_name, users=[actor], acls=[_acl('dashboard_admin', dashboard)]
         ),
     )
 
     assert response.status_code == 403
-    assert _group(db, group.name).acls == []
+    assert _group(db, group_name).acls == []
+
+
+def test_a_group_acl_without_a_resource_is_a_bad_request(db, make_user):
+    actor = make_user(['group_moderator', 'dashboard_admin'])
+    group = _make_group(db, users=[actor])
+    group_id, group_name = group.id, group.name
+    acl = _acl('dashboard_admin', _make_dashboard(db))
+    acl['resource']['name'] = ''
+
+    response = actor.request(
+        'PATCH',
+        f'/api2/group/{group_id}',
+        _group_body(group_name, users=[actor], acls=[acl]),
+    )
+
+    assert response.status_code == 400
+    assert _group(db, group_name).acls == []
 
 
 def test_dashboard_admin_shares_a_dashboard_with_its_group(db, make_user):
     actor = make_user(['group_moderator', 'dashboard_admin'])
     group = _make_group(db, users=[actor])
+    group_id, group_name = group.id, group.name
     dashboard = _make_dashboard(db)
 
     response = actor.request(
         'PATCH',
-        f'/api2/group/{group.id}',
+        f'/api2/group/{group_id}',
         _group_body(
-            group.name,
-            roles=[],
-            users=[actor],
-            acls=[_acl('dashboard_viewer', dashboard)],
+            group_name, users=[actor], acls=[_acl('dashboard_viewer', dashboard)]
         ),
     )
 
     assert response.status_code == 200
-    assert [acl.resource_role.name for acl in _group(db, group.name).acls] == [
+    assert [acl.resource_role.name for acl in _group(db, group_name).acls] == [
         'dashboard_viewer'
     ]
 
 
-# Escalation 3 (WP-2b): role_administrator creates a role with any permissions.
+# The legacy /roles sub-routes deleted Role rows themselves (decision 0004).
 
 
-def test_role_administrator_cannot_create_a_role_with_permissions(db, make_user):
+def test_clearing_a_groups_roles_keeps_the_roles(db, make_user):
+    actor = make_user(['group_moderator'])
+    held = Role(name=_name('held'), label='held')
+    db.session.add(held)
+    db.session.commit()
+    held_name = held.name
+    group = _make_group(db, roles=[held_name], users=[actor])
+    group_id, group_name = group.id, group.name
+
+    response = actor.request('PATCH', f'/api2/group/{group_id}/roles', {})
+
+    assert response.status_code == 200
+    assert held_name in _role_names(db)
+    assert _group(db, group_name).roles == []
+
+
+def test_clearing_a_users_roles_keeps_the_roles(db, make_user):
+    actor = make_user(['user_admin'])
+    held = Role(name=_name('held'), label='held')
+    db.session.add(held)
+    db.session.commit()
+    held_name = held.name
+    target = make_user([held_name])
+
+    response = actor.request('PATCH', f'/api2/user/{target.id}/roles', {})
+
+    assert response.status_code == 200
+    assert held_name in _role_names(db)
+    assert _roles_of(db, target) == set()
+
+
+# Roles: escalation 3 (WP-2b), role_administrator creates a role with any grant.
+
+
+def _role_by_label(db, label: str):
+    db.session.expire_all()
+    return db.session.query(Role).filter_by(label=label).one_or_none()
+
+
+@pytest.mark.parametrize(
+    'grant',
+    [
+        {'permissions': [('SITE', 'view_admin_page')]},
+        {'dashboard_role': 'dashboard_admin'},
+        {'alert_role': 'alert_admin'},
+    ],
+    ids=['permission', 'dashboard_resource_role', 'alert_resource_role'],
+)
+def test_role_administrator_cannot_create_a_role_with_permissions(db, make_user, grant):
+    actor = make_user(['role_administrator'])
+    label = _name('role')
+
+    response = actor.request('POST', '/api2/role', _role_body(label, **grant))
+
+    assert response.status_code == 403
+    assert _role_by_label(db, label) is None
+    assert _roles_of(db, actor) == {'role_administrator'}
+
+
+# N4 (decision 0004): query policies and data export the creator does not hold.
+
+
+def test_role_administrator_cannot_create_a_role_reading_data_it_cannot_read(
+    db, make_user
+):
     actor = make_user(['role_administrator'])
     label = _name('role')
 
     response = actor.request(
         'POST',
         '/api2/role',
-        _role_body(
-            label,
-            permissions=[('SITE', 'view_admin_page')],
-            dashboard_role='dashboard_admin',
-        ),
+        _role_body(label, query_policies=[_policy(db, 'source', None)]),
     )
 
     assert response.status_code == 403
-    assert db.session.query(Role).filter_by(label=label).one_or_none() is None
-    assert _roles_of(db, actor) == {'role_administrator'}
+    assert _role_by_label(db, label) is None
 
 
-def test_role_administrator_cannot_create_a_role_with_a_resource_role(db, make_user):
+def test_role_administrator_cannot_create_a_role_exporting_data(db, make_user):
     actor = make_user(['role_administrator'])
     label = _name('role')
 
-    response = actor.request(
-        'POST', '/api2/role', _role_body(label, dashboard_role='dashboard_admin')
-    )
+    response = actor.request('POST', '/api2/role', _role_body(label, export=True))
 
     assert response.status_code == 403
-    assert db.session.query(Role).filter_by(label=label).one_or_none() is None
+    assert _role_by_label(db, label) is None
 
 
 def test_role_administrator_creates_an_empty_role_and_is_added_to_it(db, make_user):
@@ -339,39 +540,41 @@ def test_role_administrator_creates_an_empty_role_and_is_added_to_it(db, make_us
     assert _roles_of(db, actor) == {'role_administrator', label}
 
 
-def test_role_administrator_is_added_to_a_new_role_granting_data_it_already_reads(
-    db, make_user
+@pytest.mark.parametrize('browser', [False, True], ids=['headers', 'browser_session'])
+def test_role_administrator_creates_a_role_with_grants_it_holds_and_is_added(
+    db, make_user, browser
 ):
-    actor = make_user(['role_administrator', 'all_sources_reader'])
+    actor = make_user(
+        ['role_administrator', 'all_sources_reader', 'exporter'], browser=browser
+    )
     label = _name('role')
 
     response = actor.request(
         'POST',
         '/api2/role',
-        _role_body(label, query_policies=[_policy(db, 'source', None)]),
+        _role_body(label, query_policies=[_policy(db, 'source', None)], export=True),
     )
 
     assert response.status_code == 200
     assert label in _roles_of(db, actor)
 
 
-def test_role_administrator_is_not_added_to_a_new_role_granting_data_it_cannot_read(
-    db, make_user
-):
-    actor = make_user(['role_administrator'])
+def test_a_holder_of_update_permissions_creates_a_role_with_permissions(db, make_user):
+    actor = make_user(['role_administrator', 'permission_editor'])
     label = _name('role')
 
     response = actor.request(
         'POST',
         '/api2/role',
-        _role_body(
-            label, query_policies=[_policy(db, 'StateName', 'Kigali')], export=True
-        ),
+        _role_body(label, permissions=[('SITE', 'view_admin_page')]),
     )
 
     assert response.status_code == 200
-    assert db.session.query(Role).filter_by(label=label).one().query_policies
-    assert _roles_of(db, actor) == {'role_administrator'}
+    assert [p.permission for p in _role_by_label(db, label).permissions] == [
+        'view_admin_page'
+    ]
+    # It does not hold view_admin_page, so it is not added to the new role.
+    assert _roles_of(db, actor) == {'role_administrator', 'permission_editor'}
 
 
 def test_admin_creates_a_role_with_permissions(db, make_user):
@@ -385,20 +588,28 @@ def test_admin_creates_a_role_with_permissions(db, make_user):
             label,
             permissions=[('SITE', 'view_admin_page')],
             dashboard_role='dashboard_admin',
+            query_policies=[_policy(db, 'StateName', 'Kigali')],
+            export=True,
         ),
     )
 
     assert response.status_code == 200
-    role = db.session.query(Role).filter_by(label=label).one()
+    role = _role_by_label(db, label)
     assert [p.permission for p in role.permissions] == ['view_admin_page']
     assert role.dashboard_resource_role.name == 'dashboard_admin'
+    assert _roles_of(db, admin) == {'admin'}
 
 
-# Same hole as escalation 3 through PATCH: a role's holders edit its permissions.
+# N3 (decision 0004): holders of edit_resource on role change a role they hold.
 
 
-def _new_role(db) -> int:
-    role = Role(name=_name('held'), label='held')
+def _new_role(db, policies=(), export=False) -> int:
+    role = Role(
+        name=_name('held'),
+        label='held',
+        query_policies=list(policies),
+        enable_data_export=export,
+    )
     db.session.add(role)
     db.session.commit()
     return role.id
@@ -426,62 +637,82 @@ def _patch_body(db, role_id: int, **changes) -> dict:
     return body
 
 
-def _role_moderator_holding_a_role(db, make_user):
-    role_id = _new_role(db)
-    return make_user(['role_moderator', _role(db, role_id).name]), role_id
+def _policies_body(*policies) -> list:
+    return _role_body('', query_policies=policies)['queryPolicies']
 
 
-def test_role_moderator_cannot_add_permissions_to_a_role_it_holds(db, make_user):
-    actor, role_id = _role_moderator_holding_a_role(db, make_user)
-    body = _patch_body(
-        db,
-        role_id,
-        permissions=[{'permission': 'view_admin_page', 'resource_type_id': 1}],
+def _moderator_holding_a_role(db, make_user, also=(), **role):
+    role_id = _new_role(db, **role)
+    return make_user(['role_moderator', *also, _role(db, role_id).name]), role_id
+
+
+@pytest.mark.parametrize(
+    'change',
+    [
+        {'permissions': [{'permission': 'view_admin_page', 'resource_type_id': 1}]},
+        {'dashboardResourceRoleName': 'dashboard_admin'},
+        {'alertResourceRoleName': 'alert_admin'},
+        {'dataExport': True},
+    ],
+    ids=['permission', 'dashboard_resource_role', 'alert_resource_role', 'export'],
+)
+def test_role_moderator_cannot_add_grants_to_a_role_it_holds(db, make_user, change):
+    actor, role_id = _moderator_holding_a_role(db, make_user)
+
+    response = actor.request(
+        'PATCH', f'/api2/role/{role_id}', _patch_body(db, role_id, **change)
     )
-
-    response = actor.request('PATCH', f'/api2/role/{role_id}', body)
-
-    assert response.status_code == 403
-    assert _role(db, role_id).permissions == []
-
-
-def test_role_moderator_cannot_give_a_role_it_holds_a_resource_role(db, make_user):
-    actor, role_id = _role_moderator_holding_a_role(db, make_user)
-    body = _patch_body(db, role_id, dashboardResourceRoleName='dashboard_admin')
-
-    response = actor.request('PATCH', f'/api2/role/{role_id}', body)
-
-    assert response.status_code == 403
-    assert _role(db, role_id).dashboard_resource_role_id is None
-
-
-def test_role_moderator_cannot_give_a_role_it_holds_more_data(db, make_user):
-    actor, role_id = _role_moderator_holding_a_role(db, make_user)
-    body = _patch_body(
-        db,
-        role_id,
-        dataExport=True,
-        queryPolicies=_role_body('', query_policies=[_policy(db, 'source', None)])[
-            'queryPolicies'
-        ],
-    )
-
-    response = actor.request('PATCH', f'/api2/role/{role_id}', body)
 
     assert response.status_code == 403
     role = _role(db, role_id)
-    assert role.query_policies == []
+    assert role.permissions == []
+    assert role.dashboard_resource_role_id is None
+    assert role.alert_resource_role_id is None
     assert role.enable_data_export is False
 
 
-def test_role_moderator_relabels_a_role_it_holds(db, make_user):
-    actor, role_id = _role_moderator_holding_a_role(db, make_user)
-    body = _patch_body(db, role_id, label='relabelled')
+def test_role_moderator_cannot_add_data_it_cannot_read_to_a_role_it_holds(
+    db, make_user
+):
+    actor, role_id = _moderator_holding_a_role(db, make_user)
+    body = _patch_body(
+        db, role_id, queryPolicies=_policies_body(_policy(db, 'source', None))
+    )
+
+    response = actor.request('PATCH', f'/api2/role/{role_id}', body)
+
+    assert response.status_code == 403
+    assert _role(db, role_id).query_policies == []
+
+
+def test_role_moderator_adds_data_it_already_reads_to_a_role_it_holds(db, make_user):
+    actor, role_id = _moderator_holding_a_role(
+        db, make_user, also=['all_sources_reader']
+    )
+    body = _patch_body(
+        db, role_id, queryPolicies=_policies_body(_policy(db, 'source', None))
+    )
 
     response = actor.request('PATCH', f'/api2/role/{role_id}', body)
 
     assert response.status_code == 200
-    assert _role(db, role_id).label == 'relabelled'
+    assert [p.dimension for p in _role(db, role_id).query_policies] == ['source']
+
+
+def test_role_moderator_relabels_a_role_it_holds_resending_its_grants(db, make_user):
+    actor, role_id = _moderator_holding_a_role(
+        db, make_user, policies=[_policy(db, 'StateName', 'Kigali')], export=True
+    )
+
+    response = actor.request(
+        'PATCH', f'/api2/role/{role_id}', _patch_body(db, role_id, label='relabelled')
+    )
+
+    assert response.status_code == 200
+    role = _role(db, role_id)
+    assert role.label == 'relabelled'
+    assert [p.dimension_value for p in role.query_policies] == ['Kigali']
+    assert role.enable_data_export is True
 
 
 def test_admin_adds_permissions_to_a_role(db, make_user):
@@ -497,3 +728,25 @@ def test_admin_adds_permissions_to_a_role(db, make_user):
 
     assert response.status_code == 200
     assert [p.permission for p in _role(db, role_id).permissions] == ['view_admin_page']
+
+
+# N6 (decision 0004): PATCH /api2/role/<id>/users confers a role on other users.
+
+
+def test_role_moderator_confers_only_roles_it_holds(db, make_user):
+    actor, held_id = _moderator_holding_a_role(db, make_user)
+    other = make_user()
+    not_held_id = _new_role(db)
+
+    responses = [
+        actor.request(
+            'PATCH', f'/api2/role/{not_held_id}/users', [actor.username, other.username]
+        ),
+        actor.request(
+            'PATCH', f'/api2/role/{held_id}/users', [actor.username, other.username]
+        ),
+    ]
+
+    assert [response.status_code for response in responses] == [404, 200]
+    assert _roles_of(db, actor) == {'role_moderator', _role(db, held_id).name}
+    assert _roles_of(db, other) == {_role(db, held_id).name}

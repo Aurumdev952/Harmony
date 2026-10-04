@@ -31,7 +31,7 @@ from web.server.routes.views.groups import (
     add_group_user,
     delete_group_user,
     update_group_users,
-    update_group_acls,
+    replace_group_acls,
     delete_group,
 )
 from web.server.security.grants import held_roles_from_uris, verify_acl_grants
@@ -118,7 +118,7 @@ class GroupResource(PrincipalResource):
         `Admin` like a `Manager`.
         '''
         with AuthorizedOperation('create_resource', 'group'):
-            verify_acl_grants(group_obj.get('acls', []), existing_acls=[])
+            acl_grants = verify_acl_grants(group_obj.get('acls', []), existing_acls=[])
             # We update users separately because self.manager.update cannot
             # hash users list.
             group = self.manager.create(build_group(group_obj))
@@ -126,7 +126,7 @@ class GroupResource(PrincipalResource):
                 update_group_users(group, group_obj.get('users', []))
             else:
                 update_group_users(group, [current_user.username])
-            update_group_acls(group, group_obj.get('acls', []))
+            replace_group_acls(group, acl_grants)
             return None, OK
 
     @ItemRoute.PATCH(
@@ -139,12 +139,14 @@ class GroupResource(PrincipalResource):
     )
     def update_group(self, group, obj):
         with AuthorizedOperation('edit_resource', 'group'):
-            verify_acl_grants(obj.get('acls', []), existing_acls=group.acls)
+            acl_grants = verify_acl_grants(
+                obj.get('acls', []), existing_acls=group.acls
+            )
             # We update users separately because self.manager.update cannot
             # hash users list.
             updated_group = self.manager.update(group, build_group(obj))
             update_group_users(updated_group, obj.get('users', []))
-            update_group_acls(updated_group, obj.get('acls', []))
+            replace_group_acls(updated_group, acl_grants)
             return None, OK
 
     # Overriding the default method here because Flask-Potion is unable to

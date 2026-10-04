@@ -259,13 +259,12 @@ def update_user_roles_from_map(
 ) -> List[Union[UserRoles, UserAcl, None]]:
     session = session or get_db_adapter().session
     new_role_entities = []
-    roles = user.roles
 
     # NOTE: type suppression is necessary here because SQL Alchemy model attributes
     # do not contain __iter__ attributes so mypy will complain that `roles` is not iterable
-    for role in roles:  # type: ignore
+    for role in list(user.roles):  # type: ignore
         before_user_role_change.send(user, role=role)
-        session.delete(role)
+        user.roles.remove(role)
         after_user_role_change.send(user, role=role)
 
     for resource_type in list(role_mapping.keys()):

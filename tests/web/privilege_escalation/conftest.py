@@ -38,6 +38,7 @@ _DASHBOARD_ADMIN = [
 RESOURCE_ROLES = {
     'dashboard_viewer': ('DASHBOARD', ['view_resource']),
     'dashboard_admin': ('DASHBOARD', _DASHBOARD_ADMIN),
+    'alert_admin': ('ALERT', _DASHBOARD_ADMIN),
 }
 ROLES = {
     'admin': {},
@@ -55,6 +56,17 @@ ROLES = {
             'view_user',
         ]
     },
+    'user_admin': {
+        'USER': [
+            'create_resource',
+            'delete_resource',
+            'edit_resource',
+            'invite_user',
+            'reset_password',
+            'update_roles',
+            'view_resource',
+        ]
+    },
     'group_admin': {
         'GROUP': [
             'create_resource',
@@ -70,8 +82,11 @@ ROLES = {
         'ROLE': ['create_resource', 'delete_resource', 'edit_resource', 'view_resource']
     },
     'role_moderator': {'ROLE': ['edit_resource', 'view_resource']},
-    # Not seeded: a role holding one query policy, for the creator auto-add cases.
+    # Not seeded: one query policy, data export, and ROLE update_permissions
+    # (which no seeded role holds), each on its own.
     'all_sources_reader': {'query_policies': [('source', None)]},
+    'exporter': {'export': True},
+    'permission_editor': {'ROLE': ['update_permissions']},
 }
 QUERY_POLICIES = [('source', None), ('StateName', 'Kigali')]
 
@@ -179,12 +194,13 @@ def _seed(session) -> None:
                 label=name,
                 permissions=[
                     permission(type_name, p)
-                    for type_name in ('SITE', 'GROUP', 'ROLE')
+                    for type_name in ('SITE', 'USER', 'GROUP', 'ROLE')
                     for p in spec.get(type_name, [])
                 ],
                 query_policies=[
                     policies[key] for key in spec.get('query_policies', [])
                 ],
+                enable_data_export=spec.get('export', False),
                 dashboard_resource_role_id=(
                     resource_roles[spec['dashboard']].id
                     if 'dashboard' in spec
@@ -233,12 +249,12 @@ def fixture_app(database_url):
 
 class Actor(SimpleNamespace):
     def request(self, method: str, path: str, body=None):
-        return self.client.open(
-            path,
-            method=method,
-            json=body,
-            headers={'X-Username': self.username, 'X-Password': _PASSWORD},
+        headers = (
+            {}
+            if self.browser
+            else {'X-Username': self.username, 'X-Password': _PASSWORD}
         )
+        return self.client.open(path, method=method, json=body, headers=headers)
 
 
 @pytest.fixture(name='make_user')
@@ -247,10 +263,14 @@ def fixture_make_user(app):
     from models.alchemy.permission import Role
     from models.alchemy.security_group import Group
     from models.alchemy.user import User, UserStatusEnum
+    from web.server.util.authentication import create_user_access_token
 
     db = app.extensions['sqlalchemy'].db
 
-    def make_user(roles=(), groups=()) -> Actor:
+    def make_user(roles=(), groups=(), browser=False) -> Actor:
+        '''`browser` signs in with the `accessKey` JWT cookie the login page sets,
+        instead of the X-Username and X-Password headers.
+        '''
         with app.app_context():
             username = f'{uuid.uuid4().hex[:10]}@escalation.test'
             user = User(
@@ -264,6 +284,11 @@ def fixture_make_user(app):
             )
             db.session.add(user)
             db.session.commit()
-            return Actor(id=user.id, username=username, client=app.test_client())
+            client = app.test_client()
+            if browser:
+                with app.test_request_context():
+                    token = create_user_access_token(username)
+                client.set_cookie('localhost', 'accessKey', token)
+            return Actor(id=user.id, username=username, client=client, browser=browser)
 
     return make_user

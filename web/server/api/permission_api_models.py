@@ -12,6 +12,7 @@ from flask_user import current_user
 from flask_potion import fields
 from flask_potion.routes import ItemRoute, Relation, Route
 from flask_potion.schema import FieldSet
+from werkzeug.exceptions import Forbidden
 
 from models.alchemy.permission import (
     Permission,
@@ -51,11 +52,7 @@ from web.server.routes.views.resource import (
     get_current_resource_roles,
     update_role_users,
 )
-from web.server.security.grants import (
-    holds_everything_in,
-    verify_new_role_grants,
-    verify_role_update_grants,
-)
+from web.server.security.grants import holds_everything_in, verify_role_grants
 from web.server.security.permissions import SuperUserPermission, principals
 from web.server.util.util import get_resource_string, get_user_string
 
@@ -384,11 +381,15 @@ class RoleResource(PrincipalResource):
         response_schema=fields.Inline('self'),
     )
     def create_role(self, obj):
+        if not self.manager.can_create_item(obj):
+            raise Forbidden()
         unique_name = obj['label'].lower().replace(' ', '_')
         new_role = build_role(obj)
-        verify_new_role_grants(new_role)
+        verify_role_grants(new_role)
         new_role['name'] = unique_name
         role = self.manager.create(new_role)
+        if current_user.is_superuser():
+            return role
         if holds_everything_in(role):
             add_current_user_to_role(role.id, current_user)
         else:
@@ -407,8 +408,10 @@ class RoleResource(PrincipalResource):
         response_schema=fields.Inline('self'),
     )
     def update_role(self, role, obj):
+        if not self.manager.can_update_item(role):
+            raise Forbidden()
         new_role = build_role(obj)
-        verify_role_update_grants(role, new_role)
+        verify_role_grants(new_role, role)
         role.invalidate_involved_users_permission_caches()
         return self.manager.update(role, new_role)
 

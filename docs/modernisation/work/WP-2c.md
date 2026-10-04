@@ -92,7 +92,23 @@ None of these block WP-2c; each comes from a finding below or from the review.
 
 ## Evidence
 
-EVIDENCE_PLACEHOLDER
+Re-run in full on 2026-10-05 from a clean clone of the branch head `f3ee4fd` (`git clone -b mig/WP-2c-api-contract-recordings` into `/tmp/wp2c-clean`, no local changes), Docker 29, Compose v5, uv 0.12. Live runs use `eval "$(tests/contract/stack/stack.sh env)"`.
+
+- **Static**: `ruff format --line-length 88 --check tests/contract`: 16 files already formatted; `ruff check --line-length 88`: all checks passed.
+- **Dry run**: `python -m tests.contract.record --dry-run`: `216 cases, 0 problems` (the same checks as `test_catalogue.py`).
+- **Offline suite**: `pytest tests/contract -m "not stack"`: `49 passed, 216 deselected`.
+- **Properties**: `test_schema.py` 21 passed under `--hypothesis-seed` 1, 2 and 3; the six-mutant run (`/tmp/wp2c_mutate.py /tmp/wp2c-clean`) killed all six.
+- **Recording is reproducible**: on a fresh stack built from the clean clone, `python -m tests.contract.record` ran all 216 cases with no error or skip and left `git status` empty, so every recording reproduced byte for byte. Status mix: 166x 200, 18x 204, 1x 302, 11x 400, 4x 401, 10x 404, 1x 405, 5x 500. The 500s are F5, F9, F10 (two) and F11.
+- **Replay, same stack**: `pytest tests/contract` (offline plus `stack`): `265 passed`, twice back to back. Every case cleans up after itself.
+- **Replay, new stack**: `stack.sh down`, `stack.sh up`, then the same command: `265 passed`, twice.
+- **Broken case turns red** (phase 2 exit check): with `isOfficial` set to `string` and `created` to `http-date` in `recordings/dashboard.get.json`, `pytest -m stack` reports `$.created: string format 'http-date' != 'date-time'` and the type mismatch, `1 failed, 215 passed`. The recording was restored and `git status` was empty again.
+- **Merged code**: the branch includes `mig/integration` at `b81c235` (WP-0a, WP-0c, decisions 0003 and 0004). Re-recording after the first merge changed exactly `auth.timeout`, `field.info.unknown_id` and `field.info.over_cap`, which are all WP-0c contract changes. `git ls-files .playwright-mcp` is empty.
+- **Isolation**: `docker compose ps` publishes only `forward` on `127.0.0.1:58650`. From the web container, `smtp.mailgun.org` and `api.urlbox.io` do not resolve and `1.1.1.1:443` is unreachable. Hasura runs with an admin secret (the WP-0a overlay is active); Redis runs without `requirepass` because WP-0b is not on the branch yet. The secrets file is mode 600 and owned by the user; `stack.sh down` removes it.
+- **No secrets or PII in fixtures** (INV-6): `test_recordings_hold_no_values_that_look_like_secrets_or_pii` scans all 216 recordings for emails, JWTs and hex tokens. 27 values are pinned in 23 recordings: authorisation flags, the server version, configuration values, error messages, enum value sets (statuses, resource types, role names, configuration keys, granularities, policy types, alert checks), the import result and `timeout`. Pins that name secrets, or whose values look like emails or JWTs, are refused.
+
+Limits:
+- Deferred, each with its reason in `INVENTORY.md`: 18 of 146 routes (object storage, Dataprep, Urlbox rendering, `hierarchy` under the mock Druid, dead client code, a static GeoJSON asset) and 11 of 51 Relay operations (unpublished-field and self-serve mutations).
+- Query responses come from Harmony's offline mock client, so they pin shapes, not numbers. Numbers belong to the golden suite (WP-2a). See "What phase 5 needs".
 
 ## What phase 5 needs (QA-2)
 
@@ -138,6 +154,6 @@ Found while recording. None is fixed here (QA never edits production code); each
 
 | Role | Verdict | Notes |
 |---|---|---|
-| qa | changes-requested | 2026-10-04 qa-2c-review: offline suite, properties, stack isolation, replay on two fresh stacks, byte-identical re-recording and red-on-broken all reproduced. Fix: inventory misses GET /api2/query/table[/disaggregated]?h= and the dashboard /pdf and /jpeg share links; stack reuses a stale global base image (always build or tag by input hash); storage/retrieve deferral reason wrong; request_schema never compared; configuration list caller wrong. CI risks: floating image tags, fixed project name/port, internet-reachable web container. |
-| reviewer | changes-requested | 2026-10-05 rev-2c: schema maths, properties, offline suite and inventory spot checks hold. Fix: the stack re-declares production services and stops starting once WP-0a/0b land (needs secrets; should be an infra-owned overlay shared with 2e/1a); stale global base image; CI breaks beside WP-2f (hypothesis; ruff format at 88); nested collections empty in every recording so item shapes unpinned; enum values and array pins unsupported; describe_set_cookie ignores Expires/Path/Domain and SameSite case; phase-5 replay claim does not work (login path, CSRF, route map, ZEN_OFFLINE mock); inventory gaps (pdf/jpeg, graphql 9 of ~50 ops); pinned/captured field drop gives traceback; map handling; request_schema unchecked; predictable credentials file sourced as shell; stale F4 claims; mixed commit. |
+| qa | changes-requested (re-review requested 2026-10-05) | 2026-10-04 qa-2c-review: offline suite, properties, stack isolation, replay on two fresh stacks, byte-identical re-recording and red-on-broken all reproduced. Fix: inventory misses GET /api2/query/table[/disaggregated]?h= and the dashboard /pdf and /jpeg share links; stack reuses a stale global base image (always build or tag by input hash); storage/retrieve deferral reason wrong; request_schema never compared; configuration list caller wrong. CI risks: floating image tags, fixed project name/port, internet-reachable web container. |
+| reviewer | changes-requested (re-review requested 2026-10-05) | 2026-10-05 rev-2c: schema maths, properties, offline suite and inventory spot checks hold. Fix: the stack re-declares production services and stops starting once WP-0a/0b land (needs secrets; should be an infra-owned overlay shared with 2e/1a); stale global base image; CI breaks beside WP-2f (hypothesis; ruff format at 88); nested collections empty in every recording so item shapes unpinned; enum values and array pins unsupported; describe_set_cookie ignores Expires/Path/Domain and SameSite case; phase-5 replay claim does not work (login path, CSRF, route map, ZEN_OFFLINE mock); inventory gaps (pdf/jpeg, graphql 9 of ~50 ops); pinned/captured field drop gives traceback; map handling; request_schema unchecked; predictable credentials file sourced as shell; stale F4 claims; mixed commit. |
 | security | n/a | |

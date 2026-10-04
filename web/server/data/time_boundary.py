@@ -136,13 +136,3 @@ class DataTimeBoundary:
         return self.get_filtered_time_boundary(
             query_filter=field_filter, cache_key=cache_key
         )
-
-    def get_dimension_time_boundary(
-        self, dimension_name: str, dimension_value: str
-    ) -> Optional[DateTimeInterval]:
-        '''Returns the min/max timestamp for the given dimension's value.'''
-        query_filter = DimensionFilter(dimension_name) == dimension_value
-        cache_key = f'{dimension_name}__{dimension_value}'
-        return self.get_filtered_time_boundary(
-            query_filter=query_filter, cache_key=cache_key
-        )

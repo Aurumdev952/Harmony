@@ -24,6 +24,7 @@ WP-3b collapses the lanes with two changes:
 
 **Traps**
 - The `pytest-selenium` 4.0.1 dev pin crashes pytest 8 on any test failure (INTERNALERROR, exit 3, failing test hidden). Keep `-p no:selenium`.
+- `pytest-flask` (dev pin) auto-pushes a request context around any test with an `app` fixture, which leaked Flask-Login state into `tests/web`. Keep `-p no:flask`. When a suite passes on a branch's own environment but fails under the full dev group, suspect auto-loaded pytest plugins first.
 - ruff ignores `# pylint: disable` comments.
 - ruff format is black 24 style, so a touched legacy file gets a whole-file reformat. The lead was asked for one repo-wide format commit.
 - `uv pip` is blocked by a hook; use a small uv project to lock tool sets instead.

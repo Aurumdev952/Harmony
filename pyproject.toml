@@ -1,0 +1,58 @@
+[project]
+name = "harmony"
+version = "0"
+requires-python = "==3.9.*"
+
+[dependency-groups]
+# The query engine's import closure, pinned as in requirements*.txt, so the golden
+# suite (tests/golden) runs on the host without Druid, Postgres or a container.
+# WP-2f replaces this with the full web, pipeline and dev groups.
+golden = [
+    "attrs==21.4.0",
+    "related>=0.7.0",
+    "Flask==1.0.1",
+    "Werkzeug==0.16.1",
+    "Jinja2==2.10.1",
+    "MarkupSafe==0.23",
+    "itsdangerous==2.0.1",
+    "Flask-Principal==0.4.0",
+    "Flask-SQLAlchemy==2.4.0",
+    "SQLAlchemy==1.3.24",
+    "flask-jwt-extended==3.25.1",
+    "PyJWT==1.7.1",
+    "flask-login==0.4.1",
+    "pandas>=1.3,<2.0",
+    "numpy==1.21.0",
+    "scipy>=1.2.1",
+    "requests==2.28.1",
+    "ijson-bigint==3.2.0.post1",
+    "python-rapidjson==1.9",
+    "python-dateutil>=2.8.1",
+    "toposort==1.5",
+    "stringcase==1.2.0",
+    "python-slugify",
+    "retry>=0.9.2",
+    "six>=1.9.0",
+    "future==0.18.3",
+    "ethiopian-date-converter==0.1.5",
+    "boto3==1.16.25",
+    "WTForms==2.1",
+    "flask-user==0.6.21",
+    "Flask-Potion",
+    "pylib",
+    "pydruid",
+]
+dev = ["pytest>=7.4.3"]
+
+[tool.uv]
+package = false
+default-groups = ["dev", "golden"]
+
+[tool.uv.sources]
+Flask-Potion = { git = "https://github.com/Zenysis/potion.git", rev = "bd398c18e8710a4e7cc87d9abb6ba9a95e7ba792" }
+pylib = { git = "https://github.com/room77/py77.git", rev = "70280110ec342a6f6db1c102e96756fcc3c3c01b" }
+pydruid = { git = "https://github.com/druid-io/pydruid.git", rev = "2420109553812470ed4d91cd0f8d5e70bbf2cfd3" }
+
+[tool.pytest.ini_options]
+pythonpath = ["."]
+testpaths = ["tests"]

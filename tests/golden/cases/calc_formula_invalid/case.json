@@ -1,0 +1,5 @@
+{
+  "description": "FORMULA with an unparsable expression: replaced by an always-null SUM.",
+  "endpoint": "table",
+  "policy": null
+}

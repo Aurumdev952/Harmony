@@ -1,0 +1,5 @@
+{
+  "description": "EXPANDOTREE: state then municipality; the endpoint forces totals on every group.",
+  "endpoint": "hierarchy",
+  "policy": null
+}

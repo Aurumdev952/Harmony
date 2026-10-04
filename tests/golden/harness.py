@@ -134,8 +134,10 @@ def _canonical(node: Any) -> Any:
         return node
     output = {key: _canonical(value) for key, value in node.items()}
     kind = output.get('type')
-    if kind in ('and', 'or') and isinstance(output.get('fields'), list):
-        output['fields'] = sorted(output['fields'], key=dumps_compact)
+    if kind in ('and', 'or'):
+        for operands in ('fields', 'havingSpecs'):
+            if isinstance(output.get(operands), list):
+                output[operands] = sorted(output[operands], key=dumps_compact)
     elif kind == 'in' and isinstance(output.get('values'), list):
         output['values'] = sorted(output['values'], key=dumps_compact)
     elif kind == 'regex' and isinstance(output.get('pattern'), str):
@@ -147,8 +149,8 @@ def canonical_query(query: dict) -> dict:
     '''The posted query with set-ordered parts sorted.
 
     The query builder and the policy filter build several lists from Python sets,
-    so their order follows PYTHONHASHSEED: `and`/`or` operands, `in` values, regex
-    alternatives and the aggregator list. Druid treats each of these as unordered;
+    so their order follows PYTHONHASHSEED: `and`/`or` filter and having operands,
+    `in` values, regex alternatives and the aggregator list. Druid treats each of these as unordered;
     the aggregator order only fixes the column order of array result rows, which
     `CannedDruidClient` maps by name. Nothing else is reordered.'''
     output = _canonical(json.loads(json.dumps(query)))

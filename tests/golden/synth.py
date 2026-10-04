@@ -20,6 +20,7 @@ from itertools import product
 from typing import Any, Callable, Dict, Iterable, List, Optional, Sequence, Tuple
 
 MAX_ROWS = 5000
+DETAIL_ROW_BUDGET = 300
 
 # (StateName, StateID, StateLat, StateLon, MunicipalityName, MunicipalityID,
 # MunicipalityLat, MunicipalityLon), from pipeline/harmony_demo/static_data. The last
@@ -368,9 +369,16 @@ def synthesize(case_name: str, query: dict, options: Optional[dict] = None) -> l
         key=lambda t: (t[0] or date.min, t[1]),
     )
 
+    # Real data is sparse in time: most (day, location) pairs have no report. Keep
+    # about DETAIL_ROW_BUDGET rows however wide the query is. Without a time axis
+    # every group that passes the filter has data.
+    combinations = len(time_groups) * len(data_groups)
+    keep = min(0.8, DETAIL_ROW_BUDGET / combinations) if combinations else 0
+    if not granularity and not time_dimensions:
+        keep = 1
     detail = []
     for (bucket, time_values), data_values in product(time_groups, data_groups):
-        if rng.random() < 0.2:
+        if rng.random() >= keep:
             continue
         data_iter = iter(data_values)
         time_iter = iter(time_values)

@@ -50,3 +50,47 @@ def test_response(case):
     _, body = replay(case.name)
     expected = (case.path / 'expected_response.json').read_text(encoding='utf-8')
     assert to_json_text(body) == expected
+
+
+def _walk(node, parent_key=None):
+    if isinstance(node, dict):
+        yield parent_key, node
+        for key, value in node.items():
+            yield from _walk(value, key)
+    elif isinstance(node, list):
+        for value in node:
+            yield from _walk(value, parent_key)
+
+
+def test_catalogue_covers_the_query_surface():
+    '''Adding a route, calculation type, filter type or enabled granularity without
+    a golden case fails here.'''
+    # pylint: disable=import-outside-toplevel
+    from flask import current_app
+
+    from web.server.api.query.calculation_schema import CALCULATION_IMPL_SCHEMAS
+    from web.server.api.query.query_filter_schema import QUERY_FILTER_IMPL_SCHEMAS
+
+    prefix = '/api2/query/'
+    routes = {
+        rule.rule[len(prefix) :]
+        for rule in current_app.url_map.iter_rules()
+        if rule.rule.startswith(prefix) and 'POST' in rule.methods
+    }
+    granularities = {g.id for g in current_app.query_data.granularities}
+
+    endpoints, calculations, filters, grouped = set(), set(), set(), set()
+    for case in CASES:
+        endpoints.add(case.meta['endpoint'])
+        for key, node in _walk(case.read('request.json')):
+            if key == 'calculation':
+                calculations.add(node['type'])
+            elif key in ('filter', 'field', 'fields') and 'type' in node:
+                filters.add(node['type'])
+            elif key == 'groups' and 'granularity' in node:
+                grouped.add(node['granularity'])
+
+    assert routes - endpoints == set()
+    assert set(CALCULATION_IMPL_SCHEMAS) - calculations == set()
+    assert set(QUERY_FILTER_IMPL_SCHEMAS) - filters == set()
+    assert granularities - grouped == set()

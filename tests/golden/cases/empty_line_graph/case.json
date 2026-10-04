@@ -1,0 +1,8 @@
+{
+  "description": "line_graph when Druid returns no rows.",
+  "endpoint": "line_graph",
+  "policy": null,
+  "druid": {
+    "empty": true
+  }
+}

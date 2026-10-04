@@ -1,0 +1,30 @@
+{
+  "description": "Multi-dimension need (JWT query_needs claim) ORed with a simple state policy.",
+  "endpoint": "table",
+  "policy": {
+    "query_policies": [
+      {
+        "dimension": "StateName",
+        "dimension_value": "Roraima"
+      },
+      {
+        "dimension": "source",
+        "dimension_value": null
+      }
+    ],
+    "query_needs": [
+      {
+        "StateName": {
+          "include_values": [
+            "Pará"
+          ]
+        },
+        "source": {
+          "include_values": [
+            "yellow_fever"
+          ]
+        }
+      }
+    ]
+  }
+}

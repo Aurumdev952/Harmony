@@ -1,0 +1,22 @@
+{
+  "data": [
+    {
+      "StateName": "Acre",
+      "case_fatality_rate_female": 77.43
+    },
+    {
+      "StateName": "Pará",
+      "case_fatality_rate_female": 160.5666
+    },
+    {
+      "StateName": "Roraima",
+      "case_fatality_rate_female": 696.8739
+    }
+  ],
+  "dimensions": [
+    "StateName"
+  ],
+  "fields": [
+    "case_fatality_rate_female"
+  ]
+}

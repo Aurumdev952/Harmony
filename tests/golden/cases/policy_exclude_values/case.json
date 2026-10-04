@@ -1,0 +1,21 @@
+{
+  "description": "Need excluding a state (JWT query_needs claim).",
+  "endpoint": "table",
+  "policy": {
+    "query_needs": [
+      {
+        "StateName": {
+          "exclude_values": [
+            "Pará"
+          ]
+        }
+      }
+    ],
+    "query_policies": [
+      {
+        "dimension": "source",
+        "dimension_value": null
+      }
+    ]
+  }
+}

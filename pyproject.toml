@@ -276,9 +276,11 @@ ignore_missing_imports = true
 pythonpath = ["."]
 # CI runs everything under tests/, so a new suite needs no workflow change.
 testpaths = ["tests"]
-# pytest-selenium 4.0.1 (pinned in the dev group, unused by any suite) raises an
-# INTERNALERROR on pytest 8 whenever a test fails, hiding which one.
-addopts = "-p no:selenium"
+# Plugins pinned in the dev group that no suite uses and that break suites:
+# pytest-selenium 4.0.1 raises an INTERNALERROR on pytest 8 whenever a test fails,
+# hiding which one; pytest-flask 1.3.0 pushes a request context around any test
+# with an `app` fixture, so Flask-Login state leaks into tests/web.
+addopts = "-p no:selenium -p no:flask"
 markers = [
     "stack: needs the running docker compose stack; CI's unit job deselects it",
 ]

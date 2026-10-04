@@ -115,6 +115,7 @@ None of these blocks this WP.
   - the removed packages out of `pyproject.toml` (`[project].dependencies`, `web`, `pipeline`, `dev`), then `uv lock` and `make requirements`;
   - the four removed mypy overrides (`flask_admin`, `flask_graphql`, `graphene`, `graphene_sqlalchemy`) out of `[[tool.mypy.overrides]]`;
   - the PyPy `cryptography==41.0.7` marker line. The lead's Phase 3b note deletes it outright, so it does not enter `pyproject.toml`.
+  - **the gspread PyPy exclusion.** WP-0d replaced that cryptography pin with `gspread>=5.4.0 ; platform_python_implementation != 'PyPy'` in `requirements.txt`. Nothing imports gspread, and under PyPy it pulls in cryptography, which aborts PyPy on import. When porting WP-0d, change the `"gspread>=5.4.0"` line in `[project].dependencies` to `"gspread>=5.4.0 ; platform_python_implementation != 'PyPy'"`, then run `uv lock` and `make requirements`. `make requirements` must never export an unmarked gspread, or the etl-pipeline image's PyPy step builds cryptography from source and fails. The pin test in `tests/infra/test_requirements_export.py` strips markers before matching, so the allowlist stays as it is.
 - [ ] **In-flight branches, after rebasing onto this WP.** Before WP-2f, pylint failed CI only on `type == error`, so unused imports (F401) and formatting passed unless black objected. Now ruff fails CI on F401 and on any unformatted changed file. Each in-flight branch owner runs `make format-python COMMIT=<base>` and turns intentional imports into `# noqa: F401`. Known today:
   - WP-0c (backend side): 2 F401 and 4 files to reformat (reviewer's count);
   - WP-0b: 2 F401 and 2 to reformat (reviewer's count);
@@ -124,7 +125,13 @@ None of these blocks this WP.
 
   `ci/lint_python.sh main` lists all of these.
 
+- [x] **WP-0a and WP-0c** (on `mig/integration` at `9fedcce`, merged here). No toolchain file changed. Their suites `tests/web` (68) and `tests/graphql` (5) join the 3.9 job automatically, and `tests/infra/test_compose_hasura.py` joins the 3.13 job.
+  - **`tests/web` fix.** Under the dev group, `test_timeout_clears_the_access_cookie_and_signs_the_user_out` failed because pytest-flask 1.3.0 pushes a request context around any test with an `app` fixture. On `mig/integration`'s own environment it passed. `-p no:flask` fixes it; no suite uses pytest-flask.
+  - **Golden failure, not mine.** `tests/golden::test_druid_queries[policy_include_all_all_time]` fails on `mig/integration` itself, under its own WP-2a environment, and `record.py --check` here lists only that file ("85 cases, 1 fixture files would change"). This is the INV-2 change WP-0c causes, which WP-2a's file says to regenerate on a branch carrying WP-0c. Until QA regenerates it, the 3.9 job is red on every PR based on `mig/integration`. Request below.
+
 ### Requests to other roles
+
+- [ ] **qa (WP-2a follow-up), blocks a green CI on `mig/integration`:** regenerate `tests/golden/cases/policy_include_all_all_time/druid_query.json` now that WP-0c is merged, following WP-2a's INV-2 note: `record.py --check` must list only that file, then a reviewer accepts the diff.
 
 - [x] **lead:** `scripts/watch/watch_mypy.py` and `.vscode` now follow the pyproject mypy configuration and the ruff formatter (`17dcbce` on `mig/integration`, merged here).
 - [ ] **lead:** add `.hypothesis/` to `.gitignore`. The contract suite's property tests write a Hypothesis example database at the repo root (`tests/pipeline` turns it off).

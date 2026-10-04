@@ -65,8 +65,10 @@ None of these block WP-2c; each comes from a finding below or from the review.
   - `storage.retrieve.cached` then breaks. The cache key becomes `thumbnail:v2:<dashboard resource_id>:<sha256 of the policy digest>`, so the request never reads `stack/seed_cache.py`'s `thumbnail_contract-dashboard`. It falls through to Urlbox, which 500s because the stack has no egress.
   - Whichever of WP-0i and WP-2c merges second must seed the v2 key after `dashboard.create` (the resource id only exists from then on), re-record both cases, and give the reason in its log.
 - [x] backend or QA (WP-0a): record the 11 deferred Relay mutations. Done in unit 7: `stack/seed_catalog.py` seeds the rows they edit, and all 51 Relay operations are recorded. WP-0a's `replay_relay_operations.py` still carries its own variables. Whichever WP touches Relay next should make one of the two the source.
-- [ ] backend: `POST /api2/user/<id>/generate_api_token` returns a token it does not store (F12). Either store it there, or document that the caller must save the user. A script that calls the route alone gets a token that never authenticates.
+- [x] backend: `POST /api2/user/<id>/generate_api_token` returns a token it does not store (F12). Either store it there, or document that the caller must save the user. A script that calls the route alone gets a token that never authenticates.
+  - 2026-10-04 backend-2c: done at `48ff9a3`. The route stores the token. See "Backend support: F12 and F13".
 - [ ] backend: `POST /api/import_self_serve` truncates each data-catalog table with `CASCADE`, so it deletes rows in tables it does not import (F13). Delete and reload without `CASCADE` inside one transaction, or export and import the dependent tables too.
+  - 2026-10-04 backend-2c: failing tests are in at `d23076f`. The fix is in `db/postgres/utils.py` (core), so a core instance applies it on `mig/WP-2c-api-contract-recordings-core`. Tick this line when that branch merges.
 
 ## Log
 
@@ -79,6 +81,8 @@ None of these block WP-2c; each comes from a finding below or from the review.
 - 2026-10-05 qa-2 unit 6: review fixes (see Plan 6 and "Review fixes" below); merged `mig/integration` (WP-0a, WP-0c, decision 0003/0004; `.playwright-mcp` gone, `git ls-files .playwright-mcp` empty); re-recorded on the merged code: exactly three recordings changed, all from WP-0c (`auth.timeout` now clears the JWT and CSRF cookies, `field.info.unknown_id` 404, `field.info.over_cap` 400). History rewritten before any push: the mixed commit 501337e is now a harness commit followed by an inventory-and-recordings commit; the first review's verdict rows are carried in the WP file. Checks under Evidence.
 - 2026-10-05 qa-2: status review.
 - 2026-10-04 qa-3 unit 7: resumed after the host reboot lost qa-2's session and carried its uncommitted round-3 work over. Round-3 fixes R1-R7, plus the client's `%%` search pattern, a `next_run` seed, and findings F12 and F13; commits `787f6b9` and `dc935f5`. Check: ruff clean; offline `51 passed`; dry run `231 cases, 0 problems`; two recordings on fresh stacks, identical; replay `282 passed` twice on each of two fresh stacks; two broken recordings red; stack down. Status review.
+- 2026-10-04 backend-2c (supporting, F13): failing tests `tests/db/test_import_data_into_table.py` (3 failed, 1 passed at `00e5047`) and the proposed core patch `WP-2c-evidence/F13-db-postgres-utils.patch` (4 passed with it); handed to core through the lead.
+- 2026-10-04 backend-2c (supporting, F12): `issue_api_token` stores the generated token and the route calls it, commit `48ff9a3`. Checks: the new `tests/web/test_api_token_issue.py` failed against the old behaviour (`check_token_validity` False) and passes, 2 of 2, including the admin app's later save and revoke. `tests/web` gives 70 passed, 1 failed; the failure is the existing `test_graphql_endpoint_removed` (`flask_migrate` is missing from the uv env, also at `00e5047`). The contract offline suite gives 51 passed, and the dry run reports 231 cases, 0 problems. Replay on a fresh stack: 231 passed, twice. The live F12 check passed. ruff and mypy on the changed files are clean. Stack down.
 
 ## Review fixes
 
@@ -190,6 +194,52 @@ Found while recording. None is fixed here (QA never edits production code); each
   - Repro: stack up (the seed gives the unpublished field one category mapping and one datasource mapping), run `self_serve.export`, then `self_serve.import.exported_zip`, then count the rows in the two mapping tables.
   - Expected: 1 and 1. Actual: 0 and 0, while `pipeline_datasource` and `category` keep their rows.
   - Evidence: the F13 line under Evidence; `recordings/graphql.BatchPublishModalContentsQuery.json` (no publishable field).
+
+## Backend support: F12 and F13 (backend-2c)
+
+Branch `mig/WP-2c-api-contract-recordings-backend`, from `00e5047`.
+
+### F13: reproduction and proposed fix
+
+- **Failing tests** (shared paths): `tests/db/test_import_data_into_table.py`, run against a throwaway Postgres from `tests/throwaway_postgres.py`. That is the stack's pinned `postgres:15.2-alpine` image on a random loopback port, or `HARMONY_TEST_POSTGRES_URL`; the tests skip when neither is available. The tests build the catalogue schema from `models/alchemy/{query,data_upload}`, seed every imported table plus one row in each of the 7 dependent tables, then call `export_tables_to_zip` and `import_data_into_table` with the table lists the route's scripts use. Run: `ZEN_ENV=harmony_demo uv run pytest tests/db -q`.
+  1. `test_reimporting_an_unchanged_export_keeps_rows_in_tables_it_does_not_carry`. On `00e5047` it fails: all 7 dependent tables come back empty.
+  2. `test_an_import_makes_the_catalogue_tables_match_the_export`. A renamed category is restored, and a category added after the export is removed together with its dependent mapping (ON DELETE CASCADE), while the mapping of a category the export carries survives. Fails on `00e5047`.
+  3. `test_mapping_rows_whose_ids_differ_from_the_export_are_replaced`. Mapping ids drifted between instances, so each id holds the other row's `(dimension_id, category_id)` pair. Passes on `00e5047`; it guards the fix against unique-constraint collisions.
+  4. `test_a_failed_import_changes_nothing`. The export's `category` lacks a row that `field_category_mapping` references. On `00e5047` the import raises after it has already replaced earlier tables, because it ran in autocommit.
+- **Result on `00e5047`**: 3 failed, 1 passed.
+- **Proposed fix** (core owns `db/postgres/utils.py`, routed through the lead): `WP-2c-evidence/F13-db-postgres-utils.patch`. With the patch loaded through a pytest plugin and no edit to the repo: 4 passed. A mutation that drops the leaf-table rule turns test 3 red. What the patch does:
+  1. Runs the import in one transaction.
+  2. COPYs each table into a temporary staging table.
+  3. Children first, deletes the rows whose primary key the export does not carry. A table that no foreign key references is emptied instead.
+  4. Parents first, runs `INSERT ... SELECT ... ON CONFLICT (pk) DO UPDATE`.
+  5. Drops `TRUNCATE ... CASCADE`.
+- **Behaviour before and after** (INV-2-relevant; for the human acceptance list):
+  - Before: an import emptied the 7 dependent tables (`unpublished_field_{category,pipeline_datasource,dimension}_mapping`, `geo_dimension_metadata`, `hierarchical_dimension_metadata`, `non_hierarchical_dimension`, `source_config`), and a failed import left some catalogue tables replaced.
+  - After: the imported tables hold exactly the export's rows, as before. Dependent rows survive while the export carries the row they reference, and are deleted with it otherwise. A failed import changes nothing.
+  - Rows are matched on primary keys. The catalogue's parents use string ids, which are stable across instances. `source_config` references `self_serve_source` by serial id, so on a cross-instance import a surviving `source_config` row follows whichever source holds that id in the export.
+  - Known limit: a referenced table whose secondary unique value moves between two surviving rows (`dataprep_flow.recipe_id`) makes the import fail and roll back rather than succeed.
+
+### F12: fix
+
+- **Decision**: the route stores the token (`web/server/routes/views/users.py` `issue_api_token`, called by `create_api_token_for_user`). That is the smallest fix that makes the route's answer true. The admin app's later save stays safe: `update_user_api_tokens` inserts with `ON CONFLICT DO NOTHING`, so the same token is neither duplicated nor rejected. `models/alchemy/api_token/model.py` (core) is unchanged. The route sets `user_id` itself because `generate_token` attaches the user through a view-only relationship.
+- **Test first**: `tests/web/test_api_token_issue.py`, on the throwaway Postgres.
+  - `test_a_generated_api_token_authenticates_without_saving_the_user`: the token's claim id is in the table, belongs to the user and passes `check_token_validity`. With the helper returning the unsaved token, as the route did, it failed: `check_token_validity(...)` was False.
+  - `test_the_admin_apps_later_save_keeps_the_stored_token`: after the admin app's save there is one stored copy and it still authenticates. A later save with `is_revoked` makes it stop authenticating.
+- **Live** (fresh stack at `48ff9a3`, `/tmp/f12_live.py`, a dedicated user deleted afterwards):
+  - `generate_api_token` returned 200 with the same keys.
+  - The token was listed on the user without a PATCH.
+  - `GET /api2/user/<id>` with `Authorization: Bearer <token>` returned 200. A malformed bearer returned 422.
+  - The admin app's PATCH with the same token returned 200 and left one copy, still valid.
+  - A PATCH with `isRevoked: true` returned 200, and the bearer then returned 401.
+- **Contract**: no recording changes. Replay on a fresh stack passed 231 of 231, twice. `user.generate_api_token` keeps its schema: `isRevoked` was boolean already, and `created` and `revoked` are dates. `user.get.with_api_token` reads the same item. For the owner (qa), two case notes in `cases/20-directory.json` are now stale:
+  - `user.generate_api_token` says it returns the token "without storing it";
+  - `user.update.persist_api_token` says generate_api_token "stores nothing".
+
+  Suggested wording: the route stores the token, and the PATCH is the admin app's save, which keeps it (F12, fixed by backend at `48ff9a3`).
+- **Behaviour before and after** (authentication; for the human acceptance list): a generated token now works at once, rather than only after the admin saves the user.
+  - If the admin closes the modal without saving, the token stays active. It is listed under the user's API tokens and can be revoked there.
+  - Who can obtain a working token does not widen. The route still requires `change_password` on the user, which the code already treats as equivalent to account access (`user_api_models.py:159-163`). Before, anyone holding that permission could also set the user's password.
+  - Follow-up for frontend-design (not blocking): the copy toast in `web/client/components/AdminApp/UsersTab/UserViewModal/APITokensTab.jsx` says "Do not forget to save changes before using it!". That is no longer true for new tokens. Revocation still needs Save.
 
 ## Verdicts
 

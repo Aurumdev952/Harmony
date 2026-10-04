@@ -6,3 +6,4 @@
 - [Celery startup checks](celery_startup_checks.md) — refusals in worker_process_init are swallowed; put them at import of the -A module
 - [Template render diff](template_render_diff.md) — prove Jinja template edits without a running app; known baseline failures
 - [Flask web tests](flask_web_tests.md) — run tests/web on py3.8, call handlers directly, worktree-guard and auth/policy traps
+- [Backend testing traps](backend-testing-traps.md) — real-Postgres fixture, mapper imports, contract-stack admin PATCH trap, worktree guard, quote styles

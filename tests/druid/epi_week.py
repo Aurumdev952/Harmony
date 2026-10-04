@@ -67,6 +67,7 @@ def epi_week_of_year_extraction() -> dict:
                 'type': 'lookup',
                 'lookup': {'type': 'map', 'map': epi_week_map()},
                 'retainMissingValue': False,
+                'replaceMissingValueWith': None,
                 'injective': False,
             },
         ],

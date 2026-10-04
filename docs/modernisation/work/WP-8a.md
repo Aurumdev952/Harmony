@@ -48,6 +48,7 @@ None.
 
 ## Requests
 
+- [ ] core: replace J1 with the native extraction (blocks unit 6). In `GranularityExtraction.EXTRACTION_MAP`, set `'epi_week_of_year'` to `CascadeExtraction([TimeFormatExtraction('MM-ww', 'en', 'UTC'), MapLookupExtraction(EPI_WEEK_OF_YEAR_MAP)])`. This needs a small `CascadeExtraction` (`{'type': 'cascade', 'extractionFns': [fn.build() ...]}`), because pydruid has none. The 75-entry map is `tests/druid/epi_week.epi_week_map()`; commit it as a literal next to the extraction. The built dict must equal `epi_week_of_year_extraction()`. Remove the `xfail` marker on `test_builder_emits_the_native_extraction` in the same commit: it is strict, so it fails the day the builder matches. Delete J2 (`db/druid/js_formulas/`) and the J3 branches. Proof that the change is safe: unit 3 evidence. No golden case changes, because harmony_demo does not enable the granularity.
 - [x] qa-1a (WP-1a): use of host Druid. Answered by the lead 2026-10-04: WP-1a's `harmony-wp1a-perf-druid` may be used read-only. Not needed. Every WP-8a run uses its own throwaway projects `wp8a-legacy`, `wp8a-sqlnull` and `wp8a-druid38` (ports 58891 to 58893, loopback only, metadata on tmpfs). No WP-8a run touched WP-1a's project.
 
 ## Log
@@ -55,7 +56,13 @@ None.
 - 2026-10-04 data-platform-3 unit 1: inventory above; check: the grep finds nothing outside J1 to J4.
 - 2026-10-04 data-platform-3 unit 2: audit harness (`scripts/druid/null_audit/`); check: compose validates per mode, the dataset indexes (9475 input rows, 9459 after rollup), and the legacy replay runs 85 of 85 cases with 0 errors (4 return no rows on purpose: `calc_formula_invalid`, `policy_none`, `policy_source_only`, `policy_jwt_exclude_values`).
 
+- 2026-10-04 data-platform-3 unit 3: native epi week proven; check: `uv run pytest tests/druid` 9 passed, 1 strict xfail (the builder still emits JavaScript, pending the core request); live parity on 0.23 legacy and 0.23 SQL-compatible nulls: 73414 days 1900-01-01..2100-12-31, 0 mismatches between native, JavaScript and the Python port.
+
 ## Evidence
+
+- Unit 3, native epi week:
+  - `tests/druid/test_epi_week_native.py`. Six hand-worked dates pin the formula's quirks: week 0 on the ISO year start, week -1 for 1 to 3 January that still sit in the previous ISO year, restart at 0 on 29 to 31 December, week 52. The map is then checked against the Python port on every day from 1900 to 2400, which spans a full 400-year Gregorian cycle.
+  - [parity-0.23-legacy.txt](WP-8a-evidence/parity-0.23-legacy.txt) and [parity-0.23-sqlnull.txt](WP-8a-evidence/parity-0.23-sqlnull.txt): `run_audit.py parity --js` groups a one-row-per-day datasource by the JavaScript and the native extraction in the same query.
 
 ## Verdicts
 

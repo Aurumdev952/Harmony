@@ -1,0 +1,107 @@
+{
+  "data": [
+    {
+      "dimensions": {
+        "StateName": "Acre",
+        "timestamp": "2024-01-01"
+      },
+      "metrics": {
+        "yellow_fever_cases": 57.61
+      }
+    },
+    {
+      "dimensions": {
+        "StateName": "Pará",
+        "timestamp": "2024-01-01"
+      },
+      "metrics": {
+        "yellow_fever_cases": 24.0
+      }
+    },
+    {
+      "dimensions": {
+        "StateName": "Acre",
+        "timestamp": "2024-02-01"
+      },
+      "metrics": {
+        "yellow_fever_cases": 154.01
+      }
+    },
+    {
+      "dimensions": {
+        "StateName": "Pará",
+        "timestamp": "2024-02-01"
+      },
+      "metrics": {
+        "yellow_fever_cases": 111.0
+      }
+    },
+    {
+      "dimensions": {
+        "StateName": "Roraima",
+        "timestamp": "2024-02-01"
+      },
+      "metrics": {
+        "yellow_fever_cases": 123.0
+      }
+    },
+    {
+      "dimensions": {
+        "StateName": "Acre",
+        "timestamp": "2024-03-01"
+      },
+      "metrics": {
+        "yellow_fever_cases": 395.49
+      }
+    },
+    {
+      "dimensions": {
+        "StateName": "Pará",
+        "timestamp": "2024-03-01"
+      },
+      "metrics": {
+        "yellow_fever_cases": 25.08
+      }
+    },
+    {
+      "dimensions": {
+        "StateName": "Roraima",
+        "timestamp": "2024-03-01"
+      },
+      "metrics": {
+        "yellow_fever_cases": 283.0
+      }
+    },
+    {
+      "dimensions": {
+        "StateName": "TOTAL",
+        "timestamp": "2024-01-01"
+      },
+      "metrics": {
+        "yellow_fever_cases": null
+      }
+    },
+    {
+      "dimensions": {
+        "StateName": "TOTAL",
+        "timestamp": "2024-02-01"
+      },
+      "metrics": {
+        "yellow_fever_cases": 235.0
+      }
+    },
+    {
+      "dimensions": {
+        "StateName": "TOTAL",
+        "timestamp": "2024-03-01"
+      },
+      "metrics": {
+        "yellow_fever_cases": 229.0
+      }
+    }
+  ],
+  "dimensions": [
+    "timestamp",
+    "StateName"
+  ]
+}

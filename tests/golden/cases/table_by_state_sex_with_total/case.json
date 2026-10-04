@@ -1,0 +1,5 @@
+{
+  "description": "TABLE: state with a total row, then sex; rows streamed through rapidjson.",
+  "endpoint": "table",
+  "policy": null
+}

@@ -1,0 +1,63 @@
+{
+  "fields": [
+    {
+      "id": "case_fatality_rate",
+      "calculation": {
+        "type": "FORMULA",
+        "filter": {},
+        "expression": "deaths / cases * 100",
+        "constituents": [
+          {
+            "id": "cases",
+            "calculation": {
+              "type": "SUM",
+              "filter": {
+                "type": "FIELD",
+                "fieldId": "yellow_fever_cases"
+              }
+            }
+          },
+          {
+            "id": "deaths",
+            "calculation": {
+              "type": "SUM",
+              "filter": {
+                "type": "AND",
+                "fields": [
+                  {
+                    "type": "FIELD",
+                    "fieldId": "yellow_fever_cases"
+                  },
+                  {
+                    "type": "SELECTOR",
+                    "dimension": "Death",
+                    "value": "1"
+                  }
+                ]
+              }
+            }
+          }
+        ]
+      }
+    }
+  ],
+  "filter": {
+    "type": "AND",
+    "fields": [
+      {
+        "type": "INTERVAL",
+        "start": "2024-01-01",
+        "end": "2024-04-01"
+      }
+    ]
+  },
+  "groups": [
+    {
+      "dimension": "MunicipalityName",
+      "includeAll": false,
+      "includeNull": false,
+      "includeTotal": false
+    }
+  ],
+  "type": "GROUP_BY"
+}

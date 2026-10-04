@@ -5,3 +5,4 @@
 - [Pipeline builds a Flask app](pipeline_builds_flask_app.md) — validate steps run create_app, so Flask startup checks hit pipeline runs
 - [Tooling traps](tooling_traps.md) — multi-Python test runs, black vs ruff format, mypy flags, pipeline suite scratch runs, 3.13 wheel checks
 - [Config import hook](config_import_hook.md) — alias semantics, PathFinder precedence, __spec__ restore, lazy DATASOURCE
+- [Postgres bulk-replace traps](postgres-bulk-replace-traps.md) — upsert before delete under CASCADE; setval survives rollback; DELETE not TRUNCATE in long txns

@@ -82,8 +82,6 @@ services:
   # 'flags_extra': {'volumes-from': 'nginx'},
   redis:
     image: redis:alpine
-    ports:
-      - 6379:6379
     healthcheck:
       test: [ "CMD", "redis-cli", "--raw", "incr", "ping" ]
       interval: 30s
@@ -112,8 +110,6 @@ services:
     platform: linux/amd64
     pull_policy: always
     image: ${DOCKER_NAMESPACE:-ghcr.io/zenysis}/${DOCKER_IMAGE_PREFIX:-harmony}-web:${DOCKER_TAG:-latest}
-    ports:
-      - 5000:5000
     environment:
       - ZEN_ENV=${ZEN_ENV}
       - HSTS=off
@@ -150,9 +146,6 @@ services:
   worker:
     platform: linux/amd64
     image: ${DOCKER_NAMESPACE:-ghcr.io/zenysis}/${DOCKER_IMAGE_PREFIX:-harmony}-web:${DOCKER_TAG:-latest}
-    # Assign some random ports for worker service to work
-    ports:
-      - 61234:61234
     environment:
       - ZEN_ENV=${ZEN_ENV}
       - EMAIL_HOST=${EMAIL_HOST}

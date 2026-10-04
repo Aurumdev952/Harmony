@@ -24,6 +24,8 @@ BASE_ENV = {
     'DATABASE_URL': 'postgresql://u:p@db.invalid:5432/harmony',
     'POSTGRES_DB_URI': 'postgresql://u:p@db.invalid:5432/harmony',
     'MC_CONFIG_PATH': '/tmp/mc',
+    'DATA_PATH': '/tmp/data',
+    'NGINX_VHOST': '/tmp/nginx_vhost',
 }
 
 
@@ -57,3 +59,55 @@ def test_pipeline_passes_postgres_db_uri(tmp_path):
     environment = cfg['services']['etl-pipeline']['environment']
     assert environment.get('POSTGRES_DB_URI') == BASE_ENV['POSTGRES_DB_URI']
     assert 'POSTGRES_DB_URI:' not in environment
+
+
+# WP-0a removes Hasura's published port; drop it from here when it lands.
+PUBLISHED_UNTIL_WP_0A = {'hasura'}
+
+
+def published(cfg):
+    return {
+        name: service['ports']
+        for name, service in cfg['services'].items()
+        if service.get('ports')
+    }
+
+
+@pytest.mark.parametrize(
+    'overlays',
+    [[], ['docker-compose.prod.yaml'], ['docker-compose.local.yaml']],
+    ids=['base', 'prod', 'local'],
+)
+def test_only_nginx_publishes_ports(tmp_path, overlays):
+    cfg = config(tmp_path, ['docker-compose.yaml', *overlays])
+    assert set(published(cfg)) - PUBLISHED_UNTIL_WP_0A == {'nginx'}
+
+
+def test_dev_publishes_on_loopback_only(tmp_path):
+    cfg = config(tmp_path, ['docker-compose.yaml', 'docker-compose.dev.yaml'])
+    ports = published(cfg)
+    for name in PUBLISHED_UNTIL_WP_0A:
+        ports.pop(name, None)
+    assert set(ports) == {'postgres', 'redis', 'web'}
+    for name, entries in ports.items():
+        for entry in entries:
+            assert entry.get('host_ip') == '127.0.0.1', (name, entry)
+
+
+@pytest.mark.parametrize(
+    ('compose_file', 'service', 'variable'),
+    [
+        ('docker-compose.db.yaml', 'postgres', 'POSTGRES_BIND_ADDRESS'),
+        ('docker-compose.minio.yaml', 'minio', 'MINIO_BIND_ADDRESS'),
+    ],
+)
+def test_standalone_servers_need_an_explicit_bind_address(
+    tmp_path, compose_file, service, variable
+):
+    missing = render(tmp_path, [compose_file])
+    assert missing.returncode != 0
+    assert variable in missing.stderr
+
+    cfg = config(tmp_path, [compose_file], {variable: '10.0.0.5'})
+    for entry in cfg['services'][service]['ports']:
+        assert entry['host_ip'] == '10.0.0.5', entry

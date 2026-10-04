@@ -10,6 +10,9 @@ services:
       HASURA_GRAPHQL_DATABASE_URL: postgresql://postgres:zenysis@postgres:5432/${ZEN_ENV}-local
     volumes:
       - ./graphql/hasura/metadata/versions/latest:/hasura-metadata
+  redis:
+    ports:
+      - "127.0.0.1:6379:6379"
   postgres:
     image: postgres:15.2-alpine
     restart: always
@@ -19,7 +22,7 @@ services:
       POSTGRES_DB: postgres
       POSTGRES_HOST_AUTH_METHOD: trust
     ports:
-      - "5432:5432"
+      - "127.0.0.1:5432:5432"
     volumes:
       - pgdata-volume:/var/lib/postgresql/data
     healthcheck:
@@ -59,7 +62,7 @@ services:
       SQLALCHEMY_DATABASE_URI: postgresql://postgres:zenysis@postgres:5432/${ZEN_ENV}-local
       OBJECT_STORAGE_ALIAS: ${OBJECT_STORAGE_ALIAS}
     ports:
-      - "5000:5000"
+      - "127.0.0.1:5000:5000"
     depends_on:
       postgres:
         condition: service_healthy

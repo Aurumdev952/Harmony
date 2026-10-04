@@ -31,7 +31,7 @@ services:
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
       POSTGRES_DB: ${POSTGRES_DB:-postgres}
     ports:
-      - ${POSTGRES_HOST_PORT:-5432}:5432
+      - "${POSTGRES_BIND_ADDRESS:?set POSTGRES_BIND_ADDRESS to 127.0.0.1 when web runs on this host, or to this host's private IP when it runs elsewhere}:${POSTGRES_HOST_PORT:-5432}:5432"
     volumes:
       # If you don't want to use a volume, then use: /usr/local/pgsql/data
       - ${PG_DATA:-pgdata-volume}:/var/lib/postgresql/data

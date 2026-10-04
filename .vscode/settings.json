@@ -10,14 +10,11 @@
     ".mypy_cache": true,
     ".scannerwork": true
   },
-  "pylint.path": ["venv/bin/pylint"],
   "editor.formatOnSave": true,
   "[python]": {
     "editor.rulers": [88],
-    "editor.defaultFormatter": "ms-python.black-formatter"
+    "editor.defaultFormatter": "charliermarsh.ruff"
   },
-  "black-formatter.args": ["--skip-string-normalization"],
-  "black-formatter.importStrategy": "fromEnvironment",
   "[javascript]": {
     "editor.defaultFormatter": "esbenp.prettier-vscode"
   },
@@ -31,7 +28,6 @@
   "[yaml]": {
     "editor.rulers": [80]
   },
-  "python.testing.pytestArgs": ["--driver=Chrome"],
   "python.testing.unittestEnabled": false,
   "python.testing.pytestEnabled": true,
   "flow.pathToFlow": "${workspaceFolder}/node_modules/.bin/flow",

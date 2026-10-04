@@ -1,0 +1,5 @@
+{
+  "description": "Granularity month_of_year with a state group.",
+  "endpoint": "bar_graph",
+  "policy": null
+}

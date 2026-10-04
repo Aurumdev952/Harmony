@@ -1,0 +1,10 @@
+{
+  "levels": [],
+  "root": {
+    "dimension": "",
+    "metrics": {
+      "yellow_fever_cases": 88.0
+    },
+    "name": "Overall"
+  }
+}

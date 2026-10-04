@@ -25,8 +25,9 @@ with open(os.path.join(_HERE, 'potion.yaml')) as _stream:
     TABLE = yaml.safe_load(_stream)
 
 ID_COLUMNS = ('id', 'key', 'resource_id', 'authorization_resource_id')
-DEFAULT_ITEM_ID = 7
+UNHELD_ITEM_ID = 901
 DECOY_ID = 900
+WRITE_METHODS = ('create', 'update', 'delete')
 
 
 @pytest.fixture(name='resources', scope='session')
@@ -151,9 +152,9 @@ def test_potion_writes_agree_with_is_authorized(principal, resources, request_ct
     load_identity(principal_specs()[principal])
     disagreements = []
     for name, spec in TABLE['principal_resources'].items():
-        item_id = spec.get('item_id', DEFAULT_ITEM_ID)
+        item_id = spec.get('item_id', UNHELD_ITEM_ID)
         item = _stand_in(spec['id'], item_id)
-        for method in ('create', 'update', 'delete'):
+        for method in WRITE_METHODS:
             op = TABLE['methods'][method]
             permission = _permissions(resources[name])[method]
             for target, target_id in ((None, None), (item, item_id)):
@@ -162,6 +163,26 @@ def test_potion_writes_agree_with_is_authorized(principal, resources, request_ct
                 if potion != flask:
                     disagreements.append((name, method, target_id, potion, flask))
     assert not disagreements
+
+
+@pytest.mark.usefixtures('request_ctx')
+def test_every_item_id_is_held_as_a_write_need():
+    '''Otherwise the per-item write comparison above is vacuous: Potion and
+    is_authorized would both deny every principal.'''
+    write_ops = {TABLE['methods'][method] for method in WRITE_METHODS}
+    item_ids = {
+        name: (spec['type'], spec['item_id'])
+        for name, spec in TABLE['principal_resources'].items()
+        if 'item_id' in spec
+    }
+    held = set()
+    for spec in principal_specs().values():
+        load_identity(spec)
+        for name, (need_type, item_id) in item_ids.items():
+            if any(item_id in _needs_held(op, need_type) for op in write_ops):
+                held.add(name)
+    assert item_ids
+    assert held == set(item_ids)
 
 
 def test_alert_notification_item_check_uses_the_parent_primary_key(

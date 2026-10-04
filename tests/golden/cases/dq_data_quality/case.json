@@ -1,0 +1,5 @@
+{
+  "description": "Data quality score: day granularity with a state group; three queries.",
+  "endpoint": "data_quality",
+  "policy": null
+}

@@ -1,0 +1,218 @@
+{
+  "data": [
+    {
+      "dimensions": {
+        "Sex": "F"
+      },
+      "key": "F",
+      "timestamp": "2024-01-08",
+      "yellow_fever_cases": 294.0
+    },
+    {
+      "dimensions": {
+        "Sex": "F"
+      },
+      "key": "F",
+      "timestamp": "2024-01-15",
+      "yellow_fever_cases": 52.0
+    },
+    {
+      "dimensions": {
+        "Sex": "M"
+      },
+      "key": "M",
+      "timestamp": "2024-01-15",
+      "yellow_fever_cases": 69.08
+    },
+    {
+      "dimensions": {
+        "Sex": "M"
+      },
+      "key": "M",
+      "timestamp": "2024-01-22",
+      "yellow_fever_cases": 223.0
+    },
+    {
+      "dimensions": {
+        "Sex": "F"
+      },
+      "key": "F",
+      "timestamp": "2024-01-29",
+      "yellow_fever_cases": 120.0
+    },
+    {
+      "dimensions": {
+        "Sex": "M"
+      },
+      "key": "M",
+      "timestamp": "2024-01-29",
+      "yellow_fever_cases": 305.0
+    },
+    {
+      "dimensions": {
+        "Sex": "M"
+      },
+      "key": "M",
+      "timestamp": "2024-02-05",
+      "yellow_fever_cases": 251.54
+    },
+    {
+      "dimensions": {
+        "Sex": "M"
+      },
+      "key": "M",
+      "timestamp": "2024-02-12",
+      "yellow_fever_cases": null
+    },
+    {
+      "dimensions": {
+        "Sex": "F"
+      },
+      "key": "F",
+      "timestamp": "2024-02-19",
+      "yellow_fever_cases": null
+    },
+    {
+      "dimensions": {
+        "Sex": "M"
+      },
+      "key": "M",
+      "timestamp": "2024-02-19",
+      "yellow_fever_cases": 203.56
+    },
+    {
+      "dimensions": {
+        "Sex": "F"
+      },
+      "key": "F",
+      "timestamp": "2024-02-26",
+      "yellow_fever_cases": 243.0
+    },
+    {
+      "dimensions": {
+        "Sex": "M"
+      },
+      "key": "M",
+      "timestamp": "2024-02-26",
+      "yellow_fever_cases": 232.0
+    },
+    {
+      "dimensions": {
+        "Sex": "F"
+      },
+      "key": "F",
+      "timestamp": "2024-03-04",
+      "yellow_fever_cases": 77.22
+    },
+    {
+      "dimensions": {
+        "Sex": "M"
+      },
+      "key": "M",
+      "timestamp": "2024-03-04",
+      "yellow_fever_cases": 318.0
+    },
+    {
+      "dimensions": {
+        "Sex": "F"
+      },
+      "key": "F",
+      "timestamp": "2024-03-11",
+      "yellow_fever_cases": 8.0
+    },
+    {
+      "dimensions": {
+        "Sex": "F"
+      },
+      "key": "F",
+      "timestamp": "2024-03-18",
+      "yellow_fever_cases": 147.0
+    },
+    {
+      "dimensions": {
+        "Sex": "M"
+      },
+      "key": "M",
+      "timestamp": "2024-03-18",
+      "yellow_fever_cases": null
+    },
+    {
+      "dimensions": {
+        "Sex": "M"
+      },
+      "key": "M",
+      "timestamp": "2024-03-25",
+      "yellow_fever_cases": 111.0
+    },
+    {
+      "dimensions": {
+        "Sex": "F"
+      },
+      "key": "F",
+      "timestamp": "2024-01-22",
+      "yellow_fever_cases": null
+    },
+    {
+      "dimensions": {
+        "Sex": "F"
+      },
+      "key": "F",
+      "timestamp": "2024-02-05",
+      "yellow_fever_cases": null
+    },
+    {
+      "dimensions": {
+        "Sex": "F"
+      },
+      "key": "F",
+      "timestamp": "2024-02-12",
+      "yellow_fever_cases": null
+    },
+    {
+      "dimensions": {
+        "Sex": "F"
+      },
+      "key": "F",
+      "timestamp": "2024-03-25",
+      "yellow_fever_cases": null
+    },
+    {
+      "dimensions": {
+        "Sex": "M"
+      },
+      "key": "M",
+      "timestamp": "2024-01-08",
+      "yellow_fever_cases": null
+    },
+    {
+      "dimensions": {
+        "Sex": "M"
+      },
+      "key": "M",
+      "timestamp": "2024-03-11",
+      "yellow_fever_cases": null
+    }
+  ],
+  "dates": [
+    "2024-01-08",
+    "2024-01-15",
+    "2024-01-22",
+    "2024-01-29",
+    "2024-02-05",
+    "2024-02-12",
+    "2024-02-19",
+    "2024-02-26",
+    "2024-03-04",
+    "2024-03-11",
+    "2024-03-18",
+    "2024-03-25"
+  ],
+  "totals": {
+    "F": {
+      "yellow_fever_cases": null
+    },
+    "M": {
+      "yellow_fever_cases": null
+    }
+  }
+}

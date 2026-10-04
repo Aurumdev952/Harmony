@@ -1,0 +1,5 @@
+{
+  "description": "BUMP_CHART: quarter by state over two years.",
+  "endpoint": "line_graph",
+  "policy": null
+}

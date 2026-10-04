@@ -1,0 +1,11 @@
+{
+  "data": [
+    {
+      "municipalities_reporting": null
+    }
+  ],
+  "dimensions": [],
+  "fields": [
+    "municipalities_reporting"
+  ]
+}

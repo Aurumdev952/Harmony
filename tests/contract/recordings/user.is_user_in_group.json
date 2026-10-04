@@ -1,0 +1,13 @@
+{
+  "content_type": "application/json",
+  "headers": [],
+  "id": "user.is_user_in_group",
+  "pinned": {
+    "": false
+  },
+  "response_schema": {
+    "type": "boolean"
+  },
+  "route": "GET /api2/user/<id>/is_user_in_group",
+  "status": 200
+}

@@ -1,0 +1,36 @@
+{
+  "content_type": "text/html",
+  "headers": [],
+  "id": "graphql.BatchPublishModalContentsQuery",
+  "pinned": {},
+  "response_schema": {
+    "properties": {
+      "data": {
+        "properties": {
+          "publishableFields": {
+            "properties": {
+              "edges": {
+                "maxItems": 0,
+                "type": "array"
+              }
+            },
+            "required": [
+              "edges"
+            ],
+            "type": "object"
+          }
+        },
+        "required": [
+          "publishableFields"
+        ],
+        "type": "object"
+      }
+    },
+    "required": [
+      "data"
+    ],
+    "type": "object"
+  },
+  "route": "POST /api/graphql",
+  "status": 200
+}

@@ -1,0 +1,59 @@
+{
+  "content_type": "application/json",
+  "headers": [
+    "link",
+    "x-total-count"
+  ],
+  "id": "configuration.list",
+  "pinned": {
+    "/[]/key": [
+      "cur_datasource",
+      "data_catalog_last_import_date",
+      "default_url",
+      "keep_me_signed_in",
+      "project_manager_ids",
+      "public_access"
+    ]
+  },
+  "response_schema": {
+    "items": {
+      "properties": {
+        "$uri": {
+          "type": "string",
+          "x-format": "api-uri"
+        },
+        "defaultValue": {
+          "maxItems": 0,
+          "type": [
+            "null",
+            "boolean",
+            "string",
+            "array"
+          ]
+        },
+        "key": {
+          "type": "string"
+        },
+        "value": {
+          "maxItems": 0,
+          "type": [
+            "null",
+            "boolean",
+            "string",
+            "array"
+          ]
+        }
+      },
+      "required": [
+        "$uri",
+        "defaultValue",
+        "key",
+        "value"
+      ],
+      "type": "object"
+    },
+    "type": "array"
+  },
+  "route": "GET /api2/configuration",
+  "status": 200
+}

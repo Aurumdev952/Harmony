@@ -1,0 +1,357 @@
+{
+  "cases": [
+    {
+      "id": "user.list",
+      "route": "GET /api2/user",
+      "query": {
+        "per_page": "1000"
+      },
+      "pin": [
+        "/[]/status"
+      ]
+    },
+    {
+      "id": "user.find_by_username",
+      "route": "GET /api2/user",
+      "query": {
+        "where": {
+          "username": "{env:CONTRACT_USERNAME}"
+        }
+      },
+      "capture": {
+        "admin_user": "/0/$uri",
+        "admin_user_id": "/0/$uri#id"
+      }
+    },
+    {
+      "id": "user.get",
+      "route": "GET /api2/user/<id>",
+      "path": "{admin_user}"
+    },
+    {
+      "id": "user.ownership",
+      "route": "GET /api2/user/<id>/ownership",
+      "path": "{admin_user}/ownership"
+    },
+    {
+      "id": "user.is_user_in_group",
+      "route": "GET /api2/user/<id>/is_user_in_group",
+      "pin": [
+        ""
+      ],
+      "path": "{admin_user}/is_user_in_group",
+      "query": {
+        "group_name": "contract-group"
+      }
+    },
+    {
+      "id": "user.can_export_data",
+      "route": "GET /api2/user/<id>/can_export_data",
+      "pin": [
+        ""
+      ],
+      "path": "{admin_user}/can_export_data"
+    },
+    {
+      "id": "role.create",
+      "route": "POST /api2/role",
+      "body": {
+        "$uri": "",
+        "name": "contract_role",
+        "label": "Contract role",
+        "permissions": [
+          {
+            "permission": "view_query_form",
+            "resource_type_id": 1
+          },
+          {
+            "permission": "create_resource",
+            "resource_type_id": 2
+          }
+        ],
+        "queryPolicies": [],
+        "dataExport": false,
+        "dashboardResourceRoleName": "dashboard_viewer",
+        "alertResourceRoleName": "",
+        "usernames": []
+      },
+      "capture": {
+        "role": "/$uri"
+      }
+    },
+    {
+      "id": "role.get",
+      "route": "GET /api2/role/<id>",
+      "path": "{role}"
+    },
+    {
+      "id": "role.update",
+      "route": "PATCH /api2/role/<id>",
+      "path": "{role}",
+      "body": {
+        "$uri": "{role}",
+        "name": "contract_role",
+        "label": "Contract role",
+        "permissions": [
+          {
+            "permission": "view_query_form",
+            "resource_type_id": 1
+          },
+          {
+            "permission": "create_resource",
+            "resource_type_id": 2
+          }
+        ],
+        "queryPolicies": [],
+        "dataExport": true,
+        "dashboardResourceRoleName": "dashboard_viewer",
+        "alertResourceRoleName": "",
+        "usernames": []
+      }
+    },
+    {
+      "id": "role.update_users",
+      "route": "PATCH /api2/role/<id>/users",
+      "path": "{role}/users",
+      "body": [
+        "{env:CONTRACT_USERNAME}"
+      ]
+    },
+    {
+      "id": "group.create",
+      "route": "POST /api2/group",
+      "body": {
+        "$uri": "",
+        "name": "contract-group",
+        "roles": [
+          "{role}"
+        ],
+        "users": [
+          "{env:CONTRACT_USERNAME}"
+        ],
+        "acls": []
+      },
+      "note": "The server answers 200 with a placeholder group ($uri /api2/group/None, name null)."
+    },
+    {
+      "id": "group.find_by_name",
+      "route": "GET /api2/group",
+      "query": {
+        "where": {
+          "name": "contract-group"
+        }
+      },
+      "capture": {
+        "group": "/0/$uri"
+      }
+    },
+    {
+      "id": "group.list",
+      "route": "GET /api2/group",
+      "query": {
+        "per_page": "1000"
+      }
+    },
+    {
+      "id": "client.group.list",
+      "route": "GET /api2/group",
+      "session": "client"
+    },
+    {
+      "id": "user.is_user_in_group.member",
+      "route": "GET /api2/user/<id>/is_user_in_group",
+      "pin": [
+        ""
+      ],
+      "path": "{admin_user}/is_user_in_group",
+      "query": {
+        "group_name": "contract-group"
+      }
+    },
+    {
+      "id": "group.update",
+      "route": "PATCH /api2/group/<id>",
+      "path": "{group}",
+      "body": {
+        "$uri": "{group}",
+        "name": "contract-group-renamed",
+        "roles": [
+          "{role}"
+        ],
+        "users": [
+          "{env:CONTRACT_USERNAME}"
+        ],
+        "acls": []
+      }
+    },
+    {
+      "id": "group.update_users",
+      "route": "PATCH /api2/group/<id>/users",
+      "path": "{group}/users",
+      "body": [
+        "{env:CONTRACT_USERNAME}"
+      ]
+    },
+    {
+      "id": "user.invite",
+      "route": "POST /api2/user/invite",
+      "body": [
+        {
+          "email": "contract-invitee@harmony.invalid",
+          "name": "Contract Invitee"
+        }
+      ],
+      "capture": {
+        "invitee": "/0/$uri"
+      }
+    },
+    {
+      "id": "user.update_roles.clear",
+      "route": "PATCH /api2/user/<id>/roles",
+      "path": "{invitee}/roles",
+      "body": {}
+    },
+    {
+      "id": "user.update_roles.assign",
+      "route": "PATCH /api2/user/<id>/roles",
+      "path": "{invitee}/roles",
+      "body": {
+        "SITE": {
+          "sitewideRoles": [
+            "dashboard_viewer"
+          ],
+          "resources": {}
+        }
+      },
+      "note": "Any non-empty role map 500s: add_user_role passes resource_id, which UserRoles no longer accepts (web/server/routes/views/users.py). web/python_client sends this shape (WP-2c finding F11)."
+    },
+    {
+      "id": "user.update",
+      "route": "PATCH /api2/user/<id>",
+      "path": "{invitee}",
+      "body": {
+        "$uri": "{invitee}",
+        "username": "contract-invitee@harmony.invalid",
+        "firstName": "Contract",
+        "lastName": "Invitee",
+        "phoneNumber": "",
+        "status": "pending",
+        "acls": [],
+        "apiTokens": [],
+        "roles": [],
+        "groups": []
+      },
+      "note": "update_user returns the function update_user_groups instead of the user (web/server/api/user_api_models.py:150); see WP-2c finding F8."
+    },
+    {
+      "id": "user.reset_password",
+      "route": "POST /api2/user/<id>/reset_password",
+      "body": {},
+      "path": "{invitee}/reset_password"
+    },
+    {
+      "id": "user.generate_api_token",
+      "route": "POST /api2/user/<id>/generate_api_token",
+      "body": {},
+      "path": "{invitee}/generate_api_token"
+    },
+    {
+      "id": "user.get.with_api_token",
+      "route": "GET /api2/user/<id>",
+      "path": "{invitee}"
+    },
+    {
+      "id": "user.delete",
+      "route": "DELETE /api2/user/<id>",
+      "path": "{invitee}"
+    },
+    {
+      "id": "client.user.create",
+      "route": "POST /api2/user",
+      "session": "client",
+      "body": {
+        "username": "contract-client-user@harmony.invalid",
+        "firstName": "Contract",
+        "lastName": "Client",
+        "phoneNumber": "",
+        "status": "active"
+      },
+      "capture": {
+        "client_user": "/$uri"
+      }
+    },
+    {
+      "id": "client.user.change_password",
+      "route": "POST /api2/user/<id>/password",
+      "path": "{client_user}/password",
+      "session": "client",
+      "body": {
+        "newPassword": "{env:CONTRACT_PASSWORD}"
+      }
+    },
+    {
+      "id": "user.force_delete",
+      "route": "DELETE /api2/user/<id>/force",
+      "path": "{client_user}/force"
+    },
+    {
+      "id": "client.query_policy.create",
+      "route": "POST /api2/query_policy",
+      "session": "client",
+      "body": {
+        "dimension": "StateName",
+        "dimensionValue": "Contract State",
+        "queryPolicyTypeId": 2
+      },
+      "capture": {
+        "query_policy": "/$uri"
+      }
+    },
+    {
+      "id": "client.query_policy.update",
+      "route": "PATCH /api2/query_policy/<id>",
+      "path": "{query_policy}",
+      "session": "client",
+      "body": {
+        "dimensionValue": "Contract State Renamed"
+      }
+    },
+    {
+      "id": "query_policy.delete",
+      "route": "DELETE /api2/query_policy/<id>",
+      "path": "{query_policy}",
+      "note": "No client deletes policies; this only cleans up after the create case."
+    },
+    {
+      "id": "client.metadata.server_version",
+      "route": "GET /api2/metadata/server_version",
+      "session": "client",
+      "pin": [
+        ""
+      ]
+    },
+    {
+      "id": "client.user.list",
+      "route": "GET /api2/user",
+      "session": "client"
+    },
+    {
+      "id": "client.user.find_by_username",
+      "route": "GET /api2/user",
+      "query": {
+        "where": {
+          "username": "{env:CONTRACT_USERNAME}"
+        }
+      },
+      "session": "client"
+    },
+    {
+      "id": "client.query_policy.list",
+      "route": "GET /api2/query_policy",
+      "query": {
+        "per_page": "1000"
+      },
+      "session": "client"
+    }
+  ]
+}

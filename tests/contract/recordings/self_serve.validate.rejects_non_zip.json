@@ -1,0 +1,35 @@
+{
+  "content_type": "application/json",
+  "headers": [],
+  "id": "self_serve.validate.rejects_non_zip",
+  "pinned": {},
+  "response_schema": {
+    "properties": {
+      "data": {
+        "properties": {
+          "code": {
+            "type": "string"
+          },
+          "message": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "code",
+          "message"
+        ],
+        "type": "object"
+      },
+      "success": {
+        "type": "boolean"
+      }
+    },
+    "required": [
+      "data",
+      "success"
+    ],
+    "type": "object"
+  },
+  "route": "POST /api/validate_self_serve_upload",
+  "status": 500
+}

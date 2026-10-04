@@ -1,0 +1,9 @@
+{
+  "content_type": "application/json",
+  "headers": [],
+  "id": "alert_definition.delete",
+  "pinned": {},
+  "response_schema": null,
+  "route": "DELETE /api2/alert_definitions/<id>",
+  "status": 204
+}

@@ -1,0 +1,55 @@
+{
+  "content_type": "application/json",
+  "headers": [],
+  "id": "field.info",
+  "pinned": {},
+  "response_schema": {
+    "properties": {
+      "data": {
+        "properties": {
+          "yellow_fever_cases": {
+            "properties": {
+              "count": {
+                "type": "integer"
+              },
+              "endDate": {
+                "type": "null"
+              },
+              "formula": {
+                "type": "null"
+              },
+              "humanReadableFormulaHtml": {
+                "type": "null"
+              },
+              "startDate": {
+                "type": "null"
+              }
+            },
+            "required": [
+              "count",
+              "endDate",
+              "formula",
+              "humanReadableFormulaHtml",
+              "startDate"
+            ],
+            "type": "object"
+          }
+        },
+        "required": [
+          "yellow_fever_cases"
+        ],
+        "type": "object"
+      },
+      "success": {
+        "type": "boolean"
+      }
+    },
+    "required": [
+      "data",
+      "success"
+    ],
+    "type": "object"
+  },
+  "route": "GET /api/field/<field_ids>",
+  "status": 200
+}

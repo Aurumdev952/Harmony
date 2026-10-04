@@ -23,6 +23,3 @@ REDIS_HOST = getenv('REDIS_HOST', '')  # Redis isn't a hard requirement
 HASURA_HOST = getenv('HASURA_HOST')  # Hasura is needed for web, but not for pipeline
 
 DRUID_HOST = os.environ['DRUID_HOST']
-
-RENDERBOT_EMAIL = getenv('RENDERBOT_EMAIL', None)
-URLBOX_API_KEY = getenv('URLBOX_API_KEY', None)

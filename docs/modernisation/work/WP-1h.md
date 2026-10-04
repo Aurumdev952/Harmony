@@ -70,13 +70,15 @@ C-5 (session and JWT format, owned by backend). Old: a render token was a plain 
 ## Requests
 
 - [ ] infra: `docker/renderer/Dockerfile`, the `renderer` Compose service on an `internal: true` network, `RENDERER_URL`/`RENDER_WEB_ORIGIN` on `web`, and removal of `URLBOX_API_KEY` from `docker-compose.yaml` and `.env.example`. The exact files will be under `WP-1h-evidence/infra-request/` (blocks unit 5's merge, not its local build).
-- [ ] core: remove `URLBOX_API_KEY` and `RENDERBOT_EMAIL` from `config/settings.py` once this lands; nothing reads them after unit 3 (blocks nothing).
+- [x] core: remove `URLBOX_API_KEY` and `RENDERBOT_EMAIL` from `config/settings.py` once this lands; nothing reads them after unit 3 (blocks nothing). Done on `mig/WP-1h-export-renderer-core`; see the 2026-10-04 core log line.
+- [ ] infra: also remove `RENDERBOT_EMAIL` from `docker-compose.yaml:143,178` and `.env.example:27` (the infra line above names only `URLBOX_API_KEY`; same as WP-0i's open infra request). No code reads either variable after the core change (blocks nothing).
 
 ## Log
 
 - 2026-10-04 backend-8 unit 1: failing tests for tokens, routes and the sidecar; check: red on the base (missing `render_tokens`, `harmony.worker.renderer`, sidecar call).
 - 2026-10-04 backend-8 unit 2: render tokens, liveness and policy-digest checks in `login_from_request` and `_install_token_needs`; check: `uv run pytest tests/web/render/test_render_tokens.py` 17 passed.
 - 2026-10-04 backend-8 unit 3: web client for the sidecar (`render_dashboard`, `RenderedDashboard`), routes, thumbnail and email callers; check: `uv run pytest tests/web` 196 passed, 1 failed (pre-existing `flask_migrate` import in `test_graphql_endpoint_removed.py`).
+- 2026-10-04 core (supporting, branch `mig/WP-1h-export-renderer-core`): removed `URLBOX_API_KEY` and `RENDERBOT_EMAIL` from `config/settings.py`; new `tests/core/test_settings_render.py` imports settings in a fresh interpreter with both variables set and asserts neither attribute exists. Check: red on e30587c (both names exposed), then `uv run pytest tests/core` 17 passed, `tests/web` 196 passed and 1 failed (the same pre-existing `flask_migrate` import), `tests/golden` 269 passed, ruff clean on the test (the two F401s on `config/settings.py:4` are pre-existing), mypy clean on both files. Tree grep for both names afterwards finds only `docker-compose.yaml`, `.env.example` (infra, requested above) and docs; `RENDERER_URL` and `RENDER_WEB_ORIGIN` stay read through `settings.getenv` in `page_renderer.py`, as the request asked for no new setting.
 
 ## Evidence
 

@@ -1,0 +1,4 @@
+{"Real_Date": "2021-05-01", "data": {"demo_malaria_positive": 5, "demo_malaria_tested": 19}, "key": {"MunicipalityName": "Ashford", "StateName": "Northvale"}, "source": "demo_wide"}
+{"Real_Date": "2021-05-20", "data": {"demo_malaria_positive": 1.75, "demo_malaria_tested": 2}, "key": {"MunicipalityName": "Brookline", "StateName": "Northvale"}, "source": "demo_wide"}
+{"Real_Date": "2021-06-30", "data": {"demo_malaria_positive": 7, "demo_malaria_tested": 7}, "key": {"MunicipalityName": "Cedar Point", "StateName": "Southmere"}, "source": "demo_wide"}
+{"Real_Date": "2021-07-04", "data": {"demo_malaria_positive": 1, "demo_malaria_tested": 3}, "key": {"MunicipalityName": "Lagoa Áurea", "StateName": "Southmere"}, "source": "demo_wide"}

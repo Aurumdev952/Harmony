@@ -1,0 +1,8 @@
+{"key": {"StateName": "Northvale", "MunicipalityName": "Ashford", "Sex": "F", "Age": "30"}, "data": {"demo_a": 0, "demo_b": 1.25, "demo_c": 0, "demo_d": 0.0, "demo_e": 0, "demo_f": 3}, "Real_Date": "2021-01-05", "source": "handmade"}
+{"key": {"StateName": "Northvale", "MunicipalityName": "Brookline", "Sex": "M"}, "data": {"demo_a": 0}, "Real_Date": "2021-01-06", "source": "handmade"}
+{"key": {"StateName": "Southmere", "MunicipalityName": ""}, "data": {"demo_a": 2}, "Real_Date": "2021-02-01", "source": "handmade"}
+{"key": {"StateName": "Southmere", "MunicipalityName": "Lagoa Áurea", "Sex": ["F", "X"]}, "data": {"demo_b": 0.1}, "Real_Date": "2021-02-02", "source": "handmade"}
+{"key": {"StateName": "Northvale", "MunicipalityName": "Ashford"}, "data": {"demo_a": 1}, "Real_Date": "", "source": "handmade"}
+{"key": {"StateName": "Northvale", "MunicipalityName": "Ashford"}, "data": {}, "Real_Date": "2021-03-01", "source": "handmade"}
+{"key": {"StateName": "Westfold", "MunicipalityName": "Nowhere Creek"}, "data": {"demo_a": 4}, "Real_Date": "2021-03-02", "source": "handmade"}
+{"key": {"StateName": "Southmere", "MunicipalityName": "Cedar Point", "Death": "SIM"}, "data": {"demo_a": 0, "demo_b": 0, "demo_c": 0, "demo_d": 0, "demo_e": 5}, "Real_Date": "2021-03-03", "source": "handmade"}

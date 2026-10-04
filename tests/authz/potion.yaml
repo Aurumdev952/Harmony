@@ -1,0 +1,48 @@
+# How each Flask-Potion resource under /api2 is wired into authorisation, as it
+# is on main. ZenysisPrincipalMixin (web/server/security/permissions.py) maps the
+# CRUD methods onto four permissions, whatever a resource's Meta says:
+#
+#   read -> view_resource, create -> create_resource,
+#   update -> edit_resource, delete -> delete_resource
+#
+# and each one passes on RoleNeed('admin'), on the sitewide
+# ItemNeed(<op>, None, <type>), or on the item's ItemNeed(<op>, item.<id>, <type>).
+# Lists are filtered to the ids the identity holds `view_resource` on.
+#
+# The query resources (query, query/granularities, query/dimension_values) need
+# the app's Druid metadata to register, so they are covered by tests/authz/http.
+
+methods: {read: view_resource, create: create_resource, update: edit_resource, delete: delete_resource}
+
+principal_resources:
+  UserAclResource: {type: user_acl, id: id}
+  UserResource: {type: user, id: id}                       # Meta {read: yes} has no effect
+  GroupAclResource: {type: group_acl, id: id}
+  GroupResource: {type: group, id: id}
+  BackendTypeResource: {type: resource-type, id: id}
+  BackendResource: {type: resource, id: id}
+  BackendResourceRole: {type: resource_role, id: id}
+  RoleResource: {type: role, id: id}
+  ConfigurationResource: {type: configuration, id: key}    # Meta {read: yes} has no effect
+  DashboardResource: {type: dashboard, id: resource_id}
+  AlertDefinitionResource: {type: alert_definitions, id: authorization_resource_id}
+  AlertNotificationResource:
+    type: alert_notifications
+    id: id
+    # read is checked on the parent alert definition
+    read_via: {attribute: alert_definition, type: alert_definitions, id: authorization_resource_id}
+  QueryPolicyResource: {type: query_policy, id: id}
+  PipelineRunMetadataResource: {type: pipeline_run_metadata, id: id}
+  DataUploadFileSummaryResource: {type: data_upload_file_summary, id: id}
+  SourceConfigResource: {type: source_config, id: id}
+  APITokenResource: {type: api-token, id: id}
+
+# No item-level permission at all: signing in (or public access with a Referer
+# header) is the only gate, plus whatever checks each custom route makes.
+unprotected_resources:
+  - ShareAnalysisResource
+  - MetadataResource
+  - DataDigestResource
+  - UserQuerySessionResource
+  - ThumbnailStorageResource
+  - DashboardSessionResource

@@ -53,6 +53,13 @@ None. The suite is written against today's Flask path and later re-pointed at `h
 - 2026-10-04 qa-3 unit 1: principal builder (`principals.py`, `principals.yaml`, `seed.yaml` captured from a freshly migrated harmony_demo DB) and the `is_authorized` table (`decisions.yaml`: 57 checks x 41 principals). Check: `tests/authz/run.sh` gives 2338 passed. Mutation check: dropping `role:manager` from `view_admin_page` and narrowing `view_resource user` to superusers gave 39 failures, one per changed row.
 - 2026-10-04 qa-3 unit 2: query-policy table (`query_policies.yaml`, 31 cases, 52 runs). Each case goes through `AuthorizedQueryClient.run_query` into a recording Druid client. Cases without explicit token claims run under both header auth and browser-session narrowing. Configurations: harmony_demo, plus synthetic two-level hierarchy, flat and no-authorizable-dimension configs. This answers the WP-0c request: `one_source_all_states[header|session]` shows a non-superuser's policy filter ANDed into the Druid query, and `superuser_is_not_filtered` and `superuser_via_group_is_not_filtered` show a superuser's query reaching Druid unchanged. Check: `tests/authz/run.sh` gives 2391 passed under PYTHONHASHSEED 0 to 5 and 123. Mutation check: changing `one_source_all_states` to `expect: null` failed 3 runs.
 - 2026-10-04 qa-3 unit 3: need algebra and token narrowing (`test_needs.py`). Covers `QueryNeed` containment (12 rows) and intersection (7 rows), and `QueryPermission.allows` (5 rows). For every signed-in principal it checks that a browser session keeps exactly the account's item needs (33 principals). It also covers explicit-token item narrowing (7 rows). Check: `tests/authz/run.sh` gives 2455 passed. Mutation check: flipping one containment row and one token row failed exactly those 2.
+- 2026-10-04 qa-3 unit 4: Potion wiring (`potion.yaml`, `test_potion.py`). All 23 non-query `/api2` resources are registered on a bare `Api` through the real `list_all_resource_types`. The tests check:
+  - every resource is classified, as one of 17 permission-wired and 6 unprotected;
+  - the exact standard and hybrid needs per CRUD method;
+  - for all 41 principals, Potion's `HybridPermission.can()` agrees with `is_authorized` on every resource and method, sitewide and per item;
+  - the three-dimension `QueryNeed` crash.
+
+  Check: `tests/authz/run.sh` gives 2516 passed. Mutation check: a wrong id attribute and a wrong `read_via` type failed exactly those 2 resources.
 
 ## Evidence
 
@@ -77,6 +84,12 @@ Recorded as they behave today. None of them was changed (INV-3). Each names the 
 - **I3. Some seeded permissions are on the wrong resource type for the check that reads them.** `user_admin` and `user_moderator` hold USER `invite_user`, but the invite route checks SITE `invite_user`. `manager` holds SITE `reset_password`, but the reset route checks USER `reset_password`. Nobody but admin holds `change_password`, so users cannot change their own password through `/api2/user/<id>/password`. Rows: `role:user_admin|invite_user|site|deny`, `role:manager|reset_password|user:43|deny`, `*|change_password|user:42|deny`.
 - **I4. A sitewide token need narrows to the account's per-item needs.** A token claiming `[view_resource, null, dashboard]` for a dashboard owner keeps only `view_resource` on dashboard 7. The token cannot widen the account, which is the intended direction. Row: `test_explicit_token_item_needs[dashboard_owner-...]`.
 - **I5. `is_authorized` converts the id with `int(resource_id) if resource_id else None`.** So id `0` becomes a sitewide check. Resource ids start at 1, so this is not reachable today.
+
+### Potion wiring (`potion.yaml`)
+
+- **P1. Six `/api2` resources have no item-level permission.** They are `share`, `metadata`, `data_digest`, `user_query_session`, `storage` and `dashboard_session`. Signing in is the only gate. With public access on, an anonymous request with any `Referer` header also passes. `user_query_session` and `dashboard_session` are plain `ModelResource`s, so any signed-in user can list every saved query (`userId`, `queryBlob`) and every dashboard session. Pinned by `test_unprotected_resources_have_no_item_permissions`.
+- **P2. Meta `permissions` overrides of `read`, `create`, `update` and `delete` are dead.** `ZenysisPrincipalMixin._permissions` always rewires them to the `*_resource` permissions. `UserResource` and `ConfigurationResource` declare `{read: yes}`, but reads are allowed only through the default sitewide `view_resource` every signed-in user holds. Public anonymous visitors cannot read configuration. Pinned by `test_method_permissions[UserResource|ConfigurationResource]`.
+- **P3. A `QueryNeed` over exactly three dimensions makes Potion list filtering raise `TypeError`.** `HybridItemNeed.identity_get_item_needs` matches needs to a 3-tuple prototype by `len()`. The only way to get one is an admin account using a token with an explicit `needs` list, which drops `RoleNeed('admin')`, and a three-dimension composite `query_needs` entry, which is kept verbatim for superusers. Pinned by `test_three_dimension_query_need_breaks_potion_list_filtering`.
 
 ## Verdicts
 

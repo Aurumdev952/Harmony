@@ -1,7 +1,7 @@
 ---
 wp: "2a"
 title: "Golden query suite"
-status: review
+status: ready
 owner_role: "qa"
 instances:
   - name: "qa-1"
@@ -231,6 +231,19 @@ $ time uv run pytest tests/golden -q -p no:cacheprovider
 - `tests/golden/**`.
 
 Every fixture was recorded from, and replays green against, the current code.
+
+**Ready (protocol step 8).** After the two optional reviewer nits (e342118) and `git merge mig/integration` (494bc3a):
+
+```
+$ uv sync --frozen && uv run pytest tests/golden -q
+269 passed in 2.09s
+$ uv run python tests/golden/record.py --check
+85 cases, 0 fixture files would change
+$ uv run --no-project python scripts/agents/task_gate.py WP-2a
+WP-2a meets the definition of done gates
+```
+
+The first gate run, before the status changed, printed `status is "review", expected ready or done`.
 
 ## Verdicts
 

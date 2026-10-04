@@ -1,0 +1,1 @@
+- [Golden suite harness](golden-suite-harness.md) — offline bootstrap of the legacy query engine, hash-seed traps, mutation-check approach

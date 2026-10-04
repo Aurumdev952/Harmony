@@ -66,6 +66,12 @@ def apply_authorization_filters():
                 query.query_filter = and_policy_filter(
                     query.query_filter, policy_filter
                 )
+                # A query-modifying aggregation (ExactUniqueCount) rebuilds its
+                # inner query from dimension_filter and drops query_filter.
+                if hasattr(query, 'dimension_filter'):
+                    query.dimension_filter = and_policy_filter(
+                        query.dimension_filter, policy_filter
+                    )
             return run_query(self, query)
 
         return filter_query_inner
@@ -80,7 +86,7 @@ def caller_policy_filter():
     Site administrators and, when public access is on, unregistered users have no
     policy. Every other user sees only what their Query Policies allow.
     NOTE: an API token issued to a site administrator keeps the administrator role,
-    so its own query_needs do not narrow it here (open item in WP-0c).
+    so the token's own query_needs do not narrow it here.
     '''
     if SuperUserPermission().can() or is_public_dashboard_user():
         return None
@@ -325,11 +331,14 @@ def construct_query_need_from_policy(query_policy):
 
 
 class AuthorizedQueryClient:
-    '''The query client for user requests. Every query carries the caller's policy.
+    '''The query client for user requests.
 
-    It has no `run_raw_query`: a raw Druid dict cannot reliably carry the policy
-    filter. Code that sends raw queries holds the system client, and SEC-4 requires
-    it to take no user input (see docs/modernisation/work/WP-0c.md for the open item).
+    run_query ANDs the caller's policy into the query builder's query_filter and,
+    for groupBy builders, its dimension_filter, which query-modifying aggregations
+    rebuild from. A query whose Druid filter comes from anywhere else (a raw dict,
+    a nested dataSource built outside the builder) is not covered, so the client
+    has no run_raw_query: code that sends raw queries holds the system client and
+    must take no user input.
     '''
 
     def __init__(self, query_client):

@@ -119,7 +119,7 @@ def test_policy_survives_a_query_modifying_aggregation():
 
 
 def test_ordinary_prepared_query_is_what_the_old_decorator_sent():
-    # Before WP-0c the decorator set query_filter = and[query_filter, policy] and
+    # The decorator originally set query_filter = and[query_filter, policy] and
     # nothing else; queries without a modifier must still send exactly that.
     old_decorator_query = _region_query()
     old_decorator_query.query_filter = Filter(

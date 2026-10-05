@@ -7,6 +7,7 @@
 #   scripts/perf/stack.sh index [--force]   # re-index, register the datasource with web, restart web
 #   scripts/perf/stack.sh ui        # build the production client and serve it on PERF_UI_PORT
 #   scripts/perf/stack.sh reference <git ref>   # start that commit beside this checkout, for paired runs
+#   scripts/perf/stack.sh stop      # stop every container; keep volumes, scratch and secrets
 #   scripts/perf/stack.sh down      # stop everything, delete volumes, scratch and secrets
 #   scripts/perf/stack.sh env       # what baseline.py and dashboards.mjs read
 #   scripts/perf/stack.sh logs druid|web [service]
@@ -126,9 +127,17 @@ image_tag() {
 }
 
 # build_image <repo root>: build the web image of that tree; prints its name.
+# The tag hashes every input the containers use from the image (the code is
+# bind-mounted), so an existing tag is reused; PERF_REBUILD=1 rebuilds it.
+# Each rebuild leaves about 2.4 GB of layers, and needs PyPI.
 build_image() {
   local tag
   tag="$(image_tag "$1")"
+  if [[ -z "${PERF_REBUILD:-}" ]] && docker image inspect "harmony-perf-web:${tag}" >/dev/null 2>&1; then
+    echo "perf stack: reusing harmony-perf-web:${tag}" >&2
+    echo "harmony-perf-web:${tag}"
+    return 0
+  fi
   docker build --platform linux/amd64 \
     --build-context "python:3.8=docker-image://${PYTHON_38}" \
     -f "$1/docker/web/Dockerfile_web-server" \
@@ -380,6 +389,14 @@ reference() {
   wait_for "the reference ${sha} is up at http://127.0.0.1:${PERF_REFERENCE_UI_PORT}" 120 reference_answers
 }
 
+# `up` starts the stack again without re-indexing: the segments stay in
+# Druid's volumes. Web's Postgres is tmpfs, so web-init runs again.
+stop() {
+  placeholder_env
+  web_compose --profile index --profile ui --profile reference stop
+  druid_compose --profile init stop
+}
+
 down() {
   placeholder_env
   web_compose --profile index --profile ui --profile reference down --volumes --remove-orphans
@@ -394,6 +411,7 @@ case "${1:-}" in
   index) index "${@:2}" ;;
   ui) ui ;;
   reference) reference "${@:2}" ;;
+  stop) stop ;;
   down) down ;;
   env)
     echo "export PERF_CANDIDATE_URL=http://127.0.0.1:${PERF_WEB_PORT}"
@@ -426,7 +444,7 @@ case "${1:-}" in
     esac
     ;;
   *)
-    echo "usage: $0 dataset|up|index|ui|reference <ref>|down|env|config druid|web|logs druid|web [service]" >&2
+    echo "usage: $0 dataset|up|index|ui|reference <ref>|stop|down|env|config druid|web|logs druid|web [service]" >&2
     exit 2
     ;;
 esac

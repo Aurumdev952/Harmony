@@ -109,6 +109,7 @@ None of these block WP-2e.
 - 2026-10-06 qa-5t round 2, unit 11 (QA gate finding 3): the error and external-request guard now covers the whole browser context. It watches every page, including popups opened later. The HTTP block is a context route, and WebSockets to any other host are blocked and recorded as `external websocket blocked`. `AppErrors.watch(page)` is replaced by `watchContext(context)`, and the fixtures and `signedOutPage` use it. Page-level routes, such as the map assets, still take precedence. `tests/guard.spec.ts` holds the positive controls: a fetch to an external host from a `window.open` popup, an uncaught error in that popup, and a `wss://` socket from the first page. Checks:
   - Failing first: the new spec failed (`watchContext is not a function`), and a copy driven through the old `watch(page)` recorded `[]`, missing all three. With the change it passes.
   - `e2e/run.sh e2e` passes 77 (76 plus the guard spec).
+- 2026-10-06 qa-5t round 2, unit 12 (QA gate finding 4): the present-mode case is now the last of the serial dashboard flow. A failure there can no longer skip the share and export cases. Check: with the present case broken on purpose (`Add Content` expected 5 times), `--grep @dashboard` gives 1 failed and 6 passed, with nothing skipped (`/tmp/wp2e-present-mutant.log`). Restored, the full e2e project passes 77.
 
 ## Evidence
 

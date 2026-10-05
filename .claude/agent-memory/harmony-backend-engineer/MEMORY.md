@@ -1,4 +1,6 @@
-- [Tooling traps](tooling-traps.md) — ownership.py via uv, compound bash refused in worktrees, last_modified as a WHERE-clause probe
+- [Legacy Flask test and lint env](legacy-flask-test-and-lint-env.md) — py3.8 uv recipe, CI pylint/black on changed files, worktree-hook command traps
+- [Narrowed admin tokens](narrowed-admin-tokens.md) — superuser from identity not account; render token is a narrowed admin JWT; managers decide reach
+- [Tooling traps](tooling-traps.md) — ownership.py via uv, compound bash refused in worktrees, task_gate's stale branch ref, caplog doubling
 - [Local Flask stack](local-flask-stack.md) — run legacy Flask, Alembic and replays without images: py3.8 venv, Druid stub, SERVER_SOFTWARE=gunicorn
 - [Flask local test env](flask_local_test_env.md) — import and build the Flask app without Docker: py3.8 uv env, env placeholders, route mocks
 - [py3.8 web tests](py38_web_tests.md) — run tests/web on Flask 1.0 / Python 3.8 with uv despite the worktree guard
@@ -9,4 +11,7 @@
 - [Flask web tests](flask_web_tests.md) — run tests/web on py3.8, call handlers directly, worktree-guard and auth/policy traps
 - [Gunicorn server checks](gunicorn_server_checks.md) — test web/gunicorn_server.py despite its gevent patch, mypy strict on 3.8, live run with a stub app
 - [Request logging wiring](request_logging_wiring.md) — test create_app/create_celery log wiring: non-gunicorn path gaps, global Celery signals, mypy on tasks
-- [Post-WP-2f tooling](post_wp2f_tooling.md) — tests/web on plain uv py3.9, lint-gate and noqa traps, guard workarounds, graphql stub
+- [Post-WP-2f tooling](post_wp2f_tooling.md) — dev env py3.9 but prod 3.8 until WP-3b, lint-gate and noqa traps, guard workarounds, graphql stub
+- [Backend testing traps](backend-testing-traps.md) — real-Postgres fixture from tests/throwaway_postgres.py, contract stack, worktree guard, formatting
+- [Flask route tests in process](flask-route-tests-in-process.md) — blueprint plus Potion on a bare app: conftest double import, shared Potion classes, urlbox recorder
+- [Potion route test harness](potion_route_test_harness.md) — drive /api2 Potion routes through the real app with throwaway Postgres and header login

@@ -139,8 +139,17 @@ stack_up() {
   seed_catalog
 }
 
+# The seeded admin's signed-in browser state (its session cookie) sits next
+# to the stack's credentials file, in the same 0700 runtime directory, and
+# goes with the stack.
+admin_state_file() {
+  echo "$(dirname "${CONTRACT_CREDENTIALS_FILE}")/${CONTRACT_PROJECT}-admin-state.json"
+}
+
 stack_down() {
   docker rm -f "${ASSETS}" >/dev/null 2>&1 || true
+  eval "$("${STACK}" env)"
+  rm -f "$(admin_state_file)"
   "${STACK}" down
 }
 
@@ -150,6 +159,8 @@ export_env() {
   export E2E_USERNAME="${CONTRACT_USERNAME}"
   export E2E_CREDENTIALS_FILE="${CONTRACT_CREDENTIALS_FILE}"
   export E2E_PROJECT="${CONTRACT_PROJECT}"
+  E2E_ADMIN_STATE="$(admin_state_file)"
+  export E2E_ADMIN_STATE
 }
 
 run_project() {
@@ -170,6 +181,7 @@ run_visual() {
     -e E2E_USERNAME="${E2E_USERNAME}" \
     -e E2E_PROJECT="${E2E_PROJECT}" \
     -e E2E_CREDENTIALS_FILE=/run/e2e/credentials.env \
+    -e E2E_ADMIN_STATE=/tmp/admin-state.json \
     -e E2E_VISUAL_IMAGE="${PLAYWRIGHT_IMAGE}" \
     "${PLAYWRIGHT_IMAGE}" node_modules/.bin/playwright test --project visual "$@"
 }
@@ -179,7 +191,7 @@ case "${1:-}" in
     stack_up
     export_env
     echo "e2e: stack up. From e2e/, run:"
-    echo "  E2E_BASE_URL=${E2E_BASE_URL} E2E_USERNAME=${E2E_USERNAME} E2E_PROJECT=${E2E_PROJECT} E2E_CREDENTIALS_FILE=${E2E_CREDENTIALS_FILE} node_modules/.bin/playwright test --project a11y --project e2e"
+    echo "  E2E_BASE_URL=${E2E_BASE_URL} E2E_USERNAME=${E2E_USERNAME} E2E_PROJECT=${E2E_PROJECT} E2E_CREDENTIALS_FILE=${E2E_CREDENTIALS_FILE} E2E_ADMIN_STATE=${E2E_ADMIN_STATE} node_modules/.bin/playwright test --project a11y --project e2e"
     echo "and for the visual suite: e2e/run.sh visual"
     ;;
   down)

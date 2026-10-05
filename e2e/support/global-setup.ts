@@ -1,3 +1,5 @@
+import { chmodSync } from 'fs';
+
 import { request } from '@playwright/test';
 import type { APIRequestContext } from '@playwright/test';
 
@@ -66,6 +68,7 @@ export default async function globalSetup(): Promise<void> {
     throw new Error(`admin login failed: HTTP ${response.status()}`);
   }
   await api.storageState({ path: ADMIN_STATE });
+  chmodSync(ADMIN_STATE, 0o600);
   await ensureDashboard(api);
   await api.dispose();
 }

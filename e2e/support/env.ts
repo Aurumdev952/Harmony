@@ -1,6 +1,4 @@
 import { readFileSync, statSync } from 'fs';
-import os from 'os';
-import path from 'path';
 
 // Set by e2e/run.sh from tests/contract/stack/stack.sh env. The password is
 // generated per stack into a mode-600 file and is read here, never passed
@@ -31,5 +29,6 @@ export function adminPassword(): string {
 }
 
 // Signed-in browser state for the seeded site admin. It holds a session
-// cookie for a disposable stack, so it lives outside the repository.
-export const ADMIN_STATE = path.join(os.tmpdir(), `${PROJECT}-admin-state.json`);
+// cookie, so run.sh puts it in the stack's 0700 runtime directory (inside the
+// visual container, in that container's own /tmp) and deletes it on down.
+export const ADMIN_STATE = required('E2E_ADMIN_STATE');

@@ -1,0 +1,62 @@
+# Roles, resource roles and query policies exactly as `flask db upgrade` seeds
+# them for harmony_demo (alembic head 2b730c14f514, empty Druid). Captured from
+# a freshly migrated database with tests/authz/stack.sh. The live-stack layer
+# (tests/authz/http/test_seed.py) fails if the migrations drift: one test for
+# `roles` (permissions, resource roles, query policies, data export) and one for
+# `resource_roles` (type and permission set).
+#
+# permissions: {resource type: [permission, ...]} from role_permissions.
+# dashboard / alert: the role's dashboard_resource_role / alert_resource_role.
+# query_policies: [dimension, value]; a null value means "all values".
+
+resource_roles:
+  dashboard_viewer: {type: dashboard, permissions: [view_resource]}
+  dashboard_editor: {type: dashboard, permissions: [edit_resource, view_resource]}
+  dashboard_admin: {type: dashboard, permissions: [create_resource, delete_resource, edit_resource, update_users, view_resource]}
+  alert_admin: {type: alert, permissions: [create_resource, delete_resource, edit_resource, update_users, view_resource]}
+  alert_creator: {type: alert, permissions: [create_resource]}
+  alert_editor: {type: alert, permissions: [create_resource, edit_resource, view_resource]}
+  alert_viewer: {type: alert, permissions: [view_resource]}
+
+roles:
+  admin: {}
+  dashboard_viewer: {dashboard: dashboard_viewer}
+  dashboard_editor: {dashboard: dashboard_editor}
+  dashboard_admin: {dashboard: dashboard_admin}
+  directory_reader:
+    permissions: {site: [list_resources, list_roles, list_users]}
+  query_runner: {}
+  user_admin:
+    permissions: {user: [create_resource, delete_resource, edit_resource, invite_user, reset_password, update_roles, view_resource]}
+  user_moderator:
+    permissions: {user: [invite_user, reset_password]}
+  group_admin:
+    permissions: {group: [create_resource, delete_resource, edit_resource, update_roles, update_users, view_resource]}
+  group_moderator:
+    permissions: {group: [edit_resource, update_users, view_resource]}
+  query_analyst:
+    permissions: {site: [view_query_form]}
+  alert_admin: {alert: alert_admin}
+  alert_creator: {alert: alert_creator}
+  alert_editor: {alert: alert_editor}
+  alert_viewer: {alert: alert_viewer}
+  _default_role:
+    permissions: {site: [view_query_form], dashboard: [create_resource]}
+    query_policies: [[StateName, null], [source, null]]
+    enable_data_export: true
+  data_uploader_f193e47caa08:
+    permissions: {site: [can_upload_data]}
+  manager:
+    permissions: {site: [delete_user, edit_user, invite_user, list_resources, list_roles, list_users, reset_password, view_admin_page, view_user]}
+  role_administrator:
+    permissions: {role: [create_resource, delete_resource, edit_resource, view_resource]}
+  role_moderator:
+    permissions: {role: [edit_resource, view_resource]}
+  data_upload_admin:
+    permissions: {site: [can_upload_data, selfserve_source_admin]}
+  data_catalog_viewer:
+    permissions: {site: [can_view_data_catalog]}
+  field_setup_viewer:
+    permissions: {site: [can_view_fields_setup]}
+  entity_matching_viewer:
+    permissions: {site: [can_view_entity_matching]}

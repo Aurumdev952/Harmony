@@ -35,6 +35,18 @@ from scripts.data_catalog.import_db_tables import (
 )
 from util.file.compression.lz4 import LZ4Reader, LZ4Writer
 
+# Every test also runs on a server whose OIDs are past 2^31, as on a long-lived
+# cluster: the counter is cluster-wide, and temporary tables and TOAST values consume
+# it. Such an OID read as a signed integer turns negative.
+pytestmark = pytest.mark.parametrize(
+    "postgres_server",
+    [
+        pytest.param(None, id="new-cluster"),
+        pytest.param(3_000_000_000, id="oids-past-int4"),
+    ],
+    indirect=True,
+)
+
 # Tables the export does not carry whose rows reference catalogue rows.
 DEPENDENT_TABLES = (
     "unpublished_field_category_mapping",

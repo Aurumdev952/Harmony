@@ -5,6 +5,9 @@ on one server per session. The server is HARMONY_TEST_POSTGRES_URL when set (a U
 server where the user may create databases), otherwise the contract stack's pinned
 Postgres image started on a random loopback port and removed afterwards. Tests skip when
 neither is available.
+
+Parametrize `postgres_server` indirectly with an OID to get a server in docker whose
+next OID is that value, as on a long-lived cluster whose OID counter has passed 2^31.
 """
 
 from __future__ import annotations
@@ -40,8 +43,24 @@ def _wait_until_ready(url: str) -> None:
             time.sleep(0.5)
 
 
-def _start_container() -> tuple[str, str]:
+# Initialises the cluster itself, because the image's entrypoint starts the server
+# right after initdb, and pg_resetwal needs it stopped.
+RAISED_OID_START = """set -e
+printf '%s\\n' "$POSTGRES_PASSWORD" > /tmp/password
+initdb --username=postgres --pwfile=/tmp/password --auth=scram-sha-256 >/dev/null
+echo 'host all all all scram-sha-256' >> "$PGDATA/pg_hba.conf"
+pg_resetwal --next-oid="$NEXT_OID" "$PGDATA"
+exec postgres -c listen_addresses='*'
+"""
+
+
+def _start_container(next_oid: int | None = None) -> tuple[str, str]:
     password = secrets.token_hex(16)
+    options: list[str] = []
+    command = [IMAGE]
+    if next_oid is not None:
+        options = ["--env", f"NEXT_OID={next_oid}", "--user", "postgres"]
+        command = ["--entrypoint", "sh", IMAGE, "-c", RAISED_OID_START]
     container = subprocess.run(
         [
             "docker",
@@ -52,7 +71,8 @@ def _start_container() -> tuple[str, str]:
             f"POSTGRES_PASSWORD={password}",
             "--publish",
             "127.0.0.1::5432",
-            IMAGE,
+            *options,
+            *command,
         ],
         capture_output=True,
         text=True,
@@ -68,20 +88,32 @@ def _start_container() -> tuple[str, str]:
     return container, f"postgresql://postgres:{password}@127.0.0.1:{port}/postgres"
 
 
+def _check_next_oid(url: str, next_oid: int) -> None:
+    with psycopg2.connect(url) as conn, conn.cursor() as cursor:
+        cursor.execute("CREATE TEMPORARY TABLE probe ()")
+        cursor.execute("SELECT 'probe'::regclass::oid::bigint")
+        (oid,) = cursor.fetchone()
+    conn.close()
+    assert oid >= next_oid, f"the server handed out OID {oid}, below {next_oid}"
+
+
 @pytest.fixture(name="postgres_server", scope="session")
-def fixture_postgres_server() -> Iterator[str]:
+def fixture_postgres_server(request: pytest.FixtureRequest) -> Iterator[str]:
+    next_oid = getattr(request, "param", None)
     configured = os.environ.get("HARMONY_TEST_POSTGRES_URL")
-    if configured:
+    if configured and next_oid is None:
         yield configured
         return
     if not shutil.which("docker"):
         pytest.skip("needs HARMONY_TEST_POSTGRES_URL or docker")
     try:
-        container, url = _start_container()
+        container, url = _start_container(next_oid)
     except subprocess.CalledProcessError as error:
         pytest.skip(f"could not start Postgres in docker: {error.stderr.strip()}")
     try:
         _wait_until_ready(url)
+        if next_oid is not None:
+            _check_next_oid(url, next_oid)
         yield url
     finally:
         subprocess.run(["docker", "stop", container], capture_output=True, check=False)

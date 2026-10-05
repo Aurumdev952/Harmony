@@ -2,6 +2,7 @@
 
 Never prints a password or a token.
 """
+
 import json
 import os
 import re

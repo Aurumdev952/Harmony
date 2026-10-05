@@ -1,4 +1,5 @@
 """WP-1h: what the renderer service accepts as a render request."""
+
 import json
 
 import pytest

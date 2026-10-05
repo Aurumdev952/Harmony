@@ -1,4 +1,5 @@
 """WP-1h: which requests the rendered page may make (SEC-10)."""
+
 import pytest
 
 from harmony.worker.renderer.egress import is_allowed

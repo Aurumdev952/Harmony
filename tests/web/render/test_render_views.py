@@ -4,6 +4,7 @@ Renders used to sign in as the render bot, which `track_dashboard_access` skips.
 They now sign in as the requesting user, so without this every export would
 count as that user viewing the dashboard.
 """
+
 from datetime import timedelta
 from types import SimpleNamespace
 
@@ -56,9 +57,10 @@ def _page_load(app: Flask, token: str, dashboard) -> None:
 def test_a_render_page_load_does_not_count_as_a_view(app, tracked):
     dashboard = SimpleNamespace(id=3, total_views=5)
 
-    with app.test_request_context('/'), render_token(
-        USERNAME, 7, policy=None, ttl_seconds=60
-    ) as token:
+    with (
+        app.test_request_context('/'),
+        render_token(USERNAME, 7, policy=None, ttl_seconds=60) as token,
+    ):
         _page_load(app, token, dashboard)
 
     assert dashboard.total_views == 5

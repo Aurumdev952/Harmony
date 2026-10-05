@@ -4,6 +4,7 @@ Needs Playwright and Chromium, so it runs inside the renderer image (see the WP-
 evidence for the command); elsewhere it is skipped. Nothing leaves the container:
 the origins are local servers and every other destination is `.invalid`.
 """
+
 import struct
 import threading
 import time

@@ -30,9 +30,7 @@ def fixture_unreachable_renderer(app, renderer, monkeypatch, caplog):
         probe.bind(('127.0.0.1', 0))
         port = probe.getsockname()[1]
     monkeypatch.setattr(page_renderer_views, 'requests', requests)
-    monkeypatch.setattr(
-        page_renderer_views, 'RENDERER_URL', f'http://127.0.0.1:{port}'
-    )
+    monkeypatch.setattr(page_renderer_views, 'RENDERER_URL', f'http://127.0.0.1:{port}')
     # Production logs an unhandled exception instead of raising it into the test.
     monkeypatch.setitem(app.config, 'PROPAGATE_EXCEPTIONS', False)
     caplog.set_level(logging.DEBUG)

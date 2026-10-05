@@ -3,6 +3,7 @@
 The browser work is a `render(spec, settings)` callable, so the HTTP layer can be
 tested without Chromium.
 '''
+
 import dataclasses
 import json
 import logging
@@ -138,9 +139,7 @@ def build_server(settings: RendererSettings, render: Render) -> ThreadingHTTPSer
             self.end_headers()
             self.wfile.write(body)
 
-        def log_message(
-            self, format, *args
-        ) -> None:  # pylint: disable=redefined-builtin
+        def log_message(self, format, *args) -> None:  # pylint: disable=redefined-builtin
             # One JSON line per render is logged instead of the access log.
             return
 

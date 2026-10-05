@@ -1,6 +1,7 @@
 """Test-only tap between web and the renderer: records each render request
 (including its token, so the end-to-end check can try to reuse it) and forwards
 it unchanged."""
+
 import urllib.error
 import urllib.request
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer

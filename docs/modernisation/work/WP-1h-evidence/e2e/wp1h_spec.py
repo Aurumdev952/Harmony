@@ -1,5 +1,6 @@
 """Print a complete latest-version dashboard spec with one text tile, with every
 default filled in by the backend model."""
+
 import json
 
 import related

@@ -1,4 +1,5 @@
 '''Run the renderer service: `python -m harmony.worker.renderer`.'''
+
 import logging
 import os
 

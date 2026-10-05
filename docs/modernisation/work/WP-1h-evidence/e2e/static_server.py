@@ -1,5 +1,6 @@
 """Serves the prebuilt client where dev-mode Flask expects webpack-dev-server.
 Flask's proxy pops the Connection header, so always send one."""
+
 from functools import partial
 from http.server import SimpleHTTPRequestHandler, ThreadingHTTPServer
 

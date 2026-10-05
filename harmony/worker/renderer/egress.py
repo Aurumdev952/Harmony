@@ -1,4 +1,5 @@
 '''Which URLs the rendered page may load (SEC-10).'''
+
 from typing import Optional
 from urllib.parse import urlsplit
 

@@ -2,6 +2,7 @@
 
 `FakeRenderer` stands in for the service; nothing leaves the process.
 """
+
 import logging
 from urllib.parse import parse_qs, urlsplit
 

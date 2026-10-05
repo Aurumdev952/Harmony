@@ -3,6 +3,7 @@
 The body is a JSON object with exactly the fields below. Anything else is refused,
 so a caller cannot plant cookies, scripts or another page into the browser.
 '''
+
 import json
 import re
 from dataclasses import dataclass

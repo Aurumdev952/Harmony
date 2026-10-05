@@ -1,4 +1,5 @@
 """WP-1h: the renderer service's HTTP surface, with the browser faked."""
+
 import http.client
 import json
 import logging

@@ -7,6 +7,7 @@ that minted it runs, so the token is refused as soon as the render returns. Its
 optional `policy` claim is the digest of the policy the render was requested
 under; the token grants nothing once the account's digest differs.
 '''
+
 import secrets
 from contextlib import contextmanager
 from datetime import timedelta

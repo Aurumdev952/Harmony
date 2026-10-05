@@ -87,6 +87,9 @@ ROLES = {
     'all_sources_reader': {'query_policies': [('source', None)]},
     'exporter': {'export': True},
     'permission_editor': {'ROLE': ['update_permissions']},
+    # Creates dashboards without holding any role on existing ones, as the
+    # seeded `_default_role` does.
+    'dashboard_creator': {'DASHBOARD': ['create_resource']},
 }
 QUERY_POLICIES = [('source', None), ('StateName', 'Kigali')]
 
@@ -194,7 +197,7 @@ def _seed(session) -> None:
                 label=name,
                 permissions=[
                     permission(type_name, p)
-                    for type_name in ('SITE', 'USER', 'GROUP', 'ROLE')
+                    for type_name in ('SITE', 'USER', 'GROUP', 'ROLE', 'DASHBOARD')
                     for p in spec.get(type_name, [])
                 ],
                 query_policies=[
@@ -267,12 +270,12 @@ def fixture_make_user(app):
 
     db = app.extensions['sqlalchemy'].db
 
-    def make_user(roles=(), groups=(), browser=False) -> Actor:
+    def make_user(roles=(), groups=(), browser=False, username=None) -> Actor:
         '''`browser` signs in with the `accessKey` JWT cookie the login page sets,
         instead of the X-Username and X-Password headers.
         '''
         with app.app_context():
-            username = f'{uuid.uuid4().hex[:10]}@escalation.test'
+            username = username or f'{uuid.uuid4().hex[:10]}@escalation.test'
             user = User(
                 username=username,
                 password=app.user_manager.hash_password(_PASSWORD),

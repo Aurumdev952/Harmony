@@ -24,7 +24,7 @@
           "resources": {}
         }
       },
-      "note": "Any non-empty role map 500s: add_group_role passes resource_id, which GroupRoles no longer accepts (web/server/routes/views/groups.py). web/python_client sends this shape (WP-2c finding F10)."
+      "note": "Any non-empty role map is a 400 since WP-0l: the route never wrote anything (add_group_role passed resource_id, which GroupRoles lacks, and a resource role id as role_id), and was a 500 before (WP-2c finding F10). web/python_client sends this shape."
     },
     {
       "id": "group.delete",

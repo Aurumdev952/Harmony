@@ -24,7 +24,15 @@ instances:
       - "web/server/data/data_access.py"
       - "tests/web/test_find_one_by_fields.py"
   - name: "qa-0l-tests"
-    files: []
+    files:
+      - "tests/privilege_escalation/test_exact_name_matching.py"
+      - "tests/privilege_escalation/conftest.py"
+      - "tests/web/test_exact_name_lookup.py"
+      - "tests/authz/http/test_name_matching.py"
+      - "tests/contract/cases/20-directory.json"
+      - "tests/contract/cases/95-cleanup.json"
+      - "tests/contract/recordings/user.update_roles.assign.json"
+      - "tests/contract/recordings/group.update_roles.assign.json"
 branch: "mig/WP-0l-exact-name-matching"
 requirements: [INV-3, QA-1, QA-4]
 contracts_consumed: []
@@ -55,8 +63,8 @@ None.
 ## Requests
 
 - [x] core: in `web/server/data/data_access.py` `find_one_by_fields`, replace `query.filter(field.ilike(field_value))` with `query.filter(func.lower(field) == func.lower(field_value))` for string values when `case_sensitive=False` (blocks unit 1). Done by core on `mig/WP-0l-exact-name-matching-core` 7a5c600, merged here at 90a26f5.
-- [ ] qa: re-record the contract cases `user.update_roles.assign` and `group.update_roles.assign` (`PATCH /api2/{user,group}/<id>/roles` with a non-empty map), which now answer 400 instead of 500 (INV-3 row 11). Add a case for `POST /api2/{user,group}/<id>/roles` if wanted: it is 400 now, 500 before.
-- [ ] qa (qa-0l-tests): failing tests for paths A, B and D, and the WP-2b pins; merged here when the lead reports the head.
+- [x] qa: re-record the contract cases `user.update_roles.assign` and `group.update_roles.assign` (`PATCH /api2/{user,group}/<id>/roles` with a non-empty map), which now answer 400 instead of 500 (INV-3 row 11). Add a case for `POST /api2/{user,group}/<id>/roles` if wanted: it is 400 now, 500 before.
+- [x] qa (qa-0l-tests): failing tests for paths A, B and D, and the WP-2b pins; merged at cc69345.
 
 ## Findings while building
 
@@ -85,6 +93,8 @@ One line per finished unit: `YYYY-MM-DD <instance> unit N: <what>; check: <comma
 
 - 2026-10-06 core-0l unit 1: `find_one_by_fields` with `case_sensitive=False` compares `lower(field) == lower(value)` (core 7a5c600, merged at 90a26f5). Check (core): `tests/web/test_find_one_by_fields.py` has 18 cases on SQLite and a throwaway Postgres; 14 failed before, including `a_b` returning the `axb` row. All 16 call sites were audited and none passes a pattern. tests/web 301, privilege_escalation 86, authz pure 4681 and golden 272 pass; lint, mypy and the 3.8 guard are clean.
 - 2026-10-06 backend-0l units 2-5: `find_by_name`; sharing, removal and author grants on the `Resource` object; 403 and 404 bodies without resource names; `get_resource_by_type_and_name` filters on type; legacy role grants answer 400; alert transfer naming no user answers 404 (bf75d1c). Check: `tests/privilege_escalation/test_named_lookups.py` 23 pass, and 20 of them failed on 7c34bca, each for the reason it names (below). `tests/privilege_escalation` 109 passed, `tests/web` 301 passed and 1 xfailed, `uv run --locked mypy` clean (519 files), `ci/lint_python.sh origin/mig/integration` clean, `ci/check_py38_syntax.py` on cpython-3.8.20 found 0 problems in 869 files.
+- 2026-10-06 qa-0l-tests: fail-first pins for paths A (sharing, and dashboard creation), B (user and group share removal, `_` and `%`), C (403 bodies) and D (group and role membership by username, look-alike-only 404) in `tests/privilege_escalation/test_exact_name_matching.py` (also adds `username=` to `make_user` and a `dashboard_creator` role in the shared conftest), `tests/web/test_exact_name_lookup.py` (data layer and the `get_resource_by_type_and_name` type filter) and live WP-2b pins in `tests/authz/http/test_name_matching.py`; check on 7c34bca: in-process 21 failed, 12 passed (every look-alike-first case fails, every named-first case passes); whole `tests/authz` with the live layer on a fresh stack 12 failed (all 12 new pins), 5264 passed; on bf75d1c: 33 in-process passed, whole `tests/authz` with the live layer 5276 passed.
+- 2026-10-06 qa-0l-tests: contract `user.update_roles.assign` and `group.update_roles.assign` re-recorded 500 to 400 on a fresh stack from the WP-0l tree. This is the WP-0l behaviour: a non-empty legacy role map never wrote anything (it built `UserRoles`/`GroupRoles` with a `resource_id` they lack and a resource role id as `role_id`) and is now refused with `{message, status}`. The empty-map `*.update_roles.clear` cases are unchanged. No contract case covers `POST /api2/{user,group}/<id>/roles` (no client calls it). check: replay on that stack 233 passed, 1 failed (`storage.retrieve.unknown_slug` recorded 500, served 404: WP-0i's change, unrelated to WP-0l, not re-recorded here).
 
 ## Evidence
 

@@ -8,6 +8,12 @@ principals of the pure layer. Every user and group the run creates is deleted
 when the session ends (`Stack.cleanup`).
 
 Only a loopback stack is accepted: the suite creates and deletes users.
+
+Some account pins need what no API offers: accounts that predate a check (a
+case-only pair, a pending twin), tokens minted the way older code minted them,
+and the mail a route sent. For those the stack's own containers are used
+(`Stack.sql`, `Stack.mail_recipients`), named by `AUTHZ_PROJECT`, and tokens
+are signed with the stack's generated keys from `AUTHZ_CREDENTIALS_FILE`.
 '''
 
 from __future__ import annotations
@@ -16,7 +22,9 @@ import json
 import os
 import re
 import secrets
+import subprocess
 from dataclasses import dataclass, field
+from datetime import timedelta
 from pathlib import Path
 from urllib.parse import urlparse
 
@@ -27,7 +35,15 @@ from urllib3.util.retry import Retry
 TIMEOUT_SECONDS = 120
 USER_DOMAIN = 'authz.invalid'
 LOOPBACK_HOSTS = ('127.0.0.1', 'localhost', '::1')
+DEFAULT_PROJECT = 'harmony-wp2b-authz'
+DATABASE = 'harmony_demo-local'
+# models.alchemy.user.UserStatusEnum
+ACTIVE, PENDING = 1, 3
 _BUNDLE = re.compile(r'/([A-Za-z]+)\.bundle\.js')
+_BACKEND_JSON = re.compile(r'window\.__JSON_FROM_BACKEND = (.*?);\s*\n')
+# Every signed-in user gets this page, and it carries the signed-in user's id.
+WHOAMI_PAGE = '/overview'
+_FIELD_SEPARATOR = '\x1f'
 
 
 def outcome(response: requests.Response) -> str:
@@ -56,14 +72,83 @@ def new_session() -> requests.Session:
     return session
 
 
+def stack_credential(name: str) -> str:
+    '''A value the stack generated (`CONTRACT_PASSWORD`, `JWT_SECRET_KEY`, ...).'''
+    for line in Path(os.environ['AUTHZ_CREDENTIALS_FILE']).read_text().splitlines():
+        key, _, value = line.partition('=')
+        if key == name:
+            return value
+    raise LookupError(f'no {name} in AUTHZ_CREDENTIALS_FILE')
+
+
 def _admin_password() -> str:
     if os.environ.get('AUTHZ_ADMIN_PASSWORD'):
         return os.environ['AUTHZ_ADMIN_PASSWORD']
-    for line in Path(os.environ['AUTHZ_CREDENTIALS_FILE']).read_text().splitlines():
-        key, _, value = line.partition('=')
-        if key == 'CONTRACT_PASSWORD':
-            return value
-    raise LookupError('no admin password in AUTHZ_CREDENTIALS_FILE')
+    return stack_credential('CONTRACT_PASSWORD')
+
+
+def bearer(token: str) -> requests.Session:
+    session = new_session()
+    session.headers['Authorization'] = f'Bearer {token}'
+    return session
+
+
+def password_session(username: str, password: str) -> requests.Session:
+    '''Signs every request in with the X-Username / X-Password headers.'''
+    session = new_session()
+    session.headers.update({'X-Username': username, 'X-Password': password})
+    return session
+
+
+def mint_token(identity: str, user_claims: dict) -> str:
+    '''An access token signed with the stack's JWT key, encoded by the
+    flask-jwt-extended the web app runs, with the given identity and claims.
+    Mints tokens in the shapes older code issued, which today's code no
+    longer does (a session with no `user_id`), and render tokens, which go
+    only to the renderer.'''
+    # pylint: disable=import-outside-toplevel
+    from flask_jwt_extended.tokens import encode_access_token
+
+    return encode_access_token(
+        identity=identity,
+        secret=stack_credential('JWT_SECRET_KEY'),
+        algorithm='HS256',
+        expires_delta=timedelta(days=365),
+        fresh=False,
+        user_claims=user_claims,
+        csrf=True,
+        identity_claim_key='identity',
+        user_claims_key='user_claims',
+    )
+
+
+def login_session_cookie(user_id: int) -> requests.Session:
+    '''A browser holding a flask-login session for account `user_id`, signed
+    with the stack's session key the way Flask signs its session cookie.'''
+    # pylint: disable=import-outside-toplevel
+    from flask import Flask
+    from flask.sessions import SecureCookieSessionInterface
+
+    app = Flask('authz-session-cookie')
+    app.secret_key = stack_credential('DEFAULT_SECRET_KEY')
+    serializer = SecureCookieSessionInterface().get_signing_serializer(app)
+    session = new_session()
+    # flask-login 0.4 keeps the account id under `user_id`.
+    session.cookies.set('session', serializer.dumps({'user_id': str(user_id)}))
+    return session
+
+
+def _docker(container: str, args: list, stdin: str = '') -> str:
+    result = subprocess.run(
+        ['docker', 'exec', '-i', container, *args],
+        input=stdin,
+        capture_output=True,
+        text=True,
+        timeout=TIMEOUT_SECONDS,
+        check=False,
+    )
+    assert result.returncode == 0, (container, args, result.stderr[-2000:])
+    return result.stdout
 
 
 @dataclass
@@ -108,6 +193,119 @@ class Stack:
             response.text[:500],
         )
         return response.json() if response.content else None
+
+    @property
+    def project(self) -> str:
+        return os.environ.get('AUTHZ_PROJECT') or DEFAULT_PROJECT
+
+    def sql(self, query: str, **params) -> list:
+        '''Runs `query` in the stack's database; `:'name'` in it is `params[name]`
+        as a quoted literal. Returns the result rows as tuples of strings.'''
+        args = ['psql', '-U', 'postgres', '-d', DATABASE, '-v', 'ON_ERROR_STOP=1']
+        args += ['-q', '-A', '-t', '-F', _FIELD_SEPARATOR]
+        for name, value in params.items():
+            args += ['-v', f'{name}={value}']
+        output = _docker(f'{self.project}-postgres-1', args, query)
+        return [tuple(line.split(_FIELD_SEPARATOR)) for line in output.splitlines()]
+
+    def rewrite_account(
+        self, uri: str, username: str, status_id: int = ACTIVE, invite: str = ''
+    ) -> None:
+        '''Sets an account's username, status and invitation token in the
+        database, making accounts that only code before WP-0k's checks could:
+        a case-only twin, or a pending invitation equal to a registered account
+        ignoring case. The token column is not nullable; empty means none.'''
+        self.sql(
+            'UPDATE "user" SET username = :\'username\', status_id = :\'status\', '
+            'reset_password_token = :\'invite\' WHERE id = :\'id\';',
+            username=username,
+            status=status_id,
+            invite=invite,
+            id=uri.rsplit('/', 1)[1],
+        )
+
+    def mail_recipients(self) -> list:
+        '''The recipient addresses of every message the stack's mail sink holds,
+        newest first.'''
+        script = (
+            'import json, requests\n'
+            "page = requests.get('http://mailpit:8025/api/v1/messages', timeout=30)\n"
+            "print(json.dumps([[to['Address'] for to in message['To']]"
+            " for message in page.json()['messages']]))\n"
+        )
+        output = _docker(f'{self.project}-web-1', ['python', '-'], script)
+        return json.loads(output.strip().splitlines()[-1])
+
+    def clear_mail(self) -> None:
+        script = (
+            'import requests\n'
+            "requests.delete('http://mailpit:8025/api/v1/messages', timeout=30)"
+            '.raise_for_status()\n'
+        )
+        _docker(f'{self.project}-web-1', ['python', '-'], script)
+
+    def signed_in_as(self, session: requests.Session) -> str:
+        '''The URI of the user the page layout says is signed in, or the
+        outcome of the page request (`login` when anonymous) when it is not
+        the overview page.'''
+        response = self.request(session, 'GET', WHOAMI_PAGE)
+        if outcome(response) != 'page:overviewPage':
+            return outcome(response)
+        user = json.loads(_BACKEND_JSON.search(response.text).group(1))['user']
+        return f'/api2/user/{user["id"]}'
+
+    def login(self, username: str, password: str, set_cookie: bool = False):
+        '''`POST /api2/authentication/login` from a fresh session; returns the
+        session (holding any cookie set) and the response.'''
+        session = new_session()
+        response = self.request(
+            session,
+            'POST',
+            '/api2/authentication/login'
+            + ('?set_cookie=true' if set_cookie else '?set_cookie=false'),
+            {'email': username, 'password': password, 'remember_me': False},
+        )
+        return session, response
+
+    def create_account(self, username: str, password: str) -> str:
+        '''Creates an active account named exactly `username`, with no roles,
+        through the admin API; returns its URI.'''
+        response = self.request(
+            self.admin,
+            'POST',
+            '/api2/user',
+            {
+                'username': username,
+                'firstName': 'Authz',
+                'lastName': 'Account',
+                'phoneNumber': '',
+                'status': 'active',
+            },
+        )
+        assert response.status_code < 300, (username, response.text[:500])
+        uri = response.json()['$uri']
+        self.created_users.add(uri)
+        self.admin_json('POST', f'{uri}/password', {'newPassword': password})
+        return uri
+
+    def patch_user(self, uri: str, **changes):
+        '''A full-object `PATCH /api2/user/<id>` as admin, keeping every field
+        but `changes`; returns the response.'''
+        user = self.admin_json('GET', uri)
+        body = {
+            '$uri': uri,
+            'username': user['username'],
+            'firstName': user['firstName'],
+            'lastName': user['lastName'],
+            'phoneNumber': user['phoneNumber'],
+            'status': user['status'],
+            'acls': [],
+            'apiTokens': [],
+            'roles': [role['$uri'] for role in user['roles']],
+            'groups': [],
+        }
+        body.update(changes)
+        return self.request(self.admin, 'PATCH', uri, body)
 
     def roles_by_name(self) -> dict:
         return {

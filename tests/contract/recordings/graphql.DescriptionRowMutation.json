@@ -1,0 +1,39 @@
+{
+  "content_type": "text/html",
+  "headers": [],
+  "id": "graphql.DescriptionRowMutation",
+  "pinned": {},
+  "response_schema": {
+    "properties": {
+      "data": {
+        "properties": {
+          "update_field_by_pk": {
+            "properties": {
+              "description": {
+                "type": "string"
+              },
+              "id": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "description",
+              "id"
+            ],
+            "type": "object"
+          }
+        },
+        "required": [
+          "update_field_by_pk"
+        ],
+        "type": "object"
+      }
+    },
+    "required": [
+      "data"
+    ],
+    "type": "object"
+  },
+  "route": "POST /api/graphql",
+  "status": 200
+}

@@ -13,7 +13,6 @@ from flask_potion.signals import before_delete, after_delete
 from flask_user import current_user
 from werkzeug.exceptions import BadRequest, Forbidden
 
-from models.alchemy.api_token import APIToken
 from models.alchemy.user import User, UserAcl
 from web.server.api.api_models import PrincipalResource
 from web.server.api.model_schemas import (
@@ -51,6 +50,7 @@ from web.server.routes.views.users import (
     force_delete_user,
     get_user_owned_resources,
     invite_users,
+    issue_api_token,
     replace_user_acls,
     update_user_api_tokens,
     update_user_groups,
@@ -176,7 +176,7 @@ class UserResource(PrincipalResource):
         # to gain access to the account, so their security considerations are kind of
         # identical
         with AuthorizedOperation('change_password', 'user', db_user.id):
-            return APIToken.generate_token(db_user)
+            return issue_api_token(db_user)
 
     # The parameter is coming directly from the API which uses camelCase instead of
     # snake_case

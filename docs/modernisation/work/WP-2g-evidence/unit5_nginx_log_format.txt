@@ -1,0 +1,2 @@
+log_format vhost escape=json '{"timestamp":"$time_iso8601","level":"INFO","logger":"nginx.access", "message":"$request_method $uri $status","deployment":"zz", "request_id":"$upstream_http_x_request_id", "http":{"method":"$request_method","host":"$host","path":"$uri", "status":$status,"bytes":$body_bytes_sent,"duration_s":$request_time}, "client_ip":"$remote_addr","user_agent":"$http_user_agent"}';
+access_log off;

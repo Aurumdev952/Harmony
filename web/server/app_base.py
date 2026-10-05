@@ -3,6 +3,10 @@ connection and migrations and creates the bare Flask app with only a minimal
 configuration.
 '''
 
+# First, so logging is configured and warnings are captured before any other
+# import can print one.
+import log  # noqa: F401
+
 from typing import Tuple
 
 from flask import Flask
@@ -12,22 +16,22 @@ from pylib.file.file_utils import FileUtils
 # Register all models that are used in the platform so that Flask-Migrate can
 # auto-detect schema changes.
 # pylint: disable=unused-import
-import models.alchemy.alerts
-import models.alchemy.api_token
-import models.alchemy.case_management
-import models.alchemy.configuration
-import models.alchemy.dashboard
-import models.alchemy.data_upload
-import models.alchemy.entity_matching
-import models.alchemy.feed
-import models.alchemy.permission
-import models.alchemy.pipeline_runs
-import models.alchemy.query
-import models.alchemy.query_policy
-import models.alchemy.security_group
-import models.alchemy.schedule
-import models.alchemy.user
-import models.alchemy.user_query_session
+import models.alchemy.alerts  # noqa: F401
+import models.alchemy.api_token  # noqa: F401
+import models.alchemy.case_management  # noqa: F401
+import models.alchemy.configuration  # noqa: F401
+import models.alchemy.dashboard  # noqa: F401
+import models.alchemy.data_upload  # noqa: F401
+import models.alchemy.entity_matching  # noqa: F401
+import models.alchemy.feed  # noqa: F401
+import models.alchemy.permission  # noqa: F401
+import models.alchemy.pipeline_runs  # noqa: F401
+import models.alchemy.query  # noqa: F401
+import models.alchemy.query_policy  # noqa: F401
+import models.alchemy.security_group  # noqa: F401
+import models.alchemy.schedule  # noqa: F401
+import models.alchemy.user  # noqa: F401
+import models.alchemy.user_query_session  # noqa: F401
 
 from config.loader import import_configuration_module
 from web.server.configuration.flask import FlaskConfiguration

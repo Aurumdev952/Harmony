@@ -1,0 +1,117 @@
+{
+  "content_type": "application/json",
+  "headers": [],
+  "id": "user.get",
+  "pinned": {},
+  "response_schema": {
+    "properties": {
+      "$uri": {
+        "type": "string",
+        "x-format": "api-uri"
+      },
+      "acls": {
+        "maxItems": 0,
+        "type": "array"
+      },
+      "apiTokens": {
+        "maxItems": 0,
+        "type": "array"
+      },
+      "created": {
+        "properties": {
+          "$date": {
+            "type": "integer"
+          }
+        },
+        "required": [
+          "$date"
+        ],
+        "type": "object"
+      },
+      "firstName": {
+        "type": "string"
+      },
+      "lastName": {
+        "type": "string"
+      },
+      "phoneNumber": {
+        "type": "string"
+      },
+      "roles": {
+        "items": {
+          "properties": {
+            "$uri": {
+              "type": "string",
+              "x-format": "api-uri"
+            },
+            "alertResourceRoleName": {
+              "type": "string"
+            },
+            "dashboardResourceRoleName": {
+              "type": "string"
+            },
+            "dataExport": {
+              "type": "boolean"
+            },
+            "label": {
+              "type": "string"
+            },
+            "name": {
+              "type": "string"
+            },
+            "permissions": {
+              "maxItems": 0,
+              "type": "array"
+            },
+            "queryPolicies": {
+              "maxItems": 0,
+              "type": "array"
+            },
+            "usernames": {
+              "items": {
+                "type": "string",
+                "x-format": "email"
+              },
+              "type": "array"
+            }
+          },
+          "required": [
+            "$uri",
+            "alertResourceRoleName",
+            "dashboardResourceRoleName",
+            "dataExport",
+            "label",
+            "name",
+            "permissions",
+            "queryPolicies",
+            "usernames"
+          ],
+          "type": "object"
+        },
+        "type": "array"
+      },
+      "status": {
+        "type": "string"
+      },
+      "username": {
+        "type": "string",
+        "x-format": "email"
+      }
+    },
+    "required": [
+      "$uri",
+      "acls",
+      "apiTokens",
+      "created",
+      "firstName",
+      "lastName",
+      "phoneNumber",
+      "roles",
+      "status",
+      "username"
+    ],
+    "type": "object"
+  },
+  "route": "GET /api2/user/<id>",
+  "status": 200
+}

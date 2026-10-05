@@ -65,8 +65,12 @@ def test_flask_cache_client_carries_the_password(redis_env):
     redis_env.setenv('REDIS_PASSWORD', AWKWARD_PASSWORD)
 
     cache_config = FlaskConfiguration().CACHES['default']
-    # Explicit root_path: Flask 1.0 cannot locate a module loaded by pytest's rewrite hook.
-    app = Flask('tests.web', root_path=os.path.dirname(__file__))
+    # Explicit paths: Flask 1.0 cannot locate a module loaded by pytest's rewrite hook.
+    app = Flask(
+        'tests.web',
+        root_path=os.path.dirname(__file__),
+        instance_path=os.path.dirname(__file__),
+    )
     cache = Cache(app, config=cache_config)
 
     assert cache_config['CACHE_TYPE'] == 'RedisCache'

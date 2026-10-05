@@ -1,0 +1,9 @@
+{
+  "content_type": "application/json",
+  "headers": [],
+  "id": "query_policy.delete",
+  "pinned": {},
+  "response_schema": null,
+  "route": "DELETE /api2/query_policy/<id>",
+  "status": 204
+}

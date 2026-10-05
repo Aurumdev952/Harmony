@@ -1,0 +1,59 @@
+{
+  "content_type": "text/html",
+  "headers": [],
+  "id": "graphql.usePipelineTimesLastPipelineQuery",
+  "pinned": {},
+  "response_schema": {
+    "properties": {
+      "data": {
+        "properties": {
+          "pipelineRunMetadataConnection": {
+            "properties": {
+              "edges": {
+                "items": {
+                  "properties": {
+                    "node": {
+                      "properties": {
+                        "id": {
+                          "type": "string"
+                        },
+                        "nextRun": {
+                          "type": "string",
+                          "x-format": "date-time"
+                        }
+                      },
+                      "required": [
+                        "id",
+                        "nextRun"
+                      ],
+                      "type": "object"
+                    }
+                  },
+                  "required": [
+                    "node"
+                  ],
+                  "type": "object"
+                },
+                "type": "array"
+              }
+            },
+            "required": [
+              "edges"
+            ],
+            "type": "object"
+          }
+        },
+        "required": [
+          "pipelineRunMetadataConnection"
+        ],
+        "type": "object"
+      }
+    },
+    "required": [
+      "data"
+    ],
+    "type": "object"
+  },
+  "route": "POST /api/graphql",
+  "status": 200
+}

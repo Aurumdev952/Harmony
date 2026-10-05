@@ -1,0 +1,385 @@
+{
+  "cases": [
+    {
+      "id": "dashboard.create",
+      "route": "POST /api2/dashboard",
+      "body": {
+        "slug": "contract-dashboard",
+        "specification": {
+          "version": "2023-06-30",
+          "items": [],
+          "options": {
+            "title": "Contract dashboard",
+            "columnCount": 100
+          },
+          "commonSettings": {
+            "filterSettings": {
+              "enabledCategories": [],
+              "excludedTiles": [],
+              "items": [],
+              "visible": false,
+              "enabledFilterHierarchy": []
+            },
+            "groupingSettings": {
+              "enabledCategories": [],
+              "excludedTiles": [],
+              "items": [],
+              "visible": false
+            },
+            "panelAlignment": "LEFT"
+          },
+          "legacy": false
+        }
+      },
+      "capture": {
+        "dashboard": "/$uri",
+        "dashboard_id": "/$uri#id",
+        "dashboard_resource": "/resource"
+      }
+    },
+    {
+      "id": "dashboard.list",
+      "route": "GET /api2/dashboard",
+      "query": {
+        "per_page": "10000"
+      }
+    },
+    {
+      "id": "dashboard.list.by_slug",
+      "route": "GET /api2/dashboard",
+      "query": {
+        "where": {
+          "slug": "contract-dashboard"
+        }
+      }
+    },
+    {
+      "id": "dashboard.editable",
+      "route": "GET /api2/dashboard/editable"
+    },
+    {
+      "id": "dashboard.viewable.official",
+      "route": "GET /api2/dashboard/viewable",
+      "query": {
+        "per_page": "10000",
+        "where": {
+          "isOfficial": true
+        }
+      }
+    },
+    {
+      "id": "dashboard.get",
+      "route": "GET /api2/dashboard/<id>",
+      "path": "{dashboard}"
+    },
+    {
+      "id": "dashboard.get.legacy",
+      "route": "GET /api2/dashboard/<id>",
+      "path": "{dashboard}",
+      "query": {
+        "legacy": "1"
+      },
+      "note": "A dashboard created through the API has no legacy specification, so this 500s today (WP-2c finding F9)."
+    },
+    {
+      "id": "dashboard.favorite",
+      "route": "POST /api2/dashboard/<id>/favorite",
+      "path": "{dashboard}/favorite",
+      "body": true
+    },
+    {
+      "id": "dashboard.unfavorite",
+      "route": "POST /api2/dashboard/<id>/favorite",
+      "path": "{dashboard}/favorite",
+      "body": false
+    },
+    {
+      "id": "dashboard.official",
+      "route": "POST /api2/dashboard/<id>/official",
+      "path": "{dashboard}/official",
+      "body": true
+    },
+    {
+      "id": "dashboard.unofficial",
+      "route": "POST /api2/dashboard/<id>/official",
+      "path": "{dashboard}/official",
+      "body": false
+    },
+    {
+      "id": "dashboard.update",
+      "route": "PATCH /api2/dashboard/<id>",
+      "path": "{dashboard}",
+      "body": {
+        "slug": "contract-dashboard",
+        "specification": {
+          "version": "2023-06-30",
+          "items": [],
+          "options": {
+            "title": "Contract dashboard renamed",
+            "columnCount": 100
+          },
+          "commonSettings": {
+            "filterSettings": {
+              "enabledCategories": [],
+              "excludedTiles": [],
+              "items": [],
+              "visible": false,
+              "enabledFilterHierarchy": []
+            },
+            "groupingSettings": {
+              "enabledCategories": [],
+              "excludedTiles": [],
+              "items": [],
+              "visible": false
+            },
+            "panelAlignment": "LEFT"
+          },
+          "legacy": false
+        }
+      }
+    },
+    {
+      "id": "dashboard.add_item",
+      "route": "POST /api2/dashboard/<id>/add_item",
+      "path": "{dashboard}/add_item",
+      "body": {
+        "id": "contract-item-holder",
+        "item": {
+          "type": "TEXT_ITEM",
+          "text": "<p>Contract</p>",
+          "autosize": true
+        },
+        "position": {
+          "columnCount": 25,
+          "rowCount": 4,
+          "x": 0
+        }
+      }
+    },
+    {
+      "id": "dashboard.upgrade_spec",
+      "route": "POST /api2/dashboard/upgrade_spec",
+      "body": {
+        "version": "2023-06-30",
+        "items": [],
+        "options": {
+          "title": "Contract dashboard",
+          "columnCount": 100
+        },
+        "commonSettings": {
+          "filterSettings": {
+            "enabledCategories": [],
+            "excludedTiles": [],
+            "items": [],
+            "visible": false,
+            "enabledFilterHierarchy": []
+          },
+          "groupingSettings": {
+            "enabledCategories": [],
+            "excludedTiles": [],
+            "items": [],
+            "visible": false
+          },
+          "panelAlignment": "LEFT"
+        },
+        "legacy": false
+      }
+    },
+    {
+      "id": "dashboard.set_tile_data_permissions",
+      "route": "POST /api2/dashboard/<id>/set_tile_data_permissions",
+      "path": "{dashboard}/set_tile_data_permissions",
+      "body": {
+        "registered_users_can_download_data": true,
+        "unregistered_users_can_download_data": false
+      }
+    },
+    {
+      "id": "dashboard.cannot_view",
+      "route": "POST /api2/dashboard/<id>/cannot_view",
+      "path": "{dashboard}/cannot_view",
+      "body": {
+        "emails": [
+          "contract-recipient@harmony.invalid",
+          "{env:CONTRACT_USERNAME}"
+        ]
+      }
+    },
+    {
+      "id": "dashboard.share_via_email",
+      "route": "POST /api2/dashboard/<id>/share_via_email",
+      "path": "{dashboard}/share_via_email",
+      "body": {
+        "recipients": [
+          "{env:CONTRACT_USERNAME}"
+        ],
+        "message": "Contract message",
+        "subject": "Contract subject",
+        "sender": "{env:CONTRACT_USERNAME}",
+        "shouldAttachPdf": false,
+        "shouldEmbedImage": false,
+        "dashboardUrl": "http://127.0.0.1/dashboard/contract-dashboard",
+        "useRecipientQueryPolicy": false,
+        "useSingleEmailThread": false
+      },
+      "note": "Mail goes to the stack's mailpit sink."
+    },
+    {
+      "id": "dashboard.transfer_one",
+      "route": "POST /api2/dashboard/<id>/transfer/username",
+      "path": "{dashboard}/transfer/username",
+      "body": "{env:CONTRACT_USERNAME}"
+    },
+    {
+      "id": "dashboard.transfer_all",
+      "route": "POST /api2/dashboard/transfer/username",
+      "body": {
+        "sourceAuthor": "{env:CONTRACT_USERNAME}",
+        "targetAuthor": "{env:CONTRACT_USERNAME}"
+      }
+    },
+    {
+      "id": "resource.update_roles",
+      "route": "POST /api2/resource/<id>/roles",
+      "path": "{dashboard_resource}/roles",
+      "body": {
+        "userRoles": {
+          "{env:CONTRACT_USERNAME}": [
+            "dashboard_admin"
+          ]
+        },
+        "groupRoles": {
+          "contract-group-renamed": [
+            "dashboard_viewer"
+          ]
+        },
+        "sitewideResourceAcl": {
+          "registeredResourceRole": "dashboard_viewer",
+          "unregisteredResourceRole": ""
+        }
+      }
+    },
+    {
+      "id": "resource.roles.after_update",
+      "route": "GET /api2/resource/<id>/roles",
+      "path": "{dashboard_resource}/roles",
+      "maps": [
+        "$.groupRoles",
+        "$.userRoles"
+      ],
+      "note": "groupRoles and userRoles are keyed by group name and username."
+    },
+    {
+      "id": "user.get.with_acls",
+      "route": "GET /api2/user/<id>",
+      "path": "{admin_user}"
+    },
+    {
+      "id": "group.find_by_name.with_acls_and_roles",
+      "route": "GET /api2/group",
+      "query": {
+        "where": {
+          "name": "contract-group-renamed"
+        }
+      }
+    },
+    {
+      "id": "storage.retrieve.cached",
+      "route": "GET /api2/storage/retrieve",
+      "query": {
+        "key": "contract-dashboard"
+      },
+      "note": "stack.sh seeds this thumbnail into Redis: a miss renders through Urlbox, which the stack cannot reach, and leaves a PENDING marker that stalls later reads for 10 minutes."
+    },
+    {
+      "id": "storage.retrieve.unknown_slug",
+      "route": "GET /api2/storage/retrieve",
+      "query": {
+        "key": "contract-no-such-dashboard"
+      },
+      "note": "The handler dereferences the missing dashboard, so this is a 500 today (WP-2c finding F11)."
+    },
+    {
+      "id": "user.ownership.with_dashboard",
+      "route": "GET /api2/user/<id>/ownership",
+      "path": "{admin_user}/ownership"
+    },
+    {
+      "id": "client.dashboard.list",
+      "route": "GET /api2/dashboard",
+      "query": {
+        "per_page": "1000"
+      },
+      "session": "client"
+    },
+    {
+      "id": "client.dashboard.get",
+      "route": "GET /api2/dashboard/<id>",
+      "path": "{dashboard}",
+      "session": "client"
+    },
+    {
+      "id": "resource.list.dashboards",
+      "route": "GET /api2/resource",
+      "query": {
+        "where": {
+          "resourceType": "DASHBOARD"
+        },
+        "per_page": "1000"
+      },
+      "pin": [
+        "/[]/resourceType"
+      ]
+    },
+    {
+      "id": "resource.get",
+      "route": "GET /api2/resource/<id>",
+      "path": "{dashboard_resource}"
+    },
+    {
+      "id": "resource.roles",
+      "route": "GET /api2/resource/<id>/roles",
+      "path": "{dashboard_resource}/roles",
+      "maps": [
+        "$.groupRoles",
+        "$.userRoles"
+      ],
+      "note": "groupRoles and userRoles are keyed by group name and username."
+    },
+    {
+      "id": "dashboard_session.generate_link",
+      "route": "POST /api2/dashboard_session/generate_link",
+      "body": {
+        "dashboardId": "{dashboard_id}",
+        "dataBlob": {
+          "filters": [],
+          "groupings": [
+            {
+              "type": "GROUPING_DIMENSION",
+              "item": {
+                "dimension": "StateName",
+                "includeAll": false,
+                "includeNull": false,
+                "includeTotal": false,
+                "name": "State"
+              }
+            }
+          ]
+        }
+      },
+      "capture": {
+        "dashboard_session_hash": ""
+      }
+    },
+    {
+      "id": "dashboard_session.get",
+      "route": "GET /api2/dashboard_session/<hash>",
+      "path": "/api2/dashboard_session/{dashboard_session_hash}"
+    },
+    {
+      "id": "dashboard.delete",
+      "route": "DELETE /api2/dashboard/<id>",
+      "path": "{dashboard}"
+    }
+  ]
+}

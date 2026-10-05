@@ -8,7 +8,7 @@ Back to [overview](overview.md). Evidence: [02-architecture-deep-dive.md](02-arc
 
 - **Changes.** Add `scripts/perf/baseline.py`. It replays a fixed set of `QueryRequest` payloads against `/api2/query/*` and records p50 and p95 latency, response bytes and Druid time. Add a Playwright script that loads three reference dashboards and records time to last tile and bytes transferred.
 - **Data structure.** `PerfSample = {case_id, endpoint, p50_ms, p95_ms, bytes, druid_ms}`, written as JSON lines to `docs/modernisation/perf/`.
-- **Verification.** Two consecutive runs agree within 10%. The baseline file is committed.
+- **Verification.** An A/A paired run passes on the development host (decision 0011); the absolute baseline is recorded when a quiet window exists. The run files are committed.
 
 ## 1b. Shared result cache
 

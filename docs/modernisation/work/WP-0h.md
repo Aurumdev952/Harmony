@@ -17,6 +17,9 @@ instances:
       - "web/server/routes/views/users.py"
       - "tests/privilege_escalation/**"
       - "docs/modernisation/work/WP-0h.md"
+  - name: "qa-0h-flip"
+    files:
+      - "tests/authz/http/test_escalation.py"
 branch: "mig/WP-0h-privilege-escalations"
 requirements: [INV-3, QA-1, QA-4]
 contracts_consumed: []
@@ -350,6 +353,7 @@ None.
 - 2026-10-05 backend-8 unit 11: merged `mig/integration` `e86d91a` (`741fc11`), restored the 3.8-compatible `with` in `RoleResource.update_users`, corrected the 3.8 memory note. Check: `ci/lint_python.sh`, mypy and `ci/pytest_suites.sh` pass on the merge; `py_compile` on CPython 3.8 of the 11 changed files passes; WP suite on CPython 3.8.20 `86 passed`.
 - 2026-10-05 backend-8: QA, reviewer and security approved `488e482`; QA's round-3 evidence and security's two lows recorded; `status: ready`.
 - 2026-10-06 qa-0h-flip (supporting role, on this branch at the lead's request): merged `mig/integration` `6935714` (WP-2b, WP-4a, WP-8a; no conflicts) and flipped the ten WP-2b pins to WP-0h's behaviour. Check: WP-2b pure layer `4675 passed, 583 skipped` on both the merge and integration, with identical per-test outcomes apart from the ten renamed (skipped) pins. Live layer on one fresh stack of the merged tree: `580 passed`, plus the 3 F12 token pins, which fail the same way on integration's own code (WP-2c fix). The flipped pins fail on integration's code (10 failed, 4 passed). `tests/privilege_escalation` 86 passed, `ci/lint_python.sh mig/integration`, the 3.8 guard on CPython 3.8.20 (848 files, 0 problems), mypy (519 files) and `task_gate.py WP-0h` pass. Evidence below.
+- 2026-10-06 backend-9: merged `mig/integration` `f5d5993` (WP-2c). Two conflicts resolved. `web/server/api/user_api_models.py`: the import list keeps both `issue_api_token` (WP-2c F12, `create_api_token_for_user` stores the token it issues) and `replace_user_acls` (WP-0h); `update_user` keeps WP-0h's grant-subset checks unchanged; `update_user_acls`, which WP-0h removed, stays removed. The backend memory index keeps both sides, one line per memory file. Integration's `log/config.py` makes `ZenysisLogger` propagate to root, so the `refusals` fixture counted each audit line twice through caplog; it now records on its own handler on the app logger (assertion unchanged). Front matter now claims `tests/authz/http/test_escalation.py` for the qa-0h-flip instance, which `task_gate.py` had reported unclaimed. Check: `tests/privilege_escalation` 86 passed; WP-2b pure layer (`tests/authz/run.sh`, no stack env) `4675 passed, 583 skipped`; `ci/pytest_suites.sh` all 13 suites pass (`tests/web` 140, `tests/contract` offline 60 with 234 stack cases deselected); `ci/lint_python.sh mig/integration`, `uv run --locked mypy` (519 files) and `ci/check_py38_syntax.py` on CPython 3.8.20 (860 files, 0 problems) pass; `task_gate.py WP-0h` meets the gates. Not run: the WP-2b live layer and `tests/authz` stack pins (no stack in this round; the 3 F12 token pins should now pass with WP-2c's fix merged).
 
 ## Evidence
 

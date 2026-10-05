@@ -4,7 +4,7 @@ The renderer's browser loads this app's own dashboard page over the internal
 network, signed in with a render token for the user the export is made as.
 '''
 
-from contextlib import contextmanager, nullcontext
+from contextlib import contextmanager
 from dataclasses import dataclass
 from typing import Iterator, Mapping, Optional
 from urllib.parse import urlparse
@@ -12,7 +12,7 @@ from urllib.parse import urlparse
 import requests
 from flask import current_app, url_for
 from flask_user import current_user
-from werkzeug.exceptions import HTTPException, ServiceUnavailable
+from werkzeug.exceptions import HTTPException, ServiceUnavailable, Unauthorized
 
 from config import settings
 from log import LOG
@@ -31,9 +31,10 @@ CONNECT_TIMEOUT_SECONDS = 5
 # The renderer answers by its deadline; the margin covers sending the bytes back.
 RESPONSE_MARGIN_SECONDS = 15
 RENDER_MAX_BYTES = 25 * 1024 * 1024
-# The renderer runs few renders at once, so one user's exports must not fill it
-# and leave everyone else queueing until their deadlines.
-MAX_EXPORTS_IN_FLIGHT_PER_USER = 2
+READ_CHUNK_BYTES = 64 * 1024
+# The renderer runs few renders at once, so one account's renders must not fill
+# it and leave everyone else queueing until their deadlines.
+MAX_RENDERS_IN_FLIGHT_PER_ACCOUNT = 2
 
 CONTENT_TYPES = {'pdf': 'application/pdf', 'png': 'image/png', 'jpeg': 'image/jpeg'}
 
@@ -45,7 +46,7 @@ HEIGHTS = range(240, 4321)
 PDF_PAGE_SIZES = ('A3', 'A4', 'A5', 'Legal', 'Letter', 'Tabloid')
 
 
-class ExportsInFlight(ServiceUnavailable):
+class RendersInFlight(ServiceUnavailable):
     description = 'Your other exports are still rendering. Try again shortly.'
 
 
@@ -129,48 +130,62 @@ def _is_signed_in_as(username: str) -> bool:
     return bool(current_user.is_authenticated and current_user.username == username)
 
 
+def _read_capped(response) -> Optional[bytes]:
+    '''The body, or None once it passes RENDER_MAX_BYTES (never read further).'''
+    declared = response.headers.get('Content-Length', '')
+    if declared.isascii() and declared.isdecimal() and int(declared) > RENDER_MAX_BYTES:
+        return None
+    body = bytearray()
+    for chunk in response.iter_content(READ_CHUNK_BYTES):
+        body += chunk
+        if len(body) > RENDER_MAX_BYTES:
+            return None
+    return bytes(body)
+
+
 def _checked(response, output_format: str, name: str) -> Optional[RenderedDashboard]:
     expected = CONTENT_TYPES[output_format]
     content_type = response.headers.get('Content-Type', '').split(';')[0].strip()
-    size = len(response.content)
-    if (
-        response.status_code != 200
-        or content_type != expected
-        or size > RENDER_MAX_BYTES
-    ):
+    content = None
+    if response.status_code == 200 and content_type == expected:
+        content = _read_capped(response)
+    if content is None:
         LOG.error(
-            'Renderer failed to render %s of dashboard %s: status %s, %s, %s bytes',
+            'Renderer failed to render %s of dashboard %s: status %s, %s, %s',
             output_format,
             name,
             response.status_code,
             content_type,
-            size,
+            'over the size limit' if response.status_code == 200 else 'not read',
         )
         return None
     LOG.info(
         'Rendered %s of dashboard %s: %s bytes, %s',
         output_format,
         name,
-        size,
+        len(content),
         response.headers.get('Server-Timing', ''),
     )
-    return RenderedDashboard(response.content, expected)
+    return RenderedDashboard(content, expected)
 
 
 @contextmanager
-def _export_slot(requester: str, ttl_seconds: int) -> Iterator[None]:
-    '''Holds one of the requester's export slots for the render, or raises 503.
+def _render_slot(ttl_seconds: int) -> Iterator[None]:
+    '''Holds one of the signed-in account's render slots, or raises 503.
 
-    A slot expires with the render deadline, so a worker that dies mid-render
-    cannot hold it.
+    Keyed on the session's account id, never on who the render is made as, so
+    an emailed render counts against its sender. A slot expires with the render
+    deadline, so a worker that dies mid-render cannot hold it.
     '''
-    for slot in range(MAX_EXPORTS_IN_FLIGHT_PER_USER):
-        key = f'render-in-flight:{requester}:{slot}'
+    if not current_user.is_authenticated:
+        raise Unauthorized()
+    for slot in range(MAX_RENDERS_IN_FLIGHT_PER_ACCOUNT):
+        key = f'render-in-flight:{current_user.id}:{slot}'
         if current_app.cache.add(key, True, timeout=ttl_seconds):
             break
     else:
-        LOG.warning('Refused an export: its requester has no free export slot')
-        raise ExportsInFlight()
+        LOG.warning('Refused a render: the account has no free render slot')
+        raise RendersInFlight()
     try:
         yield
     finally:
@@ -189,6 +204,9 @@ def render_dashboard(
 ) -> Optional[RenderedDashboard]:
     '''Render the dashboard `name` as `auth_user_email`, or None if it failed.
 
+    Raises RendersInFlight (503) when the signed-in account already has
+    MAX_RENDERS_IN_FLIGHT_PER_ACCOUNT renders running.
+
     When the caller renders as themselves, the token pins the digest of their
     query policy, so a policy change before the page loads gets the render nothing.
     '''
@@ -204,14 +222,8 @@ def render_dashboard(
     }
     policy = query_policy_fingerprint() if _is_signed_in_as(auth_user_email) else None
     ttl_seconds = RENDER_TIMEOUT_SECONDS + RESPONSE_MARGIN_SECONDS
-    requester = (
-        current_user.username if current_user.is_authenticated else auth_user_email
-    )
-    # A thumbnail render is already one per dashboard and policy at a time
-    # (thumbnail_storage_service), and a cold Overview asks for several at once.
-    slot = nullcontext() if is_thumbnail else _export_slot(requester, ttl_seconds)
     with (
-        slot,
+        _render_slot(ttl_seconds),
         render_token(
             auth_user_email, resource_id, policy=policy, ttl_seconds=ttl_seconds
         ) as token,
@@ -221,7 +233,12 @@ def render_dashboard(
                 f'{RENDERER_URL}/render',
                 json={**body, 'token': token},
                 timeout=(CONNECT_TIMEOUT_SECONDS, ttl_seconds),
+                stream=True,
             )
+            try:
+                return _checked(response, output_format, name)
+            finally:
+                response.close()
         except requests.RequestException as error:
             LOG.error(
                 'Renderer request for %s of dashboard %s failed: %s',
@@ -230,7 +247,6 @@ def render_dashboard(
                 type(error).__name__,
             )
             return None
-    return _checked(response, output_format, name)
 
 
 def grid_dashboard_to_pdf(

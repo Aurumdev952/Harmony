@@ -4,7 +4,10 @@ import time
 from flask import current_app
 from flask_user import current_user
 
-from web.server.routes.views.page_renderer import grid_dashboard_to_thumbnail
+from web.server.routes.views.page_renderer import (
+    RendersInFlight,
+    grid_dashboard_to_thumbnail,
+)
 from web.server.security.signal_handlers import query_policy_fingerprint
 
 EXPIRATION_SEC = 1209600  # Update thumbnail image every 2 weeks.
@@ -17,9 +20,13 @@ def get_thumbnail_storage_name(dashboard):
 
 
 def render_thumbnail(dashboard):
-    rendered = grid_dashboard_to_thumbnail(
-        name=dashboard.slug, auth_user_email=current_user.username
-    )
+    try:
+        rendered = grid_dashboard_to_thumbnail(
+            name=dashboard.slug, auth_user_email=current_user.username
+        )
+    except RendersInFlight:
+        # Not cached, so the next view renders it.
+        return ''
     if rendered is None:
         return ''
     return base64.b64encode(rendered.content).decode()

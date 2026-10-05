@@ -9,7 +9,7 @@ from urllib.parse import parse_qs, urlsplit
 import pytest
 import requests
 
-from tests.web.render.fakes import DASHBOARD_SLUG, FakeRenderResponse
+from tests.web.render.fakes import DASHBOARD_SLUG, SENDER, USERS, FakeRenderResponse
 from web.server.routes.views import page_renderer
 from web.server.routes.views.dashboard import get_email_attachments
 
@@ -132,7 +132,7 @@ def test_token_outlives_the_render_deadline_and_the_call_is_bounded(
 def _fail_with(monkeypatch, renderer, outcome):
     calls = []
 
-    def post(url, json=None, timeout=None):
+    def post(url, json=None, timeout=None, stream=False):
         calls.append(json)
         if isinstance(outcome, Exception):
             raise outcome
@@ -219,7 +219,7 @@ def test_restricted_viewer_render_carries_their_policy(client, renderer):
 def test_emailed_render_resolves_the_recipients_own_policy(app, renderer):
     # The sender is not the recipient, so no digest of the sender's policy is
     # pinned; the recipient's account decides when the page loads.
-    with app.test_request_context('/'):
+    with app.test_request_context('/', headers=SENDER):
         get_email_attachments(NORTH, SLUG, should_attach_pdf=True)
 
     [call] = renderer.calls
@@ -233,7 +233,7 @@ def test_emailed_render_with_a_failed_renderer_attaches_nothing(
 ):
     _fail_with(monkeypatch, renderer, requests.Timeout('read timed out'))
 
-    with app.test_request_context('/'):
+    with app.test_request_context('/', headers=SENDER):
         assert get_email_attachments(NORTH, SLUG, should_attach_pdf=True) == (
             None,
             None,
@@ -284,20 +284,34 @@ def test_thumbnail_ignores_request_args(client, renderer):
     assert call.params['full_page'] is False
 
 
-# One user's exports cannot fill the renderer's few slots (the rest of the
-# deployment would queue behind them until their deadlines).
+# One account's renders cannot fill the renderer's few slots (everyone else
+# would queue behind them until their deadlines). Found by security review: the
+# first cap left `/png/thumbnail`, which renders uncached on every call, and the
+# thumbnail retrieve path uncapped.
+
+VIEWER_ID = USERS[VIEWER].id
+NORTH_ID = USERS[NORTH].id
+CAPPED_ROUTES = [
+    f'/dashboard/{SLUG}/pdf',
+    f'/dashboard/{SLUG}/jpeg',
+    f'/dashboard/{SLUG}/png/thumbnail',
+]
 
 
-def _fill_export_slots(app, username):
-    for slot in range(page_renderer.MAX_EXPORTS_IN_FLIGHT_PER_USER):
-        app.cache.add(f'render-in-flight:{username}:{slot}', True)
+def _fill_render_slots(app, account_id):
+    for slot in range(page_renderer.MAX_RENDERS_IN_FLIGHT_PER_ACCOUNT):
+        app.cache.add(f'render-in-flight:{account_id}:{slot}', True)
 
 
-@pytest.mark.parametrize('route', [f'/dashboard/{SLUG}/pdf', f'/dashboard/{SLUG}/jpeg'])
-def test_an_export_beyond_the_users_in_flight_limit_is_a_503_without_a_render(
+def _slots(app):
+    return [key for key in app.cache.values if key.startswith('render-in-flight:')]
+
+
+@pytest.mark.parametrize('route', CAPPED_ROUTES)
+def test_a_render_beyond_the_accounts_in_flight_limit_is_a_503_without_a_render(
     app, client, renderer, route
 ):
-    _fill_export_slots(app, VIEWER)
+    _fill_render_slots(app, VIEWER_ID)
 
     response = client.get(route, headers=as_user(VIEWER))
 
@@ -306,8 +320,32 @@ def test_an_export_beyond_the_users_in_flight_limit_is_a_503_without_a_render(
     assert not [key for key in app.cache.values if key.startswith('render-token:')]
 
 
-def test_one_users_exports_in_flight_do_not_hold_another_user(app, client, renderer):
-    _fill_export_slots(app, VIEWER)
+def test_a_thumbnail_retrieve_beyond_the_limit_is_empty_and_not_cached(
+    app, client, renderer
+):
+    _fill_render_slots(app, VIEWER_ID)
+
+    response = client.get(f'/api2/storage/retrieve?key={SLUG}', headers=as_user(VIEWER))
+
+    assert response.status_code == 200
+    assert response.get_json() == ''
+    assert renderer.calls == []
+    assert not [key for key in app.cache.values if key.startswith('thumbnail:')]
+
+
+def test_an_emailed_render_counts_against_the_sender_not_the_recipient(app, renderer):
+    _fill_render_slots(app, NORTH_ID)
+
+    with app.test_request_context('/', headers=as_user(NORTH)):
+        app.preprocess_request()
+        with pytest.raises(page_renderer.RendersInFlight):
+            get_email_attachments(VIEWER, SLUG, should_attach_pdf=True)
+
+    assert renderer.calls == []
+
+
+def test_one_accounts_renders_in_flight_do_not_hold_another(app, client, renderer):
+    _fill_render_slots(app, VIEWER_ID)
 
     response = client.get(f'/dashboard/{SLUG}/pdf', headers=as_user(NORTH))
 
@@ -315,47 +353,80 @@ def test_one_users_exports_in_flight_do_not_hold_another_user(app, client, rende
     assert renderer.calls[-1].identity == NORTH
 
 
-def test_thumbnails_are_not_held_by_the_export_limit(app, client, renderer):
-    # A thumbnail render is already one per dashboard and policy at a time, and a
-    # cold Overview asks for several at once.
-    _fill_export_slots(app, VIEWER)
-
-    response = client.get(f'/dashboard/{SLUG}/png/thumbnail', headers=as_user(VIEWER))
-
-    assert response.status_code == 200
-
-
 @pytest.mark.parametrize(
     'outcome',
     [requests.ConnectionError('renderer unreachable'), _response(status=504), None],
     ids=['unreachable', 'failed', 'rendered'],
 )
-def test_the_export_slot_is_released_when_the_render_returns(
-    app, client, renderer, monkeypatch, outcome
+@pytest.mark.parametrize('route', CAPPED_ROUTES)
+def test_the_render_slot_is_released_when_the_render_returns(
+    app, client, renderer, monkeypatch, outcome, route
 ):
     if outcome is not None:
         _fail_with(monkeypatch, renderer, outcome)
 
-    client.get(f'/dashboard/{SLUG}/pdf', headers=as_user(VIEWER))
+    client.get(route, headers=as_user(VIEWER))
 
-    assert not [key for key in app.cache.values if key.startswith('render-in-flight:')]
+    assert _slots(app) == []
 
 
-def test_the_export_slot_is_held_only_for_the_render_deadline(
+def test_the_render_slot_is_held_by_the_account_for_the_render_deadline_only(
     app, client, renderer, monkeypatch
 ):
-    timeouts = {}
+    held = {}
     add = app.cache.add
 
     def recording_add(key, value, timeout=None):
         if key.startswith('render-in-flight:'):
-            timeouts[key] = timeout
+            held[key] = timeout
         return add(key, value, timeout)
 
     monkeypatch.setattr(app.cache, 'add', recording_add)
 
     client.get(f'/dashboard/{SLUG}/pdf', headers=as_user(VIEWER))
 
-    assert list(timeouts.values()) == [
-        page_renderer.RENDER_TIMEOUT_SECONDS + page_renderer.RESPONSE_MARGIN_SECONDS
-    ]
+    ttl = page_renderer.RENDER_TIMEOUT_SECONDS + page_renderer.RESPONSE_MARGIN_SECONDS
+    assert held == {f'render-in-flight:{VIEWER_ID}:0': ttl}
+
+
+# The web side reads at most RENDER_MAX_BYTES of the renderer's answer.
+
+
+class _EndlessResponse(FakeRenderResponse):
+    def __init__(self, content_length=None):
+        super().__init__(b'', 'application/pdf')
+        self.read = 0
+        self.closed = False
+        if content_length is not None:
+            self.headers['Content-Length'] = str(content_length)
+
+    @property
+    def content(self):
+        raise AssertionError('the whole body must never be loaded')
+
+    @content.setter
+    def content(self, _value):
+        pass
+
+    def iter_content(self, chunk_size):
+        while True:
+            self.read += chunk_size
+            yield b'x' * chunk_size
+
+    def close(self):
+        self.closed = True
+
+
+@pytest.mark.parametrize('content_length', [None, 10**9], ids=['unsized', 'sized'])
+def test_an_oversized_answer_is_refused_without_reading_it_all(
+    client, renderer, monkeypatch, content_length
+):
+    monkeypatch.setattr(page_renderer, 'RENDER_MAX_BYTES', 1024)
+    endless = _EndlessResponse(content_length)
+    _fail_with(monkeypatch, renderer, endless)
+
+    response = client.get(f'/dashboard/{SLUG}/pdf', headers=as_user(VIEWER))
+
+    assert response.status_code == 500
+    assert endless.read <= 1024 + page_renderer.READ_CHUNK_BYTES
+    assert endless.closed

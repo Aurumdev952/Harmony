@@ -9,7 +9,7 @@ emailed links use DEPLOYMENT_BASE_URL.
 import pytest
 from flask import g
 
-from tests.web.render.fakes import DASHBOARDS, DASHBOARD_SLUG, DEPLOYMENT_ORIGIN
+from tests.web.render.fakes import DASHBOARDS, DASHBOARD_SLUG, DEPLOYMENT_ORIGIN, SENDER
 from web.server.routes.views.dashboard import get_email_attachments, send_email
 from web.server.routes.views.page_renderer import RENDER_WEB_ORIGIN
 
@@ -53,7 +53,7 @@ def test_thumbnail_retrieve_renders_the_internal_origin(client, renderer, host):
 def test_emailed_render_sends_the_recipient_token_to_the_internal_origin(
     app, renderer, host
 ):
-    with app.test_request_context('/', headers={'Host': host}):
+    with app.test_request_context('/', headers={'Host': host, **SENDER}):
         get_email_attachments(VIEWER, SLUG, should_attach_pdf=True)
 
     [call] = renderer.calls

@@ -14,6 +14,7 @@ from tests.web.render.fakes import (
     DASHBOARDS,
     DASHBOARD_SLUG,
     DEPLOYMENT_ORIGIN,
+    SENDER,
     FakeDashboard,
     FakeRenderResponse,
 )
@@ -250,7 +251,7 @@ def test_slug_reused_by_another_dashboard_does_not_serve_the_old_thumbnail(
 def test_emailed_render_loads_this_apps_dashboard_whatever_link_is_sent(
     app, renderer, link, page
 ):
-    with app.test_request_context('/'):
+    with app.test_request_context('/', headers=SENDER):
         get_email_attachments(VIEWER, SLUG, should_attach_pdf=True, dashboard_url=link)
 
     [call] = renderer.calls

@@ -15,7 +15,7 @@ import requests
 from cachelib import FileSystemCache
 
 from log import LOG
-from tests.web.render.fakes import DASHBOARD_SLUG
+from tests.web.render.fakes import DASHBOARD_SLUG, SENDER
 from web.server.redis import thumbnail_storage_service
 from web.server.routes.views import page_renderer as page_renderer_views
 from web.server.routes.views.dashboard import get_email_attachments
@@ -69,7 +69,7 @@ def test_unreachable_renderer_fails_the_render_route_without_logging_secrets(
 def test_unreachable_renderer_fails_an_email_render_without_logging_secrets(
     app, unreachable_renderer, formats, output_format
 ):
-    with app.test_request_context('/'):
+    with app.test_request_context('/', headers=SENDER):
         app.preprocess_request()
         assert get_email_attachments(VIEWER, SLUG, **formats) == (None, None)
 

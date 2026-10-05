@@ -17,6 +17,8 @@ from web.server.security.permissions import SUPERUSER_NEED
 DEPLOYMENT_ORIGIN = 'https://harmony.tests.invalid'
 
 DASHBOARD_SLUG = 'malaria-overview'
+# Emailed renders run inside the sender's signed-in request.
+SENDER = {'X-Test-User': 'admin@tests.invalid'}
 DASHBOARD_RESOURCE_ID = 7
 STATE = 'StateName'  # an AUTHORIZABLE_DIMENSIONS entry in harmony_demo
 
@@ -163,6 +165,13 @@ class FakeRenderResponse:
         self.content = body
         self.headers = {'Content-Type': content_type, 'Server-Timing': 'render;dur=42'}
 
+    def iter_content(self, chunk_size: int):
+        for start in range(0, len(self.content), chunk_size):
+            yield self.content[start : start + chunk_size]
+
+    def close(self) -> None:
+        return None
+
 
 class FakeRenderer:
     """Replaces the `requests` module the web app calls the renderer service with.
@@ -177,7 +186,7 @@ class FakeRenderer:
         self._app = app
         self.calls: List[RenderCall] = []
 
-    def post(self, url, json=None, timeout=None):
+    def post(self, url, json=None, timeout=None, stream=False):
         params = dict(json or {})
         token = params.get('token', '')
         identity, claims, lifetime = None, {}, None

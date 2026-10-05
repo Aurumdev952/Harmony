@@ -38,6 +38,33 @@ def test_core_imports_no_web_framework():
     assert 'BE-1: harmony.core imports no web framework KEPT' in output
 
 
+def _namespace_directories(root: Path) -> list[str]:
+    '''Directories under `root` that hold Python files but no __init__.py.'''
+    return sorted(
+        str(directory.relative_to(root.parent))
+        for directory in [root, *root.rglob('*')]
+        if directory.is_dir()
+        and directory.name != '__pycache__'
+        and any(directory.glob('*.py'))
+        and not (directory / '__init__.py').exists()
+    )
+
+
+def test_every_harmony_directory_is_a_regular_package():
+    # grimp does not descend into a namespace directory, so its modules would be
+    # invisible to the BE-1 contract.
+    assert _namespace_directories(REPO / 'harmony') == []
+
+
+def test_namespace_check_finds_a_directory_without_init(tmp_path):
+    (tmp_path / 'harmony' / 'worker' / 'renderer').mkdir(parents=True)
+    (tmp_path / 'harmony' / '__init__.py').write_text('')
+    (tmp_path / 'harmony' / 'worker' / 'tasks.py').write_text('')
+    (tmp_path / 'harmony' / 'worker' / 'renderer' / '__init__.py').write_text('')
+
+    assert _namespace_directories(tmp_path / 'harmony') == ['harmony/worker']
+
+
 def _core_with(tmp_path: Path, source: str) -> Path:
     '''A copy of the whole harmony tree whose core gains `leak.py`.'''
     shutil.copytree(

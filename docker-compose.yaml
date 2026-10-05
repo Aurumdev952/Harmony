@@ -196,11 +196,11 @@ services:
     command:
       [
         "celery",
+        "-q",
         "-A",
         "web.background_worker.celery",
         "worker",
-        "--beat",
-        "--loglevel=INFO"
+        "--beat"
       ]
     healthcheck:
       test:

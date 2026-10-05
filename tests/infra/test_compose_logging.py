@@ -39,6 +39,16 @@ def test_services_write_json_lines_to_stdout(tmp_path, service):
     assert env['LOG_STREAM'] == 'stdout'
 
 
+def test_worker_prints_no_plain_text_banner(tmp_path):
+    command = config(tmp_path, PRODUCTION)['services']['worker']['command']
+    # `-q` is a global option of the celery command, so it goes before `worker`.
+    # Without it the worker prints its banner and task list as plain text.
+    assert command.index('-q') < command.index('worker')
+    # Logging is configured by `log`, which Celery leaves alone (WP-2g), so a
+    # `--loglevel` would be ignored; LOG_LEVEL applies.
+    assert not any(arg.startswith(('--loglevel', '-l')) for arg in command)
+
+
 def test_pipeline_writes_json_lines_but_keeps_stdout_for_data(tmp_path):
     env = environment(
         config(tmp_path, ['docker-compose.pipeline.yaml']), 'etl-pipeline'

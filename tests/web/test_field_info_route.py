@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from contextlib import ExitStack
 from types import SimpleNamespace
 from unittest import mock
 
@@ -112,21 +113,32 @@ def fixture_request_field_info(bare_flask_app, druid):
         provides = set()
         if district:
             provides.add(QueryNeed([DimensionFilter('district', [district])]))
-        with app.test_request_context(f'/api/field/{field_ids}'), mock.patch(
-            'web.server.routes.views.query_policy.SuperUserPermission',
-            return_value=SimpleNamespace(can=lambda: district is None),
-        ), mock.patch(
-            'web.server.routes.views.query_policy.is_public_dashboard_user',
-            return_value=False,
-        ), mock.patch(
-            'web.server.routes.views.authentication.current_user',
-            SimpleNamespace(is_authenticated=True),
-        ), mock.patch(
-            'web.server.routes.views.authentication.get_user_string', lambda user: 'u'
-        ), mock.patch(
-            'web.server.routes.views.authentication.get_configuration',
-            return_value=False,
-        ):
+        contexts = (
+            app.test_request_context(f'/api/field/{field_ids}'),
+            mock.patch(
+                'web.server.routes.views.query_policy.SuperUserPermission',
+                return_value=SimpleNamespace(can=lambda: district is None),
+            ),
+            mock.patch(
+                'web.server.routes.views.query_policy.is_public_dashboard_user',
+                return_value=False,
+            ),
+            mock.patch(
+                'web.server.routes.views.authentication.current_user',
+                SimpleNamespace(is_authenticated=True),
+            ),
+            mock.patch(
+                'web.server.routes.views.authentication.get_user_string',
+                lambda user: 'u',
+            ),
+            mock.patch(
+                'web.server.routes.views.authentication.get_configuration',
+                return_value=False,
+            ),
+        )
+        with ExitStack() as stack:
+            for context in contexts:
+                stack.enter_context(context)
             g.identity = SimpleNamespace(provides=provides)
             response = ApiRouter(None, None).api_field_info(field_ids)
             return response.get_json()['data']

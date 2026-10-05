@@ -1,1 +1,10 @@
 - [Tooling traps](tooling-traps.md) — ownership.py via uv, compound bash refused in worktrees, last_modified as a WHERE-clause probe
+- [Local Flask stack](local-flask-stack.md) — run legacy Flask, Alembic and replays without images: py3.8 venv, Druid stub, SERVER_SOFTWARE=gunicorn
+- [Flask local test env](flask_local_test_env.md) — import and build the Flask app without Docker: py3.8 uv env, env placeholders, route mocks
+- [py3.8 web tests](py38_web_tests.md) — run tests/web on Flask 1.0 / Python 3.8 with uv despite the worktree guard
+- [Hasura roles](hasura-roles.md) — WP-0a user/anonymous roles, the public-access hole it closed, what WP-5e must tighten, parity scripts
+- [JWT key rotation](jwt_key_rotation.md) — rotating JWT/session keys breaks old accessKey cookies unless the loader swallows InvalidSignatureError
+- [Celery startup checks](celery_startup_checks.md) — refusals in worker_process_init are swallowed; put them at import of the -A module
+- [Template render diff](template_render_diff.md) — prove Jinja template edits without a running app; known baseline failures
+- [Flask web tests](flask_web_tests.md) — run tests/web on py3.8, call handlers directly, worktree-guard and auth/policy traps
+- [Post-WP-2f tooling](post_wp2f_tooling.md) — tests/web on plain uv py3.9, lint-gate and noqa traps, guard workarounds, graphql stub

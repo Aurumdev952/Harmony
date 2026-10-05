@@ -118,19 +118,17 @@ class FlaskConfiguration:
         # Templates
         self.USER_LOGIN_TEMPLATE = 'auth/login.html'
         self.USER_REGISTER_TEMPLATE = 'auth/register.html'
-        self.USER_FORGOT_PASSWORD_TEMPLATE = 'auth/forgot_password.html'
-        self.USER_RESET_PASSWORD_TEMPLATE = 'auth/reset_password.html'
+        self.USER_FORGOT_PASSWORD_TEMPLATE = 'auth/forgot_password.html'  # noqa: S105
+        self.USER_RESET_PASSWORD_TEMPLATE = 'auth/reset_password.html'  # noqa: S105
         self.USER_PROFILE_TEMPLATE = 'auth/user_profile.html'
 
         # flask-user URLs
         self.USER_LOGIN_URL = '/login'  # url_for('user.login')
         self.USER_REGISTER_URL = '/zen/register'  # url_for('user.register')
-        self.USER_FORGOT_PASSWORD_URL = (
-            '/user/forgot-password'  # url_for('user.forgot_password')
-        )
-        self.USER_RESET_PASSWORD_URL = (
-            '/user/reset-password/<token>'  # url_for('user.reset_password')
-        )
+        # url_for('user.forgot_password')
+        self.USER_FORGOT_PASSWORD_URL = '/user/forgot-password'  # noqa: S105
+        # url_for('user.reset_password')
+        self.USER_RESET_PASSWORD_URL = '/user/reset-password/<token>'  # noqa: S105
 
         # flask-user maps endpoints using url_for, and maps empty endpoints to '/'
         self.USER_AFTER_LOGIN_ENDPOINT = ''

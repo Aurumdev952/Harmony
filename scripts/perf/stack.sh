@@ -196,6 +196,15 @@ ui_answers() {
   curl -fsS -o /dev/null "http://127.0.0.1:${PERF_UI_PORT}/build/dashboardBuilder.bundle.js"
 }
 
+# Rootless Docker frees a removed container's published port some seconds
+# later, and nothing on the host shows when, so starting is retried. A failed
+# start leaves a container without its port, so every try recreates them.
+start_reference() {
+  web_compose --profile reference up -d --no-deps --force-recreate web-reference ui-reference &&
+    [[ -n "$(web_compose --profile reference port web-reference 5000)" ]] &&
+    [[ -n "$(web_compose --profile reference port ui-reference 8080)" ]]
+}
+
 reference_answers() {
   curl -fsS -o /dev/null "http://127.0.0.1:${PERF_REFERENCE_WEB_PORT}/login" &&
     curl -fsS -o /dev/null "http://127.0.0.1:${PERF_REFERENCE_UI_PORT}/build/dashboardBuilder.bundle.js"
@@ -367,7 +376,7 @@ reference() {
     client "${src}" "${PERF_REFERENCE_DIR}/client"
   fi
   echo "${sha}" > "${PERF_REFERENCE_DIR}/sha"
-  web_compose --profile reference up -d --no-deps web-reference ui-reference
+  wait_for 'the reference containers started' 12 start_reference
   wait_for "the reference ${sha} is up at http://127.0.0.1:${PERF_REFERENCE_UI_PORT}" 120 reference_answers
 }
 

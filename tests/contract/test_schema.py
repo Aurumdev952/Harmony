@@ -46,15 +46,22 @@ json_values = st.recursive(
 )
 
 
+# No per-example deadline: these properties assert shapes, not speed, and a
+# wall-clock deadline fails at random on a loaded CI host.
+no_deadline = settings(deadline=None)
+
+
 def accepts(schema, value):
     return not list(Draft202012Validator(schema).iter_errors(value))
 
 
+@no_deadline
 @given(json_values)
 def test_inferred_schema_accepts_its_own_value(value):
     assert accepts(infer(value), value)
 
 
+@no_deadline
 @given(json_values, json_values)
 def test_merged_schema_accepts_both_values(a, b):
     merged = merge(infer(a), infer(b))
@@ -62,18 +69,20 @@ def test_merged_schema_accepts_both_values(a, b):
     assert accepts(merged, b)
 
 
+@no_deadline
 @given(json_values, json_values)
 def test_merge_is_commutative(a, b):
     assert merge(infer(a), infer(b)) == merge(infer(b), infer(a))
 
 
+@no_deadline
 @given(st.lists(json_values, min_size=1, max_size=5))
 def test_array_shape_ignores_item_order_and_repeats(items):
     assert infer(items) == infer(list(reversed(items)))
     assert infer(items + items) == infer(items)
 
 
-@settings(max_examples=300)
+@settings(max_examples=300, deadline=None)
 @given(json_values, json_values)
 def test_diff_is_empty_exactly_when_shapes_are_equal(a, b):
     sa, sb = infer(a), infer(b)
@@ -98,6 +107,7 @@ secret_values = st.recursive(
 )
 
 
+@no_deadline
 @given(secret_values)
 def test_schema_never_contains_values_or_data_keys(value):
     assert MARKER not in json.dumps(infer(value))

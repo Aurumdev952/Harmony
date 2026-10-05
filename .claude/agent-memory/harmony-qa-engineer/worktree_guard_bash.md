@@ -11,7 +11,8 @@ In an isolated worktree, the guard refuses Bash commands it cannot verify:
 - compound `cd /tmp && ...` chains;
 - a variable used as the command name (`C=/x; $C/run.sh`);
 - `uv run python - <<EOF` fed scripts containing f-string braces, when chained with other commands;
-- `git` with `A..B` plus pipes in loops.
+- `git` with `A..B` plus pipes in loops;
+- any computed value fed to `uv` or `git` (`uv run ... $(cat list)`, `xargs -a list uv run ...`, `git diff $(git merge-base ...)`), and long `cd && sed && cat <<EOF && git -C` chains. Pass paths and SHAs literally.
 
 A refused command runs nothing. Any follow-up command that depends on it then runs against missing files and can look green. Always check that the setup step actually ran.
 

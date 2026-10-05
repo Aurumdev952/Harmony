@@ -61,7 +61,8 @@ class DataTimeBoundary:
         result = self.query_client.run_raw_query(
             construct_time_boundary_query(self.datasource.name)
         )
-        assert len(result) == 1, f'Result of time boundary query unexpected: {result}'
+        if len(result) != 1:
+            raise AssertionError(f'Result of time boundary query unexpected: {result}')
 
         self.time_boundary = result[0]
         LOG.info(

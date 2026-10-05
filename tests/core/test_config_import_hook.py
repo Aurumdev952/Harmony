@@ -284,3 +284,43 @@ def test_database_config_queries_druid_on_first_access_not_on_import(module):
         'again': f'datasource-for-{site}',
         'calls': [site],
     }
+
+
+def test_missing_datasource_reaches_the_callers_except():
+    # data/query_policy/query_policy.py wraps `from config.database import
+    # DATASOURCE` in `except MissingDatasourceException`. The lazy lookup must
+    # not turn that error into an ImportError.
+    result = probe(
+        '''
+        import os
+        import types
+
+        from db.druid.errors import MissingDatasourceException
+
+        os.environ.setdefault('DEFAULT_SECRET_KEY', 'not-a-secret')
+        os.environ.setdefault('DRUID_HOST', 'http://druid.invalid')
+        calls = []
+
+        class DruidMetadata:
+            @staticmethod
+            def get_most_recent_datasource(site):
+                calls.append(site)
+                raise MissingDatasourceException(site)
+
+        stub = types.ModuleType('db.druid.metadata')
+        stub.DruidMetadata = DruidMetadata
+        sys.modules['db.druid.metadata'] = stub
+
+        caught = []
+        for _ in range(2):
+            try:
+                from config.database import DATASOURCE  # noqa: F401
+            except MissingDatasourceException:
+                caught.append('MissingDatasourceException')
+        report(caught=caught, calls=calls)
+        '''
+    )
+    assert result == {
+        'caught': ['MissingDatasourceException', 'MissingDatasourceException'],
+        'calls': ['harmony_demo', 'harmony_demo'],
+    }

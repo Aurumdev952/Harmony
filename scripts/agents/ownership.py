@@ -8,6 +8,7 @@ Modes:
   ownership.py hook                        PreToolUse hook: read the event JSON on stdin and
                                            block Edit/Write by a harmony-* agent outside its paths
 """
+
 from __future__ import annotations
 
 import argparse
@@ -108,10 +109,16 @@ def is_shared(root: Path, rel: str) -> bool:
     return owner_of(root, rel) == SHARED
 
 
+LEAD = 'lead'
+
+
 def may_edit(root: Path, role: str, rel: str) -> tuple[bool, str | None]:
     if is_shared(root, rel):
         return True, SHARED
     owner = owner_of(root, rel)
+    if owner is None and role == LEAD:
+        # Paths no ownership row covers belong to the lead (SPEC section 6).
+        return True, LEAD
     return owner == role, owner
 
 

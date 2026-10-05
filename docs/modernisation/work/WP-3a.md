@@ -1,7 +1,7 @@
 ---
 wp: "3a"
 title: "Config import hook on `find_spec`"
-status: review
+status: ready
 owner_role: "core"
 instances:
   - name: "core-4"
@@ -45,9 +45,14 @@ Units, in order. Each line names the change and the check that ends it.
    - Before: no finder was installed, and `import config.datatypes` failed with `ModuleNotFoundError: No module named 'config.datatypes'`.
    - Now: a finder is installed. It raises a `ModuleNotFoundError` with the same `name`, whose message says that `ZEN_ENV` was not set when `config` was imported and lists the valid values.
    - Explicit (`config.harmony_demo.*`) and whitelisted imports behave as before. The exception type is unchanged.
+   - The reviewer found three side effects of installing that finder. I reproduced each on 3.9 with `/tmp/wp3a/unset_probe.py`, against the old and new hook:
+     1. `importlib.util.find_spec('config.X')` now raises `ModuleNotFoundError`; before, it returned `None`.
+     2. `import config` with `ZEN_ENV` unset, then setting `ZEN_ENV` and calling `importlib.reload(config)`, no longer enables redirects. The finder installed first (unset) raises before the newly appended one is asked. Before, reload appended a working hook.
+     3. `from config import X` still fails with the old message, `cannot import name 'X' from 'config'`, not the new one. `_handle_fromlist` swallows a `ModuleNotFoundError` whose `name` is the submodule.
+   - No code in the repository calls `find_spec` on `config.*` or reloads `config`. WP-4a replaces this loader with `harmony.core.deployment`.
 2. **`config.<code>.database.DATASOURCE` is resolved on first access, not on import** (unit 4).
    - A module `__getattr__` calls `DruidMetadata.get_most_recent_datasource(DEPLOYMENT_NAME)` once and caches the result in the module globals.
-   - `from config.database import DATASOURCE` and `config.database.DATASOURCE` keep working, and raise the same exceptions (checked against an unreachable Druid: `requests.exceptions.InvalidURL` on import before, the same error on first access after).
+   - `from config.database import DATASOURCE` and `config.database.DATASOURCE` keep working, and raise the same exceptions. Checked against a closed port (`DRUID_HOST=http://127.0.0.1`, `:8081` appended, nothing listening): `requests.exceptions.ConnectionError` on import before, the same error on first access after. `MissingDatasourceException` still reaches `query_policy.py`'s `except` (test added).
    - Deviation from the phase file: it says "a function that `DruidApplicationContext` calls lazily", but `DruidApplicationContext` (`web/server/data/druid_context.py`) never reads `config.database`. The consumers are:
      - `data/pydruid_query/pydruid_query.py`, at module level;
      - `data/validation/scripts/validate_pivoted_csv.py`, as an argparse default at module level;
@@ -91,28 +96,42 @@ None.
 - 2026-10-04 core-4 unit 5: pipeline suite (WP-2d at `1928f7b`) before and after. check: 3.9 104 passed both; pypy3.9 104 passed both; 3.13 after: collection error in `future` (WP-3b input).
 - 2026-10-04 core-4 unit 6: static checks. check: black 22.6 `-S -t py39 --check`, ruff 0.14 format `--check` (quote-style preserve) and `check --select E4,E7,E9,F` clean on all touched files; mypy 1.3 with `mypy.ini` and `--follow-imports=silent` clean on the 3 modules; `mypy --strict` on `config/__init__.py` clean under 1.3 and current.
 - 2026-10-04 core-4: merged `mig/integration` (`d5944d7`); `git ls-files .playwright-mcp` is empty; reran every check on the merge (`ce0a9f8`): golden 269 passed, 0 drift, `tests/core` 16 passed on 3.8, 3.9, 3.13 and pypy3.9.
+- 2026-10-05 core-4 review follow-up: listed the reviewer's three unset-`ZEN_ENV` side effects (reproduced); typed the database `__getattr__`; added a test that `MissingDatasourceException` reaches the caller's `except` (`2b90127`). Redid the Druid probe on a real closed port (QA note: `:9` failed URL parsing and never connected). check: `tests/core` 17 passed on 3.8, 3.9, 3.11, 3.12, 3.13 and pypy3.9; black, ruff and mypy clean on touched files.
+- 2026-10-05 core-4: merged `mig/integration` (`33f1b72`, now carrying WP-0c, WP-0d and WP-2d); `git ls-files .playwright-mcp` is empty. Reran golden, the pipeline suite (now 130 tests, in-tree) and `tests/core` on the merge; set `status: ready`.
 
 ## Evidence
 
 Logs are under `/tmp/wp3a/` on the build host. Reviewers should rerun the commands below on their own checkout.
 
-- **Golden suite, 3.9 (INV-2).**
-  - `uv sync --locked && uv run pytest tests/golden -q`. Before (`mig/integration` `ab4e2f7`): 269 passed (`golden-before.txt`). After the merge: 269 passed (`golden-after-final.txt`).
-  - `uv run python tests/golden/record.py --check`. Before and after: `85 cases, 0 fixture files would change`, exit 0 (`record-before.txt`, `record-after-final.txt`).
-- **Hook tests.**
-  - `uv run -q -p <v> --no-project --with pytest pytest -q -p no:cacheprovider tests/core` gives 16 passed for each `<v>` in 3.8, 3.9, 3.13 and pypy3.9 (`core-*.txt`). 3.11 and 3.12 gave 13 passed at unit 3.
-  - QA-1: on `mig/integration`, the redirect cases fail on 3.11 and 3.13, the unset-`ZEN_ENV` case fails on 3.9, and the 3 `database` cases fail on 3.9 (checked there only).
-- **Pipeline fixture suite** (WP-2d `1928f7b`, overlaid on `git archive` copies). Run with `CI=1 [PIPELINE_FIXTURE_PYTHON=...] tests/pipeline/run.sh -q`:
+Final "before" means the merged tree (`33f1b72`) with the three WP-3a production files (`config/__init__.py`, `config/{harmony_demo,template}/database.py`) restored from `ab4e2f7`. Integration already carries an earlier WP-3a merge, so plain `mig/integration` is not a clean "before".
 
-  | Interpreter | Before (`mig/integration`) | After (`17a9751`) |
+- **Golden suite, 3.9 (INV-2).**
+  - `uv sync --locked && uv run pytest tests/golden -q`: before 269 passed, after 269 passed (`golden-final2-before.txt`, `golden-final2.txt`). The first baseline at `ab4e2f7` was also 269.
+  - `uv run python tests/golden/record.py --check`: `85 cases, 0 fixture files would change`, exit 0, at `ab4e2f7` and at `33f1b72` (`record-before.txt`, `record-final2.txt`).
+- **Hook tests.**
+  - `uv run -q -p <v> --no-project --with pytest pytest -q -p no:cacheprovider tests/core` gives 17 passed for each `<v>` in 3.8, 3.9, 3.11, 3.12, 3.13 and pypy3.9 (`core-*.txt`). 3.8 and 3.13 were rerun on `33f1b72`.
+  - QA-1: on the old hook, the redirect cases fail on 3.11 and 3.13, the unset-`ZEN_ENV` case fails on 3.9, and the 3 lazy-`database` cases fail on 3.9 (checked there only). The `MissingDatasourceException` case is a regression guard and passes on both.
+- **Pipeline fixture suite** (130 tests, in-tree since the merge). Run with `CI=1 [PIPELINE_FIXTURE_PYTHON=...] tests/pipeline/run.sh -q`:
+
+  | Interpreter | Before | After |
   |---|---|---|
-  | 3.9 | 104 passed | 104 passed |
-  | pypy3.9 | 104 passed | 104 passed |
-  | 3.13 | cannot import `config` (WP-2d README) | collection error in `future==0.18.3`; 104 passed with `future==1.0.0` |
+  | 3.9 | 130 passed | 130 passed |
+  | pypy3.9 | 130 passed | 130 passed |
+  | 3.13 | cannot import `config` | 2 collection errors, `No module named 'imp'` from `future==0.18.3`; **130 passed** with `future==1.0.0` |
+
+  Logs: `final-pipe-*.txt`, `final-pipe-313-future1.txt`. Earlier rounds at WP-2d `067ec76` and `1928f7b` gave 104 and 104 on the same interpreters.
 - **Phase check.** `ZEN_ENV=harmony_demo DRUID_HOST=... DEFAULT_SECRET_KEY=... PYTHONPATH=. uv run -p {3.9,3.13} --no-project python -c 'import config.general'` resolves to `config.harmony_demo.general`, with `DEPLOYMENT_NAME == 'harmony_demo'` and the alias set, on both interpreters.
-- **No Druid I/O on import.** `/tmp/wp3a/real_database.py` with `DRUID_HOST=http://127.0.0.1:9`:
-  - before: `import config.database` raises `InvalidURL`;
-  - after: the import succeeds, and the first `DATASOURCE` access raises `InvalidURL`.
+- **No Druid I/O on import.** `/tmp/wp3a/real_database.py` with `DRUID_HOST=http://127.0.0.1`; the Druid config appends `:8081`, and nothing listens there (`ss -ltn`):
+  - before: `import config.database` raises `requests.exceptions.ConnectionError` (`[Errno 111] Connection refused`);
+  - after: the import succeeds, and the first `DATASOURCE` access raises `requests.exceptions.ConnectionError`.
+  - QA noted that the first round used `127.0.0.1:9`, which failed URL parsing (`InvalidURL`) and never connected. The conclusion held, and the probe above replaces it.
+- **Static checks on touched files.** black 22.6 `-S -t py39 --check`, ruff 0.14 `format --check` and `check --select E4,E7,E9,F` are clean. mypy 1.3 with `mypy.ini` and `--follow-imports=silent` is clean on the 3 modules.
+- **Task gate.** `uv run python scripts/agents/task_gate.py WP-3a`:
+
+  ```
+  WP-3a meets the definition of done gates
+  exit 0
+  ```
 
 ## Verdicts
 

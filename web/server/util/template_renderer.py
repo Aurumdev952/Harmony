@@ -10,7 +10,6 @@ from werkzeug.routing import BuildError
 
 from config.locales import LOCALES
 from web.server.configuration.bots import BOT_USERS
-from web.server.configuration.settings import get_configuration
 from web.server.environment import IS_PRODUCTION, IS_TEST, BUILD_TAG
 from web.server.util.authentication import is_session_persisted
 from web.server.util.util import ISO_DATETIME_FORMAT

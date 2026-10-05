@@ -5,6 +5,7 @@ Hook mode (stdin JSON with task_subject): gates tasks whose subject starts with 
 Unit tasks (`WP-<id>.<n>: ...`) and other tasks pass through.
 CLI mode: task_gate.py WP-<id>   prints the same verdict for a human or the lead.
 """
+
 from __future__ import annotations
 
 import json
@@ -61,7 +62,7 @@ def spec_roles(root: Path, wp: str) -> list[str]:
     return []
 
 
-ROLES = 'core|backend|frontend-platform|frontend-design|visualization|data-platform|pipeline|infra|qa'
+ROLES = 'core|backend|frontend-platform|frontend-design|visualization|data-platform|pipeline|infra|qa|lead'
 INSTANCE_DECL = re.compile(rf'^\s*-\s*name:\s*"?({ROLES})-\d+"?', re.M)
 LOG_LINE = re.compile(
     rf'^\s*(?:[-*]\s+)?\d{{4}}-\d{{2}}-\d{{2}}\s+({ROLES})-\d+\b', re.M

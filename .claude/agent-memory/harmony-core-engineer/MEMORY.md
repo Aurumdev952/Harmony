@@ -1,8 +1,8 @@
+- [Pipeline builds a Flask app](pipeline_builds_flask_app.md) — validate steps construct FlaskConfiguration; put startup checks at settings import
 - [Running legacy Python tests](running-legacy-python-tests.md): uv ephemeral env for Flask 1.0 / py3.8 tests, hook workarounds, Flask-in-pytest trap
 - [WP-0c findings](wp-0c-findings.md): /api/timeout is live; system-client raw queries reachable from /api/field; remember_me JWT claim
 - [Phase-file dead claims](project_phase_file_dead_claims.md) — "unused" routes may be live via ZenClient (no /api/ in the call); verify before deleting
 - [Worktree shell guard](feedback_worktree_shell_guard.md) — command forms the isolation guard refuses and the workarounds that pass
-- [Pipeline builds a Flask app](pipeline_builds_flask_app.md) — validate steps run create_app, so Flask startup checks hit pipeline runs
-- [Tooling traps](tooling_traps.md) — multi-Python runs, ruff vs black, mypy flags, integration lint in scratch, golden case trials, 3.13 wheels
+- [Tooling traps](tooling_traps.md) — multi-Python test runs, black vs ruff format, mypy flags, integration lint in scratch, golden case trials, pipeline suite scratch runs, 3.13 wheel checks
 - [Config import hook](config_import_hook.md) — alias semantics, PathFinder precedence, __spec__ restore, lazy DATASOURCE
 - [Druid expression aggregator](druid_expression_aggregator.md) — traps replacing extensions with the native expression aggregator (0.23 and 38), LAST_VALUE N3

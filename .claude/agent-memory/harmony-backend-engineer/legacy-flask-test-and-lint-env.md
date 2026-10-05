@@ -12,4 +12,4 @@ metadata:
 
 Related: [[narrowed-admin-tokens]]
 
-Superseded once a branch merges WP-2f (mig/integration 4be8451): CI is `ci/lint_python.sh <base>` (ruff on changed files), `uv run --locked mypy`, `ci/pytest_suites.sh`. A suite that builds a Flask app and registers Potion resources must be its own top-level `tests/<name>/` directory; nested under `tests/web` it broke `test_graphql_endpoint_removed.py` by sharing the process (WP-0h, 2026-10-05). See [[post-wp2f-tooling]].
+The CI commands change once a branch merges WP-2f (mig/integration 4be8451), but production stays on 3.8 until WP-3b, so keep one 3.8 run as evidence. CI then is `ci/lint_python.sh <base>` (ruff on changed files), `uv run --locked mypy`, `ci/pytest_suites.sh`. A suite that builds a Flask app and registers Potion resources must be its own top-level `tests/<name>/` directory; nested under `tests/web` it broke `test_graphql_endpoint_removed.py` by sharing the process (WP-0h, 2026-10-05). See [[post-wp2f-tooling]].

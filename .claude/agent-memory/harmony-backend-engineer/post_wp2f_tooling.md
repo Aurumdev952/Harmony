@@ -1,11 +1,11 @@
 ---
 name: post-wp2f-tooling
-description: After WP-2f (uv, ruff, mypy CI) tests/web run with plain uv on py3.9; lint-gate traps, worktree-guard workarounds, graphql namespace trap
+description: After WP-2f (uv, ruff, mypy CI) tests run with plain uv on py3.9 but production is still CPython 3.8 until WP-3b; lint-gate traps, guard workarounds, graphql namespace trap
 metadata:
   type: reference
 ---
 
-Since WP-2f merged (mig/integration 4be8451, 2026-10-04) the project is uv-managed on CPython 3.9: `uv run --locked pytest tests/web tests/graphql` and `uv run --locked mypy` work directly. The py3.8 recipes in [[py38-web-tests]] and [[flask-web-tests]] are only needed for branches older than that.
+Since WP-2f merged (mig/integration 4be8451, 2026-10-04) the project is uv-managed on CPython 3.9: `uv run --locked pytest tests/web tests/graphql` and `uv run --locked mypy` work directly. That dev env is 3.9, but the web image still runs **CPython 3.8.20** until WP-3b, so 3.8 still matters: every change must import on 3.8. In WP-0h (2026-10-05) `ruff format` under the old py39 target rewrote a chained `with A(...), B() as b:` into a parenthesised `with (...)` (3.9+ syntax) and broke `create_app` on 3.8; all gates on 3.9 were green. Integration now sets ruff's target to py38 (1c8578e). Before review, compile changed files with `uv run --no-project -p 3.8 python -m py_compile ...` and run the touched suite once on a 3.8 web env (e.g. a venv built per [[py38-web-tests]]).
 
 - `ci/lint_python.sh main` applies the full rule set (E4, E7, E9, F, S) plus `ruff format --check` to every .py file changed since the merge-base, so touching a legacy file means cleaning all of it.
 - `ruff check --fix` deletes side-effect imports such as `import web.dev_reloader` in `web/runserver.py`; mark those `# noqa: F401` before running it.

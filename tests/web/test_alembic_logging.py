@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import ast
 import json
 import os
 import subprocess
@@ -8,7 +9,7 @@ from pathlib import Path
 
 import pytest
 
-REPO_ROOT = os.path.dirname(os.path.dirname(os.path.dirname(__file__)))
+REPO_ROOT = Path(__file__).resolve().parents[2]
 
 
 def _flask_db(
@@ -16,7 +17,7 @@ def _flask_db(
 ) -> subprocess.CompletedProcess[str]:
     env = {
         'PATH': os.environ['PATH'],
-        'PYTHONPATH': REPO_ROOT,
+        'PYTHONPATH': str(REPO_ROOT),
         'FLASK_APP': 'web.server.app',
         'ZEN_ENV': 'harmony_demo',
         'ZEN_OFFLINE': '1',
@@ -58,3 +59,23 @@ def test_migration_environment_logs_json_lines(tmp_path: Path, log_level: str) -
         for entry in entries
     ), 'alembic INFO lines are missing'
     assert not any(entry['logger'].startswith('sqlalchemy.engine') for entry in entries)
+
+
+def _print_calls(path: Path) -> list[str]:
+    tree = ast.parse(path.read_text(), filename=str(path))
+    return [
+        f'{path.relative_to(REPO_ROOT)}:{node.lineno}'
+        for node in ast.walk(tree)
+        if isinstance(node, ast.Call)
+        and isinstance(node.func, ast.Name)
+        and node.func.id == 'print'
+    ]
+
+
+def test_migrations_do_not_print() -> None:
+    # `flask db upgrade` runs every revision and seed script; print() writes plain
+    # text to stdout beside the JSON log lines.
+    scripts = sorted((REPO_ROOT / 'web/server/migrations').rglob('*.py'))
+    assert any(path.parent.name == 'seed_scripts' for path in scripts)
+    calls = [call for path in scripts for call in _print_calls(path)]
+    assert not calls

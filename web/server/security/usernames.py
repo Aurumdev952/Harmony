@@ -50,20 +50,28 @@ def find_user_by_username(
 def find_legacy_token_account(
     username: Optional[str], session: Optional[Session] = None
 ) -> Optional[User]:
-    '''The account a session issued before WP-0k, which names only the
-    username the user typed, can mean: the one account equal to it ignoring
-    case that is not a pending invitation (pending accounts never signed in),
-    else None. Unlike `find_user_by_username`, the exact spelling decides
-    nothing: before WP-0k a user could type either spelling of a case-only
-    pair and get either account.
+    '''The account a session issued before WP-0k can mean, or None.
+
+    Such a session names the string the user typed, and before WP-0k sign-in
+    took the first account that string matched as an ILIKE pattern (`_` and
+    `%` wildcards, any case). So the session can only be trusted when that
+    pattern matches exactly one account that is not a pending invitation
+    (pending accounts never signed in): typing `john_doe` with `john.doe`'s
+    password made a session naming `john_doe`, which must not sign in a
+    `john_doe` account that never gave a password.
     '''
     if not username:
         return None
-    candidates = [
-        user
-        for user in _equal_ignoring_case(username, session)
-        if user.status_id != UserStatusEnum.PENDING.value
-    ]
+    session = session or get_db_adapter().session
+    candidates = (
+        session.query(User)
+        .filter(
+            User.username.ilike(username),
+            User.status_id != UserStatusEnum.PENDING.value,
+        )
+        .limit(2)
+        .all()
+    )
     return candidates[0] if len(candidates) == 1 else None
 
 

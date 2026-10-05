@@ -279,7 +279,7 @@ def _differences(
 
 
 def diff(left_dir: Path, right_dir: Path, limit: int) -> int:
-    changed = 0
+    changed = results_changed = 0
     for left_path in sorted(left_dir.glob('*.json')):
         right_path = right_dir / left_path.name
         left = json.loads(left_path.read_text(encoding='utf-8'))
@@ -287,18 +287,25 @@ def diff(left_dir: Path, right_dir: Path, limit: int) -> int:
         if left == right or to_json_text(left) == to_json_text(right):
             continue
         changed += 1
+        result_differs = False
         print(f'## {left_path.stem}')
         for part in ('error', 'druid_query', 'druid_response', 'body'):
             found = list(_differences(left.get(part), right.get(part), part))
             if not found:
                 continue
+            result_differs = result_differs or part != 'druid_query'
             print(f'- {part}: {len(found)} differing values')
             for path, a, b in found[:limit]:
                 print(
                     f'    {path}: {json.dumps(a, allow_nan=True)[:160]} -> '
                     f'{json.dumps(b, allow_nan=True)[:160]}'
                 )
-    print(f'{changed} cases differ between {left_dir} and {right_dir}')
+        results_changed += result_differs
+    print(
+        f'{changed} cases differ between {left_dir} and {right_dir}; '
+        f'{results_changed} in Druid rows, body or error, '
+        f'{changed - results_changed} in query text only'
+    )
     return changed
 
 

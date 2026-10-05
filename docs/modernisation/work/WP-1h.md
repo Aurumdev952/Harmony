@@ -309,6 +309,16 @@ C-5 (session and JWT format, owned by backend). Old: a render token was a plain 
   - the two trailing-dot map-origin cases failed, then all 11 settings tests passed;
   - drift tests: 2 passed;
   - the overlay over WP-2b's suite (39b3a64) at this head: 18 render cases passed; the no-server layer 4681 passed and 583 skipped, the same as QA's run at abda42c.
+- 2026-10-05 backend-8 round 2 gate, on 883faf5:
+  - `ci/lint_python.sh mig/integration`: clean (50 changed files);
+  - `ci/check_py38_syntax.py` on CPython 3.8.20 over the CI directories: 857 files, 0 problems;
+  - `ci/pytest_suites.sh`: all 9 suites passed (`tests/web` 336 passed, 1 xfailed; `tests/worker` 149 passed, 1 skipped, the browser tests);
+  - `uv run --locked mypy`: no issues in 528 files, `harmony` strict;
+  - tools313 lane: mypy no issues, `tests/infra` 219 passed;
+  - renderer and test images rebuilt from the head with `--network host`: the build step of `docker/renderer/test_in_image.sh` needs bridge DNS, which fails on this host since the reboot. Its run step (`--network none`, seccomp, `cap-drop ALL` plus `SYS_CHROOT`, `--init`, read-only, 2g, pids 512) gave 175 passed and 0 skipped;
+  - the head image as a service: `/healthz` 200, uid 1001, `CapEff` 0. The images were deleted afterwards.
+
+  `task_gate.py WP-1h` fails as expected on status `review` and the reviewer's round-1 verdict. It also lists WP-0i's files (`scripts/create_bot_accounts.sh`, `web/server/app.py`, `web/server/configuration/bots.py`, `web/server/api/thumbnail_storage_models.py`, `web/server/routes/views/query_policy.py`, `tests/web/test_redis_password.py`, `tests/web/render/test_dashboard_lookup.py`), which came in with the WP-0i merge and are claimed in WP-0i.md. They drop out once WP-0i merges first, which WP-1h depends on. Status stays `review`, and security asked to re-check the cap, slot and clean-up code.
 
 ## Evidence
 

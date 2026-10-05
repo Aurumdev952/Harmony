@@ -1,0 +1,90 @@
+{
+  "levels": [
+    "StateName",
+    "MunicipalityName"
+  ],
+  "root": {
+    "children": [
+      {
+        "children": [
+          {
+            "children": [],
+            "dimension": "MunicipalityName",
+            "metrics": {
+              "yellow_fever_cases": 347.61
+            },
+            "name": "Cruzeiro do Sul"
+          },
+          {
+            "children": [],
+            "dimension": "MunicipalityName",
+            "metrics": {
+              "yellow_fever_cases": 199.0
+            },
+            "name": "Rio Branco"
+          }
+        ],
+        "dimension": "StateName",
+        "metrics": {
+          "yellow_fever_cases": null
+        },
+        "name": "Acre"
+      },
+      {
+        "children": [
+          {
+            "children": [],
+            "dimension": "MunicipalityName",
+            "metrics": {
+              "yellow_fever_cases": 270.0
+            },
+            "name": "Belém"
+          },
+          {
+            "children": [],
+            "dimension": "MunicipalityName",
+            "metrics": {
+              "yellow_fever_cases": 369.0
+            },
+            "name": "Conceição do Araguaia"
+          }
+        ],
+        "dimension": "StateName",
+        "metrics": {
+          "yellow_fever_cases": 247.49
+        },
+        "name": "Pará"
+      },
+      {
+        "children": [
+          {
+            "children": [],
+            "dimension": "MunicipalityName",
+            "metrics": {
+              "yellow_fever_cases": 121.9
+            },
+            "name": "Alto Alegre"
+          },
+          {
+            "children": [],
+            "dimension": "MunicipalityName",
+            "metrics": {
+              "yellow_fever_cases": 232.0
+            },
+            "name": "Pacaraima"
+          }
+        ],
+        "dimension": "StateName",
+        "metrics": {
+          "yellow_fever_cases": 271.0
+        },
+        "name": "Roraima"
+      }
+    ],
+    "dimension": "",
+    "metrics": {
+      "yellow_fever_cases": 273.0
+    },
+    "name": "Overall"
+  }
+}

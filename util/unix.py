@@ -4,6 +4,7 @@ import tempfile
 
 from subprocess import CalledProcessError, check_call, PIPE, Popen
 
+
 # Create a named pipe in a temporary directory that can be used like a file
 class NamedPipe:
     def __init__(self, pipe_name='pipe'):
@@ -41,7 +42,9 @@ class NamedPipe:
 class BackgroundProcess:
     def __init__(self, command, check_exit_code=True):
         self.command = command
-        self.process = Popen(self.command, shell=True, stderr=PIPE)
+        # Callers (util/file/compression) pass a shell pipeline; dropping the
+        # shell means rewriting them.
+        self.process = Popen(self.command, shell=True, stderr=PIPE)  # noqa: S602
         self._check_exit_code = check_exit_code
 
     def __enter__(self):
@@ -93,7 +96,7 @@ class BackgroundProcess:
             # Errno 3 indicates the process was already killed
             if e.errno == 3:
                 raise
-        except Exception:  # pylint: disable=broad-except
+        except Exception:  # noqa: S110
             # Ignore other exceptions so that we continue trying to
             # kill the process
             pass
@@ -108,7 +111,7 @@ class BackgroundProcess:
     def wait(self):
         try:
             self.process.wait()
-        except subprocess.CalledProcessError as e:
+        except CalledProcessError as e:
             print('CalledProcessError output:', e.output.decode())
             raise self._build_error()
 

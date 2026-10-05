@@ -1,0 +1,5 @@
+{
+  "description": "Reporting completeness line graph by day and state.",
+  "endpoint": "reporting_completeness_line_graph",
+  "policy": null
+}

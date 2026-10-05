@@ -15,14 +15,13 @@ from util.credentials.provider import CredentialProvider
 from web.server.data.data_access import Transaction
 from web.server.configuration.instance import load_instance_configuration_from_file
 
-# I have to import this model since it is referenced by the `User` model
-# pylint:disable=W0611
-# pylint:disable=ungrouped-imports
-from models.alchemy.api_token import APIToken
-from models.alchemy.dashboard import Dashboard
+# Imported for their side effect: the `User` model's relationships name these
+# models, so SQLAlchemy needs them registered before the mappers configure.
+from models.alchemy.api_token import APIToken  # noqa: F401
+from models.alchemy.dashboard import Dashboard  # noqa: F401
 from models.alchemy.permission import Permission, Role, RolePermissions
-from models.alchemy.query_policy import QueryPolicy, QueryPolicyRole
-from models.alchemy.security_group import GroupUsers
+from models.alchemy.query_policy import QueryPolicy, QueryPolicyRole  # noqa: F401
+from models.alchemy.security_group import GroupUsers  # noqa: F401
 
 PASSWORD_ENCRYPTION_SCHEME = ['bcrypt']
 PERMISSIVE_EMAIL_REGEX = re.compile(r'[^@]+@[^@]+\.[^@]+')
@@ -42,7 +41,7 @@ def get_user_string(user):
 
 
 def is_email_address(username):
-    return PERMISSIVE_EMAIL_REGEX.match(username) != None
+    return PERMISSIVE_EMAIL_REGEX.match(username) is not None
 
 
 def hash_password(password):
@@ -237,8 +236,7 @@ def main():
         '--password',
         type=str,
         required=False,
-        help='The user\'s password. If none specified, this will be '
-        'auto-generated. ',
+        help='The user\'s password. If none specified, this will be auto-generated. ',
     )
     Flags.PARSER.add_argument(
         '-s',
@@ -346,11 +344,15 @@ def main():
             Flags.ARGS.test_user,
         )
         LOG.info(
-            'Successfully created/updated User \'%s\' with status \'%s\' and password \'%s\'.',
+            'Successfully created/updated User \'%s\' with status \'%s\'.',
             get_user_string(new_user),
             status.name,
-            plaintext_password,
         )
+        if not Flags.ARGS.password:
+            # The operator never saw a generated password; print it once, outside the log.
+            print(
+                f'Generated password for {get_user_string(new_user)}: {plaintext_password}'
+            )
 
     return 0
 

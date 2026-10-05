@@ -1,0 +1,55 @@
+{
+  "data": [
+    {
+      "dimensions": {
+        "MunicipalityName": "Alto Alegre"
+      },
+      "metrics": {
+        "case_fatality_rate": null
+      }
+    },
+    {
+      "dimensions": {
+        "MunicipalityName": "Belém"
+      },
+      "metrics": {
+        "case_fatality_rate": null
+      }
+    },
+    {
+      "dimensions": {
+        "MunicipalityName": "Conceição do Araguaia"
+      },
+      "metrics": {
+        "case_fatality_rate": null
+      }
+    },
+    {
+      "dimensions": {
+        "MunicipalityName": "Cruzeiro do Sul"
+      },
+      "metrics": {
+        "case_fatality_rate": 246.1293
+      }
+    },
+    {
+      "dimensions": {
+        "MunicipalityName": "Pacaraima"
+      },
+      "metrics": {
+        "case_fatality_rate": null
+      }
+    },
+    {
+      "dimensions": {
+        "MunicipalityName": "Rio Branco"
+      },
+      "metrics": {
+        "case_fatality_rate": 672.697
+      }
+    }
+  ],
+  "dimensions": [
+    "MunicipalityName"
+  ]
+}

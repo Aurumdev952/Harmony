@@ -1,0 +1,36 @@
+{
+  "data": [
+    {
+      "Age": "50+",
+      "StateName": "Acre",
+      "yellow_fever_cases": null
+    },
+    {
+      "Age": "15-49",
+      "StateName": "Pará",
+      "yellow_fever_cases": 300.0
+    },
+    {
+      "Age": "50+",
+      "StateName": "Pará",
+      "yellow_fever_cases": 109.0
+    },
+    {
+      "Age": "15-49",
+      "StateName": "Roraima",
+      "yellow_fever_cases": 156.36
+    },
+    {
+      "Age": "50+",
+      "StateName": "Roraima",
+      "yellow_fever_cases": 48.13
+    }
+  ],
+  "dimensions": [
+    "StateName",
+    "Age"
+  ],
+  "fields": [
+    "yellow_fever_cases"
+  ]
+}

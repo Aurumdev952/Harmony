@@ -1,0 +1,81 @@
+[
+  {
+    "aggregations": [
+      {
+        "aggregator": {
+          "fieldName": "sum",
+          "name": "yellow_fever_cases",
+          "type": "doubleSum"
+        },
+        "filter": {
+          "dimension": "field",
+          "type": "selector",
+          "value": "yellow_fever_cases"
+        },
+        "type": "filtered"
+      },
+      {
+        "aggregator": {
+          "fieldName": "count",
+          "name": "yellow_fever_cases__count",
+          "type": "longSum"
+        },
+        "filter": {
+          "dimension": "field",
+          "type": "selector",
+          "value": "yellow_fever_cases"
+        },
+        "type": "filtered"
+      }
+    ],
+    "context": {
+      "resultAsArray": true
+    },
+    "dataSource": "harmony_demo_20260101",
+    "dimensions": [
+      "StateName",
+      "MunicipalityName",
+      "MunicipalityLat",
+      "MunicipalityLon"
+    ],
+    "filter": {
+      "fields": [
+        {
+          "dimension": "StateName",
+          "type": "in",
+          "values": [
+            "Pará"
+          ]
+        },
+        {
+          "dimension": "__time",
+          "intervals": [
+            "2024-01-01/2024-04-01"
+          ],
+          "type": "interval"
+        },
+        {
+          "dimension": "field",
+          "type": "selector",
+          "value": "yellow_fever_cases"
+        },
+        {
+          "field": {
+            "dimension": "MunicipalityName",
+            "type": "selector",
+            "value": ""
+          },
+          "type": "not"
+        }
+      ],
+      "type": "and"
+    },
+    "granularity": "all",
+    "having": null,
+    "intervals": [
+      "2024-01-01/2024-04-01"
+    ],
+    "postAggregations": [],
+    "queryType": "groupBy"
+  }
+]

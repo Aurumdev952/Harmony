@@ -179,31 +179,48 @@ def _reset(caller, user_id: int):
     return caller.request('POST', f'/api2/user/{user_id}/reset_password')
 
 
-# Targets holding a grant the `manager` + `user_admin` caller does not hold.
+# Targets holding a grant the caller does not hold.
 
 
-def _admin_through_group(db, make_user):
+def _admin_through_group(db, make_user, _actor=None):
     target = make_user()
     _make_group(db, roles=['admin'], users=[target])
     return target
 
 
 def _role_not_held(role_name):
-    def target(_db, make_user):
+    def target(_db, make_user, _actor):
         return make_user([role_name])
 
     target.__name__ = f'holds_{role_name}'
     return target
 
 
-def _group_not_joined(db, make_user):
+def _group_not_joined(db, make_user, _actor):
     # The group grants nothing the caller lacks; membership itself is the grant.
     target = make_user()
     _make_group(db, roles=['manager'], users=[target])
     return target
 
 
-def _dashboard_acl(db, make_user):
+def _dashboard_acl(db, make_user, _actor):
+    target = make_user()
+    _give_acl(db, target.id, 'dashboard_admin', _make_dashboard(db))
+    return target
+
+
+def _dashboard_acl_the_caller_only_views(db, make_user, actor):
+    # The caller's `view_resource` there covers one of the target's needs, not all.
+    dashboard_id = _make_dashboard(db)
+    _give_acl(db, actor.id, 'dashboard_viewer', dashboard_id)
+    target = make_user()
+    _give_acl(db, target.id, 'dashboard_admin', dashboard_id)
+    return target
+
+
+def _dashboard_acl_on_another_dashboard(db, make_user, actor):
+    # The same resource role on a different dashboard covers nothing.
+    _give_acl(db, actor.id, 'dashboard_admin', _make_dashboard(db))
     target = make_user()
     _give_acl(db, target.id, 'dashboard_admin', _make_dashboard(db))
     return target
@@ -218,6 +235,8 @@ _HIGHER_TARGETS = pytest.mark.parametrize(
         _role_not_held('group_admin'),
         _group_not_joined,
         _dashboard_acl,
+        _dashboard_acl_the_caller_only_views,
+        _dashboard_acl_on_another_dashboard,
     ],
     ids=lambda make_target: make_target.__name__.lstrip('_'),
 )
@@ -247,7 +266,7 @@ def test_user_editor_cannot_rename_a_user_holding_more(
     db, make_user, mailer, refusals, make_target
 ):
     actor = make_user(_USER_EDITOR)
-    target = make_target(db, make_user)
+    target = make_target(db, make_user, actor)
     groups = [group.id for group in _user(db, target.id).groups]
 
     response = _rename(db, actor, target.id, _attacker_address())
@@ -271,7 +290,7 @@ def test_a_reset_caller_cannot_reset_the_password_of_a_user_holding_more(
 ):
     _ensure_role(db, 'user_moderator', ['invite_user', 'reset_password'])
     actor = make_user(caller)
-    target = make_target(db, make_user)
+    target = make_target(db, make_user, actor)
 
     response = _reset(actor, target.id)
 

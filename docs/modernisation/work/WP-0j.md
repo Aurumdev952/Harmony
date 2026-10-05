@@ -132,6 +132,7 @@ None.
   - `uv run --locked mypy`: no issues in 518 source files;
   - `ci/pytest_suites.sh`: all 9 suites passed (core 25, druid 1, druid_setup 79, golden 269, graphql 22, pipeline 129 + 1 skipped, privilege_escalation 122, toolchain 12, web 95);
   - CPython 3.8.20 (`/tmp/wp2g-be3-py38`, the web image's version): `python -m pytest tests/privilege_escalation` 122 passed; `py_compile` of the three changed Python files passes.
+- 2026-10-05 backend-0j round 2 unit 1 (reviewer finding 1): two higher targets pin the `all` in `_holds_acl` and the resource id: the caller holds `dashboard_viewer` on the target's `dashboard_admin` dashboard, and `dashboard_admin` on another dashboard. Check: `test_rename_and_reset.py` 44 passed; mutants `all` to `any` and resource id ignored pass the round-1 file (36 passed each) and fail 4 tests each on the new one (`/tmp/wp0j-r2/mutate.py`); ruff clean.
 
 ## Interrogate (unit 6)
 
@@ -142,7 +143,7 @@ The three-model panel did not run (concurrent subagent limit). The reviewer prom
 - **Source of truth.** The superuser decision uses the identity; holdings use the account, minus admin. This matches WP-0h and is pinned by the narrowed-token test.
 - **Ordering.** Both checks run before any write or mail. The rename check runs before WP-0h's grant checks, so a refused rename never logs a grant refusal too.
 - **403 body.** A fixed sentence. It tells the caller the target holds more than it does, but the user list already shows the target's roles.
-- **Test gaps.** Every clause has a mutant that fails (below).
+- **Test gaps.** Round 1 said every clause had a mutant that fails. It did not: in `_holds_acl` nothing pinned that every need of an ACL must be held (`all` to `any`) or that the resource id counts, and both mutants passed the 36 tests (reviewer round 1, finding 1). Round 2 adds the two targets that kill them and the mutants for ordering and for judging the stored user (below).
 
 ## Evidence
 
@@ -163,6 +164,8 @@ The three-model panel did not run (concurrent subagent limit). The reviewer prom
   | ACLs ignored | 4 failed (`dashboard_acl`) |
   | no sitewide cover for ACLs | 1 failed (`acl_covered_by_a_held_role`) |
   | no exact cover for ACLs | 1 failed (`acl_the_caller_holds_too`) |
+  | any need of an ACL covers it (`all` to `any`) | round 1 tests: 36 passed; round 2: 4 failed (`dashboard_acl_the_caller_only_views`, rename and the three reset callers) |
+  | resource id ignored (an ACL on one dashboard covers another) | round 1 tests: 36 passed; round 2: 4 failed (`dashboard_acl_on_another_dashboard`) |
 
 ## Verdicts
 

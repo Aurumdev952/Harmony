@@ -1,7 +1,7 @@
 ---
 wp: "8a"
 title: "Remove Druid JavaScript; null-handling audit"
-status: building
+status: review
 owner_role: "data-platform"
 instances:
   - name: "data-platform-4"
@@ -130,6 +130,17 @@ Reachability: I could not reach the exclusion from a JWT identity. The token and
   - N1: on Druid 0.23 with legacy nulls, `selector value null` and `selector value ''` match the same rows, because `''` is stored as null (diff-7). Under SQL-compatible nulls, only `value null` matches a missing value.
   - N2: on 0.23, `NOT dim IS NULL` is true on every row that `dim = v` matches, so `and` returns the bare leaf. On 28 and later it turns "unknown" into "false" on null rows, so `not` keeps them as legacy did (diff-5 against diff-6).
 
+## Interrogation (unit 7)
+
+The `pstack:interrogate` model panel (three reviewers) could not start on 2026-10-05: the session's subagent cap (20 concurrent) was reached. The filled prompt, with intent, scope (the WP-8a commits only) and six focus questions, is ready for the lead to dispatch. Until then, this is the lead pass over the same questions, with the paths traced:
+
+- **N2 completeness: holds.** Every native `not` the app posts is built by pydruid's `Filter.build_filter` (query filter in `pydruid/query.py:272`, filtered aggregators in `pydruid/utils/aggregators.py:79`), which `db/druid/util.py` replaces. This covers the optimiser's merged NOTs (`filter_optimizations.py:141,191,196`) and policy exclusions (`query_policy.py:273,302`). The two raw-dict `not` filters (`compute_sketch_sizes.py:126`, and the null guard in `_false_on_null` itself) negate null tests, which need no guard. Double negation matches legacy: on a null row, the inner `and` is false, so `not(not(.))` is false, as on legacy.
+- **extractionFn on the null test: right.** Three-valued "unknown" comes from the extraction's output being null, so the guard must test that output, not the raw column.
+- **INV-3: holds.** On 0.23 the guard is the identity (diff-7, diff-9, diff-12). On 28 and later it can only re-admit rows whose dimension is null, which legacy admitted, so no policy returns more rows than it does today.
+- **N0 coverage: holds** for every ingested dimension. `UNFILTERABLE_DIMENSIONS` is a subset of `DIMENSIONS` (`task_runner_util.build_dimension_spec_dimensions`), and `field`, the only multi-valued dimension, is excluded. Compaction re-reads stored nulls.
+- **Act on (request below): N1 missed `data/pydruid_query/pydruid_query.py`.** `DEFAULT_FILTER = Dimension('nation') == ''` (line 23) and the documented `{'nation': ['']}` selection are "has no value" tests. On SQL-null Druid they match no row once N0 stores null. No app module imports this analyst library, so no golden case or endpoint changes, but DATA-1 covers every query builder.
+- **Consider (question for review): a stored filter whose selected value is `''`.** On legacy, `in [..., '']` also matches null rows; on SQL-null Druid it matches nothing. No golden case does this, and I could not establish whether the dimension-value picker can produce `''`. QA or core to confirm or add a case.
+
 ## Contract changes
 
 None. Note for WP-8c (C-8 owner is this role): the Parquet ingest schema must state that dimension values are null when absent, never `''` (N0).
@@ -142,6 +153,9 @@ None. Note for WP-8c (C-8 owner is this role): the Parquet ingest schema must st
 - [x] pipeline (N1): the same change in `data/alerts/alert.py:96` (`NotFilter(SelectorFilter(..., value=''))`). Done 2026-10-04 on `mig/WP-8a-druid-js-null-audit-pipeline`: the guard is now core's form, `~Filter(dimension=..., value=None)` (5b12e5f on `mig/WP-8a-druid-js-null-audit-core`), wrapped in `RawFilter` because the `SelectorFilter` model's `value` is a required `StringField` and rejects None. Relies on N0: under SQL-compatible nulls, `not(selector null)` keeps `''` rows, so it is right only while ingest stores `''` as null.
 - [x] core (N2, blocks unit 5): landed in 659bef9 and merged. Inside a negated filter, emit each value comparison as `and(leaf, not(selector dim null))`. Core guards `selector` and `in`, the only value leaves a query can carry (see N2 in the decision table), not the `bound`/`regex`/`search`/`like` this request also listed. Check passed: the three `audit_not_*` cases match legacy on druid38 with the real builder (diff-11).
 - [ ] core (N3, blocks unit 5 and WP-8b): a native LAST_VALUE that aggregates exactly the rows at the largest timestamp per group, ties included, without the `aggregateLast` extension. Check: `calc_last_value` matches legacy on sqlnull and druid38, and the native path equals the extension on legacy 0.23. In progress: core-8a-c, 2026-10-05. Design (per core-8a-c): `HARMONY_DRUID_LAST_VALUE=native` serialises the wrapper as Druid's built-in `expression` aggregator over a `[timestamp, value]` accumulator, and folds ties with the inner op. The default stays `extension` until WP-8b. Core-8a-c is replaying against this WP's audit stacks read-only.
+- [ ] core (N1b, from unit 7): in `data/pydruid_query/pydruid_query.py`, make `DEFAULT_FILTER` `Dimension('nation') == None` and update the `{'nation': ['']}` docstring example, or delete the module if WP-0d/WP-3a retire it. Check: a unit test that the default filter serialises as `selector value null`.
+- [ ] lead: dispatch the `pstack:interrogate` panel (claude-opus-5, claude-fable-5, claude-sonnet-5), which the subagent cap blocked, with the prompt in the Interrogation section's scope.
+- [ ] qa or core (from unit 7): can a saved query or dashboard filter carry `''` as a selected dimension value? If yes, add a golden case and decide it as N1.
 - [x] qa-1a (WP-1a): use of host Druid. Answered by the lead 2026-10-04: WP-1a's `harmony-wp1a-perf-druid` may be used read-only. Not needed. Every WP-8a run uses its own throwaway projects `wp8a-legacy`, `wp8a-sqlnull` and `wp8a-druid38` (ports 58891 to 58893, loopback only, metadata on tmpfs). No WP-8a run touched WP-1a's project.
 
 ## Log
@@ -156,6 +170,7 @@ None. Note for WP-8c (C-8 owner is this role): the Parquet ingest schema must st
 - 2026-10-05 data-platform-4 resumed from data-platform-3 (host reboot), branch at 659bef9. The strict xfail on `test_builder_emits_the_native_extraction` was already removed by core in c808afa. `uv run pytest tests/druid` 11 passed, no markers.
 - 2026-10-05 data-platform-4 drift check covers N2: `check_fixture_drift.py` rewrites fixtures by an independent statement of N1 and N2, and `run_audit.py diff` separates query-text-only cases from result changes; check: `76 cases post changed queries; 0 other differences`, ruff (pyflakes) clean.
 - 2026-10-05 data-platform-4 unit 5/6 live replays with the real builder (659bef9) on fresh `legacy`, `nojs`, `sqlnull` and `druid38` stacks (ports 58891 to 58893, dataset sha256 35af2e55…c81c regenerated and identical, 9459 rows after rollup in each); check: 0 result differences on legacy and nojs; only `calc_last_value` (N3) on sqlnull and druid38; nojs native epi week parity 0 mismatches over 73414 days; nojs refuses JavaScript. `uv run pytest tests/golden tests/druid tests/alerts`: 210 passed, 76 failed, all posted-query fixture checks pending the qa regeneration.
+- 2026-10-05 data-platform-4 unit 7 (lead pass): interrogation section above. The model panel is blocked by the subagent cap and requested from the lead. One act-on finding (N1b, core request), one question for review. Status set to review as the lead directed. These remain open and must close before `ready`: N3 (core-8a-c), N1b (core), the qa fixture regeneration, and the panel.
 
 ## Evidence
 

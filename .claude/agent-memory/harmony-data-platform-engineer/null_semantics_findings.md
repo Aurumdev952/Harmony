@@ -12,6 +12,7 @@ WP-8a audit (2026-10-04, details and evidence in docs/modernisation/work/WP-8a.m
 - **N2** Druid 28+ three-valued filters: `NOT dim = v` drops null rows that legacy kept (INV-2). Builder makes leaves under `not` two-valued: `and(leaf, not(dim IS NULL))` (core). Also affects exclude_values query policies (INV-3).
 - **N3** aggregateLast extension fails under SQL nulls and is 0.23-only; LAST_VALUE needs a native design (core).
 
+- **N3 landed behind a switch.** `HARMONY_DRUID_LAST_VALUE` defaults to `extension`, and `native` (Druid's expression aggregator) is proven equal on 0.23, SQL-null 0.23 and 38. **How to apply:** WP-8b must set `native` as the default, delete the extension branch in `db/druid/aggregations/last_value_aggregation.py` (core), and drop `druid-aggregatable-first-last` from `loadList` and `load_extensions.sh`. Otherwise `calc_last_value` fails on 38.
 - **N1b** `data/pydruid_query` (analyst library, no app importers) still defaults to `nation == ''`; outside the golden path, so greps of builder code must include it.
 - N2 as landed guards only `selector`/`in`. That is complete because request JSON can carry only selector, in, field, field_in, interval (`__time`) and and/or/not; `RawFilter` is never deserialised.
 

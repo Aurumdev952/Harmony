@@ -1,0 +1,124 @@
+[
+  {
+    "aggregations": [
+      {
+        "aggregator": {
+          "fieldName": "count",
+          "name": "yellow_fever_cases",
+          "type": "doubleSum"
+        },
+        "filter": {
+          "dimension": "field",
+          "type": "selector",
+          "value": "yellow_fever_cases"
+        },
+        "type": "filtered"
+      }
+    ],
+    "context": {
+      "resultAsArray": true
+    },
+    "dataSource": "harmony_demo_20260101",
+    "dimensions": [
+      "StateName",
+      "StateLat",
+      "StateLon"
+    ],
+    "filter": {
+      "fields": [
+        {
+          "dimension": "__time",
+          "intervals": [
+            "2024-03-04/2024-03-18"
+          ],
+          "type": "interval"
+        },
+        {
+          "dimension": "field",
+          "type": "selector",
+          "value": "yellow_fever_cases"
+        }
+      ],
+      "type": "and"
+    },
+    "granularity": "day",
+    "having": null,
+    "intervals": [
+      "2024-03-04/2024-03-18"
+    ],
+    "postAggregations": [],
+    "queryType": "groupBy"
+  },
+  {
+    "aggregations": [
+      {
+        "aggregator": {
+          "fieldName": "count",
+          "name": "yellow_fever_cases",
+          "type": "doubleSum"
+        },
+        "filter": {
+          "dimension": "field",
+          "type": "selector",
+          "value": "yellow_fever_cases"
+        },
+        "type": "filtered"
+      }
+    ],
+    "context": {
+      "resultAsArray": true
+    },
+    "dataSource": "harmony_demo_20260101",
+    "dimensions": [
+      "StateName"
+    ],
+    "filter": {
+      "dimension": "field",
+      "type": "selector",
+      "value": "yellow_fever_cases"
+    },
+    "granularity": "day",
+    "having": null,
+    "intervals": [
+      "2018-01-01/2026-01-02"
+    ],
+    "postAggregations": [],
+    "queryType": "groupBy"
+  },
+  {
+    "aggregations": [
+      {
+        "aggregator": {
+          "fieldName": "count",
+          "name": "yellow_fever_cases",
+          "type": "doubleSum"
+        },
+        "filter": {
+          "dimension": "field",
+          "type": "selector",
+          "value": "yellow_fever_cases"
+        },
+        "type": "filtered"
+      }
+    ],
+    "context": {
+      "resultAsArray": true
+    },
+    "dataSource": "harmony_demo_20260101",
+    "dimensions": [
+      "StateName"
+    ],
+    "filter": {
+      "dimension": "field",
+      "type": "selector",
+      "value": "yellow_fever_cases"
+    },
+    "granularity": "day",
+    "having": null,
+    "intervals": [
+      "2024-03-04/2024-03-18"
+    ],
+    "postAggregations": [],
+    "queryType": "groupBy"
+  }
+]

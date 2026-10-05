@@ -1,0 +1,139 @@
+{
+  "data": [
+    {
+      "MunicipalityName": "Belém",
+      "StateName": "Pará",
+      "timestamp": "2024-03-04",
+      "yellow_fever_cases": 384.0
+    },
+    {
+      "MunicipalityName": "Conceição do Araguaia",
+      "StateName": "Pará",
+      "timestamp": "2024-03-05",
+      "yellow_fever_cases": 53.02
+    },
+    {
+      "MunicipalityName": "Belém",
+      "StateName": "Pará",
+      "timestamp": "2024-03-06",
+      "yellow_fever_cases": 352.0
+    },
+    {
+      "MunicipalityName": "Conceição do Araguaia",
+      "StateName": "Pará",
+      "timestamp": "2024-03-06",
+      "yellow_fever_cases": 7.0
+    },
+    {
+      "MunicipalityName": "Conceição do Araguaia",
+      "StateName": "Pará",
+      "timestamp": "2024-03-07",
+      "yellow_fever_cases": 113.0
+    },
+    {
+      "MunicipalityName": "Conceição do Araguaia",
+      "StateName": "Pará",
+      "timestamp": "2024-03-08",
+      "yellow_fever_cases": 35.46
+    },
+    {
+      "MunicipalityName": "Belém",
+      "StateName": "Pará",
+      "timestamp": "2024-03-09",
+      "yellow_fever_cases": 81.0
+    },
+    {
+      "MunicipalityName": "Conceição do Araguaia",
+      "StateName": "Pará",
+      "timestamp": "2024-03-09",
+      "yellow_fever_cases": 224.83
+    },
+    {
+      "MunicipalityName": "Belém",
+      "StateName": "Pará",
+      "timestamp": "2024-03-10",
+      "yellow_fever_cases": 200.0
+    },
+    {
+      "MunicipalityName": "Conceição do Araguaia",
+      "StateName": "Pará",
+      "timestamp": "2024-03-10",
+      "yellow_fever_cases": 381.0
+    },
+    {
+      "MunicipalityName": "Belém",
+      "StateName": "Pará",
+      "timestamp": "2024-03-11",
+      "yellow_fever_cases": 190.0
+    },
+    {
+      "MunicipalityName": "Conceição do Araguaia",
+      "StateName": "Pará",
+      "timestamp": "2024-03-12",
+      "yellow_fever_cases": 365.0
+    },
+    {
+      "MunicipalityName": "Belém",
+      "StateName": "Pará",
+      "timestamp": "2024-03-13",
+      "yellow_fever_cases": 355.56
+    },
+    {
+      "MunicipalityName": "Conceição do Araguaia",
+      "StateName": "Pará",
+      "timestamp": "2024-03-13",
+      "yellow_fever_cases": 217.0
+    },
+    {
+      "MunicipalityName": "Belém",
+      "StateName": "Pará",
+      "timestamp": "2024-03-14",
+      "yellow_fever_cases": 131.0
+    },
+    {
+      "MunicipalityName": "Conceição do Araguaia",
+      "StateName": "Pará",
+      "timestamp": "2024-03-14",
+      "yellow_fever_cases": 224.45
+    },
+    {
+      "MunicipalityName": "Belém",
+      "StateName": "Pará",
+      "timestamp": "2024-03-15",
+      "yellow_fever_cases": 284.52
+    },
+    {
+      "MunicipalityName": "Conceição do Araguaia",
+      "StateName": "Pará",
+      "timestamp": "2024-03-15",
+      "yellow_fever_cases": 201.0
+    },
+    {
+      "MunicipalityName": "Belém",
+      "StateName": "Pará",
+      "timestamp": "2024-03-16",
+      "yellow_fever_cases": 21.0
+    },
+    {
+      "MunicipalityName": "Conceição do Araguaia",
+      "StateName": "Pará",
+      "timestamp": "2024-03-16",
+      "yellow_fever_cases": 359.32
+    },
+    {
+      "MunicipalityName": "Belém",
+      "StateName": "Pará",
+      "timestamp": "2024-03-17",
+      "yellow_fever_cases": 150.0
+    },
+    {
+      "MunicipalityName": "Conceição do Araguaia",
+      "StateName": "Pará",
+      "timestamp": "2024-03-17",
+      "yellow_fever_cases": 254.0
+    }
+  ],
+  "fields": [
+    "yellow_fever_cases"
+  ]
+}

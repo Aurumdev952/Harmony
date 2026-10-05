@@ -1,6 +1,6 @@
 # Harmony modernisation specification
 
-Version 1.1, 2026-10-04. Status: approved for execution.
+Version 1.6, 2026-10-05 (decisions 0001, 0003, 0004, 0005, 0006). Status: approved for execution.
 
 This is the binding guide for every agent and engineer working on the Harmony migration. Where this spec and another document disagree, this spec wins. The other documents explain why and describe the work in detail:
 
@@ -149,11 +149,15 @@ Each WP is one pull request, or a short stack of them. Detail lives in the named
 |---|---|---|---|---|---|
 | 0a | Lock down Hasura | backend | infra | none | yes |
 | 0b | Close published ports, refuse default secrets, pin images | infra | none | none | yes |
-| 0c | Fix the pure-mistake bugs | core | infra | none | yes |
+| 0c | Fix the pure-mistake bugs | backend | core, infra | none | yes |
 | 0d | Delete dead backend code and dependencies | core | backend | none | no |
 | 0e | Delete dead frontend code and dependencies | frontend-platform | none | none | no |
 | 0f | One CI system, `main` branch, least-privilege Actions | infra | none | none | yes |
 | 0g | Browser-share report from nginx logs | infra | qa | none | no |
+| 0h | Close privilege escalations in group and role management | backend | core, security, qa | 2b | yes |
+| 0i | Guard the dashboard render and thumbnail routes | backend | security, qa | none | yes |
+| 0j | Refuse username changes and password resets that reach a higher-privileged account | backend | security, qa | 0h | yes |
+| 0k | Build outgoing links from the configured origin; match usernames exactly | backend | security, qa | 0i | yes |
 | 1a | Performance baseline | qa | core | none | no |
 | 1b | Shared result cache | core | none | 1a | yes |
 | 1c | Columnar parsing | core | none | 1a, golden cases | no |
@@ -233,8 +237,8 @@ Only the owning role edits a path. Other roles change it by request (section 7.3
 | data-platform | `druid_setup/**`, `db/druid/indexing/**`, `scripts/druid/**`, `harmony/core/druid/schema.py` |
 | pipeline | `pipeline/**`, `data/pipeline/**`, `data/alerts/**`, `util/pipeline/**`, `harmony/pipeline/**` |
 | infra | `docker/**`, `docker-compose*.yaml`, `Makefile`, `.github/**`, `ci/**`, `prod/**`, `log/**`, `requirements*.txt`, `.env.example`, `.dockerignore`, `mypy.ini`, `.pylintrc` |
-| qa | `tests/**`, `e2e/**`, `scripts/perf/**`, `playwright.config.ts`, `vitest.config.ts`, `vitest.workspace.ts` |
-| shared | `docs/modernisation/work/**`, `docs/modernisation/decisions/**`, `docs/modernisation/perf/**`, `.claude/agent-memory/**`, `scripts/codemods/**`, `pyproject.toml`, `uv.lock`, `package.json`, `pnpm-lock.yaml`, `yarn.lock` |
+| qa | `tests/golden/**`, `tests/authz/**`, `tests/contract/**`, `tests/pipeline/**`, `tests/conftest.py`, `e2e/**`, `scripts/perf/**`, `playwright.config.ts`, `vitest.config.ts`, `vitest.workspace.ts` |
+| shared | `tests/**`, `docs/modernisation/work/**`, `docs/modernisation/decisions/**`, `docs/modernisation/perf/**`, `.claude/agent-memory/**`, `scripts/codemods/**`, `pyproject.toml`, `uv.lock`, `package.json`, `pnpm-lock.yaml`, `yarn.lock` |
 <!-- ownership:end -->
 
 Rules that apply across these boundaries:

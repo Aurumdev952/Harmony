@@ -1,0 +1,35 @@
+version: 2
+updates:
+  # Keeps the SHA pins in .github/workflows current (WP-0f); the version comment
+  # after each SHA is updated with it.
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: weekly
+    cooldown:
+      default-days: 7
+    groups:
+      actions:
+        patterns: ['*']
+
+  # The app's pins are kept on purpose until WP-3a/3b, so a limit of 0 turns off
+  # version updates and leaves only security updates. Those PRs also need
+  # `make requirements`, which CI enforces.
+  - package-ecosystem: uv
+    directory: /
+    schedule:
+      interval: weekly
+    cooldown:
+      default-days: 7
+    open-pull-requests-limit: 0
+
+  # Tools for the CPython 3.13 lane.
+  - package-ecosystem: uv
+    directory: /ci/tools313
+    schedule:
+      interval: weekly
+    cooldown:
+      default-days: 7
+    groups:
+      tools313:
+        patterns: ['*']

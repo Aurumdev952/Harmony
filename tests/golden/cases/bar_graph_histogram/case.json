@@ -1,0 +1,5 @@
+{
+  "description": "EPICURVE (HistogramQueryEngine): date group first without totals, dimension groups with totals.",
+  "endpoint": "bar_graph",
+  "policy": null
+}

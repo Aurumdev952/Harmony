@@ -1,6 +1,6 @@
 # Harmony modernisation specification
 
-Version 1.8, 2026-10-05 (decisions 0001, 0003, 0004, 0005, 0006, 0007, 0008). Status: approved for execution.
+Version 1.9, 2026-10-05 (decisions 0001, 0003, 0004, 0005, 0006, 0007, 0008, 0009). Status: approved for execution.
 
 This is the binding guide for every agent and engineer working on the Harmony migration. Where this spec and another document disagree, this spec wins. The other documents explain why and describe the work in detail:
 
@@ -38,7 +38,7 @@ These hold at every commit on `main`. A change that breaks one MUST NOT merge.
 - **INV-4.** Stored dashboards, saved queries and alert definitions load and render. Readers for `$ref` URIs stay until WP-5g finishes.
 - **INV-5.** Translations (`I18N.text`, the French, Portuguese and Amharic locales) and the Ethiopian calendar keep working.
 - **INV-6.** No secret, credential, token or production data enters the repository, logs, test fixtures or agent transcripts.
-- **INV-7.** The stack never gains a long-running service without losing one. Dagster's daemon replaces host cron.
+- **INV-7.** The stack never gains a long-running service without losing one. Dagster's daemon replaces host cron. The export renderer sidecar counts against Hasura and `render-egress` is time-boxed to WP-7g (decision 0009).
 - **INV-8.** CI is green on `main`.
 
 ## 3. Requirements

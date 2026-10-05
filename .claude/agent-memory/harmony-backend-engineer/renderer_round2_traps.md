@@ -19,3 +19,8 @@ Facts from WP-1h round 2 (2026-10-05) that cost time:
 
 **Why:** each of these cost a debugging round.
 **How to apply:** when touching the renderer, the render slots or render-route tests, or when WP-5f moves renders to Celery (keep the isolation and the atomic claim). See also [[render-token-traps]].
+
+Round 3 (2026-10-06):
+- During a merge with a conflict in `pyproject.toml`, every `uv run` in the worktree fails, because uv parses the project first. Run the resolution scripts with `uv run --no-project python …` from `/tmp`.
+- Never run `tests/web` and `tests/authz` in one pytest process. Potion resources bind to one Api, so `tests/authz/test_potion.py` errors. CI runs one process per suite (`ci/pytest_suites.sh`).
+- WP-0k binds tokens by `user_id`, and a render token carries it too. When WP-0k and WP-1h merge, follow the rule under WP-1h's Contract changes (`account_for_token` refuses `is_spent_render_token`).

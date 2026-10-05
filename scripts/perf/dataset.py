@@ -53,7 +53,8 @@ def day_weights(start: dt.date, end: dt.date) -> tuple[list[dt.date], list[float
 
 
 def rows(count: int, seed: int, start: dt.date, end: dt.date):
-    rng = random.Random(seed)
+    # A seeded generator is the point: two runs write the same CSV.
+    rng = random.Random(seed)  # noqa: S311
     codes = municipality_codes()
     rng.shuffle(codes)
     code_weights = [1.0 / rank for rank in range(1, len(codes) + 1)]

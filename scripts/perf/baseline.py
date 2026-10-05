@@ -344,7 +344,8 @@ def paired_result(
     per_round = [c / r for r, c in zip(reference_ms, candidate_ms)]
     reference_p95 = percentile(reference_ms, 0.95)
     candidate_p95 = percentile(candidate_ms, 0.95)
-    rng = random.Random(f'{case_id}:{n}')
+    # Seeded so a run's files always give the same verdict; not a secret.
+    rng = random.Random(f'{case_id}:{n}')  # noqa: S311
     ratios, shifts = [], []
     for _ in range(resamples):
         rounds = [rng.randrange(n) for _ in range(n)]

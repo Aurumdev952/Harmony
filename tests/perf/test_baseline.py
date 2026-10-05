@@ -1,7 +1,8 @@
-"""Tests for the offline parts of baseline.py: statistics, case loading, the
-request-log reader and the PERF-7 comparison.
+"""Tests for the offline parts of scripts/perf/baseline.py: statistics, case
+loading, the request-log reader and the PERF-7 comparison. conftest.py puts
+scripts/perf on the path.
 
-    uv run --no-project --with pytest --with hypothesis python -m pytest scripts/perf
+    uv run --locked pytest tests/perf
 """
 
 from __future__ import annotations
@@ -568,7 +569,6 @@ def test_the_report_says_whether_the_reference_is_the_wps_base():
     meta['integration_merge_base'] = 'c' * 40
     text = '\n'.join(baseline.method_lines(meta))
     assert f'not the merge base with mig/integration (`{"c" * 40}`)' in text
-
 
 
 def test_the_reference_web_has_its_own_redis():

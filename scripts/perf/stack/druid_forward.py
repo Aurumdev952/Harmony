@@ -42,8 +42,10 @@ def handler(target_host: str, target_port: int):
 
 
 async def main() -> None:
+    # Inside the forwarder's container, reached only over the internal Compose
+    # networks; druid.override.yaml publishes none of these ports.
     servers = [
-        await asyncio.start_server(handler(host, port), '0.0.0.0', port)
+        await asyncio.start_server(handler(host, port), '0.0.0.0', port)  # noqa: S104
         for port, host in ROUTES.items()
     ]
     await asyncio.gather(*(server.serve_forever() for server in servers))

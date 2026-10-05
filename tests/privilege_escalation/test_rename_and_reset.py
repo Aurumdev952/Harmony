@@ -346,6 +346,48 @@ def test_a_rename_is_judged_on_the_user_before_the_request(
     assert len(refusals()) == 1
 
 
+def test_a_rename_without_edit_resource_is_refused_before_the_target_is_judged(
+    db, make_user, refusals
+):
+    actor = make_user(['manager'])
+    target = _in_a_group_carrying(db, make_user, 'exporter')
+    before = _holdings(db, target.id)
+
+    response = _rename(db, actor, target.id, _attacker_address())
+
+    assert response.status_code == 403
+    assert _holdings(db, target.id) == before
+    assert refusals() == []
+
+
+def test_a_rename_is_judged_before_what_the_body_grants(db, make_user, refusals):
+    actor = make_user(_USER_EDITOR)
+    target = _in_a_group_carrying(db, make_user, 'exporter')
+    before = _holdings(db, target.id)
+    body = _resent_body(db, target.id, _attacker_address())
+    group_admin = db.session.query(Role).filter_by(name='group_admin').one()
+    body['roles'].append(f'/api2/role/{group_admin.id}')
+
+    response = actor.request('PATCH', f'/api2/user/{target.id}', body)
+
+    assert response.status_code == 403
+    assert _holdings(db, target.id) == before
+    assert len(refusals()) == 1
+    assert 'Refused username change' in refusals()[0]
+
+
+def test_a_rename_that_changes_only_case_is_a_rename(db, make_user, refusals):
+    actor = make_user(_USER_EDITOR)
+    target = _in_a_group_carrying(db, make_user, 'exporter')
+    before = _holdings(db, target.id)
+
+    response = _rename(db, actor, target.id, target.username.upper())
+
+    assert response.status_code == 403
+    assert _holdings(db, target.id) == before
+    assert len(refusals()) == 1
+
+
 @pytest.mark.parametrize(
     'caller', [_USER_EDITOR, ['user_admin'], ['user_moderator']], ids=' + '.join
 )

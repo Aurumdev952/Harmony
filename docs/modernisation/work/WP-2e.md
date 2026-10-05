@@ -1,7 +1,7 @@
 ---
 wp: "2e"
 title: "Frontend unit and end-to-end harness"
-status: building
+status: review
 owner_role: "qa"
 instances:
   - name: "qa-5"
@@ -34,7 +34,7 @@ Units, in order. Each line names the change and the check that ends it.
 3. **@smoke suite.** Login and logout; every page in the URL table opens without a server error or an uncaught page error; legacy URLs resolve (FE-9); one AQT query per visualization type; open, edit, share and export a dashboard; each auth flow (login failure, forgot password, reset link); the upload wizard opens. Check: `e2e/run.sh --grep @smoke` green twice on a fresh stack.
 4. **@a11y axe baseline.** axe on every page at 1440 px. Today's serious and critical violations are recorded per page in `e2e/a11y/baseline.json`; a new rule id or a higher node count fails the test, and a fixed one tells you to shrink the baseline. FE-8 itself is met by WP-7c to 7e, which drive the baseline to empty. Check: green on the stack; a baseline with one rule removed turns red.
 5. **Visual baseline** (`e2e/visual/`). Screenshots of every page and every chart type at 390, 1024 and 1440 px (testing.md), with volatile regions masked; charts draw from the stack's deterministic Druid broker. The snapshots are rendered in the pinned Playwright image, so they do not depend on the host's fonts. Check: two consecutive runs on fresh stacks match the committed snapshots; a one-pixel change to a snapshot turns its test red.
-6. **Runner and CI hand-off.** `e2e/run.sh` builds the client if needed, brings the stack up, runs Playwright, writes the report, and always takes the stack down; `yarn e2e` calls it. A deliberately broken case turns it red (phase 2 exit check). Check: run from a clean clone of the branch head.
+6. **Runner and CI hand-off.** `e2e/run.sh` builds the client if needed (in the web-client image's pinned Node 18.17), brings the stack up, runs the visual, a11y and e2e projects in that order, writes a report per project, and always takes the stack down; `yarn e2e` calls it. A deliberately broken case turns it red (phase 2 exit check). Check: run from a clean clone of the branch head.
 
 Deviation from the phase file (SHOULD, recorded here): phase-2 says Jest now and Vitest in phase 6. The unit harness uses Vitest 2.1.9 with Babel for Flow, so WP-6d does not need to port the tests. 2.1.9 is the newest Vitest whose engines accept the Node 18.17 that CI and the web-client image still run. WP-6b/6d can bump it with Node 24.
 
@@ -57,6 +57,7 @@ None of these block WP-2e.
 - [ ] backend (WP-5h): `grid_dashboard_urlbox_renderer` catches the builtin `ConnectionError`, not `requests.exceptions.ConnectionError`, so an unreachable renderer turns a PDF or JPEG download into an unhandled 500 (`web/server/routes/views/page_renderer.py:138-148`). Repro: on the contract stack (no egress), Share > Download > PDF. The self-hosted renderer should fail with a handled error.
 - [ ] backend: invite, reset and share e-mails on harmony_demo end "email us at None ( None )", and the reset mail links `mailto:None`: the support address is unset and the templates print it anyway. Repro: any mail in the e2e stack's mailpit.
 - [ ] visualization (WP-7g): every map load sends Mapbox GL telemetry (`events.mapbox.com/events/v2`) and a billing session (`api.mapbox.com/map-sessions/v1`). The suite blocks both and allows them by name in `e2e/support/map.ts`; remove the allowance with the MapLibre move.
+- [ ] visualization (WP-7g), not blocking: the line chart's first draw is not deterministic. The same LINE query (Cases by Month), drawn twice at 1440 px on the same stack, showed bimonthly month ticks once and quarterly ticks once. A window resize settles it, so `tests/visual.spec.ts` captures charts only after a resize. Repro: `e2e/run.sh visual --grep LINE` with the resize loop changed to capture before the first resize.
 - [ ] infra (WP-2f): run `yarn test` on every PR (Node 18.17 today, about 7 s), and run `e2e/run.sh` with no arguments in the job that can start Docker, publishing `e2e/report/` (one folder per project) and, on failure, `e2e/test-results/` as artifacts. The job needs the following:
   - the client build (`yarn build`, or the build artifact);
   - pulls of `python:3.8.20-bookworm`, `python:3.12-slim` and the digest-pinned `mcr.microsoft.com/playwright:v1.56.1-noble` (3.7 GB);
@@ -80,6 +81,7 @@ None of these block WP-2e.
   - The viz case table moved to `support/viz.ts` so that smoke and visual share it.
   `env.ts` checks the credentials file's owner with `process.getuid()`, which needs no passwd entry inside the container. Check: `e2e/run.sh` from `down`, twice: visual 80/80, a11y 21/21, e2e 76/76; one changed pixel turns its test red; tsc strict and shellcheck are clean.
 - 2026-10-05 qa-5t: added the `present` dashboard flow that testing.md lists for @smoke and unit 3 missed. Toggling Present hides Add Content and keeps the tiles; toggling back restores the control.
+- 2026-10-06 qa-5t unit 6: `run.sh` builds the client in `node:18.17.1-bookworm`, pinned by the digest that `docker/web/Dockerfile_web-client` uses, because the root packages' native modules (node-pty) do not compile on Node 24. It also installs the host Chromium for the a11y and e2e projects. Check: `yarn e2e` from a `git archive` of the head into an empty directory, with no node_modules and no build, is green. The same checkout with the data-status view raising an error fails in all three projects on exactly the data-status cases, exits 1, and leaves nothing behind. Then `yarn test` in `node:18.17.1 --network none` on that checkout gives 339 passed and 1 todo. Status set to review.
 
 ## Evidence
 
@@ -115,6 +117,9 @@ None of these block WP-2e.
   - What the snapshots show today, for WP-7: at 390 px most pages overflow sideways, for example the overview table and the Analyze panel (the BAR chart's result panel is 480 px wide). Maps draw on a blank style, because `support/map.ts` serves the boundaries locally, and at 1024 px only one of the three state points is in view.
   - Not proven here: a run on another machine (CI). Everything renders in the pinned image, so the remaining source of drift is the CPU's software rasteriser (the map canvases). The infra request below asks that the first CI run be compared against these snapshots before the job is made required.
 - Host note, outside the repository: after the reboot, rootless Docker containers could not resolve names through the router's DNS, so `stack.sh`'s always-run `docker build` failed on `github.com`. These runs went through a local `docker` wrapper that adds `--network host` to `docker build` only. The build still ran in full.
+- Unit 6, from a clean checkout of 5f2194d (`git archive` into `/tmp/wp2e-clean`, with no `node_modules`, no `e2e/node_modules` and no client build). `yarn e2e` installed the e2e package, then `yarn install` (118 s) and `yarn build` (webpack, 66 s) in the Node 18.17 image, then built and seeded the stack: visual 80 passed, a11y 21 passed, e2e 76 passed, exit 0, in 497 s in total (`/tmp/wp2e-clean-run.log`). The visual snapshots therefore also match a client built from scratch.
+  - Deliberately broken case (phase 2 exit check): in that checkout `PageRouter.data_status` (`web/server/routes/index.py`) raises `RuntimeError`. `yarn e2e` then fails with 3 visual cases (data-status at 390, 1024 and 1440), 1 a11y case (data-status) and 2 e2e cases (`/data-status` and `/en/data-status` open). Every other case passes, the exit code is 1, and no container or credentials file is left (`/tmp/wp2e-broken-run.log`).
+  - Static checks at the head: `tsc --noEmit` (strict) on `e2e/` is clean; shellcheck 0.11 on `e2e/run.sh` is clean; `ruff check` and `ruff format --check` on `e2e/stack` and `tests/golden` are clean; `eslint --max-warnings 0 tests/frontend` is clean. The repository's ESLint config (babel-eslint and Flow, `.js` and `.jsx` only, which is all CI lints) does not apply to the TypeScript in `e2e/`, so strict tsc is the gate there.
 
 ## Verdicts
 

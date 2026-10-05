@@ -10,6 +10,7 @@ import pytest
 import requests
 
 from render_fakes import DASHBOARD_SLUG, SENDER, USERS, FakeRenderResponse
+from web.server.redis import thumbnail_storage_service
 from web.server.routes.views import page_renderer
 from web.server.routes.views.dashboard import get_email_attachments
 
@@ -299,8 +300,8 @@ CAPPED_ROUTES = [
 
 
 def _fill_render_slots(app, account_id):
-    for slot in range(page_renderer.MAX_RENDERS_IN_FLIGHT_PER_ACCOUNT):
-        app.cache.add(f'render-in-flight:{account_id}:{slot}', True)
+    # Literally the one slot an account has, so a larger cap fails these tests.
+    app.cache.add(f'render-in-flight:{account_id}:0', True)
 
 
 def _slots(app):
@@ -321,8 +322,10 @@ def test_a_render_beyond_the_accounts_in_flight_limit_is_a_503_without_a_render(
 
 
 def test_a_thumbnail_retrieve_beyond_the_limit_is_empty_and_not_cached(
-    app, client, renderer
+    app, client, renderer, monkeypatch
 ):
+    # Its wait for the slot is covered in test_render_slots.py.
+    monkeypatch.setattr(thumbnail_storage_service, 'THUMBNAIL_SLOT_WAIT_SECONDS', 0)
     _fill_render_slots(app, VIEWER_ID)
 
     response = client.get(f'/api2/storage/retrieve?key={SLUG}', headers=as_user(VIEWER))

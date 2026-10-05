@@ -4,12 +4,14 @@ The renderer's browser loads this app's own dashboard page over the internal
 network, signed in with a render token for the user the export is made as.
 '''
 
+import time
 from contextlib import contextmanager
 from dataclasses import dataclass
-from typing import Iterator, Mapping, Optional
+from typing import Any, Iterator, Mapping, Optional
 from urllib.parse import urlparse, urlsplit
 
 import requests
+from cachelib import FileSystemCache, RedisCache
 from flask import current_app
 from flask_user import current_user
 from werkzeug.exceptions import HTTPException, ServiceUnavailable, Unauthorized
@@ -32,9 +34,12 @@ CONNECT_TIMEOUT_SECONDS = 5
 RESPONSE_MARGIN_SECONDS = 15
 RENDER_MAX_BYTES = 25 * 1024 * 1024
 READ_CHUNK_BYTES = 64 * 1024
-# The renderer runs few renders at once, so one account's renders must not fill
-# it and leave everyone else queueing until their deadlines.
-MAX_RENDERS_IN_FLIGHT_PER_ACCOUNT = 2
+# The renderer runs few renders at once (RENDERER_CONCURRENCY, 2), so one
+# account's renders must not fill it and leave everyone else queueing until
+# their deadlines. Kept below the renderer's concurrency
+# (tests/worker/test_renderer_web_drift.py).
+MAX_RENDERS_IN_FLIGHT_PER_ACCOUNT = 1
+SLOT_POLL_SECONDS = 0.5
 
 CONTENT_TYPES = {'pdf': 'application/pdf', 'png': 'image/png', 'jpeg': 'image/jpeg'}
 
@@ -206,9 +211,47 @@ def _checked(response, output_format: str, name: str) -> Optional[RenderedDashbo
     return RenderedDashboard(content, expected)
 
 
+def claim(cache, key: str, value: Any, timeout_seconds: int) -> bool:
+    '''Sets `key` only if it is unset, expiring after `timeout_seconds`.
+
+    On Redis this is one `SET NX EX`: cachelib's `add` is SETNX then EXPIRE, and
+    a failure between the two would leave a claim that never expires. A
+    FileSystemCache keeps an expired entry on disk, where `add` keeps failing
+    although `get` misses it, so that entry is deleted and claimed again. On
+    Redis a miss after a failed claim means the holder has just released it and
+    another caller may hold a new one, so nothing is deleted there.
+    '''
+    backend = getattr(cache, 'cache', cache)
+    if isinstance(backend, RedisCache):
+        # pylint: disable=protected-access
+        return bool(
+            backend._write_client.set(
+                f'{backend._get_prefix()}{key}',
+                backend.serializer.dumps(value),
+                nx=True,
+                ex=timeout_seconds,
+            )
+        )
+    if cache.add(key, value, timeout=timeout_seconds):
+        return True
+    if isinstance(backend, FileSystemCache) and cache.get(key) is None:
+        cache.delete(key)
+        return bool(cache.add(key, value, timeout=timeout_seconds))
+    return False
+
+
+def _claim_free_slot(account_id, ttl_seconds: int) -> Optional[str]:
+    for slot in range(MAX_RENDERS_IN_FLIGHT_PER_ACCOUNT):
+        key = f'render-in-flight:{account_id}:{slot}'
+        if claim(current_app.cache, key, True, ttl_seconds):
+            return key
+    return None
+
+
 @contextmanager
-def _render_slot(ttl_seconds: int) -> Iterator[None]:
-    '''Holds one of the signed-in account's render slots, or raises 503.
+def _render_slot(ttl_seconds: int, wait_seconds: float = 0) -> Iterator[None]:
+    '''Holds one of the signed-in account's render slots, waiting up to
+    `wait_seconds` for one, or raises 503.
 
     Keyed on the session's account id, never on who the render is made as, so
     an emailed render counts against its sender. A slot expires with the render
@@ -216,13 +259,14 @@ def _render_slot(ttl_seconds: int) -> Iterator[None]:
     '''
     if not current_user.is_authenticated:
         raise Unauthorized()
-    for slot in range(MAX_RENDERS_IN_FLIGHT_PER_ACCOUNT):
-        key = f'render-in-flight:{current_user.id}:{slot}'
-        if current_app.cache.add(key, True, timeout=ttl_seconds):
-            break
-    else:
-        LOG.warning('Refused a render: the account has no free render slot')
-        raise RendersInFlight()
+    give_up_at = time.monotonic() + wait_seconds
+    key = _claim_free_slot(current_user.id, ttl_seconds)
+    while key is None:
+        if time.monotonic() >= give_up_at:
+            LOG.warning('Refused a render: the account has no free render slot')
+            raise RendersInFlight()
+        time.sleep(SLOT_POLL_SECONDS)
+        key = _claim_free_slot(current_user.id, ttl_seconds)
     try:
         yield
     finally:
@@ -238,11 +282,13 @@ def render_dashboard(
     session_hash: str = '',
     is_thumbnail: bool = False,
     request_args: Optional[Mapping[str, str]] = None,
+    slot_wait_seconds: float = 0,
 ) -> Optional[RenderedDashboard]:
     '''Render the dashboard `name` as `auth_user_email`, or None if it failed.
 
     Raises RendersInFlight (503) when the signed-in account already has
-    MAX_RENDERS_IN_FLIGHT_PER_ACCOUNT renders running.
+    MAX_RENDERS_IN_FLIGHT_PER_ACCOUNT renders running and none ends within
+    `slot_wait_seconds`.
 
     When the caller renders as themselves, the token pins the digest of their
     query policy, so a policy change before the page loads gets the render nothing.
@@ -259,7 +305,7 @@ def render_dashboard(
     }
     policy = query_policy_fingerprint() if _is_signed_in_as(auth_user_email) else None
     ttl_seconds = RENDER_TIMEOUT_SECONDS + RESPONSE_MARGIN_SECONDS
-    with _render_slot(ttl_seconds), render_token(
+    with _render_slot(ttl_seconds, slot_wait_seconds), render_token(
         auth_user_email, resource_id, policy=policy, ttl_seconds=ttl_seconds
     ) as token:
         try:
@@ -296,10 +342,17 @@ def grid_dashboard_to_pdf(
     )
 
 
-def grid_dashboard_to_thumbnail(locale=None, name=None, *, auth_user_email):
+def grid_dashboard_to_thumbnail(
+    locale=None, name=None, *, auth_user_email, slot_wait_seconds=0
+):
     # A thumbnail is cached and shared, so no caller-supplied arg may shape it.
     return render_dashboard(
-        'png', name, auth_user_email, locale=locale, is_thumbnail=True
+        'png',
+        name,
+        auth_user_email,
+        locale=locale,
+        is_thumbnail=True,
+        slot_wait_seconds=slot_wait_seconds,
     )
 
 

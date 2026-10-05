@@ -17,10 +17,11 @@ from flask import Flask
 from flask_caching import Cache
 
 from log import LOG
-from render_fakes import DASHBOARD_SLUG, SENDER, DictCache
+from render_fakes import DASHBOARD_SLUG, SENDER, DictCache, FakeRedis
 from web.server.redis import thumbnail_storage_service
 from web.server.routes.views import page_renderer as page_renderer_views
 from web.server.routes.views.dashboard import get_email_attachments
+from web.server.routes.views.page_renderer import claim
 
 SLUG = DASHBOARD_SLUG
 VIEWER = 'viewer@tests.invalid'
@@ -244,17 +245,36 @@ def test_redis_miss_after_a_failed_claim_does_not_release_another_callers_claim(
     assert renderer.calls == []
 
 
-@pytest.mark.parametrize(
-    'config, keeps_expired',
-    [
-        ({'CACHE_TYPE': 'FileSystemCache'}, True),
-        ({'CACHE_TYPE': 'RedisCache', 'CACHE_REDIS_PORT': 1}, False),
-    ],
-)
-def test_production_cache_backends_are_told_apart(tmp_path, config, keeps_expired):
+def test_an_expired_claim_behind_the_apps_file_cache_is_taken_again(tmp_path):
     # The app's cache is a flask_caching.Cache wrapping a cachelib backend.
     app = Flask('tests.web', root_path=str(tmp_path), instance_path=str(tmp_path))
-    cache = Cache(app, config={**config, 'CACHE_DIR': str(tmp_path)})
+    cache = Cache(
+        app, config={'CACHE_TYPE': 'FileSystemCache', 'CACHE_DIR': str(tmp_path)}
+    )
 
     with app.app_context():
-        assert thumbnail_storage_service._keeps_expired_entries(cache) is keeps_expired
+        cache.set('claim', 'dead worker', timeout=-1)
+        assert claim(cache, 'claim', 'mine', 60)
+        assert cache.get('claim') == 'mine'
+        assert not claim(cache, 'claim', 'theirs', 60)
+
+
+def test_a_claim_behind_the_apps_redis_cache_is_one_set_nx_ex(tmp_path):
+    app = Flask('tests.web', root_path=str(tmp_path), instance_path=str(tmp_path))
+    cache = Cache(
+        app,
+        config={
+            'CACHE_TYPE': 'RedisCache',
+            'CACHE_REDIS_PORT': 1,
+            'CACHE_KEY_PREFIX': 'zen-test-',
+        },
+    )
+    fake = FakeRedis()
+
+    with app.app_context():
+        cache.cache._write_client = fake  # pylint: disable=protected-access
+        assert claim(cache, 'claim', 'mine', 60)
+        assert not claim(cache, 'claim', 'theirs', 60)
+
+    assert fake.commands == [('set', 'zen-test-claim'), ('set', 'zen-test-claim')]
+    assert fake.ttls == {'zen-test-claim': 60}

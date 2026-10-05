@@ -2,8 +2,9 @@
 service."""
 
 from dataclasses import dataclass, field
-from typing import Dict, FrozenSet, List, Optional
+from typing import Dict, FrozenSet, List, Optional, Tuple
 
+import redis
 import requests
 from flask import Flask
 from flask_jwt_extended import decode_token
@@ -215,3 +216,48 @@ class FakeRenderer:
             CONTENT_TYPES.get(params.get('format'), 'application/octet-stream'),
             status_code=self.status_code,
         )
+
+
+class FakeRedis:
+    """The redis-py calls cachelib's RedisCache makes, kept in a dict with each
+    key's expiry. `expire` fails, as Redis can between two commands."""
+
+    def __init__(self) -> None:
+        self.values: Dict[str, bytes] = {}
+        self.ttls: Dict[str, Optional[int]] = {}
+        self.commands: List[Tuple[str, str]] = []
+
+    def get(self, name: str) -> Optional[bytes]:
+        return self.values.get(name)
+
+    def set(self, name, value, ex=None, nx=False, **_kwargs):
+        self.commands.append(('set', name))
+        if nx and name in self.values:
+            return None
+        self.values[name] = value
+        self.ttls[name] = ex
+        return True
+
+    def setex(self, name, time, value):
+        self.commands.append(('setex', name))
+        self.values[name] = value
+        self.ttls[name] = time
+        return True
+
+    def setnx(self, name, value):
+        self.commands.append(('setnx', name))
+        if name in self.values:
+            return False
+        self.values[name] = value
+        self.ttls[name] = None
+        return True
+
+    def expire(self, name, time):
+        self.commands.append(('expire', name))
+        raise redis.ConnectionError('connection lost between SETNX and EXPIRE')
+
+    def delete(self, *names):
+        for name in names:
+            self.values.pop(name, None)
+            self.ttls.pop(name, None)
+        return len(names)

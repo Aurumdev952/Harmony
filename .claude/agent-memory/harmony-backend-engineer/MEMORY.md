@@ -8,4 +8,4 @@
 - [Celery startup checks](celery_startup_checks.md) — refusals in worker_process_init are swallowed; put them at import of the -A module
 - [Template render diff](template_render_diff.md) — prove Jinja template edits without a running app; known baseline failures
 - [Flask web tests](flask_web_tests.md) — run tests/web on py3.8, call handlers directly, worktree-guard and auth/policy traps
-- [Post-WP-2f tooling](post_wp2f_tooling.md) — tests/web on plain uv py3.9, lint-gate and noqa traps, guard workarounds, graphql stub
+- [Post-WP-2f tooling](post_wp2f_tooling.md) — dev env py3.9 but prod 3.8 until WP-3b, lint-gate and noqa traps, guard workarounds, graphql stub

@@ -207,14 +207,30 @@ ignore = ["S603", "S607"]
 "tests/**" = ["S101", "S104", "S105", "S106", "S108", "S311"]
 
 [tool.mypy]
-files = ["web/server", "models", "db"]
-plugins = ["sqlmypy"]
+files = ["web/server", "models", "db", "harmony/core"]
+plugins = ["sqlmypy", "pydantic.mypy"]
 ignore_missing_imports = false
 show_error_codes = true
 namespace_packages = true
 explicit_package_bases = true
 # Always on under the mypy daemon, so on here too for the same results.
 local_partial_types = true
+
+[[tool.mypy.overrides]]
+# --strict, which mypy only accepts globally.
+module = ["harmony.core", "harmony.core.*"]
+disallow_any_generics = true
+disallow_subclassing_any = true
+disallow_untyped_calls = true
+disallow_untyped_defs = true
+disallow_incomplete_defs = true
+check_untyped_defs = true
+disallow_untyped_decorators = true
+warn_unused_ignores = true
+warn_return_any = true
+no_implicit_reexport = true
+strict_equality = true
+strict_concatenate = true
 
 [[tool.mypy.overrides]]
 module = ["models.python.dashboard.*", "web.server.migrations.*"]

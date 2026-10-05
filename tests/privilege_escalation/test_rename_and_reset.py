@@ -97,11 +97,11 @@ def _make_group(db, roles=(), users=()) -> int:
     return group.id
 
 
-def _make_dashboard(db) -> int:
+def _make_dashboard(db, resource_type=ResourceTypeEnum.DASHBOARD) -> int:
     resource = Resource(
-        resource_type_id=ResourceTypeEnum.DASHBOARD.value,
-        name=_name('dashboard'),
-        label='Dashboard',
+        resource_type_id=resource_type.value,
+        name=_name(resource_type.name.lower()),
+        label=resource_type.name.title(),
     )
     db.session.add(resource)
     db.session.commit()
@@ -157,13 +157,13 @@ def _resent_body(db, user_id: int, username: str) -> dict:
                 'resourceRole': {
                     '$uri': '',
                     'name': acl.resource_role.name,
-                    'resourceType': 'DASHBOARD',
+                    'resourceType': acl.resource.resource_type.name.name,
                 },
                 'resource': {
                     '$uri': '',
                     'label': acl.resource.label,
                     'name': acl.resource.name,
-                    'resourceType': 'DASHBOARD',
+                    'resourceType': acl.resource.resource_type.name.name,
                 },
             }
             for acl in user.acls
@@ -249,6 +249,28 @@ def _dashboard_acl_on_another_dashboard(db, make_user, actor):
     return target
 
 
+def _alert_acl_and_a_caller_with_the_alert_admin_role(db, make_user, actor):
+    # A role's `alert_resource_role` yields `alert` needs only; the ACL an alert
+    # author gets also yields `alert_definitions` needs, which no seeded role
+    # holds sitewide.
+    if not db.session.query(Role).filter_by(name='alert_admin').one_or_none():
+        alert_admin = db.session.query(ResourceRole).filter_by(name='alert_admin').one()
+        db.session.add(
+            Role(
+                name='alert_admin',
+                label='alert_admin',
+                alert_resource_role_id=alert_admin.id,
+            )
+        )
+        db.session.commit()
+    caller = db.session.query(User).get(actor.id)
+    caller.roles.append(db.session.query(Role).filter_by(name='alert_admin').one())
+    db.session.commit()
+    target = make_user()
+    _give_acl(db, target.id, 'alert_admin', _make_dashboard(db, ResourceTypeEnum.ALERT))
+    return target
+
+
 _HIGHER_TARGETS = pytest.mark.parametrize(
     'make_target',
     [
@@ -259,6 +281,7 @@ _HIGHER_TARGETS = pytest.mark.parametrize(
         _dashboard_acl,
         _dashboard_acl_the_caller_only_views,
         _dashboard_acl_on_another_dashboard,
+        _alert_acl_and_a_caller_with_the_alert_admin_role,
     ],
     ids=lambda make_target: make_target.__name__.lstrip('_'),
 )

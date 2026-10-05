@@ -16,6 +16,10 @@ export type PageCase = {
   // just the server-rendered shell.
   ready: (page: Page) => Locator;
   signedOut?: boolean;
+  // The page this URL renders, when another row already covers it. The
+  // URL still has to resolve (pages.spec.ts), but a snapshot of it would
+  // repeat that row's.
+  aliasOf?: string;
   knownErrors?: KnownError[];
 };
 
@@ -39,6 +43,7 @@ const NO_OBJECT_STORAGE: KnownError = {
 export const PAGES: PageCase[] = [
   {
     name: 'home',
+    aliasOf: 'overview',
     path: '/',
     lands: /^\/overview$/,
     ready: page => page.getByText('My Dashboards', { exact: true }),
@@ -51,6 +56,7 @@ export const PAGES: PageCase[] = [
   },
   {
     name: 'simple-query',
+    aliasOf: 'advanced-query',
     path: '/query',
     lands: /^\/advanced-query$/,
     ready: page => page.getByRole('heading', { name: 'Build Query' }),
@@ -101,6 +107,7 @@ export const PAGES: PageCase[] = [
     // Alerts are not enabled in any deployment today; the route renders the
     // not-found page with a 200 (web/server/routes/index.py).
     name: 'alerts',
+    aliasOf: 'not-found',
     path: '/alerts',
     lands: /^\/alerts$/,
     ready: page => page.getByText('The page you are trying to access does not exist'),

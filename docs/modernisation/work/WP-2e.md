@@ -95,6 +95,9 @@ None of these block WP-2e.
   - With `E2E_A11Y_ACCEPT=login:button-name` both tests pass, and the file is byte-identical to the committed baseline.
   - The full a11y project passes 26.
 - 2026-10-06 qa-5t round 2, unit 6 (reviewer finding 6, FE-2): `e2e/` moves to TypeScript 6.0.3 (exact pin, `e2e/yarn.lock` updated), with `module` and `moduleResolution` set to `node16`. Check, failing first: TypeScript 6.0.3 on the old config failed with TS5107 ("moduleResolution=node10 is deprecated"). With node16, strict `tsc --noEmit` is clean over the 20 project files (`--listFilesOnly`). Playwright still loads the specs.
+- 2026-10-06 qa-5t round 2, unit 7 (reviewer finding 7): the visual loop skips the three alias rows of the page table. Each row now names the page it renders in a new `aliasOf` field: home is overview, simple-query is advanced-query, alerts is not-found. Their 9 snapshots are deleted. `pages.spec.ts` and the a11y baseline still open every alias URL. Check:
+  - home and overview, and alerts and not-found, are byte-identical (`sha256sum`) at all three widths. simple-query and advanced-query differ in 24-36 pixels by at most 2 levels per channel, which is re-render noise.
+  - `run.sh visual`: 71 passed (17 pages x 3 widths, plus 20 chart types); `--grep @pages`: 42 passed.
 
 ## Evidence
 

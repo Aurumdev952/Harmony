@@ -38,7 +38,7 @@ test.describe('pages at three widths @visual', () => {
     test.describe(`${viewport.width} px`, () => {
       test.use({ viewport });
 
-      for (const pageCase of PAGES) {
+      for (const pageCase of PAGES.filter(({ aliasOf }) => aliasOf === undefined)) {
         test.describe(pageCase.name, () => {
           if (pageCase.signedOut) {
             test.use({ storageState: SIGNED_OUT });

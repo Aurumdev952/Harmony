@@ -16,6 +16,7 @@ instances:
   - name: "qa-0j-pins"
     files:
       - "tests/authz/http/test_account_handover.py"
+      - "tests/authz/http/test_lists.py"
 branch: "mig/WP-0j-rename-reset-guard"
 requirements: [INV-3, QA-1, QA-4]
 contracts_consumed: []

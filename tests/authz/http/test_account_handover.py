@@ -12,9 +12,9 @@ Each refusal below pins the behaviour after WP-0j. Before WP-0j (WP-0h head
 488e482) the same request succeeds: the rename answers 200 and writes the new
 username, and the reset answers 204, stores a reset token and mails the link to
 the username; every user route reaches an administrator through a group, and
-the user list shows them. The controls are unchanged and pass on both trees. The
-rename over 50 characters and a hidden author's `authorUsername` are pinned as
-they are; owner WP-5d.
+the user list shows them, and a dashboard names its administrator author. The
+controls are unchanged and pass on both trees. The rename over 50 characters is
+pinned as it is; owner WP-5d.
 
 What HTTP cannot show is read from the stack's containers (`AUTHZ_PROJECT`, as
 for tests/authz/stack.sh): the target's rows in Postgres, the reset token, the
@@ -33,10 +33,6 @@ import secrets
 import subprocess
 
 import pytest
-
-# The live harness (stack.py, the `stack` fixture) comes with WP-2b. Until WP-2b
-# and WP-0j meet on one branch, this module is skipped where the harness is absent.
-pytest.importorskip('tests.authz.http.stack', reason='needs the WP-2b live harness')
 
 _PROJECT = os.environ.get('AUTHZ_PROJECT', 'harmony-wp2b-authz')
 _EDITOR = ('manager', 'user_admin')
@@ -512,22 +508,59 @@ def test_superuser_lists_an_admin_through_a_group(world):
     ]
 
 
-def test_dashboard_still_names_a_hidden_admin_author(world):
-    '''Pinned as it is; owner WP-5d. `authorUsername` is documented as null
-    when the author is not visible to the caller, but it reads
-    `Dashboard.author` directly, not through UserResourceManager, so a
-    non-superuser who can view the dashboard still gets the username of an
-    administrator through a group, while the `author` URI answers 404.'''
-    _, author = _admin_through_group(world)
+def _direct_admin(world):
+    return _EDITOR, world.user(['admin'])
+
+
+def _author_username_seen_by(world, session, dashboard_uri) -> tuple:
+    '''`authorUsername` of the dashboard on its item route and in the list.'''
+    item = world.stack.request(session, 'GET', dashboard_uri)
+    assert item.status_code == 200, item.text[:300]
+    listing = world.stack.request(session, 'GET', '/api2/dashboard?per_page=1000')
+    assert listing.status_code == 200, listing.text[:300]
+    listed = [d for d in listing.json() if d['$uri'] == dashboard_uri]
+    assert len(listed) == 1, len(listed)
+    return item.json()['authorUsername'], listed[0]['authorUsername']
+
+
+@pytest.mark.parametrize(
+    'make_author',
+    [_admin_through_group, _direct_admin],
+    ids=lambda make_author: make_author.__name__.lstrip('_'),
+)
+def test_a_dashboard_hides_its_admin_author_from_a_non_superuser(world, make_author):
+    '''Decision 0010, WP-0j INV-3 row 6. Before (488e482, and 429bf96): a
+    non-superuser who can view the dashboard gets the administrator author's
+    username in `authorUsername` on the item route and in the list. After:
+    null in both, as the field's description says for an author the caller
+    cannot see. The `author` URI is unchanged and answers 404 to that caller;
+    a superuser still gets the username.'''
+    _, author = make_author(world)
     dashboard_uri = world.dashboard_by(author)
     viewer = world.user(['dashboard_viewer'])
 
-    dashboard = world.stack.request(viewer, 'GET', dashboard_uri)
+    seen = _author_username_seen_by(world, viewer, dashboard_uri)
 
-    assert dashboard.status_code == 200, dashboard.text[:300]
-    assert dashboard.json()['authorUsername'] == _username(author)
-    assert dashboard.json()['author'] == author.user_uri
+    assert seen == (None, None)
+    item = world.stack.request(viewer, 'GET', dashboard_uri).json()
+    assert item['author'] == author.user_uri
     assert world.stack.request(viewer, 'GET', author.user_uri).status_code == 404
+    assert _author_username_seen_by(world, world.stack.admin, dashboard_uri) == (
+        _username(author),
+        _username(author),
+    )
+
+
+def test_a_dashboard_names_an_author_who_is_not_an_admin(world):
+    '''Unchanged: an author the viewer can see is named on both routes.'''
+    author = world.user(['_default_role'])
+    dashboard_uri = world.dashboard_by(author)
+    viewer = world.user(['dashboard_viewer'])
+
+    assert _author_username_seen_by(world, viewer, dashboard_uri) == (
+        _username(author),
+        _username(author),
+    )
 
 
 def test_user_editor_cannot_take_over_an_admin_through_a_group(world):

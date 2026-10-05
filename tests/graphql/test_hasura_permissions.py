@@ -5,6 +5,7 @@ too, so it shows up in review. `scripts/db/hasura/check_role_permissions.py`
 proves against a live Hasura that these permissions cover the compiled Relay
 operations; this test needs no Hasura.
 '''
+
 import os
 
 import yaml

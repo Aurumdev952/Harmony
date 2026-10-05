@@ -1,5 +1,6 @@
 '''The Flask GraphQL proxy talks to Hasura with the admin secret and a role
 derived from the signed-in user, never one chosen by the client (SEC-2).'''
+
 import os
 from types import SimpleNamespace
 

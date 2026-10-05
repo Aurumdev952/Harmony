@@ -10,7 +10,87 @@
           "publishableFields": {
             "properties": {
               "edges": {
-                "maxItems": 0,
+                "items": {
+                  "properties": {
+                    "node": {
+                      "properties": {
+                        "calculation": {
+                          "properties": {
+                            "type": {
+                              "type": "string"
+                            }
+                          },
+                          "required": [
+                            "type"
+                          ],
+                          "type": "object"
+                        },
+                        "description": {
+                          "type": "string"
+                        },
+                        "id": {
+                          "type": "string"
+                        },
+                        "name": {
+                          "type": "string"
+                        },
+                        "shortName": {
+                          "type": "string"
+                        },
+                        "unpublishedFieldCategoryMappings": {
+                          "items": {
+                            "properties": {
+                              "categoryId": {
+                                "type": "string"
+                              },
+                              "id": {
+                                "type": "string"
+                              }
+                            },
+                            "required": [
+                              "categoryId",
+                              "id"
+                            ],
+                            "type": "object"
+                          },
+                          "type": "array"
+                        },
+                        "unpublishedFieldPipelineDatasourceMappings": {
+                          "items": {
+                            "properties": {
+                              "id": {
+                                "type": "string"
+                              },
+                              "pipelineDatasourceId": {
+                                "type": "string"
+                              }
+                            },
+                            "required": [
+                              "id",
+                              "pipelineDatasourceId"
+                            ],
+                            "type": "object"
+                          },
+                          "type": "array"
+                        }
+                      },
+                      "required": [
+                        "calculation",
+                        "description",
+                        "id",
+                        "name",
+                        "shortName",
+                        "unpublishedFieldCategoryMappings",
+                        "unpublishedFieldPipelineDatasourceMappings"
+                      ],
+                      "type": "object"
+                    }
+                  },
+                  "required": [
+                    "node"
+                  ],
+                  "type": "object"
+                },
                 "type": "array"
               }
             },

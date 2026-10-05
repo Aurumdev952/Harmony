@@ -1,19 +1,18 @@
 import os
 import secrets
 import socket
+import subprocess
 import sys
 from pathlib import Path
 from pylib.base.flags import Flags
 
 # NOTE: Need to import our dev reloader since registration is handled in that
 # file.
-# pylint: disable=unused-import
-import web.dev_reloader
+import web.dev_reloader  # noqa: F401
 
 from config import VALID_MODULES
 from web.server.app import create_app
 from web.server.configuration.instance import load_instance_configuration_from_file
-from web.server.configuration.flask import FlaskConfiguration
 from util.flask import build_flask_config
 
 
@@ -22,7 +21,7 @@ def start_postgres():
     with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
         port_in_use = s.connect_ex(('localhost', 5432)) == 0
         if not port_in_use:
-            os.system('scripts/db/postgres/dev/start_postgres.sh')
+            subprocess.run(['scripts/db/postgres/dev/start_postgres.sh'], check=False)
 
 
 def ensure_dev_hasura_admin_secret():
@@ -130,7 +129,7 @@ def main():
 
     # NOTE: For ease of development, make sure hasura graphql docker services
     # are running and using the correct DB.
-    os.system(f'scripts/db/hasura/dev/start_hasura.sh {db_name}')
+    subprocess.run(['scripts/db/hasura/dev/start_hasura.sh', db_name], check=False)
 
     app = create_app(
         flask_config,
@@ -140,7 +139,13 @@ def main():
         and (Flags.ARGS.skip_db_check or os.environ.get('ZEN_SKIP_DB_CHECK')),
         Flags.ARGS.force_druid_db_update,
     )
-    app.run(host='0.0.0.0', port=Flags.ARGS.port, reloader_type='zenysis_watchdog')
+    # Local dev server only. It has always listened on every interface; narrowing
+    # that to loopback would change how developers reach it, so it is out of scope.
+    app.run(
+        host='0.0.0.0',  # noqa: S104
+        port=Flags.ARGS.port,
+        reloader_type='zenysis_watchdog',
+    )
 
 
 if __name__ == '__main__':

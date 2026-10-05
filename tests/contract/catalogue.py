@@ -142,6 +142,43 @@ def empty_connection_problems(
     return problems
 
 
+def _list_paths(node: dict, path: str, filled: dict[str, bool]) -> None:
+    """Record, for each array in a response schema, whether it held items."""
+    types = node.get("type")
+    if types == "array" or (isinstance(types, list) and "array" in types):
+        filled[path] = filled.get(path, False) or node.get("maxItems") != 0
+    for key, child in (node.get("properties") or {}).items():
+        _list_paths(child, f"{path}.{key}", filled)
+    if isinstance(node.get("items"), dict):
+        _list_paths(node["items"], f"{path}[]", filled)
+
+
+def _operation(case: Case) -> str:
+    query = case.body.get("query", "") if isinstance(case.body, dict) else ""
+    if str(query).startswith(RELAY_PREFIX):
+        return Path(query).name.split(".", 1)[0]
+    return case.route
+
+
+def always_empty_lists(
+    cases: list[Case], recordings_dir: Path = RECORDINGS_DIR
+) -> dict[str, list[str]]:
+    """Lists that are empty in every recording of a route, or of a Relay
+    operation for ``POST /api/graphql``. Such a list pins no item shape, so
+    the replay accepts any items there. ``record.py --dry-run`` prints them."""
+    filled: dict[str, dict[str, bool]] = {}
+    for case in cases:
+        path = recording_path(case.id, recordings_dir)
+        if path.exists():
+            schema = json.loads(path.read_text())["response_schema"] or {}
+            _list_paths(schema, "$", filled.setdefault(_operation(case), {}))
+    return {
+        operation: sorted(p for p, has_items in paths.items() if not has_items)
+        for operation, paths in sorted(filled.items())
+        if not all(paths.values())
+    }
+
+
 def capture_order_problems(cases: list[Case]) -> list[str]:
     captured: set[str] = set()
     problems = []

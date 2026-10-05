@@ -245,7 +245,7 @@
         "query": "relay:web/client/components/FieldSetupApp/FieldSetupPageHeaderActions/BatchPublishAction/__generated__/BatchPublishModalContentsQuery.graphql.js",
         "variables": {}
       },
-      "note": "Records an empty connection: a field is publishable only with a datasource mapping, and self_serve.import.exported_zip deletes the seeded one (WP-2c finding F13). Until F13 is fixed no recording pins the unpublished-field datasource-mapping item shape."
+      "note": "A field is publishable only with a datasource mapping. The seeded unpublished field keeps its mapping through self_serve.import.exported_zip (F13 fixed), so this recording pins the unpublished-field datasource-mapping item shape."
     },
     {
       "id": "graphql.EditableCalculationQuery",
@@ -570,7 +570,7 @@
           "searchText": "%%"
         }
       },
-      "note": "The table wraps the search box text in % (UnpublishedFieldTableRows/index.jsx:35), so an empty box sends %%. Runs after CategoryInputMutation, which restores the category mapping that self_serve.import.exported_zip deletes (F13), so the mapping item shape is pinned."
+      "note": "The table wraps the search box text in % (UnpublishedFieldTableRows/index.jsx:35), so an empty box sends %%. The seeded category and datasource mappings are in the response, so both mapping item shapes are pinned."
     },
     {
       "id": "graphql.UnpublishedFieldTableRowsPaginationQuery",
@@ -583,7 +583,7 @@
           "after": null
         }
       },
-      "note": "The table wraps the search box text in % (UnpublishedFieldTableRows/index.jsx:35), so an empty box sends %%. Runs after CategoryInputMutation, which restores the category mapping that self_serve.import.exported_zip deletes (F13), so the mapping item shape is pinned."
+      "note": "The table wraps the search box text in % (UnpublishedFieldTableRows/index.jsx:35), so an empty box sends %%. The seeded category and datasource mappings are in the response, so both mapping item shapes are pinned."
     },
     {
       "id": "graphql.UnpublishedFieldRowMutation",

@@ -9,15 +9,23 @@ does not carry them.
 
 from __future__ import annotations
 
+import importlib.util
 import os
 import zipfile
 from collections.abc import Iterator
+from pathlib import Path
+from types import SimpleNamespace
 
 import psycopg2
+from psycopg2 import sql
 import pytest
 import sqlalchemy as sa
 
-from db.postgres.utils import export_tables_to_zip, import_data_into_table
+from db.postgres.utils import (
+    ImportTableDataError,
+    export_tables_to_zip,
+    import_data_into_table,
+)
 from models.alchemy.base import Base
 from scripts.data_catalog.export_db_tables import (
     DATA_CATALOG_TABLE_NAMES as EXPORTED_TABLES,
@@ -36,6 +44,14 @@ DEPENDENT_TABLES = (
     "hierarchical_dimension_metadata",
     "non_hierarchical_dimension",
     "source_config",
+)
+
+# The catalogue's update_last_modified triggers, which stamp last_modified with now()
+# on every UPDATE. The self-serve validator compares last_modified across instances.
+LAST_MODIFIED_MIGRATION = (
+    Path(__file__).resolve().parents[2]
+    / "web/server/migrations/versions"
+    / "2b730c14f514_add_data_catalog_tables_sql_trigger.py"
 )
 
 SEED = """
@@ -89,14 +105,25 @@ def fixture_database(postgres_database: str) -> Iterator[str]:
             "CREATE TABLE alembic_version (version_num varchar(32) PRIMARY KEY);"
             "INSERT INTO alembic_version VALUES ('test');"
         )
+        _upgrade(LAST_MODIFIED_MIGRATION, cursor)
         cursor.execute(SEED)
     conn.close()
     yield postgres_database
 
 
+def _upgrade(migration: Path, cursor) -> None:
+    """Runs a migration's upgrade() with its op.execute going to `cursor`."""
+    spec = importlib.util.spec_from_file_location(migration.stem, migration)
+    assert spec and spec.loader
+    module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)
+    module.op = SimpleNamespace(execute=cursor.execute)
+    module.upgrade()
+
+
 def _rows(url: str, table: str) -> list[tuple]:
     with psycopg2.connect(url) as conn, conn.cursor() as cursor:
-        cursor.execute(f"SELECT * FROM {table}")
+        cursor.execute(sql.SQL("SELECT * FROM {}").format(sql.Identifier(table)))
         rows = cursor.fetchall()
     conn.close()
     return sorted(rows, key=repr)
@@ -104,6 +131,30 @@ def _rows(url: str, table: str) -> list[tuple]:
 
 def _snapshot(url: str, tables: tuple[str, ...] | list[str]) -> dict[str, list[tuple]]:
     return {table: _rows(url, table) for table in tables}
+
+
+def _row_versions(url: str, table: str) -> dict[str, str]:
+    """Each row's xmin by id. An UPDATE writes a new row version, even of equal
+    values."""
+    with psycopg2.connect(url) as conn, conn.cursor() as cursor:
+        cursor.execute(
+            sql.SQL("SELECT id, xmin::text FROM {}").format(sql.Identifier(table))
+        )
+        versions = dict(cursor.fetchall())
+    conn.close()
+    return versions
+
+
+def _last_modified_triggers(url: str) -> dict[str, str]:
+    """pg_trigger.tgenabled of each update_last_modified trigger, by table."""
+    with psycopg2.connect(url) as conn, conn.cursor() as cursor:
+        cursor.execute(
+            "SELECT tgrelid::regclass::text, tgenabled FROM pg_trigger"
+            " WHERE tgname = 'update_last_modified'"
+        )
+        states = dict(cursor.fetchall())
+    conn.close()
+    return states
 
 
 def _execute(url: str, statement: str) -> None:
@@ -154,6 +205,26 @@ def test_reimporting_an_unchanged_export_keeps_rows_in_tables_it_does_not_carry(
     assert _snapshot(database, IMPORTED_TABLES) == catalogue
 
 
+def test_an_import_keeps_the_archives_last_modified_and_skips_unchanged_rows(
+    database, tmp_path
+):
+    archive = _export(database, str(tmp_path / "export.zip"))
+    exported = _rows(database, "category")
+    _execute(database, "UPDATE category SET name = 'Renamed' WHERE id = 'cat_a'")
+    renamed = _rows(database, "category")
+    assert len([row for row in renamed if row not in exported]) == 1
+    versions = _row_versions(database, "category")
+
+    _import(database, archive)
+
+    assert _rows(database, "category") == exported
+    after = _row_versions(database, "category")
+    assert after["cat_a"] != versions["cat_a"]
+    del after["cat_a"], versions["cat_a"]
+    assert after == versions, "rows the archive leaves unchanged are not rewritten"
+    assert _last_modified_triggers(database) == dict.fromkeys(IMPORTED_TABLES, "O")
+
+
 def test_an_import_makes_the_catalogue_tables_match_the_export(database, tmp_path):
     archive = _export(database, str(tmp_path / "export.zip"))
     exported = _snapshot(database, IMPORTED_TABLES)
@@ -201,6 +272,135 @@ def test_a_failed_import_changes_nothing(database, tmp_path):
     before = _snapshot(database, [*IMPORTED_TABLES, *DEPENDENT_TABLES])
 
     with pytest.raises(psycopg2.IntegrityError):
+        _import(database, archive)
+
+    assert _snapshot(database, [*IMPORTED_TABLES, *DEPENDENT_TABLES]) == before
+    assert _last_modified_triggers(database) == dict.fromkeys(IMPORTED_TABLES, "O")
+
+
+def test_a_dependent_of_a_row_the_export_carries_survives_its_old_parents_removal(
+    database, tmp_path
+):
+    # The export moves cat_a under cat_new and no longer carries cat_old. Removing
+    # cat_old must not cascade through the target's stale cat_a.parent_id into
+    # cat_a's unpublished-field mapping.
+    _execute(
+        database,
+        "INSERT INTO category (id, name, parent_id) VALUES"
+        " ('cat_new', 'New', 'root'), ('cat_old', 'Old', 'root');"
+        "UPDATE category SET parent_id = 'cat_new' WHERE id = 'cat_a';",
+    )
+    archive = _export(database, str(tmp_path / "export.zip"))
+    _rewrite_table(archive, "category", lambda line: ";cat_old;" not in line)
+    exported = [row for row in _rows(database, "category") if "cat_old" not in row]
+    _execute(database, "UPDATE category SET parent_id = 'cat_old' WHERE id = 'cat_a'")
+    dependents = _snapshot(database, DEPENDENT_TABLES)
+
+    _import(database, archive)
+
+    assert _rows(database, "category") == exported
+    assert _snapshot(database, DEPENDENT_TABLES) == dependents
+
+
+def test_a_failed_import_leaves_id_sequences_ahead_of_the_rows(database, tmp_path):
+    archive = _export(database, str(tmp_path / "export.zip"))
+    _rewrite_table(archive, "category", lambda line: ";cat_b;" not in line)
+    # Added after the export, this row holds the id the export's sequence hands out.
+    _execute(
+        database,
+        "INSERT INTO field_dimension_mapping (field_id, dimension_id)"
+        " VALUES ('f2', 'Region')",
+    )
+
+    with pytest.raises(psycopg2.IntegrityError):
+        _import(database, archive)
+
+    _execute(
+        database,
+        "INSERT INTO field_dimension_mapping (field_id, dimension_id)"
+        " VALUES ('f2', 'District')",
+    )
+
+
+def test_an_import_moves_id_sequences_past_the_imported_rows(database, tmp_path):
+    archive = _export(database, str(tmp_path / "export.zip"))
+    # A fresh instance's sequence, under a name that needs quoting.
+    _execute(
+        database,
+        "ALTER SEQUENCE field_dimension_mapping_id_seq"
+        ' RENAME TO "fdm ""id"" seq";'
+        "SELECT setval('\"fdm \"\"id\"\" seq\"', 1, false);",
+    )
+
+    _import(database, archive)
+
+    _execute(
+        database,
+        "INSERT INTO field_dimension_mapping (field_id, dimension_id)"
+        " VALUES ('f2', 'District')",
+    )
+
+
+def test_an_import_that_fails_at_commit_leaves_id_sequences_ahead_of_the_rows(
+    database, tmp_path
+):
+    archive = _export(database, str(tmp_path / "export.zip"))
+    _execute(
+        database,
+        "INSERT INTO field_dimension_mapping (field_id, dimension_id)"
+        " VALUES ('f2', 'Region');"
+        # setval is not transactional. A deferred trigger fails the import at COMMIT,
+        # after the import has set its sequences.
+        "CREATE FUNCTION fail_at_commit() RETURNS trigger LANGUAGE plpgsql AS"
+        " $$ BEGIN RAISE EXCEPTION 'fail at commit'; END $$;"
+        "CREATE CONSTRAINT TRIGGER fail_at_commit AFTER INSERT"
+        " ON field_dimension_mapping DEFERRABLE INITIALLY DEFERRED"
+        " FOR EACH ROW EXECUTE FUNCTION fail_at_commit();",
+    )
+
+    with pytest.raises(psycopg2.Error, match="fail at commit"):
+        _import(database, archive)
+
+    _execute(
+        database,
+        "DROP TRIGGER fail_at_commit ON field_dimension_mapping;"
+        "INSERT INTO field_dimension_mapping (field_id, dimension_id)"
+        " VALUES ('f2', 'District')",
+    )
+
+
+def test_an_export_that_drops_the_parent_of_a_row_it_carries_changes_nothing(
+    database, tmp_path
+):
+    _execute(
+        database,
+        "INSERT INTO category (id, name, parent_id) VALUES"
+        " ('orphan_parent', 'P', 'root'), ('orphan_child', 'C', 'orphan_parent');",
+    )
+    archive = _export(database, str(tmp_path / "export.zip"))
+    _rewrite_table(archive, "category", lambda line: ";orphan_parent;P;" not in line)
+    before = _snapshot(database, [*IMPORTED_TABLES, *DEPENDENT_TABLES])
+
+    with pytest.raises(ImportTableDataError, match="category"):
+        _import(database, archive)
+
+    assert _snapshot(database, [*IMPORTED_TABLES, *DEPENDENT_TABLES]) == before
+
+
+def test_an_archive_missing_a_table_changes_nothing(database, tmp_path):
+    archive = _export(database, str(tmp_path / "export.zip"))
+    with zipfile.ZipFile(archive) as source:
+        members = {
+            name: source.read(name)
+            for name in source.namelist()
+            if name != "field_category_mapping.csv.lz4"
+        }
+    with zipfile.ZipFile(archive, "w") as target:
+        for name, data in members.items():
+            target.writestr(name, data)
+    before = _snapshot(database, [*IMPORTED_TABLES, *DEPENDENT_TABLES])
+
+    with pytest.raises(ImportTableDataError, match="field_category_mapping"):
         _import(database, archive)
 
     assert _snapshot(database, [*IMPORTED_TABLES, *DEPENDENT_TABLES]) == before

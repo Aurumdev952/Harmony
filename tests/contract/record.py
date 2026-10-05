@@ -34,6 +34,10 @@ def dry_run(cases: list[Case]) -> int:
     problems = catalogue.all_problems(cases, load_inventory(), load_relay_operations())
     for problem in problems:
         print(f"! {problem}")
+    empty = catalogue.always_empty_lists(cases)
+    print(f"lists empty in every recording, so no item shape is pinned ({len(empty)}):")
+    for operation, paths in empty.items():
+        print(f"  {operation}: {', '.join(paths)}")
     print(f"{len(cases)} cases, {len(problems)} problems")
     return 1 if problems else 0
 

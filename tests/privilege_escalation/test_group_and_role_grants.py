@@ -1241,22 +1241,45 @@ def test_admin_sending_a_user_acl_without_a_resource_gets_a_bad_request(db, make
     assert _acls_of(db, target.id) == []
 
 
-# try_get_role_and_resource no longer dereferences a missing resource role, so an
-# unknown name is its NotFound (404), not an AttributeError (500), on every route
-# that names resource roles (INV-3 row 14).
-
-
-@pytest.mark.parametrize('target', ['user', 'group'])
-def test_an_unknown_resource_role_name_is_not_found(db, make_user, target):
+def test_admin_adds_a_user_to_a_group_it_is_not_in(db, make_user):
     admin = make_user(['admin'])
-    acl = _acl('no_such_resource_role', _make_dashboard(db))
+    target = make_user()
+    group = _make_group(db)
+    group_id, group_name = group.id, group.name
+
+    response = admin.request(
+        'PATCH',
+        f'/api2/user/{target.id}',
+        _user_body(db, target.id, groups=[group_id]),
+    )
+
+    assert response.status_code == 200
+    assert _user_ids(_group(db, group_name)) == [target.id]
+
+
+# try_get_role_and_resource no longer dereferences a missing resource role, so an
+# unknown name, or a resource role of another type than the resource, is its
+# NotFound (404), not an AttributeError (500), on every route that names resource
+# roles (INV-3 row 14).
+
+
+@pytest.mark.parametrize('resource_role', ['no_such_resource_role', 'alert_admin'])
+@pytest.mark.parametrize('target', ['user', 'group'])
+def test_an_unknown_resource_role_name_is_not_found(
+    db, make_user, target, resource_role
+):
+    admin = make_user(['admin'])
+    acl = _acl(resource_role, _make_dashboard(db))
+    other = make_user()
+    group = _make_group(db)
+    group_name = group.name
     if target == 'user':
-        other = make_user()
         url, body = f'/api2/user/{other.id}', _user_body(db, other.id, acls=[acl])
     else:
-        group = _make_group(db)
-        url, body = f'/api2/group/{group.id}', _group_body(group.name, acls=[acl])
+        url, body = f'/api2/group/{group.id}', _group_body(group_name, acls=[acl])
 
     response = admin.request('PATCH', url, body)
 
     assert response.status_code == 404
+    assert _acls_of(db, other.id) == []
+    assert _group(db, group_name).acls == []

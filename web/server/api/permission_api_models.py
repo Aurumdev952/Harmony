@@ -3,6 +3,7 @@
 Resource APIs Accessible via http://<server_uri>:5000/api2/resource
 Role APIs Accessible via http://<server_uri>:5000/api2/role
 '''
+
 # pylint: disable=C0413
 from collections import defaultdict
 from http.client import METHOD_NOT_ALLOWED, NO_CONTENT, NOT_ACCEPTABLE, OK, UNAUTHORIZED
@@ -48,7 +49,6 @@ from web.server.routes.views.authorization import (
     AuthorizedOperation,
     current_user_is_superuser,
 )
-from web.server.routes.views.feed import create_dashboard_permission_updates
 from web.server.routes.views.permission import build_role, add_current_user_to_role
 from web.server.routes.views.resource import (
     update_resource_roles,
@@ -563,9 +563,10 @@ class RoleResource(PrincipalResource):
         rel='updateUsers',
     )
     def update_users(self, role, usernames):
-        with AuthorizedOperation(
-            'edit_resource', 'role', role.id
-        ), Transaction() as transaction:
+        with (
+            AuthorizedOperation('edit_resource', 'role', role.id),
+            Transaction() as transaction,
+        ):
             update_role_users(role, usernames, transaction)
             return StandardResponse('Role usernames has been updated', OK, True)
         return None, UNAUTHORIZED

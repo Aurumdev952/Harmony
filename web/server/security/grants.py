@@ -27,7 +27,6 @@ from models.alchemy.permission import Resource, ResourceRole, Role
 from models.alchemy.security_group import Group, GroupAcl
 from models.alchemy.user import UserAcl
 from models.alchemy.user.web_base_user import BaseWebUserMixin
-from models.python.permissions import QueryNeed
 from web.server.data.data_access import get_db_adapter
 from web.server.potion.access import get_id_from_uri
 from web.server.routes.views.authorization import (
@@ -178,7 +177,11 @@ def verify_role_grants(new_role: RoleFields, role: Role | None = None) -> None:
     if role is None:
         permission_ids, dashboard_role_id, alert_role_id = set(), None, None
     else:
-        permission_ids = {permission.id for permission in role.permissions}
+        # sqlmypy types an untyped `relationship` as one `Permission`.
+        permission_ids = {
+            permission.id
+            for permission in role.permissions  # type: ignore[attr-defined]
+        }
         dashboard_role_id = role.dashboard_resource_role_id
         alert_role_id = role.alert_resource_role_id
     gated = [
@@ -230,13 +233,12 @@ def verify_role_grants(new_role: RoleFields, role: Role | None = None) -> None:
 
 
 def holds_everything_in(role: Role) -> bool:
-    '''Whether the caller's account already holds every permission and resource
-    role `role` grants. Its policies and export passed `verify_role_grants`.
+    '''Whether the caller's account already holds every need `role` grants. Its
+    policies passed `verify_role_grants`, so only permissions and resource roles
+    can be missing.
     '''
     account_needs = _account_needs()
     # pylint: disable=protected-access
     return all(
-        need in account_needs
-        for need in BaseWebUserMixin._build_role_needs([role])
-        if not isinstance(need, QueryNeed)
+        need in account_needs for need in BaseWebUserMixin._build_role_needs([role])
     )

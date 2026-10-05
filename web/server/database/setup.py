@@ -1,5 +1,5 @@
-'''A module containing initialization logic for the User Database.
-'''
+'''A module containing initialization logic for the User Database.'''
+
 import sqlite3
 
 from flask_user import UserManager, SQLAlchemyAdapter
@@ -13,6 +13,7 @@ from log import LOG
 from models.alchemy.user import User
 from models.alchemy.user.base_user import BaseUserMixin
 from web.server.configuration.settings import _populate_configuration_table
+from web.server.security.usernames import find_user_by_username
 from web.server.routes.views.flask_user_views import (
     unauthenticated,
     logout,
@@ -26,8 +27,21 @@ class AnonymousUser(BaseUserMixin, AnonymousUserMixin):
         return f'<{cls.__name__}>'
 
 
+class UsernameAdapter(SQLAlchemyAdapter):
+    '''flask-user's adapter, except that it finds a user by username with an
+    equality ignoring case instead of an ILIKE pattern, where `_` and `%` are
+    wildcards. Its only other such lookup, by email, names a column `User`
+    does not have and fails as before.
+    '''
+
+    def ifind_first_object(self, ObjectClass, **kwargs):
+        if ObjectClass is User and list(kwargs) == ['username']:
+            return find_user_by_username(kwargs['username'], self.db.session)
+        return super().ifind_first_object(ObjectClass, **kwargs)
+
+
 def initialize_user_manager(app, db):
-    db_adapter = SQLAlchemyAdapter(db, UserClass=User)
+    db_adapter = UsernameAdapter(db, UserClass=User)
     login_manager = LoginManager()
     login_manager.anonymous_user = AnonymousUser
 

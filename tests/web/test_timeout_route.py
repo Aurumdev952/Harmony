@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-from contextlib import contextmanager
 from datetime import timedelta
 from http.cookies import SimpleCookie
 from types import SimpleNamespace
@@ -24,12 +23,8 @@ class _User(UserMixin):
     id = USERNAME
 
 
-@contextmanager
-def _users_table():
-    def find_one_by_fields(_model, _case_sensitive, fields):
-        return _User() if fields == {'username': USERNAME} else None
-
-    yield SimpleNamespace(find_one_by_fields=find_one_by_fields)
+def _find_user_by_username(username):
+    return _User() if username == USERNAME else None
 
 
 @pytest.fixture(name='app')
@@ -64,7 +59,10 @@ def fixture_app(bare_flask_app) -> Flask:
 
 @pytest.fixture(autouse=True)
 def fixture_users_table():
-    with mock.patch('web.server.security.signal_handlers.Transaction', _users_table):
+    with mock.patch(
+        'web.server.security.signal_handlers.find_user_by_username',
+        _find_user_by_username,
+    ):
         yield
 
 

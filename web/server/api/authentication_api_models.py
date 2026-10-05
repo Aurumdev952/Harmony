@@ -1,7 +1,6 @@
 import json
 from http.client import OK, BAD_REQUEST
 from datetime import timedelta
-from http.client import OK
 
 from flask import current_app, jsonify, make_response, request
 from flask_potion import fields, Resource
@@ -70,10 +69,12 @@ class AuthenticationResource(Resource):
         # but the whole refresh token magic is too complicated for now
         expires = timedelta(days=365)
 
+        # The token names the account that signed in, not what the user typed.
+        username = user_authenticated.username
         if set_cookie:
-            return login_user("login_successful", email, remember_me, expires)
+            return login_user("login_successful", username, remember_me, expires)
 
-        access_token = create_user_access_token(email, expires)
+        access_token = create_user_access_token(username, expires)
         return jsonify(access_token=access_token)
 
     @Route.POST(
@@ -119,7 +120,7 @@ class AuthenticationResource(Resource):
         # pylint: disable=protected-access
         user_registered.send(current_app._get_current_object(), user=pending_user)
 
-        return login_user("registration_successful", email)
+        return login_user("registration_successful", pending_user.username)
 
     @Route.POST(
         '/forgot_password',

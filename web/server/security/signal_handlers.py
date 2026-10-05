@@ -23,15 +23,15 @@ from werkzeug.exceptions import BadRequest
 
 from log import LOG
 from models.alchemy.api_token import APIToken
-from models.alchemy.user import User
 from models.python.permissions import DimensionFilter, QueryNeed
-from web.server.data.data_access import Transaction, get_db_adapter
+from web.server.data.data_access import get_db_adapter
 from web.server.routes.views.authentication import try_authenticate_user
 from web.server.routes.views.authorization import (
     AuthorizedOperation,
     WhitelistedPermission,
 )
 from web.server.security.permissions import SuperUserPermission
+from web.server.security.usernames import find_user_by_username
 from web.server.util.util import get_user_string, get_remote_ip_address
 
 # Dashboard render tokens keep whatever query policy the account they are issued
@@ -320,10 +320,7 @@ def install_login_manager_signal_handlers(app, login_manager):
             # NOTE: if we found JWT then we don't need the session
             session.permanent = False
             session.modified = False
-            with Transaction() as transaction:
-                user = transaction.find_one_by_fields(
-                    User, False, {'username': auth_email}
-                )
+            user = find_user_by_username(auth_email)
             if user:
                 user.from_jwt = True
                 return user

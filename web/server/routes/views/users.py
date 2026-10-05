@@ -3,6 +3,7 @@ from typing import Any, Dict, List, Optional, Tuple, TYPE_CHECKING, TypedDict, U
 
 from flask import g, current_app
 from flask_user import current_user
+from sqlalchemy import func
 from sqlalchemy.dialects.postgresql import insert
 
 from models.alchemy.api_token import APIToken
@@ -22,6 +23,7 @@ from web.server.data.data_access import (
 from web.server.errors import UserAlreadyInvited
 from web.server.routes.views.core import try_get_role_and_resource
 from web.server.routes.views.invite import send_invite_emails
+from web.server.security.usernames import find_user_by_username
 from web.server.util.util import get_user_string, Success
 from web.server.potion.access import get_id_from_uri
 from web.server.potion.signals import after_user_role_change, before_user_role_change
@@ -75,12 +77,7 @@ APITokenType = TypedDict('APITokenType', {'$uri': str, 'is_revoked': bool, 'id':
 
 
 def try_get_user(username: str, session: 'Optional[Session]' = None) -> Optional[User]:
-    return find_one_by_fields(
-        User,
-        case_sensitive=False,
-        search_fields={'username': username},
-        session=session,
-    )
+    return find_user_by_username(username, session)
 
 
 def try_get_user_acl(
@@ -184,9 +181,7 @@ def add_user_role(
 
     if not entity:
         exists = True
-        entity = UserRoles(
-            user_id=user.id, role_id=role.id, resource_id=resource_id
-        )  # type: ignore
+        entity = UserRoles(user_id=user.id, role_id=role.id, resource_id=resource_id)  # type: ignore
         before_user_role_change.send(user, role=role)
         add_entity(session, entity, flush, commit)
         after_user_role_change.send(user, role=role)
@@ -418,7 +413,7 @@ def update_user_api_tokens(user: User, tokens: List[APITokenType]):
         # now revoke tokens to be revoked, we don't allow un-revoke them
         user.api_tokens.filter(  # type: ignore[attr-defined]
             # pylint: disable=singleton-comparison
-            APIToken.is_revoked == False,
+            APIToken.is_revoked == False,  # noqa: E712 (a SQL expression)
             APIToken.id.in_(to_revoke),
         ).update({'is_revoked': True}, synchronize_session=False)
 
@@ -522,11 +517,13 @@ def invite_users(invitees: List[Invitee]) -> List[User]:
         pending_users = []
         # pylint:disable=E1101
         existing_users = User.query.filter(
-            User.username.in_(emails), User.status_id != UserStatusEnum.PENDING.value
+            func.lower(User.username).in_(emails),
+            User.status_id != UserStatusEnum.PENDING.value,
         ).all()
         # pylint:disable=E1101
         existing_pending_users = User.query.filter(
-            User.username.in_(emails), User.status_id == UserStatusEnum.PENDING.value
+            func.lower(User.username).in_(emails),
+            User.status_id == UserStatusEnum.PENDING.value,
         ).all()
 
         existing_username_to_user = {}
@@ -564,8 +561,8 @@ def invite_users(invitees: List[Invitee]) -> List[User]:
 def get_anonymous_user() -> User:
     '''Fetch anonymous user. Create if it doesn't already exist.'''
     with Transaction() as transaction:
-        maybe_anon_user = transaction.find_one_by_fields(
-            User, False, {'username': UNREGISTERED_USER_USERNAME}
+        maybe_anon_user = find_user_by_username(
+            UNREGISTERED_USER_USERNAME, transaction.run_raw()
         )
         if maybe_anon_user:
             return maybe_anon_user

@@ -2,7 +2,6 @@ from slugify import slugify
 from werkzeug.exceptions import NotFound
 
 from models.alchemy.permission import Resource, SitewideResourceAcl, ResourceRole
-from models.alchemy.user import User
 from models.alchemy.security_group import Group
 from models.alchemy.user import UserRoles
 from web.server.data.data_access import Transaction, get_db_adapter, find_one_by_fields
@@ -19,6 +18,7 @@ from web.server.routes.views.users import (
 )
 
 from web.server.potion.signals import after_roles_update, before_roles_update
+from web.server.security.usernames import find_user_by_username
 
 
 def get_resource_by_type_and_name(resource_type, resource_name):
@@ -109,7 +109,7 @@ def _update_user_roles(resource, user_roles, session, add_roles=True):
         return undefined_users
 
     for username, roles in list(user_roles.items()):
-        user = find_one_by_fields(User, False, {'username': username})
+        user = find_user_by_username(username)
 
         if not user:
             undefined_users.add(username)

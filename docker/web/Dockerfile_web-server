@@ -6,9 +6,7 @@ FROM python:3.13.16-slim-bookworm@sha256:5024f48ba9441d4b13a95d3945abc6365538e3a
 COPY --from=ghcr.io/astral-sh/uv:0.12.23@sha256:61d393e44e249f2e4b526b6c7ddcecce245946826e608e11c93ad4f5bba55b21 /uv /bin/uv
 
 # git fetches the two git dependencies (Flask-Potion, pylib); gcc builds the C
-# speedups of the sdists that have them (MarkupSafe, SQLAlchemy). No yajl: the
-# ijson-bigint C backend does not compile on 3.13, and with libyajl2 installed ijson
-# would pick its ctypes backend, which rejects Druid's Long.MIN_VALUE.
+# speedups of the sdists that have them (MarkupSafe, SQLAlchemy).
 RUN --mount=type=cache,target=/var/cache/apt,sharing=locked \
   --mount=type=cache,target=/var/lib/apt,sharing=locked \
   rm -f /etc/apt/apt.conf.d/docker-clean && \
@@ -57,4 +55,4 @@ COPY graphql graphql
 COPY util util
 COPY web/*.py web/
 COPY web/server web/server
-RUN python -m compileall -q -j 0 config data db log models graphql util web
+RUN python -m compileall -q -j 0 config data db harmony log models graphql util web

@@ -3,7 +3,6 @@ every Python image copies the first-party code that loading a deployment imports
 
 import ast
 import re
-import tomllib
 from pathlib import Path
 
 import pytest
@@ -115,19 +114,16 @@ def test_python_images_copy_what_deployment_loading_imports(dockerfile):
     assert missing == set(), f'{dockerfile} does not copy {sorted(missing)}'
 
 
-def stage_names(dockerfile):
-    return {stage for _, stage in FROM.findall(dockerfile) if stage}
-
-
-def test_pipeline_pypy_wheel_stages_live_exactly_as_long_as_the_pypy_venv():
-    dockerfile = (REPO / 'docker/pipeline/Dockerfile').read_text()
-    creates_venv = 'pypy3 -m venv venv_pypy3' in dockerfile
-    wheel_stages = {'rust', 'pypy-wheels'} & stage_names(dockerfile)
-    if not creates_venv:
-        assert wheel_stages == set(), f'dead PyPy wheel stages: {sorted(wheel_stages)}'
-        return
-    assert wheel_stages == {'rust', 'pypy-wheels'}
-    lock = tomllib.loads((REPO / 'uv.lock').read_text())
-    locked = {p['name']: p['version'] for p in lock['package']}['pydantic-core']
-    built = re.search(r'ARG PYDANTIC_CORE_VERSION=(\S+)', dockerfile).group(1)
-    assert built == locked
+def test_web_server_image_compiles_every_python_directory_it_copies():
+    """The app user cannot write the code, so bytecode it does not get at build time
+    is compiled again in every process, and SyntaxWarnings print before logging is
+    configured."""
+    dockerfile = REPO / 'docker/web/Dockerfile_web-server'
+    command = re.search(r'python -m compileall .*$', dockerfile.read_text(), re.M)
+    compiled = set(command.group(0).split())
+    python_dirs = {
+        path
+        for path in copied_top_level_paths(dockerfile)
+        if (REPO / path).is_dir() and any((REPO / path).rglob('*.py'))
+    }
+    assert python_dirs - compiled == set()

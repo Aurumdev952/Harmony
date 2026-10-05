@@ -29,6 +29,7 @@ instances:
       - tests/web/render/test_thumbnail_policy_digest.py
       - .claude/agent-memory/harmony-backend-engineer/render_token_traps.md
       - .claude/agent-memory/harmony-backend-engineer/MEMORY.md
+      - .claude/agent-memory/harmony-backend-engineer/renderer_round2_traps.md
       - tests/worker/renderer/**
       - docs/modernisation/work/WP-1h.md
       - docs/modernisation/work/WP-1h-evidence/**

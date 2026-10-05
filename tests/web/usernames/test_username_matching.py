@@ -7,8 +7,6 @@ registered through an invitation was signed in as the older account, with its
 roles and query policy.
 """
 
-import json
-
 import pytest
 from flask import current_app
 from flask_jwt_extended import decode_token
@@ -16,10 +14,14 @@ from flask_login import current_user
 
 from models.alchemy.user import User
 from tests.web.usernames.accounts import ACCOUNTS, PASSWORD
+from tests.web.usernames.tokens import (
+    login,
+    session_token_without_account_id,
+    signed_in_id,
+)
 from web.server.api.authentication_api_models import AuthenticationResource
 from web.server.errors import UserAlreadyInvited
 from web.server.routes.views import users
-from web.server.util.authentication import create_user_access_token
 
 # (what the caller sends, the id it must resolve to; None means nobody)
 LOOKUPS = [
@@ -40,6 +42,11 @@ LOOKUPS = [
     ('%', None),
     ('_%', None),
     ('jane_doe@moh.gov.rw', 9),
+    ('pending.user@moh.gov.rw', 4),
+    # The active account wins over a pending one equal to it ignoring case.
+    ('dup.shell@moh.gov.rw', 10),
+    ('Dup.Shell@moh.gov.rw', 10),
+    ('DUP.SHELL@moh.gov.rw', 10),
 ]
 CASES = pytest.mark.parametrize(
     'sent, expected_id', LOOKUPS, ids=[c[0] for c in LOOKUPS]
@@ -47,10 +54,7 @@ CASES = pytest.mark.parametrize(
 
 
 def _signed_in_id(app, identity):
-    with app.test_request_context('/'):
-        token = create_user_access_token(identity)
-    with app.test_request_context('/', headers={'Authorization': f'Bearer {token}'}):
-        return current_user.id if current_user.is_authenticated else None
+    return signed_in_id(app, session_token_without_account_id(app, identity))
 
 
 @CASES
@@ -70,27 +74,24 @@ def test_role_assignment_lookup_matches_exactly(app, request_ctx, sent, expected
     assert (user.id if user else None) == expected_id
 
 
-def _login(app, email):
-    login = AuthenticationResource.login_user_route.view_func
-    with app.test_request_context('/api2/authentication/login?set_cookie=false'):
-        response = login(None, email=email, password=PASSWORD, remember_me=False)
-        return decode_token(json.loads(response.get_data())['access_token'])
-
-
 @pytest.mark.parametrize(
     'typed, username',
     [
         ('john_doe@moh.gov.rw', 'john_doe@moh.gov.rw'),
         ('JOHN.DOE@moh.gov.rw', 'john.doe@moh.gov.rw'),
         ('mixed.case@moh.gov.rw', 'Mixed.Case@moh.gov.rw'),
+        ('dup.shell@moh.gov.rw', 'Dup.Shell@moh.gov.rw'),
     ],
 )
 def test_login_token_names_the_stored_username(app, typed, username):
-    claims = _login(app, typed)
+    token = login(app, typed)
 
-    assert claims['identity'] == username
     expected_id = next(i for i, name, *_ in ACCOUNTS if name == username)
-    assert _signed_in_id(app, claims['identity']) == expected_id
+    with app.app_context():
+        claims = decode_token(token)
+    assert claims['identity'] == username
+    assert claims['user_claims']['user_id'] == expected_id
+    assert signed_in_id(app, token) == expected_id
 
 
 def test_registering_a_look_alike_signs_in_the_new_account(app):
@@ -146,3 +147,24 @@ def test_reinviting_a_pending_account_in_another_case_reuses_it(
 def _usernames_like(email):
     rows = User.query.all()  # pylint: disable=no-member
     return {row.username for row in rows if row.username.lower() == email.lower()}
+
+
+@pytest.mark.parametrize(
+    'wanted, available',
+    [
+        ('brand.new@moh.gov.rw', True),
+        ('BRAND.NEW@moh.gov.rw', True),
+        # Taken ignoring case, including by two accounts at once.
+        ('MIXED.CASE@moh.gov.rw', False),
+        ('ANN@moh.gov.rw', False),
+        ('JOHN_DOE@moh.gov.rw', False),
+        ('dup.shell@moh.gov.rw', False),
+        # `_` and `%` are not wildcards here either.
+        ('john_doe@moh.gov.rwx', True),
+        ('j%@moh.gov.rw', True),
+    ],
+)
+def test_username_is_available_only_if_no_account_equals_it_ignoring_case(
+    app, request_ctx, wanted, available
+):
+    assert current_app.user_manager.username_is_available(wanted) is available

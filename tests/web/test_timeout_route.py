@@ -21,6 +21,7 @@ USERNAME = 'analyst@example.org'
 
 class _User(UserMixin):
     id = USERNAME
+    username = USERNAME
 
 
 def _find_user_by_username(username):
@@ -68,7 +69,7 @@ def fixture_users_table():
 
 def _signed_in_client(app: Flask, remember_me: bool) -> FlaskClient:
     with app.test_request_context('/api/login', method='POST'):
-        response = login_user('login_successful', USERNAME, remember_me)
+        response = login_user('login_successful', _User(), remember_me)
     client = app.test_client()
     for header in response.headers.getlist('Set-Cookie'):
         for name, morsel in SimpleCookie(header).items():

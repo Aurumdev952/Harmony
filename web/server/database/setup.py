@@ -3,7 +3,7 @@
 import sqlite3
 
 from flask_user import UserManager, SQLAlchemyAdapter
-from flask_login import AnonymousUserMixin, LoginManager
+from flask_login import AnonymousUserMixin, LoginManager, current_user
 from sqlalchemy import create_engine, event
 from sqlalchemy.engine import Engine
 from sqlalchemy.orm.session import sessionmaker
@@ -13,7 +13,7 @@ from log import LOG
 from models.alchemy.user import User
 from models.alchemy.user.base_user import BaseUserMixin
 from web.server.configuration.settings import _populate_configuration_table
-from web.server.security.usernames import find_user_by_username
+from web.server.security.usernames import find_user_by_username, username_taken
 from web.server.routes.views.flask_user_views import (
     unauthenticated,
     logout,
@@ -40,13 +40,21 @@ class UsernameAdapter(SQLAlchemyAdapter):
         return super().ifind_first_object(ObjectClass, **kwargs)
 
 
+class HarmonyUserManager(UserManager):
+    def username_is_available(self, new_username):
+        '''For a rename on flask-user's change-username page: no other
+        account may equal the new username ignoring case.'''
+        own_id = current_user.id if current_user.is_authenticated else None
+        return not username_taken(new_username, self.db_adapter.db.session, own_id)
+
+
 def initialize_user_manager(app, db):
     db_adapter = UsernameAdapter(db, UserClass=User)
     login_manager = LoginManager()
     login_manager.anonymous_user = AnonymousUser
 
     # Initialize Flask-User.
-    UserManager(
+    HarmonyUserManager(
         db_adapter,
         app,
         password_validator=validate_password,

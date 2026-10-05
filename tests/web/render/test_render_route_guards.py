@@ -13,6 +13,7 @@ from tests.web.render.fakes import (
     DASHBOARDS,
     DASHBOARD_SLUG,
     DEPLOYMENT_ORIGIN,
+    USERS,
     FakeDashboard,
 )
 from web.server.routes.views.dashboard import get_email_attachments
@@ -271,7 +272,7 @@ def test_emailed_render_loads_this_apps_dashboard_whatever_link_is_sent(
 
 def _sign_in_with_cookie(app, client, username):
     with app.app_context():
-        token = create_user_access_token(username, timedelta(minutes=5))
+        token = create_user_access_token(USERS[username], timedelta(minutes=5))
     client.set_cookie('localhost', 'accessKey', token)
 
 

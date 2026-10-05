@@ -385,7 +385,7 @@ def update_user_groups(user: User, new_groups: List[str]) -> None:
 
 def update_user_api_tokens(user: User, tokens: List[APITokenType]):
     # pylint: disable=import-outside-toplevel
-    from web.server.security.signal_handlers import check_token_validity
+    from web.server.security.signal_handlers import api_token_user_id
 
     if not tokens:
         # nothing to do here
@@ -418,7 +418,7 @@ def update_user_api_tokens(user: User, tokens: List[APITokenType]):
         ).update({'is_revoked': True}, synchronize_session=False)
 
         # invalidate validity caches because the state of the tokens has changed
-        memoized = current_app.cache.memoize()(check_token_validity)
+        memoized = current_app.cache.memoize()(api_token_user_id)
         for token in tokens:
             current_app.cache.delete_memoized(memoized, token['id'])
 

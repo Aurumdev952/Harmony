@@ -70,11 +70,12 @@ class AuthenticationResource(Resource):
         expires = timedelta(days=365)
 
         # The token names the account that signed in, not what the user typed.
-        username = user_authenticated.username
         if set_cookie:
-            return login_user("login_successful", username, remember_me, expires)
+            return login_user(
+                "login_successful", user_authenticated, remember_me, expires
+            )
 
-        access_token = create_user_access_token(username, expires)
+        access_token = create_user_access_token(user_authenticated, expires)
         return jsonify(access_token=access_token)
 
     @Route.POST(
@@ -120,7 +121,7 @@ class AuthenticationResource(Resource):
         # pylint: disable=protected-access
         user_registered.send(current_app._get_current_object(), user=pending_user)
 
-        return login_user("registration_successful", pending_user.username)
+        return login_user("registration_successful", pending_user)
 
     @Route.POST(
         '/forgot_password',
@@ -176,7 +177,7 @@ class AuthenticationResource(Resource):
         user_reset_password.send(current_app._get_current_object(), user=user)
 
         if user_manager.auto_login_after_reset_password:
-            return login_user("password_reset_success", user.username)
+            return login_user("password_reset_success", user)
 
         return make_response(
             jsonify({"msg": "password_reset_success"}),

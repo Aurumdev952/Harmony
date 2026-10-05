@@ -1,4 +1,5 @@
 import itertools
+from typing import Optional
 from logging import LoggerAdapter
 from uuid import uuid4
 
@@ -32,6 +33,7 @@ from web.server.routes.views.authorization import (
 )
 from web.server.security.permissions import SuperUserPermission
 from web.server.security.usernames import find_user_by_username
+from web.server.util.authentication import USER_ID_CLAIM
 from web.server.util.util import get_user_string, get_remote_ip_address
 
 # Dashboard render tokens keep whatever query policy the account they are issued
@@ -286,14 +288,31 @@ def install_user_events_handlers(app):
         user.get_permissions.delete_memoized()
 
 
-def check_token_validity(token_id: str) -> bool:
+def api_token_user_id(token_id: str) -> Optional[int]:
+    '''The id of the account an API token was issued to, or None once the
+    token is revoked or deleted.'''
     db_session = get_db_adapter().session
     token = db_session.query(APIToken).filter_by(id=token_id).first()
-    return bool(token and not token.is_revoked)
+    return token.user_id if token and not token.is_revoked else None
 
 
 def install_login_manager_signal_handlers(app, login_manager):
-    memoized_check_token_validity = app.cache.memoize()(check_token_validity)
+    memoized_api_token_user_id = app.cache.memoize()(api_token_user_id)
+
+    def user_for_token(username, claims):
+        # The account the token was issued to: an API token's through its row,
+        # a session's through its user_id claim since WP-0k. A token with
+        # neither (an older session, a render token) has only its username.
+        if 'id' in claims:
+            issued_to = memoized_api_token_user_id(claims['id'])
+            if issued_to is None:
+                return None
+        else:
+            issued_to = claims.get(USER_ID_CLAIM)
+        user = find_user_by_username(username)
+        if user is None or issued_to not in (None, user.id):
+            return None
+        return user
 
     @login_manager.request_loader
     def login_from_request(request_object=None):
@@ -310,20 +329,13 @@ def install_login_manager_signal_handlers(app, login_manager):
             pass
 
         auth_email = get_jwt_identity()
-        is_token_valid = True
-        if auth_email:
-            claims = get_jwt_claims()
-            if 'id' in claims:
-                is_token_valid = memoized_check_token_validity(claims['id'])
-
-        if auth_email and is_token_valid:
+        user = user_for_token(auth_email, get_jwt_claims()) if auth_email else None
+        if user:
             # NOTE: if we found JWT then we don't need the session
             session.permanent = False
             session.modified = False
-            user = find_user_by_username(auth_email)
-            if user:
-                user.from_jwt = True
-                return user
+            user.from_jwt = True
+            return user
 
         try:
             username = request.headers.get('X-Username')

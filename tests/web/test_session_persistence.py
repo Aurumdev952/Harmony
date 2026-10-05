@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from datetime import timedelta
 from http.cookies import SimpleCookie
+from types import SimpleNamespace
 
 import pytest
 from flask import Flask
@@ -9,7 +10,7 @@ from flask_jwt_extended import JWTManager, create_access_token
 
 from web.server.util.authentication import is_session_persisted, login_user
 
-USERNAME = 'analyst@example.org'
+USER = SimpleNamespace(id=1, username='analyst@example.org')
 
 
 @pytest.fixture(name='app_signing_with')
@@ -39,7 +40,7 @@ def _cookie_header_after_login(
     app: Flask, remember_me: bool, expires: timedelta | None = None
 ) -> str:
     with app.test_request_context('/api/login', method='POST'):
-        response = login_user('login_successful', USERNAME, remember_me, expires)
+        response = login_user('login_successful', USER, remember_me, expires)
     jar: SimpleCookie = SimpleCookie()
     for header in response.headers.getlist('Set-Cookie'):
         jar.load(header)
@@ -91,5 +92,5 @@ def test_bearer_token_without_the_claim_wins_over_a_remembered_cookie(app):
     # Authentication reads the header before the cookie, so persistence must too.
     remembered_cookie = _cookie_header_after_login(app, remember_me=True)
     with app.app_context():
-        api_token = create_access_token(identity=USERNAME)
+        api_token = create_access_token(identity=USER.username)
     assert not _persisted(app, remembered_cookie, Authorization=f'Bearer {api_token}')

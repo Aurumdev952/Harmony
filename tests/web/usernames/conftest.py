@@ -14,6 +14,7 @@ import sqlalchemy
 from flask import Flask, g
 from flask_jwt_extended import JWTManager
 
+from config.loader import import_configuration_module
 from models.alchemy.user import User
 from tests.web.usernames.accounts import ACCOUNTS, PASSWORD
 from web.server.app_db import create_db
@@ -44,10 +45,24 @@ for _module in (
     importlib.import_module(f'models.alchemy.{_module}')
 
 
-class _NoCache:
-    @staticmethod
-    def memoize(*_args, **_kwargs):
-        return lambda function: function
+class _MemoizeCache:
+    """Remembers results like the app's cache, which keeps API token lookups
+    for minutes after the token or its account is deleted."""
+
+    def __init__(self):
+        self.results = {}
+
+    def memoize(self, *_args, **_kwargs):
+        def decorate(function):
+            def memoized(*args):
+                key = (function.__name__, args)
+                if key not in self.results:
+                    self.results[key] = function(*args)
+                return self.results[key]
+
+            return memoized
+
+        return decorate
 
 
 @pytest.fixture(name='app')
@@ -66,11 +81,14 @@ def fixture_app(tmp_path):
         JWT_TOKEN_WEB_COOKIE_EXPIRATION=timedelta(days=1),
         USER_ENABLE_EMAIL=False,
         USER_ENABLE_USERNAME=True,
+        USER_ENABLE_CHANGE_USERNAME=True,
+        WTF_CSRF_ENABLED=False,
     )
     db = create_db()
     db.init_app(app)
     JWTManager(app)
-    app.cache = _NoCache()
+    app.cache = _MemoizeCache()
+    app.zen_config = import_configuration_module('harmony_demo')
     app.user_authentication_router = SimpleNamespace(unauthorized=lambda: '')
     with app.app_context():
         initialize_user_manager(app, db)
@@ -87,6 +105,12 @@ def _create_users(db, password_hash):
     )
     with db.engine.begin() as connection:
         connection.execute(sqlalchemy.text(f'CREATE TABLE "user" ({columns})'))
+        connection.execute(
+            sqlalchemy.text(
+                'CREATE TABLE api_token (id PRIMARY KEY, user_id, is_revoked, '
+                'created, last_modified)'
+            )
+        )
         for user_id, username, status, token in ACCOUNTS:
             connection.execute(
                 sqlalchemy.text(

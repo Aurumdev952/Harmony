@@ -21,4 +21,8 @@ ACCOUNTS = [
     (8, 'jane.doe@moh.gov.rw', ACTIVE, ''),
     # Invited after jane.doe, and not yet registered.
     (9, 'jane_doe@moh.gov.rw', PENDING, 'invite-9'),
+    # Re-inviting a mixed-case account before WP-0k lowercased the address and
+    # added a second, pending account without a password.
+    (10, 'Dup.Shell@moh.gov.rw', ACTIVE, ''),
+    (11, 'dup.shell@moh.gov.rw', PENDING, 'invite-11'),
 ]

@@ -109,7 +109,7 @@ def _update_user_roles(resource, user_roles, session, add_roles=True):
         return undefined_users
 
     for username, roles in list(user_roles.items()):
-        user = find_user_by_username(username)
+        user = find_user_by_username(username, session)
 
         if not user:
             undefined_users.add(username)

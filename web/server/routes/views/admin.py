@@ -5,9 +5,9 @@ from flask_user.signals import user_forgot_password
 from werkzeug.exceptions import BadGateway
 
 from log import LOG
-from models.alchemy.user import User
 from web.server.errors import ItemNotFound, NotificationError
 from web.server.data.data_access import Transaction
+from web.server.security.usernames import find_user_by_username
 from web.server.util.deployment_links import deployment_url
 
 
@@ -16,9 +16,7 @@ def send_reset_password(email: str) -> None:
 
     with Transaction() as transaction:
         user_manager = current_app.user_manager
-        user = transaction.find_one_by_fields(
-            User, case_sensitive=True, search_fields={'username': email}
-        )
+        user = find_user_by_username(email, transaction.run_raw())
 
         if not user:
             logger.warning('User does not exist with email: \'%s\'', email)
@@ -45,7 +43,7 @@ def send_reset_password(email: str) -> None:
 
         # Store token to db
         user.reset_password_token = token
-        user = transaction.add_or_update(user, flush=True)
+        transaction.add_or_update(user, flush=True)
 
     # Send forgot_password signal to flask_user to trigger any hooks
     # pylint: disable=W0212

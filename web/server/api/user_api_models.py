@@ -2,6 +2,7 @@
 
 User APIs Accessible via http://<server_uri>:5000/api2/user
 '''
+
 from http.client import BAD_REQUEST, OK, NO_CONTENT, UNAUTHORIZED
 
 from flask import current_app, g
@@ -55,6 +56,7 @@ from web.server.routes.views.users import (
     update_user_groups,
     update_user_roles_from_map,
 )
+from web.server.security.usernames import username_taken
 from web.server.security.permissions import (
     SuperUserPermission,
     principals,
@@ -138,6 +140,8 @@ class UserResource(PrincipalResource):
     )
     def update_user(self, db_user, obj):
         with AuthorizedOperation('edit_user', 'site'):
+            if username_taken(obj['username'], except_user_id=db_user.id):
+                raise BadRequest('Another account has this username.')
             # NOTE: this whole block must run in the same transaction
             # and can leave db in incosistent state like this but should be
             # addressed seaparately of why I'm here and requires quite a big refactoring

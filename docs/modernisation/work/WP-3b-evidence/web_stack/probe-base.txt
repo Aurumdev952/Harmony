@@ -1,0 +1,46 @@
+== processes in web (user pid command)
+root 1 /bin/sh -c ./docker/entrypoint_web.sh 
+root 25 /bin/bash ./run_web_gunicorn.sh 
+root 27 python web/gunicorn_server.py --timeout=600 --pidfile /tmp/gunicorn_master.pid 
+root 7 /bin/bash -eu ./docker/entrypoint_web.sh 
+root 76 python web/gunicorn_server.py --timeout=600 --pidfile /tmp/gunicorn_master.pid 
+root 77 python web/gunicorn_server.py --timeout=600 --pidfile /tmp/gunicorn_master.pid 
+root 78 python web/gunicorn_server.py --timeout=600 --pidfile /tmp/gunicorn_master.pid 
+root 79 python web/gunicorn_server.py --timeout=600 --pidfile /tmp/gunicorn_master.pid 
+== processes in worker
+     18 root 10 /usr/local/bin/python3.8 /usr/local/bin/celery -A web.background_worker.celery worker --beat --sched
+== create an admin with the Makefile's command (compose run through the entrypoint)
+  util.warn_limited(
+20261005.163537.940 INFO create_user.py:create_user:162: Marked 'admin@wp3b.invalid - (WP, 3b)' as a site-administrator. 
+20261005.163537.941 INFO create_user.py:main:346: Successfully created/updated User 'admin@wp3b.invalid - (WP, 3b)' with status 'ACTIVE'.
+== HTTP from inside web
+anonymous GET / 200
+anonymous GET /login 200
+anonymous GET /api2/user 401
+anonymous GET /static/build/version.txt 404
+POST /api2/authentication/login 200
+signed-in GET /api2/user 200 (1 items)
+signed-in GET /api2/role 200 (20 items)
+signed-in GET /overview 200
+signed-in GET /data-catalog 200
+== ownership in web
+ls: cannot access '/home/zenysis/.mc': No such file or directory
+/data/output:
+total 52
+-rw-r--r-- 1 0 0     0 Oct  5 16:34 default.log
+-rw-r--r-- 1 0 0     0 Oct  5 16:34 gunicorn_access.log
+-rw-r--r-- 1 0 0   526 Oct  5 16:35 gunicorn_error.log
+drwxrwxr-x 2 0 0  4096 Oct  5 16:34 logs
+-rw-rw-r-- 1 0 0 36937 Oct  5 16:35 zenysis.log
+drwxrwxr-x 5 0 0  4096 Oct  5 16:34 zenysis_static
+
+/zenysis/uploads/2024:
+total 4
+-rw-rw-r-- 1 0 0 7 Oct  5 16:34 report.csv
+stale.js replaced
+== worker: beat schedule and mc config
+ls: cannot access '/home/zenysis/.mc/config.json': No such file or directory
+ls: cannot access '/zenysis/celerybeat-schedule': No such file or directory
+-rw-r--r-- 1 0 0 16384 Oct  5 16:35 /tmp/celerybeat-schedule
+== errors in the logs
+      1 web-1     | 20261005.163539.862 ERROR error_handlers.py:log_error:24: An uncaught exception was thrown. Logging it here for debugging purposes. Exception details were: 'Traceback (most recent call las

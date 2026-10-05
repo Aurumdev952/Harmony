@@ -185,6 +185,9 @@ services:
         "web.background_worker.celery",
         "worker",
         "--beat",
+        # The beat schedule defaults to the working directory, /zenysis, which
+        # the unprivileged app user cannot write.
+        "--schedule=/tmp/celerybeat-schedule",
         "--loglevel=INFO"
       ]
     healthcheck:

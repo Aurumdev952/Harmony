@@ -31,7 +31,7 @@ PORT=$(docker port "$PG" 5432/tcp | head -1 | cut -d: -f2)
 until docker exec "$PG" pg_isready -U postgres -d zenysis -h 127.0.0.1 -q; do sleep 0.5; done
 sleep 1
 
-cd "$TREE"
+cd "$TREE" || exit 1
 run() {
   env -i PATH="$PATH" PYTHONPATH=. FLASK_APP=web.server.app ZEN_OFFLINE=1 \
     ZEN_ENV=harmony_demo DEFAULT_SECRET_KEY=scratch-default-0123456789 JWT_SECRET_KEY=scratch-jwt-9876543210 \

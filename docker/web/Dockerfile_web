@@ -1,40 +1,41 @@
-ARG NAMESPACE
-ARG IMAGE_PREFIX
-ARG TAG
+# syntax=docker/dockerfile:1.27.1@sha256:4edf897a3ffa55b89f906fc8cc78afdb3f1834cc9c7083565e611a8a7d5fe99e
+ARG NAMESPACE=ghcr.io/zenysis
+ARG IMAGE_PREFIX=harmony
+ARG TAG=latest
 
 FROM ${NAMESPACE}/${IMAGE_PREFIX}-web-client:${TAG} AS client-build
 FROM ${NAMESPACE}/${IMAGE_PREFIX}-web-server:${TAG} AS server-build
 
-# Ideally we would use a slim distro here, but just what we need from server-build
-# won't always work for us, depending on what platform you're building and what
-# dependencies are needed.
+# One image for web and worker: the server image (CPython 3.13, uv.lock) plus the
+# built client and the container scripts.
 FROM server-build
 
-# Redeclare the TAG arg since ARGs before FROM are outside ofa build stage and
+# Redeclare the TAG arg since ARGs before FROM are outside of a build stage and
 # can't be reused after FROM.
 # https://docs.docker.com/engine/reference/builder/#understand-how-arg-and-from-interact
 ARG TAG
 
-ENV INSTALL_PATH /zenysis
-ENV ZEN_HOME ${INSTALL_PATH}
-ENV R77_SRC_ROOT ${INSTALL_PATH}
-ENV ZENYSIS_SRC_ROOT ${INSTALL_PATH}
-ENV PYTHONPATH "${ZENYSIS_SRC_ROOT}:${PYTHONPATH}"
-ENV PYTHONUNBUFFERED 1
-ENV BUILD_TAG ${TAG}
+ENV INSTALL_PATH=/zenysis
+ENV ZEN_HOME=${INSTALL_PATH} \
+  R77_SRC_ROOT=${INSTALL_PATH} \
+  ZENYSIS_SRC_ROOT=${INSTALL_PATH} \
+  PYTHONPATH=${INSTALL_PATH} \
+  PYTHONUNBUFFERED=1 \
+  BUILD_TAG=${TAG} \
+  ZEN_PROD=1
 
-ENV ZEN_PROD 1
-
-# Build the parent directories needed in the install location.
-RUN mkdir -p ${INSTALL_PATH}/web/public
-RUN mkdir -p /data/output
 WORKDIR ${INSTALL_PATH}
+
+# What the app user writes: static files and logs under /data/output, and uploads.
+RUN mkdir -p web/public /data/output uploads && \
+  chown zenysis:zenysis /data/output uploads
 
 # Copy the built client files.
 COPY --from=client-build /client/ web/public/
 
 # Copy over various utilities.
 COPY docker/entrypoint_web.sh docker/entrypoint_web.sh
+COPY docker/web/run_as_zenysis.sh /usr/local/bin/run_as_zenysis
 COPY scripts scripts
 
 # Copy all utilities used by the docker web container to the source root.
@@ -43,4 +44,7 @@ COPY docker/web/scripts/* ./
 # Web server runs on port 5000.
 EXPOSE 5000
 
-CMD ./docker/entrypoint_web.sh
+# Starts as root to hand the writable mounts to zenysis, then runs the command as
+# zenysis (see the script).
+ENTRYPOINT ["run_as_zenysis"]
+CMD ["./docker/entrypoint_web.sh"]

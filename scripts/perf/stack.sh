@@ -20,6 +20,8 @@
 #   PERF_REFERENCE_WEB_PORT default 58702, PERF_REFERENCE_UI_PORT 58703 (the reference copy)
 #   PERF_COORDINATOR_PORT default 58981, PERF_BROKER_PORT 58982, PERF_ROUTER_PORT 58988
 #   PERF_SCRATCH          default ${TMPDIR:-/tmp}/<project>: dataset, pipeline output, broker request log
+#   PERF_BUILD_NETWORK    unset; `host` builds the web image on the host network
+#   PERF_REBUILD          unset; 1 rebuilds the web image and the client
 # Every port is published on 127.0.0.1 only. Secrets are generated per stack into a
 # mode-600 file outside the repository (SPEC INV-6); compose reads no .env file.
 # The file lives under XDG_STATE_HOME, not the tmpfs XDG_RUNTIME_DIR: Druid's
@@ -27,7 +29,7 @@
 # password it was created with.
 set -euo pipefail
 
-HERE="$(cd "$(dirname "$0")" && pwd -P)"
+HERE="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd -P)"
 ROOT="$(cd "${HERE}/../.." && pwd -P)"
 export PERF_PROJECT="${PERF_PROJECT:-harmony-wp1a-perf}"
 export PERF_WEB_PORT="${PERF_WEB_PORT:-58700}"
@@ -127,21 +129,28 @@ image_tag() {
 # build_image <repo root>: build the web image of that tree; prints its name.
 # The tag hashes every input the containers use from the image (the code is
 # bind-mounted), so an existing tag is reused; PERF_REBUILD=1 rebuilds it.
-# Each rebuild leaves about 2.4 GB of layers, and needs PyPI.
+# Each rebuild leaves about 2.4 GB of layers, and needs PyPI. Where build
+# containers cannot resolve names (as on the WP-1a host since a reboot), set
+# PERF_BUILD_NETWORK=host to build on the host's network.
+# Callers run it in a command substitution, where bash drops errexit, so each
+# build returns on failure: otherwise the old image would start.
 build_image() {
-  local tag
+  local tag network=()
   tag="$(image_tag "$1")"
   if [[ -z "${PERF_REBUILD:-}" ]] && docker image inspect "harmony-perf-web:${tag}" >/dev/null 2>&1; then
     echo "perf stack: reusing harmony-perf-web:${tag}" >&2
     echo "harmony-perf-web:${tag}"
     return 0
   fi
-  docker build --platform linux/amd64 \
+  if [[ -n "${PERF_BUILD_NETWORK:-}" ]]; then
+    network=(--network "${PERF_BUILD_NETWORK}")
+  fi
+  docker build "${network[@]}" --platform linux/amd64 \
     -f "$1/docker/web/Dockerfile_web-server" \
-    -t "harmony-perf-web-server:${tag}" "$1" >&2
-  docker build --platform linux/amd64 \
+    -t "harmony-perf-web-server:${tag}" "$1" >&2 || return 1
+  docker build "${network[@]}" --platform linux/amd64 \
     --build-arg "BASE_IMAGE=harmony-perf-web-server:${tag}" \
-    -t "harmony-perf-web:${tag}" "${HERE}/stack" >&2
+    -t "harmony-perf-web:${tag}" "${HERE}/stack" >&2 || return 1
   echo "harmony-perf-web:${tag}"
 }
 
@@ -422,46 +431,53 @@ down() {
   rm -f "${SECRETS}"
 }
 
-case "${1:-}" in
-  dataset) dataset "${@:2}" ;;
-  up) up ;;
-  index) index "${@:2}" ;;
-  ui) ui ;;
-  reference) reference "${@:2}" ;;
-  stop) stop ;;
-  down) down ;;
-  env)
-    echo "export PERF_CANDIDATE_URL=http://127.0.0.1:${PERF_WEB_PORT}"
-    echo "export PERF_CANDIDATE_UI_URL=http://127.0.0.1:${PERF_UI_PORT}"
-    echo "export PERF_REFERENCE_URL=http://127.0.0.1:${PERF_REFERENCE_WEB_PORT}"
-    echo "export PERF_REFERENCE_UI_URL=http://127.0.0.1:${PERF_REFERENCE_UI_PORT}"
-    if [[ -f "${PERF_REFERENCE_DIR}/sha" ]]; then
-      echo "export PERF_REFERENCE_SHA=$(cat "${PERF_REFERENCE_DIR}/sha")"
-    fi
-    echo "export PERF_USERNAME=${PERF_USERNAME}"
-    echo "export PERF_CREDENTIALS_FILE=${SECRETS}"
-    echo "export PERF_REQUEST_LOG_DIR=${PERF_REQUEST_LOG_DIR}"
-    echo "export PERF_BROKER_URL=http://127.0.0.1:${PERF_BROKER_PORT}"
-    echo "export PERF_COORDINATOR_URL=http://127.0.0.1:${PERF_COORDINATOR_PORT}"
-    ;;
-  config)
-    placeholder_env
-    case "${2:-}" in
-      druid) druid_compose --profile init config ;;
-      web) web_compose --profile index --profile ui --profile reference config ;;
-      *) echo "usage: $0 config druid|web" >&2; exit 2 ;;
-    esac
-    ;;
-  logs)
-    placeholder_env
-    case "${2:-}" in
-      druid) druid_compose logs --tail 200 "${@:3}" ;;
-      web) web_compose logs --tail 200 "${@:3}" ;;
-      *) echo "usage: $0 logs druid|web [service]" >&2; exit 2 ;;
-    esac
-    ;;
-  *)
-    echo "usage: $0 dataset|up|index|ui|reference [<ref>]|stop|down|env|config druid|web|logs druid|web [service]" >&2
-    exit 2
-    ;;
-esac
+main() {
+  case "${1:-}" in
+    dataset) dataset "${@:2}" ;;
+    up) up ;;
+    index) index "${@:2}" ;;
+    ui) ui ;;
+    reference) reference "${@:2}" ;;
+    stop) stop ;;
+    down) down ;;
+    env)
+      echo "export PERF_CANDIDATE_URL=http://127.0.0.1:${PERF_WEB_PORT}"
+      echo "export PERF_CANDIDATE_UI_URL=http://127.0.0.1:${PERF_UI_PORT}"
+      echo "export PERF_REFERENCE_URL=http://127.0.0.1:${PERF_REFERENCE_WEB_PORT}"
+      echo "export PERF_REFERENCE_UI_URL=http://127.0.0.1:${PERF_REFERENCE_UI_PORT}"
+      if [[ -f "${PERF_REFERENCE_DIR}/sha" ]]; then
+        echo "export PERF_REFERENCE_SHA=$(cat "${PERF_REFERENCE_DIR}/sha")"
+      fi
+      echo "export PERF_USERNAME=${PERF_USERNAME}"
+      echo "export PERF_CREDENTIALS_FILE=${SECRETS}"
+      echo "export PERF_REQUEST_LOG_DIR=${PERF_REQUEST_LOG_DIR}"
+      echo "export PERF_BROKER_URL=http://127.0.0.1:${PERF_BROKER_PORT}"
+      echo "export PERF_COORDINATOR_URL=http://127.0.0.1:${PERF_COORDINATOR_PORT}"
+      ;;
+    config)
+      placeholder_env
+      case "${2:-}" in
+        druid) druid_compose --profile init config ;;
+        web) web_compose --profile index --profile ui --profile reference config ;;
+        *) echo "usage: $0 config druid|web" >&2; exit 2 ;;
+      esac
+      ;;
+    logs)
+      placeholder_env
+      case "${2:-}" in
+        druid) druid_compose logs --tail 200 "${@:3}" ;;
+        web) web_compose logs --tail 200 "${@:3}" ;;
+        *) echo "usage: $0 logs druid|web [service]" >&2; exit 2 ;;
+      esac
+      ;;
+    *)
+      echo "usage: $0 dataset|up|index|ui|reference [<ref>]|stop|down|env|config druid|web|logs druid|web [service]" >&2
+      exit 2
+      ;;
+  esac
+}
+
+# Sourced (by tests/perf), it only defines the functions.
+if [[ "${BASH_SOURCE[0]}" == "$0" ]]; then
+  main "$@"
+fi

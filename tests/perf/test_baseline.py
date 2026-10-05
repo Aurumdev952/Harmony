@@ -9,8 +9,10 @@ from __future__ import annotations
 
 import json
 import math
+import os
 import random
 import statistics
+import subprocess
 from pathlib import Path
 
 import baseline
@@ -584,3 +586,59 @@ def test_the_reference_web_has_its_own_redis():
     assert reference_redis != candidate_redis
     assert services[reference_redis]['profiles'] == ['reference']
     assert reference_redis in services['web-reference']['depends_on']
+
+
+# --- stack.sh: building the web image ------------------------------------------
+
+STACK_SH = baseline.HERE / 'stack.sh'
+
+
+def _build_image(tmp_path: Path, build_exit: int, **env: str):
+    """Source stack.sh with a fake `docker` first on PATH, call build_image the
+    way `up` and `reference` do, and return the result and the docker calls."""
+    calls = tmp_path / 'docker-calls'
+    fake = tmp_path / 'bin' / 'docker'
+    fake.parent.mkdir(parents=True)
+    fake.write_text(
+        '#!/bin/bash\n'
+        f'echo "$*" >> {calls}\n'
+        # No image exists yet, so build_image has to build.
+        '[[ $1 == image ]] && exit 1\n'
+        f'[[ $1 == build ]] && exit {build_exit}\n'
+        'exit 0\n'
+    )
+    fake.chmod(0o755)
+    script = f'source {STACK_SH}\nimage="$(build_image "${{ROOT}}")"\necho "built ${{image}}"\n'
+    result = subprocess.run(
+        ['bash', '-c', script],
+        env={**os.environ, 'PATH': f'{fake.parent}:{os.environ["PATH"]}', **env},
+        capture_output=True,
+        text=True,
+        check=False,
+    )
+    builds = [c for c in calls.read_text().splitlines() if c.startswith('build ')]
+    return result, builds
+
+
+def test_a_failed_docker_build_stops_stack_sh(tmp_path: Path):
+    # The image is built inside a command substitution, where bash drops
+    # errexit: a failed build used to go on and start the old image.
+    result, builds = _build_image(tmp_path, build_exit=1)
+    assert result.returncode != 0
+    assert 'built' not in result.stdout
+    assert len(builds) == 1
+
+
+def test_builds_use_the_default_network_unless_perf_build_network_is_set(
+    tmp_path: Path,
+):
+    result, builds = _build_image(tmp_path / 'default', build_exit=0)
+    assert result.returncode == 0, result.stderr
+    assert len(builds) == 2
+    assert not any('--network' in b for b in builds)
+    result, builds = _build_image(
+        tmp_path / 'host', build_exit=0, PERF_BUILD_NETWORK='host'
+    )
+    assert result.returncode == 0, result.stderr
+    assert len(builds) == 2
+    assert all(' --network host ' in f' {b} ' for b in builds)

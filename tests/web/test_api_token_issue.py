@@ -11,6 +11,7 @@ from __future__ import annotations
 import importlib
 import pkgutil
 from collections.abc import Iterator
+from datetime import datetime
 
 import pytest
 from flask import Flask
@@ -95,3 +96,37 @@ def test_the_admin_apps_later_save_keeps_the_stored_token(app, user):
     update_user_api_tokens(user, [{**saved, 'is_revoked': True}])
 
     assert not check_token_validity(token.id)
+
+
+def test_revoking_skips_tokens_that_are_already_revoked(app, user):
+    app.cache = _Cache()
+    session = app.extensions['sqlalchemy'].db.session
+    long_ago = datetime(2000, 1, 1)
+    session.add_all(
+        [
+            APIToken(id='revokedold', user_id=user.id, is_revoked=True),
+            APIToken(id='stillvalid', user_id=user.id, is_revoked=False),
+        ]
+    )
+    session.commit()
+    APIToken.query.update({'last_modified': long_ago}, synchronize_session=False)
+    session.commit()
+
+    update_user_api_tokens(
+        user,
+        [
+            {'$uri': f'/api2/api-token/{token_id}', 'id': token_id, 'is_revoked': True}
+            for token_id in ('revokedold', 'stillvalid')
+        ],
+    )
+
+    session.expire_all()
+    stored = {row.id: row for row in APIToken.query.filter_by(user_id=user.id)}
+    assert {token_id: row.is_revoked for token_id, row in stored.items()} == {
+        'revokedold': True,
+        'stillvalid': True,
+    }
+    # The UPDATE bumps last_modified on every row it matches, so an unchanged
+    # timestamp shows the revocation excluded the token that was already revoked.
+    assert stored['revokedold'].last_modified == long_ago
+    assert stored['stillvalid'].last_modified != long_ago

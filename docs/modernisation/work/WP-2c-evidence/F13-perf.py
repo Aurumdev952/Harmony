@@ -67,6 +67,8 @@ INSERT INTO source_config (config, source_id, is_active)
 def load(source, name):
     spec = importlib.util.spec_from_loader(name, loader=None)
     module = importlib.util.module_from_spec(spec)
+    # dataclasses and typing resolve names through sys.modules[cls.__module__].
+    sys.modules[name] = module
     exec(compile(source, name, "exec"), module.__dict__)  # noqa: S102 (our own source)
     return module
 

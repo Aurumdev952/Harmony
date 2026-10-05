@@ -34,7 +34,16 @@ Each bound is one-sided at 5% split over both bounds of every case (Bonferroni: 
 
 Under the heaviest synthetic stalls the run still fails more often than 5%: a bootstrap over 30 to 100 rounds is a little optimistic when a quarter of the requests stall. On this host's real noise it holds.
 
-**Reading the `detects` column.** `detects` is the smallest slowdown of every candidate request that would have failed that case. A pass is only as strong as the largest `detects`, and the run prints that value on its last line.
+**Reading the `detects` column.** `detects` is the smallest slowdown of every candidate request that would have failed that case. It is exact: both ratios, their bounds and the seeded bootstrap scale with the candidate. A pass is only as strong as the largest `detects`, and the run prints that value on its last line.
+
+**A pass is per case. Read the cases your WP touches.** Each case is judged on its own, so a slowdown confined to one endpoint has to be caught by that endpoint's cases. On this host one case fails a uniform 1.15 slowdown in 79 to 87% of runs (synthetic stalls and real noise) (`probes/2026-10-06-level-bounds.txt`), so a localised regression can pass a full run. A WP that changes one endpoint or one visualization reads that endpoint's rows: both ratios and `detects`. If the touched case's `detects` is above 1.10, the run could not have seen a 10% regression there. Add a targeted run of that case with more rounds (`--case <name> --rounds 300 --label WP-<id>-<name>`, which narrows the bound), and file it beside the full run.
+
+**A compliant change can fail.** PERF-7 allows up to 10%, but a case whose `detects` is below 1.10 fails a uniform slowdown of 1.10 or less. Recomputed at the current split, the committed A/A run (`paired/2026-10-05-01d5bdf47f-vs-01d5bdf47f-aa`) fails 1 of 24 cases at a uniform 1.05 slowdown, 3 at 1.08 and 9 at 1.10. In the level simulation on real noise, a uniform 1.05 slowdown fails 4.1% of cases, and 63% of runs fail at least one case. At 1.10, 39% of cases fail and every run fails at least one. The rule is stricter than PERF-7's text by design (decision 0011). The failing-run policy below covers a failure that lands just over the limit.
+
+**When a run fails** (decision 0011, item 4):
+- Commit the failing run's files beside the passing ones. Never replace or delete them.
+- File a rerun next to the failure with its own label (`--label WP-<id>-rerun1`). Do not rerun until one passes and cite only that pass: the record must show every run.
+- A failure whose ratio is just above 1.10 goes to the reviewer with the per-case detail: both ratios, both bounds, `detects` and the `.rounds.jsonl`. The reviewer may accept it under PERF-7's text when the case's recorded sensitivity (`detects` below 1.10 in this run or in the A/A run) shows the rule fired on a compliant change. A clear failure (a ratio well above 1.10 with its bound above 1) is a regression to fix.
 
 **Absolute numbers.** p50, p95, bytes, Druid time and host load at start and end are recorded as evidence only.
 
@@ -54,6 +63,7 @@ All commands run from your worktree. Paired mode needs at least 30 rounds per si
    ```bash
    scripts/perf/stack.sh reference               # the old code, beside yours: git merge-base HEAD mig/integration
    npm ci --ignore-scripts --prefix scripts/perf # Playwright 1.56.1, once
+   scripts/perf/node_modules/.bin/playwright install chromium   # its browser, once per machine; not in node_modules
    eval "$(scripts/perf/stack.sh env)"           # the isolation guard refuses eval: export these lines from a script
    uv run --no-project --with requests python scripts/perf/baseline.py --label WP-<id> \
      --dataset "harmony_demo_20261004 (scripts/perf/dataset.py seed 20261004)"
@@ -63,6 +73,19 @@ All commands run from your worktree. Paired mode needs at least 30 rounds per si
    ```bash
    scripts/perf/stack.sh stop                    # keeps volumes; `down` deletes everything
    ```
+   `stop` lasts only until the Docker daemon restarts. Druid's containers are `restart: always`, so a daemon restart or a reboot starts them again, and they take CPU from everyone else on the host. Run `stop` again afterwards. After a reboot, `up` reruns Druid's extension loader while the JVMs are down, and the loader downloads its jars. If containers cannot reach the internet, `docker start` the stopped Druid containers first: `up` then sees them running and skips the loader.
+
+## The phase-exit run
+
+When a phase closes (phase 1 after WP-1b to 1g), one more paired run checks the phase as a whole. Each WP's run passes within its own noise, and several small slowdowns can add up. The reference is the integration commit the phase started from, not a merge base (decision 0011, item 2):
+
+```bash
+scripts/perf/stack.sh reference <phase start commit on mig/integration>
+uv run --no-project --with requests python scripts/perf/baseline.py --label phase-<n>-exit \
+  --dataset "harmony_demo_20261004 (scripts/perf/dataset.py seed 20261004)"
+```
+
+The report notes that the reference is not the merge base, as it should for this run. The phase's exit evidence links this run, under the same failing-run policy.
 
 Use `--case <name>` (repeatable) for a quick look while you work. Only a full run counts as evidence.
 
@@ -97,4 +120,4 @@ Use `--case <name>` (repeatable) for a quick look while you work. Only a full ru
 |---|---|
 | `paired/` | Paired runs: `.reference.jsonl`, `.candidate.jsonl` (`PerfSample` per case), `.rounds.jsonl` (every timed latency, to recompute a verdict), `.meta.json`, `.md` |
 | `contended-host/` | The two rejected committed-mode runs that showed the host's noise |
-| `probes/` | One-off measurements behind requests to other roles |
+| `probes/` | One-off measurements behind requests to other roles, and the outputs of `scripts/perf/probes/` (`level.py`: A/A fail rates and power of full runs; `rounds.py`: a bound's level by round count) |

@@ -10,43 +10,28 @@
 import type { ConcreteRequest } from 'relay-runtime';
 type useSelfServeMutation_DataUploadTableFragment$ref = any;
 export type category_constraint = "category_pkey" | "%future added value";
+export type category_select_column = "created" | "id" | "last_modified" | "name" | "parent_id" | "visibility_status" | "%future added value";
 export type category_update_column = "created" | "id" | "last_modified" | "name" | "parent_id" | "visibility_status" | "%future added value";
 export type data_upload_file_summary_constraint = "data_upload_file_summary_pkey" | "%future added value";
 export type data_upload_file_summary_update_column = "column_mapping" | "created" | "file_path" | "id" | "last_modified" | "self_serve_source_id" | "source_id" | "user_file_name" | "%future added value";
 export type dataprep_flow_constraint = "dataprep_flow_pkey" | "dataprep_flow_recipe_id_key" | "%future added value";
 export type dataprep_flow_update_column = "appendable" | "created" | "expected_columns" | "id" | "last_modified" | "recipe_id" | "%future added value";
-export type dataprep_job_constraint = "dataprep_job_pkey" | "%future added value";
-export type dataprep_job_update_column = "created" | "created_on_dataprep" | "dataprep_flow_id" | "id" | "job_id" | "last_modified" | "last_modified_on_dataprep" | "status" | "%future added value";
-export type dimension_category_constraint = "dimension_category_pkey" | "%future added value";
-export type dimension_category_mapping_constraint = "dimension_category_mapping_dimension_id_category_id_key" | "dimension_category_mapping_pkey" | "%future added value";
-export type dimension_category_mapping_update_column = "category_id" | "created" | "dimension_id" | "id" | "last_modified" | "%future added value";
-export type dimension_category_update_column = "created" | "id" | "last_modified" | "name" | "parent_id" | "%future added value";
-export type dimension_constraint = "dimension_pkey" | "%future added value";
-export type dimension_update_column = "authorizable" | "created" | "description" | "filterable" | "id" | "last_modified" | "name" | "%future added value";
 export type field_category_mapping_constraint = "field_category_mapping_field_id_category_id_key" | "field_category_mapping_pkey" | "%future added value";
+export type field_category_mapping_select_column = "category_id" | "created" | "field_id" | "id" | "last_modified" | "visibility_status" | "%future added value";
 export type field_category_mapping_update_column = "category_id" | "created" | "field_id" | "id" | "last_modified" | "visibility_status" | "%future added value";
 export type field_constraint = "field_pkey" | "%future added value";
-export type field_dimension_mapping_constraint = "field_dimension_mapping_field_id_dimension_id_key" | "field_dimension_mapping_pkey" | "%future added value";
-export type field_dimension_mapping_update_column = "created" | "dimension_id" | "field_id" | "id" | "last_modified" | "%future added value";
 export type field_pipeline_datasource_mapping_constraint = "field_pipeline_datasource_map_field_id_pipeline_datasource__key" | "field_pipeline_datasource_mapping_pkey" | "%future added value";
-export type field_pipeline_datasource_mapping_update_column = "created" | "field_id" | "id" | "last_modified" | "pipeline_datasource_id" | "%future added value";
+export type field_pipeline_datasource_mapping_update_column = "_PLACEHOLDER" | "%future added value";
 export type field_update_column = "calculation" | "copied_from_field_id" | "created" | "description" | "id" | "last_modified" | "name" | "short_name" | "%future added value";
-export type geo_dimension_metadata_constraint = "geo_dimension_metadata_pkey" | "%future added value";
-export type geo_dimension_metadata_update_column = "id" | "lat_id" | "lon_id" | "%future added value";
-export type hierarchical_dimension_metadata_constraint = "hierarchical_dimension_metadata_pkey" | "%future added value";
-export type hierarchical_dimension_metadata_update_column = "dimension_id" | "id" | "parent_id" | "unique_identifier_dimension_id" | "%future added value";
-export type non_hierarchical_dimension_constraint = "non_hierarchical_dimension_pkey" | "%future added value";
-export type non_hierarchical_dimension_update_column = "id" | "%future added value";
 export type pipeline_datasource_constraint = "pipeline_datasource_pkey" | "%future added value";
 export type pipeline_datasource_update_column = "created" | "id" | "last_modified" | "name" | "%future added value";
 export type self_serve_source_constraint = "self_serve_source_pkey" | "%future added value";
 export type self_serve_source_update_column = "created" | "dataprep_flow_id" | "id" | "last_modified" | "source_id" | "%future added value";
 export type unpublished_field_category_mapping_constraint = "unpublished_field_category_ma_unpublished_field_id_category_key" | "unpublished_field_category_mapping_pkey" | "%future added value";
-export type unpublished_field_category_mapping_update_column = "category_id" | "id" | "unpublished_field_id" | "%future added value";
+export type unpublished_field_category_mapping_update_column = "_PLACEHOLDER" | "%future added value";
 export type unpublished_field_constraint = "unpublished_field_pkey" | "%future added value";
-export type unpublished_field_dimension_mapping_constraint = "unpublished_field_dimension_m_unpublished_field_id_dimensio_key" | "unpublished_field_dimension_mapping_pkey" | "%future added value";
-export type unpublished_field_dimension_mapping_update_column = "dimension_id" | "id" | "unpublished_field_id" | "%future added value";
 export type unpublished_field_pipeline_datasource_mapping_constraint = "unpublished_field_pipeline_da_unpublished_field_id_pipeline_key" | "unpublished_field_pipeline_datasource_mapping_pkey" | "%future added value";
+export type unpublished_field_pipeline_datasource_mapping_select_column = "id" | "pipeline_datasource_id" | "unpublished_field_id" | "%future added value";
 export type unpublished_field_pipeline_datasource_mapping_update_column = "id" | "pipeline_datasource_id" | "unpublished_field_id" | "%future added value";
 export type unpublished_field_update_column = "calculation" | "description" | "id" | "name" | "short_name" | "%future added value";
 export type self_serve_source_insert_input = {|
@@ -222,6 +207,7 @@ export type pipeline_datasource_bool_exp = {|
   name?: ?String_comparison_exp,
   self_serve_sources?: ?self_serve_source_bool_exp,
   unpublished_field_pipeline_datasource_mappings?: ?unpublished_field_pipeline_datasource_mapping_bool_exp,
+  unpublished_field_pipeline_datasource_mappings_aggregate?: ?unpublished_field_pipeline_datasource_mapping_aggregate_bool_exp,
 |};
 export type field_pipeline_datasource_mapping_bool_exp = {|
   _and?: ?$ReadOnlyArray<field_pipeline_datasource_mapping_bool_exp>,
@@ -245,6 +231,7 @@ export type field_bool_exp = {|
   created?: ?timestamp_comparison_exp,
   description?: ?String_comparison_exp,
   field_category_mappings?: ?field_category_mapping_bool_exp,
+  field_category_mappings_aggregate?: ?field_category_mapping_aggregate_bool_exp,
   field_copies?: ?field_bool_exp,
   field_dimension_mappings?: ?field_dimension_mapping_bool_exp,
   field_pipeline_datasource_mappings?: ?field_pipeline_datasource_mapping_bool_exp,
@@ -271,8 +258,10 @@ export type category_bool_exp = {|
   _not?: ?category_bool_exp,
   _or?: ?$ReadOnlyArray<category_bool_exp>,
   children?: ?category_bool_exp,
+  children_aggregate?: ?category_aggregate_bool_exp,
   created?: ?timestamp_comparison_exp,
   field_category_mappings?: ?field_category_mapping_bool_exp,
+  field_category_mappings_aggregate?: ?field_category_mapping_aggregate_bool_exp,
   id?: ?String_comparison_exp,
   last_modified?: ?timestamp_comparison_exp,
   name?: ?String_comparison_exp,
@@ -280,6 +269,24 @@ export type category_bool_exp = {|
   parent_id?: ?String_comparison_exp,
   unpublished_field_category_mappings?: ?unpublished_field_category_mapping_bool_exp,
   visibility_status?: ?visibility_status_enum_comparison_exp,
+|};
+export type category_aggregate_bool_exp = {|
+  count?: ?category_aggregate_bool_exp_count
+|};
+export type category_aggregate_bool_exp_count = {|
+  arguments?: ?$ReadOnlyArray<category_select_column>,
+  distinct?: ?boolean,
+  filter?: ?category_bool_exp,
+  predicate: Int_comparison_exp,
+|};
+export type field_category_mapping_aggregate_bool_exp = {|
+  count?: ?field_category_mapping_aggregate_bool_exp_count
+|};
+export type field_category_mapping_aggregate_bool_exp_count = {|
+  arguments?: ?$ReadOnlyArray<field_category_mapping_select_column>,
+  distinct?: ?boolean,
+  filter?: ?field_category_mapping_bool_exp,
+  predicate: Int_comparison_exp,
 |};
 export type unpublished_field_category_mapping_bool_exp = {|
   _and?: ?$ReadOnlyArray<unpublished_field_category_mapping_bool_exp>,
@@ -301,18 +308,50 @@ export type unpublished_field_bool_exp = {|
   name?: ?String_comparison_exp,
   short_name?: ?String_comparison_exp,
   unpublished_field_category_mappings?: ?unpublished_field_category_mapping_bool_exp,
-  unpublished_field_dimension_mappings?: ?unpublished_field_dimension_mapping_bool_exp,
   unpublished_field_pipeline_datasource_mappings?: ?unpublished_field_pipeline_datasource_mapping_bool_exp,
+  unpublished_field_pipeline_datasource_mappings_aggregate?: ?unpublished_field_pipeline_datasource_mapping_aggregate_bool_exp,
 |};
-export type unpublished_field_dimension_mapping_bool_exp = {|
-  _and?: ?$ReadOnlyArray<unpublished_field_dimension_mapping_bool_exp>,
-  _not?: ?unpublished_field_dimension_mapping_bool_exp,
-  _or?: ?$ReadOnlyArray<unpublished_field_dimension_mapping_bool_exp>,
-  dimension?: ?dimension_bool_exp,
-  dimension_id?: ?String_comparison_exp,
+export type unpublished_field_pipeline_datasource_mapping_bool_exp = {|
+  _and?: ?$ReadOnlyArray<unpublished_field_pipeline_datasource_mapping_bool_exp>,
+  _not?: ?unpublished_field_pipeline_datasource_mapping_bool_exp,
+  _or?: ?$ReadOnlyArray<unpublished_field_pipeline_datasource_mapping_bool_exp>,
   id?: ?Int_comparison_exp,
+  pipeline_datasource?: ?pipeline_datasource_bool_exp,
+  pipeline_datasource_id?: ?String_comparison_exp,
   unpublished_field?: ?unpublished_field_bool_exp,
   unpublished_field_id?: ?String_comparison_exp,
+|};
+export type unpublished_field_pipeline_datasource_mapping_aggregate_bool_exp = {|
+  count?: ?unpublished_field_pipeline_datasource_mapping_aggregate_bool_exp_count
+|};
+export type unpublished_field_pipeline_datasource_mapping_aggregate_bool_exp_count = {|
+  arguments?: ?$ReadOnlyArray<unpublished_field_pipeline_datasource_mapping_select_column>,
+  distinct?: ?boolean,
+  filter?: ?unpublished_field_pipeline_datasource_mapping_bool_exp,
+  predicate: Int_comparison_exp,
+|};
+export type visibility_status_enum_comparison_exp = {|
+  _eq?: ?any,
+  _gt?: ?any,
+  _gte?: ?any,
+  _in?: ?$ReadOnlyArray<any>,
+  _is_null?: ?boolean,
+  _lt?: ?any,
+  _lte?: ?any,
+  _neq?: ?any,
+  _nin?: ?$ReadOnlyArray<any>,
+|};
+export type field_dimension_mapping_bool_exp = {|
+  _and?: ?$ReadOnlyArray<field_dimension_mapping_bool_exp>,
+  _not?: ?field_dimension_mapping_bool_exp,
+  _or?: ?$ReadOnlyArray<field_dimension_mapping_bool_exp>,
+  created?: ?timestamp_comparison_exp,
+  dimension?: ?dimension_bool_exp,
+  dimension_id?: ?String_comparison_exp,
+  field?: ?field_bool_exp,
+  field_id?: ?String_comparison_exp,
+  id?: ?Int_comparison_exp,
+  last_modified?: ?timestamp_comparison_exp,
 |};
 export type dimension_bool_exp = {|
   _and?: ?$ReadOnlyArray<dimension_bool_exp>,
@@ -324,16 +363,9 @@ export type dimension_bool_exp = {|
   dimension_category_mappings?: ?dimension_category_mapping_bool_exp,
   field_dimension_mappings?: ?field_dimension_mapping_bool_exp,
   filterable?: ?Boolean_comparison_exp,
-  geoDimensionMetadataByLatId?: ?geo_dimension_metadata_bool_exp,
-  geoDimensionMetadataByLonId?: ?geo_dimension_metadata_bool_exp,
-  geo_dimension_metadata?: ?geo_dimension_metadata_bool_exp,
-  hierarchicalDimensionMetadataByUniqueIdentifierDimensionId?: ?hierarchical_dimension_metadata_bool_exp,
-  hierarchical_dimension_metadata?: ?hierarchical_dimension_metadata_bool_exp,
   id?: ?String_comparison_exp,
   last_modified?: ?timestamp_comparison_exp,
   name?: ?String_comparison_exp,
-  non_hierarchical_dimensions?: ?non_hierarchical_dimension_bool_exp,
-  unpublished_field_dimension_mappings?: ?unpublished_field_dimension_mapping_bool_exp,
 |};
 export type dimension_category_mapping_bool_exp = {|
   _and?: ?$ReadOnlyArray<dimension_category_mapping_bool_exp>,
@@ -360,70 +392,6 @@ export type dimension_category_bool_exp = {|
   parent?: ?dimension_category_bool_exp,
   parent_id?: ?String_comparison_exp,
 |};
-export type field_dimension_mapping_bool_exp = {|
-  _and?: ?$ReadOnlyArray<field_dimension_mapping_bool_exp>,
-  _not?: ?field_dimension_mapping_bool_exp,
-  _or?: ?$ReadOnlyArray<field_dimension_mapping_bool_exp>,
-  created?: ?timestamp_comparison_exp,
-  dimension?: ?dimension_bool_exp,
-  dimension_id?: ?String_comparison_exp,
-  field?: ?field_bool_exp,
-  field_id?: ?String_comparison_exp,
-  id?: ?Int_comparison_exp,
-  last_modified?: ?timestamp_comparison_exp,
-|};
-export type geo_dimension_metadata_bool_exp = {|
-  _and?: ?$ReadOnlyArray<geo_dimension_metadata_bool_exp>,
-  _not?: ?geo_dimension_metadata_bool_exp,
-  _or?: ?$ReadOnlyArray<geo_dimension_metadata_bool_exp>,
-  dimension?: ?dimension_bool_exp,
-  dimensionByLatId?: ?dimension_bool_exp,
-  dimensionByLonId?: ?dimension_bool_exp,
-  id?: ?String_comparison_exp,
-  lat_id?: ?String_comparison_exp,
-  lon_id?: ?String_comparison_exp,
-|};
-export type hierarchical_dimension_metadata_bool_exp = {|
-  _and?: ?$ReadOnlyArray<hierarchical_dimension_metadata_bool_exp>,
-  _not?: ?hierarchical_dimension_metadata_bool_exp,
-  _or?: ?$ReadOnlyArray<hierarchical_dimension_metadata_bool_exp>,
-  dimension?: ?dimension_bool_exp,
-  dimensionByUniqueIdentifierDimensionId?: ?dimension_bool_exp,
-  dimension_id?: ?String_comparison_exp,
-  hierarchical_dimension_metadata?: ?hierarchical_dimension_metadata_bool_exp,
-  hierarchical_dimension_metadatum?: ?hierarchical_dimension_metadata_bool_exp,
-  id?: ?Int_comparison_exp,
-  parent_id?: ?Int_comparison_exp,
-  unique_identifier_dimension_id?: ?String_comparison_exp,
-|};
-export type non_hierarchical_dimension_bool_exp = {|
-  _and?: ?$ReadOnlyArray<non_hierarchical_dimension_bool_exp>,
-  _not?: ?non_hierarchical_dimension_bool_exp,
-  _or?: ?$ReadOnlyArray<non_hierarchical_dimension_bool_exp>,
-  dimension?: ?dimension_bool_exp,
-  id?: ?String_comparison_exp,
-|};
-export type unpublished_field_pipeline_datasource_mapping_bool_exp = {|
-  _and?: ?$ReadOnlyArray<unpublished_field_pipeline_datasource_mapping_bool_exp>,
-  _not?: ?unpublished_field_pipeline_datasource_mapping_bool_exp,
-  _or?: ?$ReadOnlyArray<unpublished_field_pipeline_datasource_mapping_bool_exp>,
-  id?: ?Int_comparison_exp,
-  pipeline_datasource?: ?pipeline_datasource_bool_exp,
-  pipeline_datasource_id?: ?String_comparison_exp,
-  unpublished_field?: ?unpublished_field_bool_exp,
-  unpublished_field_id?: ?String_comparison_exp,
-|};
-export type visibility_status_enum_comparison_exp = {|
-  _eq?: ?any,
-  _gt?: ?any,
-  _gte?: ?any,
-  _in?: ?$ReadOnlyArray<any>,
-  _is_null?: ?boolean,
-  _lt?: ?any,
-  _lte?: ?any,
-  _neq?: ?any,
-  _nin?: ?$ReadOnlyArray<any>,
-|};
 export type data_upload_file_summary_on_conflict = {|
   constraint: data_upload_file_summary_constraint,
   update_columns: $ReadOnlyArray<data_upload_file_summary_update_column>,
@@ -436,32 +404,11 @@ export type dataprep_flow_obj_rel_insert_input = {|
 export type dataprep_flow_insert_input = {|
   appendable?: ?boolean,
   created?: ?any,
-  dataprep_jobs?: ?dataprep_job_arr_rel_insert_input,
   expected_columns?: ?any,
   id?: ?number,
   last_modified?: ?any,
   recipe_id?: ?number,
   self_serve_sources?: ?self_serve_source_arr_rel_insert_input,
-|};
-export type dataprep_job_arr_rel_insert_input = {|
-  data: $ReadOnlyArray<dataprep_job_insert_input>,
-  on_conflict?: ?dataprep_job_on_conflict,
-|};
-export type dataprep_job_insert_input = {|
-  created?: ?any,
-  created_on_dataprep?: ?any,
-  dataprep_flow?: ?dataprep_flow_obj_rel_insert_input,
-  dataprep_flow_id?: ?number,
-  id?: ?number,
-  job_id?: ?number,
-  last_modified?: ?any,
-  last_modified_on_dataprep?: ?any,
-  status?: ?string,
-|};
-export type dataprep_job_on_conflict = {|
-  constraint: dataprep_job_constraint,
-  update_columns: $ReadOnlyArray<dataprep_job_update_column>,
-  where?: ?dataprep_job_bool_exp,
 |};
 export type self_serve_source_arr_rel_insert_input = {|
   data: $ReadOnlyArray<self_serve_source_insert_input>,
@@ -510,7 +457,6 @@ export type field_insert_input = {|
   description?: ?string,
   field_category_mappings?: ?field_category_mapping_arr_rel_insert_input,
   field_copies?: ?field_arr_rel_insert_input,
-  field_dimension_mappings?: ?field_dimension_mapping_arr_rel_insert_input,
   field_pipeline_datasource_mappings?: ?field_pipeline_datasource_mapping_arr_rel_insert_input,
   id?: ?string,
   last_modified?: ?any,
@@ -578,163 +524,7 @@ export type unpublished_field_insert_input = {|
   name?: ?string,
   short_name?: ?string,
   unpublished_field_category_mappings?: ?unpublished_field_category_mapping_arr_rel_insert_input,
-  unpublished_field_dimension_mappings?: ?unpublished_field_dimension_mapping_arr_rel_insert_input,
   unpublished_field_pipeline_datasource_mappings?: ?unpublished_field_pipeline_datasource_mapping_arr_rel_insert_input,
-|};
-export type unpublished_field_dimension_mapping_arr_rel_insert_input = {|
-  data: $ReadOnlyArray<unpublished_field_dimension_mapping_insert_input>,
-  on_conflict?: ?unpublished_field_dimension_mapping_on_conflict,
-|};
-export type unpublished_field_dimension_mapping_insert_input = {|
-  dimension?: ?dimension_obj_rel_insert_input,
-  dimension_id?: ?string,
-  id?: ?number,
-  unpublished_field?: ?unpublished_field_obj_rel_insert_input,
-  unpublished_field_id?: ?string,
-|};
-export type dimension_obj_rel_insert_input = {|
-  data: dimension_insert_input,
-  on_conflict?: ?dimension_on_conflict,
-|};
-export type dimension_insert_input = {|
-  authorizable?: ?boolean,
-  created?: ?any,
-  description?: ?string,
-  dimension_category_mappings?: ?dimension_category_mapping_arr_rel_insert_input,
-  field_dimension_mappings?: ?field_dimension_mapping_arr_rel_insert_input,
-  filterable?: ?boolean,
-  geoDimensionMetadataByLatId?: ?geo_dimension_metadata_arr_rel_insert_input,
-  geoDimensionMetadataByLonId?: ?geo_dimension_metadata_arr_rel_insert_input,
-  geo_dimension_metadata?: ?geo_dimension_metadata_arr_rel_insert_input,
-  hierarchicalDimensionMetadataByUniqueIdentifierDimensionId?: ?hierarchical_dimension_metadata_arr_rel_insert_input,
-  hierarchical_dimension_metadata?: ?hierarchical_dimension_metadata_arr_rel_insert_input,
-  id?: ?string,
-  last_modified?: ?any,
-  name?: ?string,
-  non_hierarchical_dimensions?: ?non_hierarchical_dimension_arr_rel_insert_input,
-  unpublished_field_dimension_mappings?: ?unpublished_field_dimension_mapping_arr_rel_insert_input,
-|};
-export type dimension_category_mapping_arr_rel_insert_input = {|
-  data: $ReadOnlyArray<dimension_category_mapping_insert_input>,
-  on_conflict?: ?dimension_category_mapping_on_conflict,
-|};
-export type dimension_category_mapping_insert_input = {|
-  category_id?: ?string,
-  created?: ?any,
-  dimension?: ?dimension_obj_rel_insert_input,
-  dimension_category?: ?dimension_category_obj_rel_insert_input,
-  dimension_id?: ?string,
-  id?: ?number,
-  last_modified?: ?any,
-|};
-export type dimension_category_obj_rel_insert_input = {|
-  data: dimension_category_insert_input,
-  on_conflict?: ?dimension_category_on_conflict,
-|};
-export type dimension_category_insert_input = {|
-  children?: ?dimension_category_arr_rel_insert_input,
-  created?: ?any,
-  dimension_category_mappings?: ?dimension_category_mapping_arr_rel_insert_input,
-  id?: ?string,
-  last_modified?: ?any,
-  name?: ?string,
-  parent?: ?dimension_category_obj_rel_insert_input,
-  parent_id?: ?string,
-|};
-export type dimension_category_arr_rel_insert_input = {|
-  data: $ReadOnlyArray<dimension_category_insert_input>,
-  on_conflict?: ?dimension_category_on_conflict,
-|};
-export type dimension_category_on_conflict = {|
-  constraint: dimension_category_constraint,
-  update_columns: $ReadOnlyArray<dimension_category_update_column>,
-  where?: ?dimension_category_bool_exp,
-|};
-export type dimension_category_mapping_on_conflict = {|
-  constraint: dimension_category_mapping_constraint,
-  update_columns: $ReadOnlyArray<dimension_category_mapping_update_column>,
-  where?: ?dimension_category_mapping_bool_exp,
-|};
-export type field_dimension_mapping_arr_rel_insert_input = {|
-  data: $ReadOnlyArray<field_dimension_mapping_insert_input>,
-  on_conflict?: ?field_dimension_mapping_on_conflict,
-|};
-export type field_dimension_mapping_insert_input = {|
-  created?: ?any,
-  dimension?: ?dimension_obj_rel_insert_input,
-  dimension_id?: ?string,
-  field?: ?field_obj_rel_insert_input,
-  field_id?: ?string,
-  id?: ?number,
-  last_modified?: ?any,
-|};
-export type field_dimension_mapping_on_conflict = {|
-  constraint: field_dimension_mapping_constraint,
-  update_columns: $ReadOnlyArray<field_dimension_mapping_update_column>,
-  where?: ?field_dimension_mapping_bool_exp,
-|};
-export type geo_dimension_metadata_arr_rel_insert_input = {|
-  data: $ReadOnlyArray<geo_dimension_metadata_insert_input>,
-  on_conflict?: ?geo_dimension_metadata_on_conflict,
-|};
-export type geo_dimension_metadata_insert_input = {|
-  dimension?: ?dimension_obj_rel_insert_input,
-  dimensionByLatId?: ?dimension_obj_rel_insert_input,
-  dimensionByLonId?: ?dimension_obj_rel_insert_input,
-  id?: ?string,
-  lat_id?: ?string,
-  lon_id?: ?string,
-|};
-export type geo_dimension_metadata_on_conflict = {|
-  constraint: geo_dimension_metadata_constraint,
-  update_columns: $ReadOnlyArray<geo_dimension_metadata_update_column>,
-  where?: ?geo_dimension_metadata_bool_exp,
-|};
-export type hierarchical_dimension_metadata_arr_rel_insert_input = {|
-  data: $ReadOnlyArray<hierarchical_dimension_metadata_insert_input>,
-  on_conflict?: ?hierarchical_dimension_metadata_on_conflict,
-|};
-export type hierarchical_dimension_metadata_insert_input = {|
-  dimension?: ?dimension_obj_rel_insert_input,
-  dimensionByUniqueIdentifierDimensionId?: ?dimension_obj_rel_insert_input,
-  dimension_id?: ?string,
-  hierarchical_dimension_metadata?: ?hierarchical_dimension_metadata_arr_rel_insert_input,
-  hierarchical_dimension_metadatum?: ?hierarchical_dimension_metadata_obj_rel_insert_input,
-  id?: ?number,
-  parent_id?: ?number,
-  unique_identifier_dimension_id?: ?string,
-|};
-export type hierarchical_dimension_metadata_obj_rel_insert_input = {|
-  data: hierarchical_dimension_metadata_insert_input,
-  on_conflict?: ?hierarchical_dimension_metadata_on_conflict,
-|};
-export type hierarchical_dimension_metadata_on_conflict = {|
-  constraint: hierarchical_dimension_metadata_constraint,
-  update_columns: $ReadOnlyArray<hierarchical_dimension_metadata_update_column>,
-  where?: ?hierarchical_dimension_metadata_bool_exp,
-|};
-export type non_hierarchical_dimension_arr_rel_insert_input = {|
-  data: $ReadOnlyArray<non_hierarchical_dimension_insert_input>,
-  on_conflict?: ?non_hierarchical_dimension_on_conflict,
-|};
-export type non_hierarchical_dimension_insert_input = {|
-  dimension?: ?dimension_obj_rel_insert_input,
-  id?: ?string,
-|};
-export type non_hierarchical_dimension_on_conflict = {|
-  constraint: non_hierarchical_dimension_constraint,
-  update_columns: $ReadOnlyArray<non_hierarchical_dimension_update_column>,
-  where?: ?non_hierarchical_dimension_bool_exp,
-|};
-export type dimension_on_conflict = {|
-  constraint: dimension_constraint,
-  update_columns: $ReadOnlyArray<dimension_update_column>,
-  where?: ?dimension_bool_exp,
-|};
-export type unpublished_field_dimension_mapping_on_conflict = {|
-  constraint: unpublished_field_dimension_mapping_constraint,
-  update_columns: $ReadOnlyArray<unpublished_field_dimension_mapping_update_column>,
-  where?: ?unpublished_field_dimension_mapping_bool_exp,
 |};
 export type unpublished_field_pipeline_datasource_mapping_arr_rel_insert_input = {|
   data: $ReadOnlyArray<unpublished_field_pipeline_datasource_mapping_insert_input>,

@@ -33,7 +33,7 @@ def lists_are_equal(list_a: List[str], list_b: List[str]) -> bool:
 
 
 def refresh_status(continuous_scroll: bool = False):
-    output_lines = list(run_dmypy_command('run -- .', False)[1])
+    output_lines = list(run_dmypy_command('run --', False)[1])
     # pylint: disable=global-statement
     global last_mypy_output
     if last_mypy_output is None or not lists_are_equal(last_mypy_output, output_lines):

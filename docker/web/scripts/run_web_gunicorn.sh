@@ -8,7 +8,7 @@
 
 # Location of gunicorn master PID. Gunicorn will store its master process ID in
 # this file when the server has fully initialized.
-PID_FILE='/tmp/gunicorn_master.pid'
+PID_FILE="${GUNICORN_PID_FILE:-/tmp/gunicorn_master.pid}"
 
 # Clean up pid file on first run in case container was stopped and the file was
 # not cleared.
@@ -19,6 +19,7 @@ rm -f "${PID_FILE}"
 # NOTE: If adjusting this timeout, also adjust nginx timeout in
 # `prod/nginx/nginx_vhost_default_location`.
 web/gunicorn_server.py --timeout=600 --pidfile "${PID_FILE}"
+server_status=$?
 
 # Monitor the gunicorn PID file to detect if the server is still running. Prefer
 # to loop like this since the master process can be replaced out-of-band by a
@@ -27,6 +28,7 @@ web/gunicorn_server.py --timeout=600 --pidfile "${PID_FILE}"
 # (since the original master will terminate). Watching the PID file allows us to
 # continue blocking even if the original gunicorn is replaced.
 retry_count=0
+replaced=0
 while true ; do
   # NOTE: There are some edge cases where the master PID file will be
   # replaced *right when this while loop comes out of sleep*. This is because
@@ -42,7 +44,14 @@ while true ; do
     ((retry_count += 1))
   else
     retry_count=0
+    replaced=1
   fi
 
   sleep 5
 done
+
+# A server that refused to start (for example on a default secret) never wrote
+# the PID file; report its failure instead of a clean stop.
+if (( ! replaced )) ; then
+  exit "${server_status}"
+fi

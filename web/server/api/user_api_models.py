@@ -2,6 +2,7 @@
 
 User APIs Accessible via http://<server_uri>:5000/api2/user
 '''
+
 from http.client import BAD_REQUEST, OK, NO_CONTENT, UNAUTHORIZED
 
 from flask import current_app, g

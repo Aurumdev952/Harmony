@@ -31,7 +31,6 @@ from models.alchemy.permission import Resource, ResourceRole, Role
 from models.alchemy.security_group import Group, GroupAcl
 from models.alchemy.user import User, UserAcl
 from models.alchemy.user.web_base_user import BaseWebUserMixin
-from models.python.permissions import QueryNeed
 from web.server.data.data_access import get_db_adapter
 from web.server.potion.access import get_id_from_uri
 from web.server.routes.views.authorization import (
@@ -127,7 +126,11 @@ def member_groups_from_uris(
     if current_user_is_superuser():
         return groups
     allowed_ids = {group.id for group in existing} | {
-        group.id for group in current_user.groups
+        group.id
+        for group in current_user.groups
+        # As in `held_roles_from_uris`: a narrowed token on an admin account
+        # must not pass on a group carrying the admin role.
+        if all(role.name != SUPERUSER_ROLENAME for role in group.roles)
     }
     not_member = [group for group in groups if group.id not in allowed_ids]
     if not_member:
@@ -183,7 +186,11 @@ def verify_role_grants(new_role: RoleFields, role: Role | None = None) -> None:
     if role is None:
         permission_ids, dashboard_role_id, alert_role_id = set(), None, None
     else:
-        permission_ids = {permission.id for permission in role.permissions}
+        # sqlmypy types an untyped `relationship` as one `Permission`.
+        permission_ids = {
+            permission.id
+            for permission in role.permissions  # type: ignore[attr-defined]
+        }
         dashboard_role_id = role.dashboard_resource_role_id
         alert_role_id = role.alert_resource_role_id
     gated = [
@@ -235,15 +242,14 @@ def verify_role_grants(new_role: RoleFields, role: Role | None = None) -> None:
 
 
 def holds_everything_in(role: Role) -> bool:
-    '''Whether the caller's account already holds every permission and resource
-    role `role` grants. Its policies and export passed `verify_role_grants`.
+    '''Whether the caller's account already holds every need `role` grants. Its
+    policies passed `verify_role_grants`, so only permissions and resource roles
+    can be missing.
     '''
     account_needs = _account_needs()
     # pylint: disable=protected-access
     return all(
-        need in account_needs
-        for need in BaseWebUserMixin._build_role_needs([role])
-        if not isinstance(need, QueryNeed)
+        need in account_needs for need in BaseWebUserMixin._build_role_needs([role])
     )
 
 

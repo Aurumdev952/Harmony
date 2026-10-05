@@ -6,7 +6,7 @@ set -o pipefail
 # started and will take over for the existing master process.
 
 # Location of gunicorn master PID.
-PID_FILE='/tmp/gunicorn_master.pid'
+PID_FILE="${GUNICORN_PID_FILE:-/tmp/gunicorn_master.pid}"
 
 # Location of a potentialy secondary master gunicorn process file. When the
 # primary gunicorn process is being replaced, the new master will store its PID

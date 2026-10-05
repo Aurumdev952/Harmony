@@ -1,0 +1,2 @@
+{"Real_Date": "2021-05-01", "data": {"demo_malaria_positive": 5, "demo_malaria_tested": 15}, "key": {"Age": "30", "Death": "NAO", "MunicipalityName": "Ashford", "Sex": "F", "StateName": "Northvale"}, "source": "demo_wide"}
+{"Real_Date": "2021-06-30", "data": {"demo_malaria_positive": 7, "demo_malaria_tested": 7}, "key": {"Age": "5", "Death": "NAO", "MunicipalityName": "Cedar Point, East", "Sex": "F", "StateName": "Southmere"}, "source": "demo_wide"}

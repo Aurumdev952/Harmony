@@ -1,0 +1,2 @@
+{"key": {"StateName": "Northvale", "MunicipalityName": "Ashford", "Sex": "F"}, "data": {"clinic_survey_visits_total": 20, "clinic_survey_referrals": 1}, "Real_Date": "2021-09-01", "source": "clinic_survey"}
+{"key": {"StateName": "Southmere", "MunicipalityName": "Cedar Point", "Sex": "M"}, "data": {"clinic_survey_visits_total": 5}, "Real_Date": "2021-09-02", "source": "clinic_survey"}

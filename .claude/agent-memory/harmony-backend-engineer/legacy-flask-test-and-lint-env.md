@@ -11,3 +11,5 @@ metadata:
 - To compare against a base revision without touching the worktree: `git archive <rev> -o /tmp/x.tar`, extract it to /tmp, copy the test dir in. If the target directory does not exist, `cp -r` lands one level too high.
 
 Related: [[narrowed-admin-tokens]]
+
+Superseded once a branch merges WP-2f (mig/integration 4be8451): CI is `ci/lint_python.sh <base>` (ruff on changed files), `uv run --locked mypy`, `ci/pytest_suites.sh`. A suite that builds a Flask app and registers Potion resources must be its own top-level `tests/<name>/` directory; nested under `tests/web` it broke `test_graphql_endpoint_removed.py` by sharing the process (WP-0h, 2026-10-05). See [[post-wp2f-tooling]].

@@ -94,6 +94,7 @@ None of these block WP-2e.
   - Against the stack, with `login.button-name` removed from the baseline and `admin-roles.color-contrast` raised to 95, an update run fails login with `login: button-name 0 -> 1`, leaves login without the rule, and shrinks admin-roles to 94.
   - With `E2E_A11Y_ACCEPT=login:button-name` both tests pass, and the file is byte-identical to the committed baseline.
   - The full a11y project passes 26.
+- 2026-10-06 qa-5t round 2, unit 6 (reviewer finding 6, FE-2): `e2e/` moves to TypeScript 6.0.3 (exact pin, `e2e/yarn.lock` updated), with `module` and `moduleResolution` set to `node16`. Check, failing first: TypeScript 6.0.3 on the old config failed with TS5107 ("moduleResolution=node10 is deprecated"). With node16, strict `tsc --noEmit` is clean over the 20 project files (`--listFilesOnly`). Playwright still loads the specs.
 
 ## Evidence
 

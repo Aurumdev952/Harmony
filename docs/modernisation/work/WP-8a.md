@@ -5,7 +5,11 @@ status: review
 owner_role: "data-platform"
 instances:
   - name: "data-platform-4"
-    files: ["druid_setup/**", "scripts/druid/null_audit/**", "tests/druid/**", "docs/modernisation/work/WP-8a.md", "docs/modernisation/work/WP-8a-evidence/**", "docs/modernisation/decisions/*-wp-8a-*.md"]
+    files: ["druid_setup/**", "db/druid/indexing/**", "scripts/druid/null_audit/**", "tests/druid/**", "docs/modernisation/work/WP-8a.md", "docs/modernisation/work/WP-8a-evidence/**", "docs/modernisation/decisions/*-wp-8a-*.md", ".claude/agent-memory/harmony-data-platform-engineer/**"]
+  - name: "core-8a-c"
+    files: ["data/query/models/dimension.py", "data/query/models/granularity/**", "db/druid/aggregations/exact_unique_count_aggregation.py", "db/druid/util.py", "db/druid/post_aggregation_builder.py", "db/druid/js_formulas/**", "web/server/data/dimension_metadata_util/compute_sketch_sizes.py", "tests/core/test_null_selectors.py", "tests/core/test_negation_keeps_nulls.py", ".claude/agent-memory/harmony-core-engineer/**"]
+  - name: "pipeline-8a"
+    files: ["data/alerts/alert.py", "tests/alerts/**", ".claude/agent-memory/harmony-pipeline-engineer/**"]
 branch: "mig/WP-8a-druid-js-null-audit"
 requirements: [SEC-8, DATA-1]
 contracts_consumed: []

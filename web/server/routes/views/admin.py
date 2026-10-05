@@ -62,30 +62,25 @@ def _logger() -> Union[Logger, LoggerAdapter]:
 def _mail_reset_link(
     transaction: Transaction, user: User, logger: Union[Logger, LoggerAdapter]
 ) -> None:
-    # Generate reset password token
     token = current_app.user_manager.generate_token(int(user.get_id()))
     reset_password_link = deployment_url('auth.reset_password', token=token)
 
-    # Create reset password email message
     email_message = current_app.email_renderer.create_password_reset_message(
         current_user, user, reset_password_link
     )
     logger.info('Sending reset-password email to: \'%s\'', user.username)
     try:
-        # Send password reset email
         current_app.notification_service.send_email(email_message)
     except NotificationError:
         error = f'Failed to send reset-password email to: \'{user.username}\''
         logger.error('Failed to send reset-password email to: \'%s\'', user.username)
         raise BadGateway(error)  # pylint: disable=raise-missing-from
 
-    # Store token to db
     user.reset_password_token = token
     transaction.add_or_update(user, flush=True)
 
 
 def _announce_reset(user: User, logger: Union[Logger, LoggerAdapter]) -> None:
-    # Send forgot_password signal to flask_user to trigger any hooks
     # pylint: disable=W0212
     user_forgot_password.send(current_app._get_current_object(), user=user)
     logger.info(

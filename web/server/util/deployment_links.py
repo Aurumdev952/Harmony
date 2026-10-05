@@ -7,6 +7,7 @@ host.
 """
 
 import re
+from typing import Any, Optional, Tuple
 from urllib.parse import urlsplit
 
 from flask import current_app
@@ -21,7 +22,7 @@ from config.locales import LOCALES
 _SESSION_HASH = re.compile(r"(?:^|#)h=([0-9A-Za-z_-]{1,128})(?=#|$)")
 
 
-def deployment_origin(deployment_base_url):
+def deployment_origin(deployment_base_url: Optional[str]) -> str:
     """The configured DEPLOYMENT_BASE_URL as a bare https origin, or ValueError.
 
     Renders send a minted token to this origin and emails send links to it, so it
@@ -49,14 +50,14 @@ def deployment_origin(deployment_base_url):
     return f"https://{parts.netloc}"
 
 
-def deployment_url(endpoint, **values):
+def deployment_url(endpoint: str, **values: Any) -> str:
     """`endpoint`'s absolute URL on the configured origin. Values the rule does
     not take become the query string; `None` values are left out."""
     origin = deployment_origin(current_app.zen_config.general.DEPLOYMENT_BASE_URL)
     return origin + current_app.url_map.bind("").build(endpoint, values)
 
 
-def page_args(link, endpoint):
+def page_args(link: Optional[str], endpoint: str) -> Tuple[Optional[str], str]:
     """The locale and session hash in a caller's link to `endpoint`'s page.
 
     Nothing else is taken from the link: its host, path and query are ignored,
@@ -78,7 +79,7 @@ def page_args(link, endpoint):
     )
 
 
-def shared_page_url(link, endpoint, **values):
+def shared_page_url(link: Optional[str], endpoint: str, **values: Any) -> str:
     """The page a share email links to: `endpoint` on the configured origin, in
     the locale of the caller's `link` and with its session hash."""
     locale, session_hash = page_args(link, endpoint)

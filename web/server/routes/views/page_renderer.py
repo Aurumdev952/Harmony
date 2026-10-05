@@ -50,16 +50,8 @@ SUPPORTED_RENDERING_PARAMS = [
 ]
 
 
-def deployment_dashboard_url(name, locale=None):
-    """The dashboard page's absolute URL on the deployment's configured origin.
-
-    Renders send a token to this URL, and emails send it to their recipients.
-    """
-    return deployment_url("dashboard.grid_dashboard", locale=locale, name=name)
-
-
 def get_dashboard_downloadable_url(locale, name, output_format, session_hash):
-    dashboard_url = deployment_dashboard_url(name, locale)
+    dashboard_url = deployment_url("dashboard.grid_dashboard", locale=locale, name=name)
     hash_suffix = f"#h={session_hash}" if session_hash else ""
     dash_url = (
         f"{dashboard_url}?screenshot=1&pdf=1{hash_suffix}"

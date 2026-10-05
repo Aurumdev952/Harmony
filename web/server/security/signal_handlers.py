@@ -327,7 +327,9 @@ def _sqlite_time_from_epoch(element, compiler, **kwargs):
     return f"datetime({compiler.process(element.clauses, **kwargs)}, 'unixepoch')"
 
 
-def account_for_token(username: str, claims: dict, issued_at: Optional[int]):
+def account_for_token(
+    username: str, claims: dict, issued_at: Optional[int]
+) -> Optional[User]:
     '''The active account a JWT was issued to, or None.
 
     The token names its account by id: an API token through its `api_token`

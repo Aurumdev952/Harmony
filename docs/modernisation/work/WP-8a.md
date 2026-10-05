@@ -1,7 +1,7 @@
 ---
 wp: "8a"
 title: "Remove Druid JavaScript; null-handling audit"
-status: review
+status: ready
 owner_role: "data-platform"
 instances:
   - name: "data-platform-4"
@@ -202,7 +202,7 @@ Reachability: I could not reach the exclusion from a JWT identity. The token and
 - Fold: a later row replaces the accumulator; a row at the same time is combined with the inner sum, max or min.
 - Combine: segment partials merge the same way.
 - Finalize: returns the value.
-- `accumulatorIdentifier` is posted, never equal to the aggregator name, `__time` or the inner field (security low item 1).
+- `accumulatorIdentifier` is posted, never equal to the aggregator name or the inner field (security low item 1). It cannot be `__time` by construction: it is `__acc` with zero or more leading `_`.
 - `maxSizeBytes: 32`. Druid reserves this per group and aggregator for the accumulator (default 1024; the extension reserved about 17). A nullable `ARRAY<DOUBLE>` of two takes 23 bytes in 0.23.0's type strategies (null byte, 4-byte length, a null byte and 8 bytes per element). A value that does not fit fails the query with "Unable to serialize"; it is never truncated (`ExprEval.serialize`, source read 2026-10-05).
 
 The default stays `extension`, so deployments on 0.23 post exactly what they post today: `calc_last_value`'s `druid_query.json` is unchanged and needs no regeneration. WP-8b sets `native` everywhere, deletes the `extension` branch, and drops `druid-aggregatable-first-last` from `loadList`. Until then, a deployment that turns on SQL-compatible nulls must also set `native`.
@@ -252,11 +252,30 @@ None. Note for WP-8c (C-8 owner is this role): the Parquet ingest schema must st
 
 ## Deferrals (for the PR body)
 
-- **WP-8b, decision 0007 rule 5:** make native LAST_VALUE the only form; delete `HARMONY_DRUID_LAST_VALUE`, the `extension` branch and the first-last extension in `loadList`. Until then 0.23 deployments post the extension, as today.
+- **WP-8b, decision 0007 rule 5:** make native LAST_VALUE the only form; delete `HARMONY_DRUID_LAST_VALUE`, the `extension` branch and the first-last extension in `loadList`. Until then 0.23 deployments post the extension, as today. A deployment that turns on SQL-compatible nulls before WP-8b must set `HARMONY_DRUID_LAST_VALUE=native`; with the extension, `calc_last_value` fails loudly (the extension's `NullPointerException`).
 - **WP-8b, decision 0007 rule 7:** re-run the security policy probe on the upgraded Druid, including a policy that *includes* `''`. Such a policy is posted as `in [""]` untranslated, so on Druid 38 it hides null rows that 0.23 shows (fails closed). If a deployment has one, a human accepts the change or core translates `''` to null in the policy builder. Record the Druid 38 harness image by digest in the run instructions.
 - **WP-8c (C-8):** carry N0 into the Parquet schema: a dimension with no value is null, never `''`.
 - **Core follow-up for WP-1c/WP-4d:** the exact COUNT_DISTINCT inner `<agg> / <agg>` divides by zero when a group's filtered count is 0 (predates this WP).
-- **Lead:** the three-model `pstack:interrogate` panel (see Interrogation).
+- **Not deferred, waived:** the three-model `pstack:interrogate` panel, waived by the lead on 2026-10-05 (see Requests).
+
+## PR summary
+
+**WP-8a: remove Druid JavaScript; null-handling audit.** This branch was cut from `mig/integration` (#1), so its diff against `main` also holds the integration commits. Merge #1 first.
+
+Verdicts: security approved (round 2), QA approved (round 3), reviewer approved (round 3). `task_gate.py WP-8a` passes.
+
+Requirements:
+- **SEC-8.** `druid_javascript_enabled=false` in `druid_setup/{single,cluster}`. Every JavaScript construct in the query path is gone: the epi-week-of-year extraction is a native `cascade` (0 mismatches over 73414 days on 0.23 and 38), and `db/druid/js_formulas` and the `javascript` post-aggregator branches are deleted. `tests/druid/test_javascript_disabled.py` and `tests/druid_setup/test_druid_compose.py` fail if any env file or compose service turns it back on, or if a granularity extraction emits `javascript`.
+- **DATA-1.** Under SQL-compatible nulls (0.23 with `useDefaultValueForNull=false`, and 38.0.0 on Java 21), the golden suite (86 cases) and 7 audit cases give the same Druid rows and bodies as legacy 0.23. The setting must be `native` for this. Decisions N0 to N3 and N1c are in the null-audit table:
+  - N0: `''` is ingested as null;
+  - N1: the "has no value" test is `selector null`;
+  - N1c: a filter value `''` is posted as null;
+  - N2: negated value filters keep null rows;
+  - N3: native LAST_VALUE.
+- **INV-2.** 76 golden `druid_query.json` change in posted text only (N1, N2), plus the new `filter_empty_value` case. No `expected_response.json` changes. N1c changes only the posted query for a filter holding `''`. See the three INV-2 notes: golden fixtures, `''` filter values (N1c), and LAST_VALUE.
+- **INV-3.** N2 keeps policy exclusions identical; security's probe found 0 violations in 783 runs.
+
+Evidence: diff-0 to diff-31 and the parity files under `WP-8a-evidence/`. Deferrals: the section above.
 
 ## Requests
 
@@ -270,7 +289,7 @@ None. Note for WP-8c (C-8 owner is this role): the Parquet ingest schema must st
 - [x] lead (gate): solved on integration by e86d91a (a `lead-1` instance may claim paths with no ownership row); clears once integration is merged, and the instance is renamed `lead-1`. Original: `task_gate.py WP-8a` reports `data/pydruid_query/pydruid_query.py (owner: lead)` under "files outside the owner role". The path matches no ownership row, and the gate's role list has no `lead`, so no front-matter entry can clear it. Add an ownership row, or record the gate exception. Data-platform does not edit `scripts/agents/`.
 - [x] lead (N1b, from unit 7; reassigned from core): done in 3953bee, where the lead deleted `data/pydruid_query`; the `lead` instance in the front matter claims it. `data/pydruid_query/**` matches no ownership row, so it is the lead's (SPEC section 6) and the core hook refuses the edit. Recommendation: delete the module rather than fix it. Nothing imports it: a grep over every file type finds only the module-name entry in `tests/web/test_no_raw_queries_from_routes.py` and that test's synthetic source text, both harmless after deletion. It also cannot be imported without `DRUID_HOST` (WP-0d sweep, WP-3a). If it is kept instead, apply the original request: `DEFAULT_FILTER = Dimension('nation') == None`, the `{'nation': ['']}` docstring example, and a test that the default serialises as `selector value null`.
 - [x] data-platform (from qa, does not block): fixed 2026-10-05. The rewrite now skips an `and` that already is `[leaf, not(selector dim null)]`, in either operand order. Check: on the regenerated fixtures it prints `0 cases post changed queries; 0 other differences`. For all 85 fixtures, `rewrite(fixture at b84e9e9) == regenerated fixture == rewrite(regenerated fixture)` as canonical queries. Original report: `check_fixture_drift.py` is not idempotent. After the regeneration it prints `filter_nested` and `filter_not: queries differ beyond the accepted changes` and `0 cases post changed queries; 2 other differences`, and exits 1. The cause is that `_guard_leaves` recurses into an `and` that is already `[leaf, not(selector dim null)]` and guards the leaf a second time. Posted queries equal the fixtures in all 85 cases, and no body differs. Either skip already-guarded `and` nodes, or record that the tool applies only to pre-N2 fixtures.
-- [ ] lead: dispatch the `pstack:interrogate` panel (claude-opus-5, claude-fable-5, claude-sonnet-5), which the subagent cap blocked, with the prompt in the Interrogation section's scope.
+- [x] lead: waived by the lead on 2026-10-05. The concurrency cap prevented the panel; instead the WP passed three independent gates (security, QA, reviewer) with two mutation passes (33 and 7 mutants) and live replays in four modes. Original: dispatch the `pstack:interrogate` panel (claude-opus-5, claude-fable-5, claude-sonnet-5), which the subagent cap blocked, with the prompt in the Interrogation section's scope.
 - [x] qa or core (from unit 7): can a saved query or dashboard filter carry `''` as a selected dimension value? If yes, add a golden case and decide it as N1. Answered yes by qa's verdict: stored geo dimension values carry `''` for a missing parent. Decided as N1c and fixed at build time (core-8a-c, 1e34633). The golden case is the qa request below.
   - Core's answer from the server side (core-8a-c, 2026-10-05): not through the product. The filter picker's values come from `DimensionValuesLookup.load_dimensions_from_druid` (`web/server/data/dimension_values.py:61`), which queries with `Dimension(d) != None`. On legacy Druid `''` is null, and with N0 it is stored as null, so `''` is never offered. A stored `QueryPolicy` with `dimension_value=''` has no include values and no all-values flag, so it falls to `Dimension(d) == NO_FILTER_VAL` (deny) in every null mode.
   - Only a hand-written or API-posted spec could carry `''`, and on SQL-null Druid that would match nothing. Left open for qa to confirm on the client: free-text or pasted filter values, and saved specs created before N0.
@@ -343,6 +362,7 @@ None. Note for WP-8c (C-8 owner is this role): the Parquet ingest schema must st
     - `tests/web`: 68 passed, 1 failed (`test_graphql_endpoint_is_not_registered`), the same failure as at bb32764.
 - 2026-10-05 data-platform-4 final replays at ef93473 (core-r3 merged; gates: `ci/lint_python.sh main` exit 0, 121 files formatted; 3.8 guard 869 files 0 problems; suites 467 passed, 11 skipped; `record.py --check` 86 cases 0 changes). One stack at a time (legacy, nojs, sqlnull, druid38), each removed with its volumes before the next; no `wp8a` containers, volumes or networks remain. Each mode replayed 93 cases (86 golden, 7 audit, with the new `audit_selector_empty_value` and `audit_in_with_empty_value`) with the head (`extension` and `native`) and with integration code from an export of 61db9f8 (`/tmp/wp8a/int` with this branch's harness and cases). Checks: the head with `native` has 0 result differences against legacy with integration code in every mode; integration code differs in 67 cases on sqlnull and 7 on druid38 (diff-21 to diff-31, `final-runs.txt`). `test_last_value_live.py`: nojs 11 passed, sqlnull 10 passed and 1 skipped, druid38 10 passed and 1 skipped (core's 29 plus the shape test once per extra stack); `maxSizeBytes: 32` holds on 38. `check_quoting.py` passes on all four stacks. N1c and N3 data-platform requests ticked.
 - 2026-10-05 data-platform-5 (resumed data-platform-4) review round-2 fixes: merged core-r4 (d7a095b, `config.settings` imported inside `build_last_value`, `tests/core/test_import_without_settings.py`, `__time` collision entry dropped) and integration bf91ec0 (decisions 0007 rule 7 and 0008), both without conflicts; claimed core's new test under core-8a-c. Lows and nits: the order dependence in `tests/druid/test_javascript_disabled.py` came from that module-level import, so it needs no `setdefault`: the file alone with `DEFAULT_SECRET_KEY`, `DRUID_HOST` and `ZEN_ENV` unset gives 4 passed, and `config.settings` is not loaded after importing `granularity_extraction`; restored the three lost MEMORY.md index lines (and refreshed the stale `running_druid_python_checks.md`); moved the diff-13..15 rows into the first Results table; ticked the ingest-quoting request (5ddfd92); rewrapped `tests/druid_setup/test_druid_compose.py:154`; added Deferrals with decision 0007 rule 7. Checks, in a shell with the three variables unset: `ci/pytest_suites.sh` all 9 suites passed (alerts 9, core 92, druid 17 + 11 skipped, druid_setup 83, golden 272, graphql 22, pipeline 129 + 1 skipped, toolchain 12, web 95); `ci/lint_python.sh main` exit 0 (ruff check clean, 123 files formatted); mypy 1.3 `--follow-imports=silent` clean on the 11 touched core and audit modules; `ci/check_py38_syntax.py` on CPython 3.8.20 (CI paths plus `tests/druid`, `tests/druid_setup`, `tests/alerts`, `tests/core`) 871 files, 0 problems; `record.py --check` 86 cases, 0 changes; `task_gate.py WP-8a` fails only on status and the qa and reviewer verdicts.
+- 2026-10-05 data-platform-5 close-out after the round-3 approvals: merged integration e31294c (decision 0009, no conflicts); fixed the three round-3 nits (the `__time` accumulator wording, the SQL-null deployment needing `native` before WP-8b, and the ZooKeeper wording in this file and the data-platform memory, which now say the skill and decision 0007 agree); ticked the interrogate-panel request as waived by the lead; added the PR summary; status `ready`. Check: `task_gate.py WP-8a` "meets the definition of done gates" (before the status change it reported only the status line). Docs and memory changes only since 00efe0f.
 - 2026-10-05 core-8a-c (supporting) reviewer round 2 on `mig/WP-8a-druid-js-null-audit-core-r4` from 79178ec, 7b22569:
   - **High, INV-8:** `from config import settings` moves inside `build_last_value`. This reverses the side effect noted for b335723: `db.druid.util` no longer needs `DEFAULT_SECRET_KEY` or `DRUID_HOST`. `tests/core/test_import_without_settings.py` imports `db.druid.util`, `db.druid.query_builder`, `data.query.models`, `data.validation.metrics.datatypes`, `util.fiscal_calendar`, `util.ethiopian_calendar.ethiopian_calendar` and `util.stat_month_calendar` in a fresh interpreter without those variables or `ZEN_ENV`: 7 failed at 79178ec, 7 pass.
   - **Nit:** dropped `'__time'` from the accumulator collision tuple and its `test_native_accumulator_never_shadows_a_binding` case.
@@ -361,7 +381,7 @@ None. Note for WP-8c (C-8 owner is this role): the Parquet ingest schema must st
   - Then `make_dataset.py`, `run_audit.py index [--raw]`, `replay` and `diff`, as in the module docstring.
 - Version facts checked against the Druid upgrade notes (fetched 2026-10-04):
   - 32.0.0 removed `useDefaultValueForNull`, `useStrictBooleans=false` and `useThreeValueLogicForNativeFilters=false`; services refuse to start with the legacy values.
-  - 38.0.0 removed the ZooKeeper task runner and segment announcement, but ZooKeeper "is still used for Coordinator/Overlord leader election and service (node) announcement and discovery". So 38 still needs ZooKeeper in Compose, which corrects the `harmony-druid` skill's "drop ZooKeeper (38)" for WP-8b.
+  - 38.0.0 removed the ZooKeeper task runner and segment announcement, but ZooKeeper "is still used for Coordinator/Overlord leader election and service (node) announcement and discovery". So 38 still needs ZooKeeper in Compose. Decision 0007 (rule 1) and the corrected `harmony-druid` skill now agree that ZooKeeper stays for WP-8b.
 
 ## Verdicts
 

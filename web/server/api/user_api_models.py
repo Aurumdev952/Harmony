@@ -19,7 +19,6 @@ from web.server.api.model_schemas import (
     USER_ROLES_SCHEMA,
     USERNAME_SCHEMA,
     ROLE_MAP_SCHEMA,
-    user_role_as_dictionary,
 )
 from web.server.api.permission_api_schemas import (
     RESOURCE_ROLE_SUMMARY,
@@ -43,8 +42,8 @@ from web.server.api.user_api_schemas import (
     PHONE_NUMBER_SCHEMA,
     STATUS_SCHEMA,
 )
+from web.server.routes.views.core import refuse_legacy_role_grant
 from web.server.routes.views.users import (
-    add_user_role_api,
     build_user_updates,
     delete_user_role_api,
     force_delete_user,
@@ -68,7 +67,6 @@ from web.server.security.permissions import (
 from web.server.util.util import (
     EMAIL_REGEX,
     get_user_string,
-    Success,
 )
 from web.server.potion.signals import after_user_role_change, after_user_group_change
 
@@ -284,24 +282,7 @@ class UserResource(PrincipalResource):
     )
     def add_role_by_name(self, user, request):
         with AuthorizedOperation('edit_resource', 'user', user.id):
-            # TODO Refactor this into a separate module like
-            # we do for the Groups API
-            role_name = request['roleName']
-            resource_type = request['resourceType']
-            resource_name = request.get('resourceName')
-
-            result = add_user_role_api(
-                user, role_name, resource_type, resource_name, commit=True
-            )
-            success = False
-            if isinstance(result, Success):
-                success = True
-
-            response_code = OK if success else BAD_REQUEST
-            return (
-                StandardResponse(result['data']['message'], response_code, success),
-                response_code,
-            )
+            refuse_legacy_role_grant()
 
     @ItemRoute.DELETE(
         '/roles',
@@ -335,13 +316,10 @@ class UserResource(PrincipalResource):
     )
     def update_roles(self, user, request):
         with AuthorizedOperation('edit_resource', 'user', user.id):
-            roles = update_user_roles_from_map(user, request)
-            message = (
-                'Successfully updated the roles attached to user \'%s\'. '
-                'New roles are now: \'%s\''
-                % (user.username, [user_role_as_dictionary(role) for role in roles])
+            update_user_roles_from_map(user, request)
+            g.request_logger.info(
+                'Removed every role from user \'%s\'.', get_user_string(user)
             )
-            g.request_logger.info(message)
             return self.manager.read(user.id)
 
     @ItemRoute.GET(

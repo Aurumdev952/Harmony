@@ -12,7 +12,6 @@ from web.server.api.model_schemas import (
     CONCISE_USER_SCHEMA,
     GROUP_ROLES_SCHEMA,
     ROLE_MAP_SCHEMA,
-    group_role_as_dictionary,
 )
 from web.server.api.permission_api_schemas import (
     RESOURCE_ROLE_SUMMARY,
@@ -27,8 +26,8 @@ from web.server.routes.views.authorization import (
     AuthorizedOperation,
     current_user_is_superuser,
 )
+from web.server.routes.views.core import refuse_legacy_role_grant
 from web.server.routes.views.groups import (
-    add_group_role,
     delete_group_role,
     update_group_roles_from_map,
     add_group_user,
@@ -173,19 +172,7 @@ class GroupResource(PrincipalResource):
     )
     def add_role_by_name(self, group, request):
         with AuthorizedOperation('edit_resource', 'group', group.id):
-            role_name = request['roleName']
-            resource_name = request.get('resourceName')
-            resource_type = request['resourceType']
-            (_, exists) = add_group_role(group, role_name, resource_type, resource_name)
-            action = 'already exists' if exists else 'has been added'
-            message = 'Role \'%s\' %s for %s' % (
-                role_name,
-                action,
-                get_resource_string(resource_name, resource_type),
-            )
-            g.request_logger.info(message)
-            response_code = OK if exists else CREATED
-            return (StandardResponse(message, response_code, True), response_code)
+            refuse_legacy_role_grant()
 
     @ItemRoute.PATCH(
         '/roles',
@@ -197,11 +184,10 @@ class GroupResource(PrincipalResource):
     )
     def update_roles(self, group, request):
         with AuthorizedOperation('edit_resource', 'group', group.id):
-            roles = update_group_roles_from_map(group, request)
+            update_group_roles_from_map(group, request)
             message = (
                 'Successfully updated the roles attached to group \'%s\'. '
-                'New roles are now: \'%s\''
-                % (group.name, [group_role_as_dictionary(role) for role in roles])
+                'New roles are now: \'[]\'' % group.name
             )
             g.request_logger.info(message)
             return StandardResponse(message, OK, True)

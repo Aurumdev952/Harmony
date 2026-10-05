@@ -159,9 +159,9 @@ def verify_acl_grants(
         resource_type = resource.resource_type.name.name
         if not is_authorized('update_users', resource_type, resource.id):
             refuse_grant(
-                f'Granting \'{resource_role.name}\' on {resource_type} '
-                f'\'{resource.name}\' needs the \'update_users\' permission on it.',
-                '',
+                f'Granting \'{resource_role.name}\' on a {resource_type} needs the '
+                '\'update_users\' permission on it.',
+                f'Resource: {(resource.id, resource.name)}.',
             )
     return grants
 

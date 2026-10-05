@@ -1,5 +1,5 @@
 from collections import defaultdict, namedtuple
-from typing import Any, Dict, List, Optional, Tuple, TYPE_CHECKING, TypedDict, Union
+from typing import Any, Dict, List, Optional, Tuple, TYPE_CHECKING, TypedDict
 
 from flask import g, current_app
 from flask_user import current_user
@@ -10,7 +10,7 @@ from models.alchemy.alerts import AlertDefinition
 from models.alchemy.dashboard import Dashboard
 from models.alchemy.security_group import Group
 from models.alchemy.permission import Resource, ResourceRole, Role
-from models.alchemy.user import UserRoles, User, UserAcl, UserStatusEnum
+from models.alchemy.user import User, UserAcl, UserStatusEnum
 from web.server.data.data_access import (
     get_db_adapter,
     add_entity,
@@ -20,7 +20,12 @@ from web.server.data.data_access import (
     Transaction,
 )
 from web.server.errors import UserAlreadyInvited
-from web.server.routes.views.core import try_get_role_and_resource
+from web.server.routes.views.core import (
+    find_by_name,
+    refuse_legacy_role_map_grants,
+    try_get_resource_role,
+    try_get_role_and_resource,
+)
 from web.server.routes.views.invite import send_invite_emails
 from web.server.util.util import get_user_string, Success
 from web.server.potion.signals import after_user_role_change, before_user_role_change
@@ -74,12 +79,7 @@ APITokenType = TypedDict('APITokenType', {'$uri': str, 'is_revoked': bool, 'id':
 
 
 def try_get_user(username: str, session: 'Optional[Session]' = None) -> Optional[User]:
-    return find_one_by_fields(
-        User,
-        case_sensitive=False,
-        search_fields={'username': username},
-        session=session,
-    )
+    return find_by_name(User, username, session, name_field='username')
 
 
 def try_get_user_acl(
@@ -163,55 +163,26 @@ def force_delete_user(
         session.commit()
 
 
-# TODO: We need to deprecate this function. find all functions to deprecate.
-def add_user_role(
-    user: User,
-    role_name: str,
-    resource_type: str,
-    resource_name: Optional[str],
-    session: 'Optional[Session]' = None,
-    flush: bool = True,
-    commit: bool = True,
-) -> Tuple[Union[UserRoles, Optional[UserAcl]], bool]:
-    session = session or get_db_adapter().session
-    (role, resource_type, resource) = try_get_role_and_resource(
-        role_name, resource_type, resource_name, session
-    )
-    resource_id = resource.id if resource else None
-    entity = try_get_user_acl(user.id, role.id, resource_id, session)
-    exists = False
-
-    if not entity:
-        exists = True
-        entity = UserRoles(user_id=user.id, role_id=role.id, resource_id=resource_id)  # type: ignore
-        before_user_role_change.send(user, role=role)
-        add_entity(session, entity, flush, commit)
-        after_user_role_change.send(user, role=role)
-
-    return (entity, exists)
-
-
 def add_user_acl(
     user: User,
     resource_role_name: str,
-    resource_type: str,
-    resource_name: Optional[str],
+    resource: Resource,
     session: 'Optional[Session]' = None,
     flush: bool = True,
     commit: bool = True,
 ) -> Tuple[UserAcl, bool]:
+    '''Gives `user` the resource role `resource_role_name` on `resource`, the
+    row the caller holds, never one found again by its name.
+    '''
     session = session or get_db_adapter().session
-    (resource_role, resource_type, resource) = try_get_role_and_resource(
-        resource_role_name, resource_type, resource_name, session
-    )
-    resource_id = resource.id if resource else None
-    entity = try_get_user_acl(user.id, resource_role.id, resource_id, session)
+    resource_role = try_get_resource_role(resource_role_name, resource, session)
+    entity = try_get_user_acl(user.id, resource_role.id, resource.id, session)
     exists = False
 
     if not entity:
         exists = True
         entity = UserAcl(
-            user_id=user.id, resource_role_id=resource_role.id, resource_id=resource_id
+            user_id=user.id, resource_role_id=resource_role.id, resource_id=resource.id
         )
         before_user_role_change.send(user, role=resource_role)
         add_entity(session, entity, flush, commit)
@@ -246,16 +217,16 @@ def delete_user_role(
     return (entity, exists)
 
 
-# NOTE: Will have to deprecate / modify this with new roles
 def update_user_roles_from_map(
     user: User,
     role_mapping: Dict[str, RollResourceType],
     session: 'Optional[Session]' = None,
     flush: bool = True,
     commit: bool = True,
-) -> List[Union[UserRoles, UserAcl, None]]:
+) -> None:
+    '''Removes every role of `user`. A map naming any role is refused.'''
+    refuse_legacy_role_map_grants(role_mapping)
     session = session or get_db_adapter().session
-    new_role_entities = []
 
     # NOTE: type suppression is necessary here because SQL Alchemy model attributes
     # do not contain __iter__ attributes so mypy will complain that `roles` is not iterable
@@ -264,38 +235,11 @@ def update_user_roles_from_map(
         user.roles.remove(role)  # type: ignore[attr-defined]
         after_user_role_change.send(user, role=role)
 
-    for resource_type in list(role_mapping.keys()):
-        resource_to_roles = role_mapping[resource_type]['resources']
-        sitewide_roles = role_mapping[resource_type]['sitewideRoles']
-
-        # Add all sitewide roles for the current resource type
-        for role_name in sitewide_roles:
-            (result, _) = add_user_role(
-                user, role_name, resource_type, None, session, flush=False, commit=False
-            )
-            new_role_entities.append(result)
-
-        # Add all resource specific roles for the current resource type
-        for resource_name, role_names in list(resource_to_roles.items()):
-            for role_name in role_names:
-                (result, _) = add_user_role(
-                    user,
-                    role_name,
-                    resource_type,
-                    resource_name,
-                    session,
-                    flush=False,
-                    commit=False,
-                )
-                new_role_entities.append(result)
-
     if flush:
         session.flush()
 
     if commit:
         session.commit()
-
-    return new_role_entities
 
 
 def list_resource_roles_for_user(user_id: int) -> List[UserAcl]:
@@ -312,43 +256,22 @@ def list_resource_roles_for_user_and_resource(
 
 def update_user_resource_roles(
     user: User,
-    new_resource_roles: List[Dict[str, Any]],
-    resource: Optional[Resource] = None,
+    role_names: List[str],
+    resource: Resource,
     session: 'Optional[Session]' = None,
     flush: bool = True,
     commit: bool = True,
 ) -> List[UserAcl]:
+    '''Replaces the resource roles `user` holds on `resource` with `role_names`.'''
     session = session or get_db_adapter().session
-    new_role_entities = []
-    # List only resource roles acls for user and resource ids when resource
-    # exists.
-    if resource:
-        resource_roles = list_resource_roles_for_user_and_resource(resource.id, user.id)
-    else:
-        resource_roles = list_resource_roles_for_user(user.id)
+    for acl in list_resource_roles_for_user_and_resource(resource.id, user.id):
+        session.delete(acl)
 
-    # TODO: Refactor this to take advantage of SQLAlchemy rather than
-    # manually deleting and re-adding resource roles
-    for role in resource_roles:
-        session.delete(role)
-
-    for new_role in new_resource_roles:
-        role_name = new_role['role_name']
-        resource_type = new_role['resource_type']
-        resource_name = resource.name if resource else new_role.get('resource_name')
-
-        # Do not flush or commit these changes. We want to perform the update in a transacted
-        # fashion.
-        (result, _) = add_user_acl(
-            user,
-            role_name,
-            resource_type,
-            resource_name,
-            session,
-            flush=False,
-            commit=False,
-        )
-        new_role_entities.append(result)
+    # Flushed and committed once below, so the update is one transaction.
+    new_role_entities = [
+        add_user_acl(user, role_name, resource, session, flush=False, commit=False)[0]
+        for role_name in role_names
+    ]
 
     if flush:
         session.flush()
@@ -456,35 +379,6 @@ def build_user_updates(user_obj: UserObject, roles: List[Role]) -> Dict[str, Any
     if user_obj['status_id'] == UserStatusEnum.PENDING.value:
         user_updates.pop('status_id')
     return user_updates
-
-
-# NOTE: Will need to modify this later
-def add_user_role_api(
-    user: User,
-    role_name: str,
-    resource_type: str,
-    resource_name: Optional[str] = None,
-    session: 'Optional[Session]' = None,
-    flush: bool = True,
-    commit: bool = True,
-) -> Success:
-    '''Add a user role association for a given user, role and resource.'''
-    add_user_role(user, role_name, resource_type, resource_name, session, flush, commit)
-
-    resource_string = (
-        f'Resource \'{resource_name}\' of type \'{resource_type}\''
-        if resource_name
-        else f'all resources of type \'{resource_type}\''
-    )
-    message = '%s Role \'%s\' for User \'%s\' on %s' % (
-        'Added' if commit else 'Commit pending for addition of',
-        role_name,
-        get_user_string(user),
-        resource_string,
-    )
-
-    g.request_logger.info(message)
-    return Success({'code': SUCCESS_USER_ROLE_ADDED, 'message': message})
 
 
 def delete_user_role_api(

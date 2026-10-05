@@ -23,7 +23,14 @@ instances:
     files:
       - "web/server/data/data_access.py"
   - name: "qa-0l-tests"
-    files: []
+    files:
+      - "tests/privilege_escalation/test_exact_name_matching.py"
+      - "tests/web/test_exact_name_lookup.py"
+      - "tests/authz/http/test_name_matching.py"
+      - "tests/contract/cases/20-directory.json"
+      - "tests/contract/cases/95-cleanup.json"
+      - "tests/contract/recordings/user.update_roles.assign.json"
+      - "tests/contract/recordings/group.update_roles.assign.json"
 branch: "mig/WP-0l-exact-name-matching"
 requirements: [INV-3, QA-1, QA-4]
 contracts_consumed: []
@@ -58,6 +65,9 @@ None.
 ## Log
 
 One line per finished unit: `YYYY-MM-DD <instance> unit N: <what>; check: <command and result>`
+
+- 2026-10-06 qa-0l-tests: fail-first pins for paths A (sharing, and dashboard creation), B (user and group share removal, `_` and `%`), C (403 bodies) and D (group and role membership by username, look-alike-only 404) in `tests/privilege_escalation/test_exact_name_matching.py` (also adds `username=` to `make_user` and a `dashboard_creator` role in the shared conftest), `tests/web/test_exact_name_lookup.py` (data layer and the `get_resource_by_type_and_name` type filter) and live WP-2b pins in `tests/authz/http/test_name_matching.py`; check on 7c34bca: in-process 21 failed, 12 passed (every look-alike-first case fails, every named-first case passes); whole `tests/authz` with the live layer on a fresh stack 12 failed (all 12 new pins), 5264 passed; on bf75d1c: 33 in-process passed, whole `tests/authz` with the live layer 5276 passed.
+- 2026-10-06 qa-0l-tests: contract `user.update_roles.assign` and `group.update_roles.assign` re-recorded 500 to 400 on a fresh stack from the WP-0l tree. This is the WP-0l behaviour: a non-empty legacy role map never wrote anything (it built `UserRoles`/`GroupRoles` with a `resource_id` they lack and a resource role id as `role_id`) and is now refused with `{message, status}`. The empty-map `*.update_roles.clear` cases are unchanged. No contract case covers `POST /api2/{user,group}/<id>/roles` (no client calls it). check: replay on that stack 233 passed, 1 failed (`storage.retrieve.unknown_slug` recorded 500, served 404: WP-0i's change, unrelated to WP-0l, not re-recorded here).
 
 ## Evidence
 

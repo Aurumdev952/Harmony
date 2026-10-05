@@ -2,7 +2,7 @@ from datetime import datetime
 from http.client import NO_CONTENT, OK, UNAUTHORIZED
 import re
 
-from flask import g, url_for, current_app, request as flask_request
+from flask import g, current_app, request as flask_request
 from flask_potion import fields
 from flask_potion.schema import FieldSet
 from flask_potion.contrib.alchemy import fields as alchemy_fields
@@ -21,7 +21,6 @@ from models.alchemy.permission import (
     RESOURCE_ROLE_NAMES,
     SitewideResourceAcl,
 )
-from models.alchemy.schedule import SchedulerEntry
 from models.alchemy.security_group import Group
 from web.server.api.model_schemas import (
     QUERY_LINK_PATTERN,
@@ -55,6 +54,7 @@ from web.server.routes.views.dashboard import (
     format_and_downgrade_dashboard_list,
     format_and_downgrade_specification,
 )
+from web.server.routes.views.page_renderer import deployment_dashboard_url
 from web.server.routes.views.users import get_current_user
 from web.server.security.permissions import SuperUserPermission, principals
 from web.server.util.util import EMAIL_PATTERN, get_dashboard_title
@@ -583,9 +583,10 @@ class DashboardResource(PrincipalResource):
         schema=USER_URI_SCHEMA,
     )
     def transfer_ownership(self, dashboard, new_author):
-        with AuthorizedOperation(
-            'update_users', 'dashboard', dashboard.resource_id
-        ), AuthorizedOperation('view_resource', 'user', dashboard.author.id):
+        with (
+            AuthorizedOperation('update_users', 'dashboard', dashboard.resource_id),
+            AuthorizedOperation('view_resource', 'user', dashboard.author.id),
+        ):
             new_author = lookup_author(author_id=new_author)
             api_transfer_dashboard_ownership(dashboard, new_author)
             return None, NO_CONTENT
@@ -598,9 +599,10 @@ class DashboardResource(PrincipalResource):
         schema=USERNAME_SCHEMA,
     )
     def transfer_ownership_by_username(self, dashboard, new_author):
-        with AuthorizedOperation(
-            'update_users', 'dashboard', dashboard.resource_id
-        ), AuthorizedOperation('view_resource', 'user', dashboard.author.id):
+        with (
+            AuthorizedOperation('update_users', 'dashboard', dashboard.resource_id),
+            AuthorizedOperation('view_resource', 'user', dashboard.author.id),
+        ):
             new_author = lookup_author(author_username=new_author)
             api_transfer_dashboard_ownership(dashboard, new_author)
             return None, NO_CONTENT
@@ -642,8 +644,7 @@ class DashboardResource(PrincipalResource):
         title='Update Dashboard \'official\' flag',
         description='Marks a Dashboard as official or not.',
         schema=fields.Boolean(
-            description='The updated value of the "isOfficial" flag for the '
-            'dashboard.'
+            description='The updated value of the "isOfficial" flag for the dashboard.'
         ),
     )
     @authorization_required('publish_resource', 'dashboard')
@@ -656,14 +657,14 @@ class DashboardResource(PrincipalResource):
         title='Update Dashboard \'favorite\' flag',
         description='Marks a Dashboard as a user favorite or not.',
         schema=fields.Boolean(
-            description='The updated value of the "isFavorite" flag for the '
-            'dashboard.'
+            description='The updated value of the "isFavorite" flag for the dashboard.'
         ),
     )
     def set_favorite(self, dashboard, is_favorite):
-        with AuthorizedOperation(
-            'view_resource', 'dashboard', dashboard.id
-        ), Transaction() as transaction:
+        with (
+            AuthorizedOperation('view_resource', 'dashboard', dashboard.id),
+            Transaction() as transaction,
+        ):
             metadata = get_or_create_metadata(transaction, dashboard.id)
             metadata.is_favorite = is_favorite
             transaction.add_or_update(metadata)
@@ -1095,7 +1096,7 @@ def track_dashboard_access(dashboard_id, edited=False, increment_view_count=True
 # Suppressing this warning because this is the method signature for signal handlers.
 @after_create.connect_via(DashboardResource)
 def send_email_after_create(sender, item):
-    dashboard_link = url_for('dashboard.grid_dashboard', name=item.slug, _external=True)
+    dashboard_link = deployment_dashboard_url(item.slug)
     message = current_app.email_renderer.create_new_dashboard_message(
         item.author,
         current_app.zen_config.general.DEPLOYMENT_FULL_NAME,

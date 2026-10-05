@@ -40,11 +40,11 @@ from web.server.routes.views.authorization import is_authorized
 from web.server.routes.views.feed import add_share_notification
 from web.server.routes.views.users import add_user_acl, get_current_user, try_get_user
 from web.server.routes.views.page_renderer import (
-    dashboard_page_args,
     deployment_dashboard_url,
     grid_dashboard_to_pdf,
     grid_dashboard_to_image,
 )
+from web.server.util.deployment_links import page_args
 
 from web.server.util.util import get_user_string, get_dashboard_title
 
@@ -401,7 +401,7 @@ def get_email_attachments(
 ):
     attachments = []
     image_name = None
-    locale, session_hash = dashboard_page_args(dashboard_url)
+    locale, session_hash = page_args(dashboard_url, 'dashboard.grid_dashboard')
     if should_attach_pdf:
         render_response = grid_dashboard_to_pdf(
             locale,

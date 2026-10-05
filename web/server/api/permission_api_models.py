@@ -3,16 +3,18 @@
 Resource APIs Accessible via http://<server_uri>:5000/api2/resource
 Role APIs Accessible via http://<server_uri>:5000/api2/role
 '''
+
 # pylint: disable=C0413
 from collections import defaultdict
 from http.client import METHOD_NOT_ALLOWED, NO_CONTENT, NOT_ACCEPTABLE, OK, UNAUTHORIZED
 
-from flask import g, current_app, url_for
+from flask import g, current_app
 from flask_user import current_user
 from flask_potion import fields
 from flask_potion.routes import ItemRoute, Relation, Route
 from flask_potion.schema import FieldSet
 
+from models.alchemy.dashboard import Dashboard
 from models.alchemy.permission import (
     Permission,
     Resource,
@@ -44,7 +46,7 @@ from web.server.potion.filters import ResourceTypeFilter
 from web.server.potion.managers import RoleResourceManager
 from web.server.potion.signals import after_roles_update
 from web.server.routes.views.authorization import AuthorizedOperation
-from web.server.routes.views.feed import create_dashboard_permission_updates
+from web.server.routes.views.page_renderer import deployment_dashboard_url
 from web.server.routes.views.permission import build_role, add_current_user_to_role
 from web.server.routes.views.resource import (
     update_resource_roles,
@@ -264,9 +266,13 @@ class BackendResource(PrincipalResource):
 def send_email(sender, existing_roles, new_roles):
     recepients = list(set(new_roles['userRoles']) - set(existing_roles['userRoles']))
     if sender.resource_type.name == ResourceTypeEnum.DASHBOARD and recepients:
-        dashboard_url = url_for(
-            'dashboard.grid_dashboard', name=sender.name, _external=True
-        )
+        # The resource name is the slug with `-` replaced by `_`, so link the
+        # dashboard's own slug.
+        with Transaction() as transaction:
+            dashboard = transaction.find_one_by_fields(
+                Dashboard, True, {'resource_id': sender.id}
+            )
+        dashboard_url = deployment_dashboard_url(dashboard.slug)
         try:
             for recepient in recepients:
                 msg = current_app.email_renderer.create_add_dashboard_user_message(
@@ -543,9 +549,10 @@ class RoleResource(PrincipalResource):
         rel='updateUsers',
     )
     def update_users(self, role, usernames):
-        with AuthorizedOperation(
-            'edit_resource', 'role', role.id
-        ), Transaction() as transaction:
+        with (
+            AuthorizedOperation('edit_resource', 'role', role.id),
+            Transaction() as transaction,
+        ):
             update_role_users(role, usernames, transaction)
             return StandardResponse('Role usernames has been updated', OK, True)
         return None, UNAUTHORIZED

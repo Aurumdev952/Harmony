@@ -1,9 +1,10 @@
-from flask import current_app, g, url_for
+from flask import current_app, g
 from flask_user import current_user
 from werkzeug.exceptions import BadGateway
 
 from log import LOG
 from web.server.errors import NotificationError
+from web.server.util.deployment_links import deployment_url
 
 
 def send_invite_emails(pending_users):
@@ -16,7 +17,7 @@ def send_invite_emails(pending_users):
         logger.info('Sending email invite to: \'%s\'', user.username)
         # generate invite token
         token = user_manager.generate_token(int(user.id))
-        invite_link = url_for('user.register', token=token, _external=True)
+        invite_link = deployment_url('user.register', token=token)
 
         email_msg = current_app.email_renderer.create_invitation_message(
             current_user, user, invite_link

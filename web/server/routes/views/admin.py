@@ -1,6 +1,5 @@
 # mypy: disallow_untyped_defs=True
-from urllib.parse import urlencode
-from flask import current_app, url_for, g
+from flask import current_app, g
 from flask_user import current_user
 from flask_user.signals import user_forgot_password
 from werkzeug.exceptions import BadGateway
@@ -9,6 +8,7 @@ from log import LOG
 from models.alchemy.user import User
 from web.server.errors import ItemNotFound, NotificationError
 from web.server.data.data_access import Transaction
+from web.server.util.deployment_links import deployment_url
 
 
 def send_reset_password(email: str) -> None:
@@ -26,9 +26,7 @@ def send_reset_password(email: str) -> None:
 
         # Generate reset password token
         token = user_manager.generate_token(int(user.get_id()))
-        reset_password_link = url_for('auth.reset_password', _external=True)
-        params = urlencode({'token': token})
-        reset_password_link = f"{reset_password_link}?{params}"
+        reset_password_link = deployment_url('auth.reset_password', token=token)
 
         # Create reset password email message
         email_message = current_app.email_renderer.create_password_reset_message(

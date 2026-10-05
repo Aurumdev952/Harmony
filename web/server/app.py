@@ -29,9 +29,9 @@ from web.server.database.setup import (
 )
 from web.server.errors.error_handlers import register_for_error_events
 from web.server.migrations.util import RevisionStatus
-from web.server.routes.views.page_renderer import deployment_origin
 from web.server.routes.views.query_policy import AuthorizedQueryClient
 from web.server.security.signal_handlers import register_for_signals
+from web.server.util.deployment_links import deployment_origin
 from web.server.util.template_renderer import (
     TemplateRenderer,
     read_js_version,

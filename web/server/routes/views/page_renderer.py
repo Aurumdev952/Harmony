@@ -1,17 +1,17 @@
 from datetime import timedelta
-from urllib.parse import urlparse, urlsplit
+from urllib.parse import urlparse
 
 import requests
-from flask import current_app, request
+from flask import request
 from requests import RequestException
 from flask_jwt_extended import create_access_token
-from werkzeug.exceptions import HTTPException
 
 from config import settings
 from log import LOG
 from models.alchemy.dashboard import Dashboard
 from web.server.data.data_access import Transaction
 from web.server.security.signal_handlers import RENDER_TOKEN_QUERY_NEEDS
+from web.server.util.deployment_links import deployment_url
 
 # Make the URLBOX API URL configurable in case a reverse proxy is necessary.
 URLBOX_API_URL = settings.getenv("URLBOX_API_URL", "https://api.urlbox.io")
@@ -47,64 +47,12 @@ SUPPORTED_RENDERING_PARAMS = [
 ]
 
 
-def dashboard_page_args(dashboard_url):
-    """The locale and session hash in a link to a dashboard page.
-
-    Nothing else is taken from a caller's link: a render always loads this app's
-    own dashboard page, because it carries a token for the user it renders as.
-    """
-    if not dashboard_url:
-        return None, ""
-    parsed = urlparse(dashboard_url)
-    try:
-        endpoint, args = current_app.url_map.bind("").match(parsed.path)
-    except HTTPException:
-        endpoint, args = None, {}
-    locale = args.get("locale") if endpoint == "dashboard.grid_dashboard" else None
-    session_hash = parsed.fragment[2:] if parsed.fragment.startswith("h=") else ""
-    return locale, session_hash
-
-
-def deployment_origin(deployment_base_url):
-    """The configured DEPLOYMENT_BASE_URL as a bare https origin, or ValueError.
-
-    Renders send a minted token to this origin and emails send links to it, so it
-    must name exactly one host: no userinfo (`https://real@attacker`), path,
-    query or fragment.
-    """
-    parts = urlsplit(deployment_base_url or "")
-    try:
-        has_valid_port = parts.port is None or parts.port > 0
-    except ValueError:
-        has_valid_port = False
-    if (
-        not has_valid_port
-        or parts.scheme != "https"
-        or not parts.hostname
-        or "@" in parts.netloc
-        or parts.path not in ("", "/")
-        or parts.query
-        or parts.fragment
-    ):
-        raise ValueError(
-            "DEPLOYMENT_BASE_URL must be an https origin with no userinfo, path, "
-            f"query or fragment: {deployment_base_url!r}"
-        )
-    return f"https://{parts.netloc}"
-
-
 def deployment_dashboard_url(name, locale=None):
     """The dashboard page's absolute URL on the deployment's configured origin.
 
-    Never built from the request: renders send a token to this URL, and emails
-    send it to their recipients. `url_for` would prefix the request's script
-    root, which gunicorn takes from a `SCRIPT_NAME` request header.
+    Renders send a token to this URL, and emails send it to their recipients.
     """
-    origin = deployment_origin(current_app.zen_config.general.DEPLOYMENT_BASE_URL)
-    path = current_app.url_map.bind("").build(
-        "dashboard.grid_dashboard", {"locale": locale, "name": name}
-    )
-    return origin + path
+    return deployment_url("dashboard.grid_dashboard", locale=locale, name=name)
 
 
 def get_dashboard_downloadable_url(locale, name, output_format, session_hash):

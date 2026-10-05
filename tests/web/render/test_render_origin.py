@@ -13,8 +13,8 @@ import pytest
 from flask import g
 
 from tests.web.render.fakes import DASHBOARDS, DASHBOARD_SLUG, DEPLOYMENT_ORIGIN
-from web.server.routes.views import page_renderer as page_renderer_views
 from web.server.routes.views.dashboard import get_email_attachments, send_email
+from web.server.util.deployment_links import deployment_origin
 
 SLUG = DASHBOARD_SLUG
 VIEWER = 'viewer@tests.invalid'
@@ -171,7 +171,7 @@ def test_emailed_link_ignores_the_request_script_root(
     ],
 )
 def test_configured_origin_is_accepted(configured, origin):
-    assert page_renderer_views.deployment_origin(configured) == origin
+    assert deployment_origin(configured) == origin
 
 
 @pytest.mark.parametrize(
@@ -195,7 +195,7 @@ def test_configured_origin_is_accepted(configured, origin):
 )
 def test_unusable_configured_origin_is_refused(configured):
     with pytest.raises(ValueError, match='DEPLOYMENT_BASE_URL'):
-        page_renderer_views.deployment_origin(configured)
+        deployment_origin(configured)
 
 
 def test_render_with_an_unusable_configured_origin_makes_no_outbound_call(

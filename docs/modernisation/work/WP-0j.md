@@ -19,7 +19,7 @@ security_review: true
 
 # WP-0j: Refuse username changes and password resets that reach a higher-privileged account
 
-Phase detail: [phase-0-security-and-subtraction.md, section 0j](../phase-0-security-and-subtraction.md). Added by [decision 0005](../decisions/0005-wp-0j-account-takeover-via-rename-and-reset.md) after the WP-0h security round 2 confirmed H5 live. Depends on WP-0h, which is still in review: this branch started from `mig/WP-0h-privilege-escalations` at `a615058` and merged its round 3 (`b094556`). It reuses WP-0h's harness (`tests/privilege_escalation`) and `web/server/security/grants.py`.
+Phase detail: [phase-0-security-and-subtraction.md, section 0j](../phase-0-security-and-subtraction.md). Added by [decision 0005](../decisions/0005-wp-0j-account-takeover-via-rename-and-reset.md) after the WP-0h security round 2 confirmed H5 live. Depends on WP-0h, which is still in review: this branch started from `mig/WP-0h-privilege-escalations` at `a615058` and merged its round 3 (`b094556`), then `488e482` and `mig/integration` `61db9f8`. It reuses WP-0h's harness (`tests/privilege_escalation`) and `web/server/security/grants.py`.
 
 ## Plan
 
@@ -126,6 +126,12 @@ None.
 
 - 2026-10-05 backend-0j unit 5: `UserResourceManager` change decided (not adopted, reasons above), INV-3 rows 1-2, human acceptance, Request to qa. Check: this file.
 - 2026-10-05 backend-0j unit 6: `pstack:interrogate` could not start: the session was at its limit of 20 concurrent subagents, and the skill says not to retry. I did the adversarial pass myself instead (below). Status `review`.
+- 2026-10-05 backend-0j unit 7 (lead request): merged WP-0h `488e482` (its merge of integration `e86d91a` and the restored 3.8 `with` statement; one conflict, the backend memory index, kept both entries), then `mig/integration` `61db9f8` (py38 ruff target, 3.8 syntax guard). Merge commits `b0625fd`, `03c79c4`. Check on the merged head:
+  - `uv run --no-project -p cpython-3.8.20 python ci/check_py38_syntax.py config data db log models graphql util web scripts tests/web tests/privilege_escalation`: 849 files checked, 0 problems;
+  - `ci/lint_python.sh mig/WP-0h-privilege-escalations`: ruff clean, 5 changed files formatted; `ci/lint_python.sh mig/integration`: ruff clean, 12 changed files (WP-0h's and this WP's) formatted;
+  - `uv run --locked mypy`: no issues in 518 source files;
+  - `ci/pytest_suites.sh`: all 9 suites passed (core 25, druid 1, druid_setup 79, golden 269, graphql 22, pipeline 129 + 1 skipped, privilege_escalation 122, toolchain 12, web 95);
+  - CPython 3.8.20 (`/tmp/wp2g-be3-py38`, the web image's version): `python -m pytest tests/privilege_escalation` 122 passed; `py_compile` of the three changed Python files passes.
 
 ## Interrogate (unit 6)
 

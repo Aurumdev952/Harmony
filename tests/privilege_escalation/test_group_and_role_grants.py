@@ -345,11 +345,12 @@ def _token_client(app, username: str, needs=None):
     # pylint: disable=import-outside-toplevel
     from flask_jwt_extended import create_access_token
 
+    from models.alchemy.user import User
     from web.server.util.authentication import create_user_access_token
 
     with app.test_request_context():
         token = (
-            create_user_access_token(username)
+            create_user_access_token(User.query.filter_by(username=username).one())
             if needs is None
             else create_access_token(
                 identity=username, user_claims={'needs': needs, 'query_needs': []}

@@ -287,7 +287,7 @@ def fixture_make_user(app):
             client = app.test_client()
             if browser:
                 with app.test_request_context():
-                    token = create_user_access_token(username)
+                    token = create_user_access_token(user)
                 client.set_cookie('localhost', 'accessKey', token)
             return Actor(id=user.id, username=username, client=client, browser=browser)
 

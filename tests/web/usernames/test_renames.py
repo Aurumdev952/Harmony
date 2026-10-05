@@ -80,7 +80,6 @@ def test_a_look_alike_rename_signs_in_only_the_renamed_account(app):
     assert _username(app, 6) == LOOK_ALIKE
 
     assert signed_in_id(app, login(app, LOOK_ALIKE)) == 6
-    # A session minted before WP-0k names only the username it was typed with.
     # A session minted before WP-0k naming `j_hn.doe` matched john.doe too.
     assert signed_in_id(app, session_token_without_account_id(app, LOOK_ALIKE)) is None
     assert signed_in_id(app, login(app, 'john.doe@moh.gov.rw')) == 1

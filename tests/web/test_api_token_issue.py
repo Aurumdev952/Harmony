@@ -72,18 +72,7 @@ def test_a_generated_api_token_authenticates_without_saving_the_user(user):
     assert (stored.user_id, stored.is_revoked) == (user.id, False)
 
 
-class _Cache:
-    """The app cache's memoize interface, which update_user_api_tokens clears."""
-
-    def memoize(self):
-        return lambda function: function
-
-    def delete_memoized(self, function, *args):
-        pass
-
-
 def test_the_admin_apps_later_save_keeps_the_stored_token(app, user):
-    app.cache = _Cache()
     token = issue_api_token(user)
     saved = {'$uri': f'/api2/api-token/{token.id}', 'id': token.id}
 
@@ -99,7 +88,6 @@ def test_the_admin_apps_later_save_keeps_the_stored_token(app, user):
 
 
 def test_revoking_skips_tokens_that_are_already_revoked(app, user):
-    app.cache = _Cache()
     session = app.extensions['sqlalchemy'].db.session
     long_ago = datetime(2000, 1, 1)
     session.add_all(

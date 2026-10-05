@@ -1,4 +1,4 @@
-"""Checks on the export renderer's image and Compose services (WP-1h).
+"""Checks on the export renderer's image, Compose services and CI (WP-1h).
 
 Run with: uv run --project ci/tools313 --locked pytest tests/infra
 """
@@ -11,11 +11,16 @@ import subprocess
 from pathlib import Path
 
 import pytest
+import yaml
 
 REPO = Path(__file__).resolve().parents[2]
 DOCKERFILE = REPO / 'docker/renderer/Dockerfile'
+TEST_DOCKERFILE = REPO / 'docker/renderer/Dockerfile.test'
+TEST_REQUIREMENTS = REPO / 'docker/renderer/test-requirements.txt'
+TEST_IN_IMAGE = REPO / 'docker/renderer/test_in_image.sh'
 SECCOMP = REPO / 'docker/renderer/seccomp_profile.json'
 REQUIREMENTS = REPO / 'harmony/worker/renderer/requirements.txt'
+WORKFLOW = REPO / '.github/workflows/renderer.yml'
 
 # utils/docker/seccomp_profile.json at Playwright v1.63.0, byte for byte.
 PLAYWRIGHT_SECCOMP_SHA256 = (
@@ -264,3 +269,162 @@ def test_build_overlay_builds_the_renderer(tmp_path):
     cfg = compose_config(tmp_path, ['docker-compose.build.yaml'])
     build = cfg['services']['renderer']['build']
     assert (Path(build['context']) / build['dockerfile']).resolve() == DOCKERFILE
+
+
+ONLY_ON_PRS = "github.event_name == 'pull_request'"
+NOT_ON_PRS = "github.event_name != 'pull_request'"
+
+
+def load_workflow():
+    workflow = yaml.safe_load(WORKFLOW.read_text())
+    # YAML 1.1 reads the bare key `on` as true.
+    workflow['on'] = workflow.pop(True)
+    return workflow
+
+
+def step_running(job, command):
+    runs = [step.get('run', '') for step in job['steps']]
+    return next((i for i, run in enumerate(runs) if command in run), None)
+
+
+def test_workflow_runs_on_pull_requests_that_touch_the_renderer():
+    paths = load_workflow()['on']['pull_request']['paths']
+    for path in (
+        'harmony/worker/renderer/**',
+        'tests/worker/renderer/**',
+        'docker/renderer/**',
+        '.github/workflows/renderer.yml',
+    ):
+        assert path in paths
+
+
+def test_every_job_tests_the_image_it_built_before_pushing_it():
+    for name, job in load_workflow()['jobs'].items():
+        build = step_running(job, 'docker build')
+        tests = step_running(job, 'docker/renderer/test_in_image.sh')
+        assert build is not None and tests is not None and build < tests, name
+        push = step_running(job, 'docker push')
+        assert push is None or tests < push, name
+
+
+def test_pull_requests_get_a_read_only_token():
+    workflow = load_workflow()
+    assert workflow['permissions'] == {}
+    jobs = workflow['jobs'].values()
+    for job in jobs:
+        assert job.get('if') in (None, ONLY_ON_PRS, NOT_ON_PRS)
+    on_prs = [job for job in jobs if job.get('if') != NOT_ON_PRS]
+    assert on_prs
+    for job in on_prs:
+        assert job['permissions'] == {'contents': 'read'}
+        assert step_running(job, 'docker push') is None
+
+
+def test_workflow_actions_are_pinned_and_runs_take_no_expressions():
+    for job in load_workflow()['jobs'].values():
+        assert job['runs-on'] == 'ubuntu-24.04'
+        for step in job['steps']:
+            if 'uses' in step:
+                assert re.fullmatch(r'[\w.-]+/[\w.-]+@[0-9a-f]{40}', step['uses'])
+            assert '${{' not in step.get('run', '')
+
+
+# Records each call, writes an image id wherever --iidfile asks for one, and
+# plays pytest for `run`: prints PYTEST_SUMMARY and exits PYTEST_STATUS.
+FAKE_DOCKER = """#!/bin/sh
+printf '%s\\n' "$*" >> "$DOCKER_CALLS"
+command=$1
+while [ "$#" -gt 0 ]; do
+  if [ "$1" = --iidfile ]; then printf 'sha256:test-image' > "$2"; fi
+  shift
+done
+if [ "$command" = run ]; then
+  echo "$PYTEST_SUMMARY"
+  exit "$PYTEST_STATUS"
+fi
+"""
+
+
+def run_test_in_image(tmp_path, summary, status=0):
+    fake = tmp_path / 'docker'
+    fake.write_text(FAKE_DOCKER)
+    fake.chmod(0o755)
+    calls = tmp_path / 'calls'
+    result = subprocess.run(
+        ['bash', str(TEST_IN_IMAGE), 'harmony-renderer:ci', '-x'],
+        capture_output=True,
+        text=True,
+        env={
+            'PATH': f'{tmp_path}:/usr/bin:/bin',
+            'DOCKER_CALLS': str(calls),
+            'PYTEST_SUMMARY': summary,
+            'PYTEST_STATUS': str(status),
+        },
+        check=False,
+    )
+    return result, calls.read_text().splitlines()
+
+
+@pytest.mark.parametrize(
+    ('summary', 'status'),
+    [
+        ('=== 1 failed, 154 passed in 98.18s ===', 1),
+        ('=== 154 passed, 1 skipped in 98.18s ===', 0),
+        ('154 passed, 1 skipped in 98.18s', 0),
+    ],
+    ids=['failed', 'skipped', 'skipped-quiet'],
+)
+def test_in_image_tests_fail_on_a_failure_or_a_skip(tmp_path, summary, status):
+    result, _ = run_test_in_image(tmp_path, summary, status)
+    assert result.returncode != 0
+
+
+def test_in_image_tests_run_with_the_renderer_hardening_and_no_network(tmp_path):
+    result, calls = run_test_in_image(tmp_path, '=== 155 passed in 98.18s ===')
+    assert result.returncode == 0, result.stderr
+    build, run = calls
+    assert build.startswith('build ')
+    assert f'-f {TEST_DOCKERFILE} ' in build
+    assert '--build-arg RENDERER_IMAGE=harmony-renderer:ci ' in build
+
+    args = run.split()
+    assert args[0] == 'run'
+    joined = f" {' '.join(args)} "
+    for flag in (
+        '--network none',
+        '--read-only',
+        '--init',
+        '--cap-drop ALL',
+        '--cap-add SYS_CHROOT',
+        '--security-opt no-new-privileges:true',
+        f'--security-opt seccomp={SECCOMP}',
+        '--tmpfs /tmp',
+        '--tmpfs /home/pwuser',
+        '--shm-size 1g',
+        '--memory 2g',
+        '--pids-limit 512',
+    ):
+        assert f' {flag} ' in joined, flag
+    # Only the tests and pytest's settings go in. The code under test is the
+    # image's own, and the rest of the checkout (.env included) stays out.
+    mounts = [args[i + 1] for i, arg in enumerate(args) if arg == '-v']
+    assert sorted(mounts) == [
+        f'{REPO}/pyproject.toml:/src/pyproject.toml:ro',
+        f'{REPO}/tests/worker/renderer:/src/tests/worker/renderer:ro',
+    ]
+    assert args[-3:] == ['sha256:test-image', '/src/tests/worker/renderer', '-x']
+
+
+def test_test_image_adds_only_hash_pinned_pytest_to_the_renderer_image():
+    instructions = [
+        line.strip()
+        for line in TEST_DOCKERFILE.read_text().replace('\\\n', ' ').splitlines()
+        if line.strip() and not line.lstrip().startswith('#')
+    ]
+    assert 'FROM ${RENDERER_IMAGE}' in instructions
+    installs = [line for line in instructions if 'pip install' in line]
+    assert len(installs) == 1
+    assert '--require-hashes' in installs[0] and '--no-deps' in installs[0]
+    assert instructions[-1].startswith('ENTRYPOINT ["python", "-m", "pytest"')
+    pins = TEST_REQUIREMENTS.read_text()
+    assert re.search(r'^pytest==\S+ \\$', pins, re.MULTILINE)

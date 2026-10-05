@@ -1,7 +1,7 @@
 ---
 wp: "0h"
 title: "Close privilege escalations in group and role management"
-status: review
+status: ready
 owner_role: "backend"
 instances:
   - name: "backend-6"
@@ -314,6 +314,8 @@ None.
   - At `f2e04ac` the live layer pins ten of these: H1-H3, N3, N4 (create, and update by `role_administrator` and `role_moderator`), N5 and both empty role maps. QA's run on a trial merge: all ten fail on this branch and nothing else changes (Evidence).
   - **F1**, if the suite pins it: `manager` + `user_admin` on `PATCH /api2/user/<id>` adding admin, an unheld group, or a `dashboard_admin` ACL gets 403. `test_user_admin_cannot_change_roles_through_the_user_form` (`user_admin` alone) is unchanged.
 - [x] lead: routed by decision 0005 to WP-0j (backend, Sec yes); not this WP's scope. Original request: security's H5 (WP-2b) is not fixed here. `manager` + `user_admin` can rename a user who is an admin through a group, keeping the group by the resend rule, then pass the reset-password check, so the reset goes to an address the caller chose. That is a possible account takeover, unconfirmed. F1 does not reach it, because it is a profile edit, not a grant. Candidate rules are refusing a non-superuser's edit to the username of a user holding grants the caller does not hold, or checking the reset target's roles. Needs its own decision; suggested owner backend, Sec yes.
+- [ ] backend (C-5 port, FastAPI `PrincipalDep` and authz): the admin exclusion is spelled out in four places (`grants.py` `held_roles_from_uris` and `member_groups_from_uris`, `managers.py` `RoleResourceManager` and `GroupResourceManager`). Make it one helper there (security, low).
+- [ ] infra / lead: CI runs the tests on 3.9 while the web image is CPython 3.8. Guarded by `ci/check_py38_syntax.py` until WP-3b moves the image (security, low).
 
 ## Log
 
@@ -327,6 +329,7 @@ None.
 - 2026-10-05 backend-8 unit 9: `member_groups_from_uris` admin-group exclusion after security round 2, commit `e58c67a`; H5 pointed at WP-0j (decision 0005). Check: the new narrowed-token case failed first (200); 83 passed here; the file on integration `3780c8c` gives `50 failed, 33 passed`; CI pylint no errors and black 22.6.0 clean on the WP's 11 changed Python files; WP-2b pure layer (`09a7581`) `4675 passed, 580 skipped` on both, outcomes byte-identical.
 - 2026-10-05 backend-8 unit 10: merged `mig/integration` (`1697a7a`), suite moved to `tests/privilege_escalation`, mypy and ruff fixes, two guards pinned, dead `QueryNeed` filter removed, evidence corrected; commits `df01179`, `98e77fc`, `044a457`. Check: `ci/lint_python.sh mig/integration` and `uv run --locked mypy` pass; `ci/pytest_suites.sh` all 9 suites pass (86 here); the file on integration `1697a7a` gives `50 failed, 36 passed`; the new pins kill their guards; WP-2b pure layer byte-identical.
 - 2026-10-05 backend-8 unit 11: merged `mig/integration` `e86d91a` (`741fc11`), restored the 3.8-compatible `with` in `RoleResource.update_users`, corrected the 3.8 memory note. Check: `ci/lint_python.sh`, mypy and `ci/pytest_suites.sh` pass on the merge; `py_compile` on CPython 3.8 of the 11 changed files passes; WP suite on CPython 3.8.20 `86 passed`.
+- 2026-10-05 backend-8: QA, reviewer and security approved `488e482`; QA's round-3 evidence and security's two lows recorded; `status: ready`.
 
 ## Evidence
 
@@ -336,6 +339,7 @@ None.
 - `ci/pytest_suites.sh`: `all 9 suites passed`. `tests/core` 25, `tests/druid` 1, `tests/druid_setup` 79, `tests/golden` 269, `tests/graphql` 22, `tests/pipeline` 129 (1 skipped), `tests/privilege_escalation` 86, `tests/toolchain` 12, `tests/web` 95.
 - **CPython 3.8** (`/tmp/wp2g-be3-py38`, Python 3.8.20, the web image's version): `python -m pytest tests/privilege_escalation` gives `86 passed`. `py_compile` of the 11 changed Python files on 3.8 passes; the same on `98e77fc`'s `permission_api_models.py` gives `SyntaxError: invalid syntax`.
 - No code change since unit 10 other than the restored statement, so the unit 10 pure-layer result stands.
+- **QA round 3, `488e482` merged with integration `61db9f8`:** the three CI gates pass; `ci/check_py38_syntax.py` passes (846 files) and flags line 568 on the `b094556` merge; the 11 changed files compile on CPython 3.8.20, and `tests/web` (95) and the WP suite (86) pass on 3.8. WP-2b live layer: `580 passed` on base and `570 passed` on the merge, the 10 failures being exactly the ten pinned cases under Requests (403 where 200 was pinned, or `Role` rows kept). Pure layer identical.
 
 **Unit 10 (merged head `044a457`; code at `98e77fc`):**
 - `ci/lint_python.sh mig/integration` (the 11 Python files this WP changes): `All checks passed!`, `11 files already formatted`.

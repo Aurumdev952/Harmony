@@ -143,6 +143,7 @@ def test_nullable_field_records_both_types():
         ("Mon, 01 Jan 2024 10:00:00 GMT", "http-date"),
         ("2024-01-01T10:00:00.123+00:00", "date-time"),
         ("2024-01-01 10:00:00", "date-time-space"),
+        ("2024-01-01", "date"),
         ("/api2/dashboard/4", "api-uri"),
         ("hello", None),
     ],

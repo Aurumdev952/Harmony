@@ -63,6 +63,21 @@
       "cookies": true
     },
     {
+      "id": "auth.login.cookie.remember_me",
+      "route": "POST /api2/authentication/login",
+      "query": {
+        "set_cookie": "true"
+      },
+      "body": {
+        "email": "{env:CONTRACT_USERNAME}",
+        "password": "{env:CONTRACT_PASSWORD}",
+        "remember_me": true
+      },
+      "session": "anonymous-remember-login",
+      "cookies": true,
+      "note": "remember_me makes the accessKey cookie persistent (Max-Age); without it, a session cookie."
+    },
+    {
       "id": "auth.api_rejects_anonymous",
       "route": "GET /api2/dashboard",
       "session": "anonymous"

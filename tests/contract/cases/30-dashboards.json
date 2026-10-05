@@ -262,7 +262,12 @@
     {
       "id": "resource.roles.after_update",
       "route": "GET /api2/resource/<id>/roles",
-      "path": "{dashboard_resource}/roles"
+      "path": "{dashboard_resource}/roles",
+      "maps": [
+        "$.groupRoles",
+        "$.userRoles"
+      ],
+      "note": "groupRoles and userRoles are keyed by group name and username."
     },
     {
       "id": "user.get.with_acls",
@@ -334,7 +339,12 @@
     {
       "id": "resource.roles",
       "route": "GET /api2/resource/<id>/roles",
-      "path": "{dashboard_resource}/roles"
+      "path": "{dashboard_resource}/roles",
+      "maps": [
+        "$.groupRoles",
+        "$.userRoles"
+      ],
+      "note": "groupRoles and userRoles are keyed by group name and username."
     },
     {
       "id": "dashboard_session.generate_link",

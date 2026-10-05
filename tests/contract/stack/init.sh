@@ -17,4 +17,6 @@ python scripts/create_user.py \
   --site_admin \
   --overwrite
 
+python tests/contract/stack/seed_catalog.py
+
 echo 'contract-init: done'

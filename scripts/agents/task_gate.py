@@ -5,6 +5,7 @@ Hook mode (stdin JSON with task_subject): gates tasks whose subject starts with 
 Unit tasks (`WP-<id>.<n>: ...`) and other tasks pass through.
 CLI mode: task_gate.py WP-<id>   prints the same verdict for a human or the lead.
 """
+
 from __future__ import annotations
 
 import json

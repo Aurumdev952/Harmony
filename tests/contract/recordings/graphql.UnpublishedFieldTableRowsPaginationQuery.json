@@ -10,13 +10,115 @@
           "unpublishedFieldConnection": {
             "properties": {
               "edges": {
-                "maxItems": 0,
+                "items": {
+                  "properties": {
+                    "cursor": {
+                      "type": "string"
+                    },
+                    "node": {
+                      "properties": {
+                        "__typename": {
+                          "type": "string"
+                        },
+                        "calculation": {
+                          "properties": {
+                            "type": {
+                              "type": "string"
+                            }
+                          },
+                          "required": [
+                            "type"
+                          ],
+                          "type": "object"
+                        },
+                        "description": {
+                          "type": "string"
+                        },
+                        "id": {
+                          "type": "string"
+                        },
+                        "name": {
+                          "type": "string"
+                        },
+                        "serializedCalculation": {
+                          "properties": {
+                            "type": {
+                              "type": "string"
+                            }
+                          },
+                          "required": [
+                            "type"
+                          ],
+                          "type": "object"
+                        },
+                        "shortName": {
+                          "type": "string"
+                        },
+                        "unpublishedFieldCategoryMappings": {
+                          "items": {
+                            "properties": {
+                              "category": {
+                                "properties": {
+                                  "id": {
+                                    "type": "string"
+                                  },
+                                  "name": {
+                                    "type": "string"
+                                  }
+                                },
+                                "required": [
+                                  "id",
+                                  "name"
+                                ],
+                                "type": "object"
+                              },
+                              "categoryId": {
+                                "type": "string"
+                              },
+                              "id": {
+                                "type": "string"
+                              }
+                            },
+                            "required": [
+                              "category",
+                              "categoryId",
+                              "id"
+                            ],
+                            "type": "object"
+                          },
+                          "type": "array"
+                        },
+                        "unpublishedFieldPipelineDatasourceMappings": {
+                          "maxItems": 0,
+                          "type": "array"
+                        }
+                      },
+                      "required": [
+                        "__typename",
+                        "calculation",
+                        "description",
+                        "id",
+                        "name",
+                        "serializedCalculation",
+                        "shortName",
+                        "unpublishedFieldCategoryMappings",
+                        "unpublishedFieldPipelineDatasourceMappings"
+                      ],
+                      "type": "object"
+                    }
+                  },
+                  "required": [
+                    "cursor",
+                    "node"
+                  ],
+                  "type": "object"
+                },
                 "type": "array"
               },
               "pageInfo": {
                 "properties": {
                   "endCursor": {
-                    "type": "null"
+                    "type": "string"
                   },
                   "hasNextPage": {
                     "type": "boolean"

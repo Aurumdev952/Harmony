@@ -78,18 +78,67 @@ def relay_problems(cases: list[Case], relay_rows: list[RelayRow]) -> list[str]:
         for a in sorted(set(listed) - set(operations))
     ]
     for artifact, row in sorted(listed.items()):
-        if row.coverage == "recorded" and artifact not in sent:
+        if row.recorded and artifact not in sent:
             problems.append(f"{row.operation}: marked recorded but no case sends it")
         elif row.deferred and artifact in sent:
             problems.append(f"{row.operation}: deferred but a case sends it")
-        elif row.coverage != "recorded" and not re.match(r"deferred: \S", row.coverage):
+        elif not row.recorded and not re.match(r"deferred: \S", row.coverage):
             problems.append(
-                f"{row.operation}: coverage must be 'recorded' or 'deferred: <reason>'"
+                f"{row.operation}: coverage must be 'recorded',"
+                " 'recorded (empty connection, <reason>)' or 'deferred: <reason>'"
             )
     problems += [
         f"{a}: a case sends it but INVENTORY.md does not list it"
         for a in sorted(sent - set(listed))
     ]
+    return problems
+
+
+def _empty_edges(node: dict, path: str = "$") -> list[str]:
+    """Paths of Relay connection ``edges`` arrays that recorded no item."""
+    found = []
+    for key, child in (node.get("properties") or {}).items():
+        here = f"{path}.{key}"
+        if key == "edges" and child.get("maxItems") == 0:
+            found.append(here)
+        found += _empty_edges(child, here)
+    if isinstance(node.get("items"), dict):
+        found += _empty_edges(node["items"], f"{path}[]")
+    return found
+
+
+def empty_connection_problems(
+    cases: list[Case],
+    relay_rows: list[RelayRow],
+    recordings_dir: Path = RECORDINGS_DIR,
+) -> list[str]:
+    """A Relay operation whose every recording has an empty connection pins no
+    item shape, so its row must say why; a row that says so while a recording
+    has items is stale."""
+    empties: dict[str, list[list[str]]] = {}
+    for case in cases:
+        query = case.body.get("query", "") if isinstance(case.body, dict) else ""
+        path = recording_path(case.id, recordings_dir)
+        if str(query).startswith(RELAY_PREFIX) and path.exists():
+            schema = json.loads(path.read_text())["response_schema"] or {}
+            artifact = query.removeprefix(RELAY_PREFIX)
+            empties.setdefault(artifact, []).append(_empty_edges(schema))
+    problems = []
+    for row in relay_rows:
+        recorded = empties.get(row.artifact)
+        if not recorded:
+            continue
+        all_empty = all(recorded)
+        if all_empty and not row.empty_connection:
+            problems.append(
+                f"{row.operation}: every recording has an empty connection"
+                f" ({', '.join(recorded[0])}); seed rows or mark it"
+                " 'recorded (empty connection, <reason>)'"
+            )
+        elif row.empty_connection and not all_empty:
+            problems.append(
+                f"{row.operation}: marked empty connection but a recording has items"
+            )
     return problems
 
 
@@ -140,6 +189,7 @@ def all_problems(
         *cases_without_a_row(cases, rows),
         *coverage_problems(cases, rows),
         *relay_problems(cases, relay_rows),
+        *empty_connection_problems(cases, relay_rows),
         *capture_order_problems(cases),
         *recording_problems(cases),
         *leak_problems(),

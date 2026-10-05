@@ -46,6 +46,21 @@ def test_capture_takes_a_pointer_or_the_id_at_the_end_of_a_uri():
     doc = [{"$uri": "/api2/dashboard/12"}]
     assert capture_value(doc, "/0/$uri") == "/api2/dashboard/12"
     assert capture_value(doc, "/0/$uri#id") == 12
+    node = {"id": "WzEsICJwdWJsaWMiLCAic2VsZl9zZXJ2ZV9zb3VyY2UiLCA0Ml0="}
+    assert capture_value(node, "/id#relay") == 42
+
+
+@pytest.mark.parametrize(
+    ("doc", "spec"),
+    [
+        ({"$uri": "/api2/user/someone@example.org"}, "/$uri#id"),
+        ({"id": "someone@example.org"}, "/id#relay"),
+    ],
+)
+def test_a_failed_capture_transform_does_not_echo_the_value(doc, spec):
+    with pytest.raises(ValueError) as caught:
+        capture_value(doc, spec)
+    assert "someone" not in str(caught.value)
 
 
 def test_misspelt_case_keys_are_refused():
@@ -61,7 +76,7 @@ def test_pins_that_name_secrets_are_refused():
 def test_pinned_values_that_look_like_pii_are_refused():
     case = make_case(pin=["/owner"])
     with pytest.raises(ValueError, match="email"):
-        observe(case, 200, JSON, b'{"owner": "a@b.org"}')
+        observe(case, 200, JSON, b'{"owner": "a@b.org"}', recording=True)
 
 
 def test_each_tokens_pin_the_sorted_set_of_values():
@@ -177,3 +192,15 @@ def test_cookie_changes_are_reported_only_for_cases_that_ask():
     assert "cookies" not in observe(
         make_case(), 200, {}, b"", ("accessKey=; Max-Age=0",)
     )
+
+
+def test_a_replay_reports_an_unsafe_pinned_value_without_echoing_it():
+    case = make_case(pin=["/owner"])
+    recorded = observe(case, 200, JSON, b'{"owner": "team-a"}', recording=True)
+    replayed = observe(case, 200, JSON, b'{"owner": "someone@example.org"}')
+    problems = compare(recorded, replayed)
+    assert problems == [
+        "$.owner: string format None != 'email'",
+        "pinned /owner: 'team-a' != '<not shown: a value looks like email>'",
+    ]
+    assert "someone" not in " ".join(problems)

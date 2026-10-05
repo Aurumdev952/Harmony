@@ -2,9 +2,9 @@
 
     tests/contract/stack/stack.sh up
     eval "$(tests/contract/stack/stack.sh env)"
-    uv run --no-project --with requests python -m tests.contract.record            # record all
-    uv run --no-project --with requests python -m tests.contract.record --only 'dashboard.*'
-    uv run --no-project --with requests python -m tests.contract.record --dry-run  # no network
+    uv run --locked python -m tests.contract.record            # record all
+    uv run --locked python -m tests.contract.record --only 'dashboard.*'
+    uv run --locked python -m tests.contract.record --dry-run  # no network
 
 Replaying is pytest's job: ``pytest tests/contract -m stack``.
 
@@ -45,7 +45,7 @@ def record(cases: list[Case], base_url: str, selected: set[str]) -> int:
     failures = 0
     for case in cases:
         try:
-            observed = runner.run(case)
+            observed = runner.run(case, recording=True)
         except SkipCase as exc:
             print(f"SKIP {case.id}: {exc}")
             failures += 1

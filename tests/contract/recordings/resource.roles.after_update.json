@@ -6,17 +6,12 @@
   "response_schema": {
     "properties": {
       "groupRoles": {
-        "properties": {
-          "contract-group-renamed": {
-            "items": {
-              "type": "string"
-            },
-            "type": "array"
-          }
+        "additionalProperties": {
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
         },
-        "required": [
-          "contract-group-renamed"
-        ],
         "type": "object"
       },
       "sitewideResourceAcl": {

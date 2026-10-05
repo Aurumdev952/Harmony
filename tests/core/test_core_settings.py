@@ -58,11 +58,17 @@ def test_keeps_a_real_key_verbatim_and_hidden(environ):
     assert REAL_KEY not in str(loaded)
 
 
-def test_refuses_a_missing_druid_host(environ):
+def test_refuses_a_missing_druid_host_without_exposing_the_key(environ):
     environ.delenv('DRUID_HOST')
 
-    with pytest.raises(RuntimeError, match='DRUID_HOST'):
+    with pytest.raises(RuntimeError) as raised:
         load_settings()
+
+    assert str(raised.value) == 'DRUID_HOST is not set; refusing to start.'
+    # A traceback must not reach the ValidationError, which holds the real key.
+    assert raised.value.__cause__ is None
+    assert raised.value.__context__ is None
+    assert REAL_KEY not in str(raised.value)
 
 
 def test_accepts_an_empty_druid_host_as_before(environ):

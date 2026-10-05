@@ -182,10 +182,10 @@ No other decision moved. The WP-2b pure layer is identical outside the render pi
 
 ## Carried risks (for WP-1h unless noted)
 
-1. **The render bot account still exists as a site admin in deployments.**
-   - It is created by `scripts/create_bot_accounts.sh:5` (`-a`) and listed in `web/server/configuration/bots.py`.
-   - No server path mints a token for it any more (`grep RENDERBOT web` is empty), so it is now an unused admin login.
-   - Removing the creation line is requested below. Deactivating existing accounts is an operation on real data, so it is for the human.
+1. **Existing render-bot accounts, created by the old script, are still site admins in deployments.**
+   - The old `scripts/create_bot_accounts.sh` created `renderbot@zenysis.com` with `-a`. The lead removed that line on this branch (`e6a90bf`), so new stacks create no render bot. The remaining `--automation_user` line is pre-existing and stays a lead item.
+   - No server path mints a token for an existing account any more (`grep RENDERBOT web` is empty), so each one is an unused admin login. It now shows in the Admin user list.
+   - Deactivating or demoting those accounts is an operation on real data, so it is for the human (Questions).
 2. **Policy drift during a render.**
    - The digest is computed when the retrieve request arrives. The render token (`query_needs ['*']`) is re-resolved when urlbox loads the page, up to about 5 minutes later.
    - If an admin widens a user's policy inside that window, the wider render is cached under the old digest for 14 days.
@@ -220,7 +220,7 @@ No other decision moved. The WP-2b pure layer is identical outside the render pi
 
 ## Questions for the human
 
-- **Existing render-bot accounts.** Every deployment has a `renderbot@zenysis.com` site-admin account (`scripts/create_bot_accounts.sh:5`, `-a`). No code path signs in as it any more, and it now shows in the Admin user list. Should it be deactivated, or demoted from site admin, on each deployment? That is an operation on production data.
+- **Existing render-bot accounts.** Deployments set up before this WP have a `renderbot@zenysis.com` site-admin account, created by the old `scripts/create_bot_accounts.sh` (`-a`; the line is gone since `e6a90bf`). No code path signs in as it any more, and it now shows in the Admin user list. Should these existing accounts be deactivated, or demoted from site admin, on each deployment? That is an operation on production data.
 - **`DEPLOYMENT_BASE_URL` per deployment.** Before this ships, each deployment's value must be its real public https origin, or the app will not start (see the INV-1 note).
 
 - **Public PDF download.**
@@ -242,11 +242,13 @@ These are WP-2c API contract recordings (`tests/contract`, owned by qa), not one
   - New: 404, from werkzeug `NotFound` inside a Potion route, so the error body shape changes too. Re-record the body.
 - **Consumers.** qa-2c (the recordings and the replay). Frontend callers already treat an empty string as "no thumbnail" (`ThumbnailStorageService.js:25`, `Overview/index.jsx`).
 - **Acknowledgements.**
-  - [ ] qa-2c:
+  - [x] qa-2c: accepted both changes (qa-3, 2026-10-05, `WP-2c.md` on `mig/WP-2c-api-contract-recordings` at `bf08a36`). Whichever of WP-0i and WP-2c merges second re-records both cases, and replaces the start-up seed in `seed_cache.py` with a v2-key seed after `dashboard.create`.
 
 ## Requests
 
 - [ ] **qa (qa-2b): flip the N1, N2 and N7 pins** in `tests/authz/test_render_routes.py` on this branch.
+  - The front matter will need a qa instance (for example `qa-2b`) with `files: [tests/authz/test_render_routes.py]`, so that `task_gate` attributes that file to qa.
+  - The overlay is 3.8-safe: it uses `contextlib.ExitStack`, not a parenthesised `with`, and passes `ci/check_py38_syntax.py`.
   - A verified flipped version is at `docs/modernisation/work/WP-0i-evidence/test_render_routes.flipped.py`. It passes 18 of 18. The full pure layer gives 4681 passed against 4675 on base, and the non-render outcomes are identical (Evidence).
   - N7 is flipped, not dropped: `test_caller_chosen_url_does_not_receive_the_minted_render_token`. With `?url=https://attacker.invalid/steal&cookie=accessKey=planted` on `/png/thumbnail`, `/pdf` and retrieve, the urlbox call loads `<DEPLOYMENT_BASE_URL>/dashboard/<slug>?...`, and the token belongs to the caller.
   - The pin harness needs three changes:
@@ -262,11 +264,11 @@ These are WP-2c API contract recordings (`tests/contract`, owned by qa), not one
     - anonymous under public access gets 401.
   - This blocks review sign-off, not code.
 - [ ] **frontend-design: hide "Download" from unauthenticated visitors** in `DashboardShareButton.jsx:90`, as "Email" already is, because public visitors now get 401. Needed before merge if the human accepts the public-PDF change.
-- [ ] **lead:** remove the render-bot line from `scripts/create_bot_accounts.sh:5`. Whether to deactivate the existing accounts is a human question (above).
+- [x] **lead:** remove the render-bot line from `scripts/create_bot_accounts.sh:5`. Done on this branch (`e6a90bf`, instance `lead-1`). Whether to deactivate the existing accounts is a human question (above).
 - [x] **core:** remove the unused `RENDERBOT_EMAIL` from `config/settings.py:39`. This is done on WP-1h's core branch.
 - [ ] **infra:** remove `RENDERBOT_EMAIL` from `docker-compose.yaml:145` and `:179` (`:143` and `:178` on WP-1h's core branch).
 - [ ] **infra (WP-3b):** upgrade gunicorn from 20.0.4 (`uv.lock`), so that a `SCRIPT_NAME` request header no longer reaches the WSGI environ (carried risk 11). Not blocking: the render paths no longer read it.
-- [ ] **qa (qa-2c):** acknowledge the two contract changes above, and drop or rework `tests/contract/stack/seed_cache.py`.
+- [x] **qa (qa-2c):** acknowledge the two contract changes above (done at `bf08a36`). The `seed_cache.py` rework belongs to whichever of WP-0i and WP-2c merges second.
 - [ ] **human:** remove `RENDERBOT_EMAIL` from `.env.example` (a human item; agents do not read `.env*`).
 - [ ] **human:** accept the INV-3 table, including the public-PDF row, and answer the questions above.
 
@@ -285,39 +287,55 @@ These are WP-2c API contract recordings (`tests/contract`, owned by qa), not one
 - 2026-10-05 backend-7 round 3: render and email URLs built from the URL map on a validated `DEPLOYMENT_BASE_URL`, checked at startup (`cb67bed`). Check: the 32 new origin tests fail on `76c31e2` (the hostile `SCRIPT_NAME` gives `https://harmony.tests.invalid@attacker.invalid/...`) and pass on the head.
 - 2026-10-05 backend-7 round 3: the Redis claim race is closed, and tests are added for thumbnail args, redaction of a 500, the hash seed and the bounded claim loop (`03acb20`). Check: each new test kills its mutant (dropping `request_args={}`, logging `res.url`, an unsorted canonical policy, no deadline, an unconditional delete). `tests/web` 237 passed plus 1 strict xfail; the lint gate is clean.
 - 2026-10-05 backend-7 round 3: flipped N7 in the WP-2b overlay, and brought this file up to date (INV-1 note, INV-3 rows, contract changes, risks, requests, evidence). Check: the WP-2b pure layer is 4681 passed with the overlay, 4675 on base, and 4663 plus 12 errors with today's pins; the non-render outcomes are identical to base.
+- 2026-10-05 backend-7 round-3 rework: merged `mig/integration` `61db9f8` (`fc3d8de`: py38 ruff target, 3.8 syntax guard, gate fix for lead-owned paths). Check: the 3.8 syntax guard passes 852 files.
+- 2026-10-05 backend-7 round-3 rework: the render fakes are now `render_fakes.py`, imported by basename. A new test checks that a gunicorn `create_app` refuses a hostile `DEPLOYMENT_BASE_URL` before any database access (`d5c3d23`). Check: tests/web gives 238 passed and 1 xfail on 3.9 (CI way) and on 3.8 (requirements*.txt). With a regular `tests` package placed after the repo on the 3.8 path, as the editable Flask-Potion install does, the round-3 head fails collection (`flask_testing`) and this head passes. The startup test fails ("the database was touched") when `validate_deployment_base_url` is removed.
+- 2026-10-05 backend-7 round-3 rework: the overlay now uses `ExitStack` instead of a parenthesised `with`. Stale lead, render-bot and qa-2c items updated, with the evidence refreshed. Check: the old overlay fails the 3.8 guard at line 159 and the new one passes. The lint gate is clean. The WP-2b pure layer (`7933e17`) is 4681 passed with the overlay against 4675 on base, with identical non-render outcomes.
 
 ## Evidence
 
-Round-3 head. Commands are run from the repo root.
+Round-3 rework head, after merging `mig/integration` `61db9f8`. Commands are run from the repo root.
 
-- **`tests/web` the CI way.** `uv run --locked pytest -m 'not stack' -- tests/web` (as `ci/pytest_suites.sh` does) gives 237 passed and 1 xfailed. The xfail is the strict pin for carried risk 9.
-  - `tests/web/render` alone gives 142 passed and 1 xfailed.
+- **`tests/web`, run the CI way.** `uv run --locked pytest -m 'not stack' -- tests/web` (as `ci/pytest_suites.sh` does) gives 238 passed and 1 xfailed. The xfail is the strict pin for carried risk 9.
+  - `tests/web/render` alone gives 143 passed and 1 xfailed.
   - `docs/modernisation/work/WP-0i-evidence/tests-web-render.txt` lists every case by name.
-- **Fail before, restated.**
-  - **Against `mig/integration` code.** The round-3 `tests/web/render` run against the `mig/integration` tree (`1697a7a`) with `--continue-on-collection-errors` gives 126 failed, 5 passed and 1 collection error.
+- **`tests/web` on the web image's stack.** CPython 3.8.20 with `requirements.txt` and `requirements-web.txt`, using the WP-0c rewrite of the `-e git+` lines, gives 238 passed and 1 xfailed.
+  - That rewrite installs Flask-Potion from git, not as an editable checkout, so it does not ship the checkout's `tests` package.
+  - To reproduce QA's environment, a regular `tests` package that imports `flask_testing` is put after the repo on `PYTHONPATH`.
+  - With it, the round-3 head (`cc01fa0`) fails collection with `ModuleNotFoundError: flask_testing`, and this head gives 238 passed and 1 xfailed.
+- **3.8 syntax.** `uv run --no-project -p cpython-3.8.20 python ci/check_py38_syntax.py config data db log models graphql util web scripts tests/web` gives 852 files checked and 0 problems.
+  - The same check on `WP-0i-evidence/` gives 0 problems.
+  - The previous overlay failed it at line 159: a parenthesised `with`.
+- **Fail before.**
+  - **Against `mig/integration` code.** The round-3 `tests/web/render` suite was run against the `mig/integration` tree (`1697a7a`) with `--continue-on-collection-errors`. It gave 126 failed, 5 passed and 1 collection error.
     - The collection error is `test_thumbnail_policy_digest.py`: `query_policy_fingerprint` does not exist on base.
-    - 68 failures are `KeyError: 'sqlalchemy'`. The base handlers use `Transaction` and `find_one_by_fields` directly, and the harness does not fake those, so these do not test the defect.
+    - 68 of the failures are `KeyError: 'sqlalchemy'`. The base handlers use `Transaction` and `find_one_by_fields` directly, and the harness does not fake those, so these failures do not test the defect.
     - The rest fail on the defect itself: 401 or 500 where a refusal or a render is expected, the bot identity, the slug-only key, caller args reaching urlbox, an unredacted URL, a request-derived origin, and missing `deployment_origin`.
-    - The 5 that pass on base: the three `test_slug_matches_in_any_case` cases, anonymous retrieve refused, and `test_render_with_an_unusable_configured_origin_makes_no_outbound_call`. The last passes only because base fails earlier.
-  - **Against the round-2 head `76c31e2`.** The 32 new origin tests fail there: 12 `SCRIPT_NAME` cases with a hostile render or link host, and 20 that need `deployment_origin` or `validate_deployment_base_url`. The 8 hostile-`Host` tests pass there.
-  - **The claim-race test.** It fails on `76c31e2` code: the caller deleted the third caller's claim and rendered again.
+    - Five cases pass on base: the three `test_slug_matches_in_any_case` cases, the anonymous retrieve refusal, and `test_render_with_an_unusable_configured_origin_makes_no_outbound_call`. The last passes only because base fails earlier.
+  - **Against the round-2 head `76c31e2`.** The 32 new origin tests fail there:
+    - 12 `SCRIPT_NAME` cases, because the render or link host is the attacker's;
+    - 20 that need `deployment_origin` or `validate_deployment_base_url`.
+    - The 8 hostile-`Host` tests pass there.
+  - **The claim-race test** fails on `76c31e2` code: the caller deleted the third caller's claim and rendered again.
   - **Mutants.** Each new test fails under its mutant, and none hangs:
-    - dropping `request_args={}` from thumbnails: 2 failures;
-    - logging `res.url` on a non-200: 3 failures;
-    - an unsorted `include` in `canonical_policy`: the hash-seed test fails;
-    - no claim deadline: the bounded loop test fails with "the claim loop is spinning".
-- **WP-2b pure layer.** `tests/authz/run.sh` from `mig/WP-2b-authz-suite` (`09a7581`; it changes nothing outside `tests/authz`), run in scratch copies under `/tmp/wp0i-r3` that were never committed.
+    - dropping `request_args={}` from thumbnails fails 2 tests;
+    - logging `res.url` on a non-200 fails 3 tests;
+    - an unsorted `include` in `canonical_policy` fails the hash-seed test;
+    - removing the claim deadline makes the bounded-loop test fail with "the claim loop is spinning";
+    - removing `validate_deployment_base_url(app)` from `_create_app_internal` makes the gunicorn startup test fail with "the database was touched before the origin check".
+- **WP-2b pure layer.** `tests/authz/run.sh` from `mig/WP-2b-authz-suite` (`7933e17`; it changes nothing outside `tests/authz`) was run in scratch copies under `/tmp/wp0i-r3`, which were never committed.
 
   | Tree | Result |
   |---|---|
-  | `mig/integration` `1697a7a` + WP-2b | 4675 passed, 580 skipped |
-  | branch `03acb20` + WP-2b, pins as they are today | 4663 passed, 580 skipped, 12 errors (each pin patches `page_renderer.Transaction`, which this WP removed) |
-  | branch `03acb20` + WP-2b, with `WP-0i-evidence/test_render_routes.flipped.py` | 4681 passed, 580 skipped (18 render cases, including 3 flipped N7) |
+  | `mig/integration` `61db9f8` + WP-2b | 4675 passed, 580 skipped |
+  | this head + WP-2b, with `WP-0i-evidence/test_render_routes.flipped.py` | 4681 passed, 580 skipped. The 18 render cases include 3 flipped N7 cases. |
+  | round-3 head `03acb20` + WP-2b `09a7581`, with the pins as they are today | 4663 passed, 580 skipped, 12 errors. Each erroring pin patches `page_renderer.Transaction`, which this WP removed. |
 
-  With `test_render_routes.py` deselected, the per-test outcome lists of base and branch are byte-identical: 4663 passed.
-- **Lint.** `ci/lint_python.sh mig/integration` gives "All checks passed!" and "18 files already formatted". That covers ruff E4, E7, E9, F and S, plus `ruff format --check`, on every Python file this branch changes, the flipped overlay included.
-- **Imports.** `web.server.app` imports `deployment_origin` from `web.server.routes.views.page_renderer`. The startup test imports `web.server.app` in-process.
-- **Not run: a live render.** urlbox is never called (decision 0004). QA's round-2 live run on the WP-2c stack covered the hostile `Host` values. The `SCRIPT_NAME` path is measured in-process with `environ_overrides`, which is what gunicorn 20.0.4 produces from the header.
+  With `test_render_routes.py` deselected, the per-test outcome lists of base and head are byte-identical: 4663 passed.
+- **Lint.** `ci/lint_python.sh mig/integration` reports "All checks passed!" and "18 files already formatted". That covers ruff E4, E7, E9, F and S at the py38 target, plus `ruff format --check`, on every Python file this branch changes, including the flipped overlay.
+- **Imports.** `web.server.app` imports `deployment_origin` from `web.server.routes.views.page_renderer`. The startup tests import `web.server.app` in-process, and one of them runs `create_app` as gunicorn.
+- **Not run: a live render.** urlbox is never called (decision 0004).
+  - QA's round-3 live run on a fresh stack under gunicorn covered hostile `Host` and `SCRIPT_NAME` values. It also confirmed that a bad `DEPLOYMENT_BASE_URL` exits the container with code 1.
+  - In-process, the `SCRIPT_NAME` path is measured with `environ_overrides`. That is what gunicorn 20.0.4 produces from the header.
 
 ## Verdicts
 

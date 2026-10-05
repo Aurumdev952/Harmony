@@ -12,6 +12,7 @@ from __future__ import annotations
 
 import logging
 import os
+from contextlib import ExitStack
 from types import SimpleNamespace
 from unittest import mock
 
@@ -156,12 +157,16 @@ def fixture_render_app(app: Flask) -> Flask:
 
 def _get(render_app, principal, path, headers=None):
     spec = principal_specs()[principal]
-    with (
-        configuration(spec.public_access),
-        mock.patch.object(
-            authentication_views, 'get_configuration', lambda key: spec.public_access
-        ),
-    ):
+    # ExitStack, not a parenthesised `with`: the web image runs Python 3.8.
+    with ExitStack() as stack:
+        stack.enter_context(configuration(spec.public_access))
+        stack.enter_context(
+            mock.patch.object(
+                authentication_views,
+                'get_configuration',
+                lambda key: spec.public_access,
+            )
+        )
         return render_app.test_client().get(
             path, headers={PRINCIPAL_HEADER: principal, **(headers or {})}
         )

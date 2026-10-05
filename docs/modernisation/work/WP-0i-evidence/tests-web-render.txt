@@ -58,6 +58,7 @@ tests/web/render/test_render_origin.py::test_unusable_configured_origin_is_refus
 tests/web/render/test_render_origin.py::test_render_with_an_unusable_configured_origin_makes_no_outbound_call
 tests/web/render/test_render_origin.py::test_app_startup_validates_the_configured_origin[https://harmony.tests.invalid-False]
 tests/web/render/test_render_origin.py::test_app_startup_validates_the_configured_origin[https://real@attacker.invalid-True]
+tests/web/render/test_render_origin.py::test_gunicorn_app_refuses_an_unusable_origin_before_touching_the_database
 tests/web/render/test_render_route_guards.py::test_anonymous_render_is_refused_without_an_outbound_call[/dashboard/malaria-overview/pdf]
 tests/web/render/test_render_route_guards.py::test_anonymous_render_is_refused_without_an_outbound_call[/fr/dashboard/malaria-overview/pdf]
 tests/web/render/test_render_route_guards.py::test_anonymous_render_is_refused_without_an_outbound_call[/dashboard/malaria-overview/a1b2c3/pdf]
@@ -141,4 +142,4 @@ tests/web/render/test_thumbnail_policy_digest.py::test_policies_that_render_diff
 tests/web/render/test_thumbnail_policy_digest.py::test_digest_does_not_depend_on_the_hash_seed
 tests/web/render/test_thumbnail_policy_digest.py::test_digest_does_not_depend_on_query_need_order
 tests/web/render/test_thumbnail_policy_digest.py::test_narrowed_token_caller_digest_matches_their_render (strict xfail)
-142 passed, 1 xfailed (uv run --locked pytest -m 'not stack' -- tests/web/render, at the round-3 head)
+143 passed, 1 xfailed (uv run --locked pytest -m 'not stack' -- tests/web/render, round-3 rework head; the same on CPython 3.8 with requirements*.txt)

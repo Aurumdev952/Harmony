@@ -42,7 +42,7 @@ Under the heaviest synthetic stalls the run still fails more often than 5%: a bo
 
 ## Running it for a WP
 
-All commands run from your worktree. Paired mode needs at least 20 rounds per side. A full run takes about 30 minutes.
+All commands run from your worktree. Paired mode needs at least 30 rounds per side (decision 0011): over fewer, the bootstrap of p95 resamples little more than the maximum and an A/A case fails too often. At a 5% level, the p95 bound of an A/A case on real noise exceeds 1 in 14% of cases at 4 rounds, 11% at 10, 6.5% at 20 and 4.1% at 30 (`probes/2026-10-06-rounds.txt`, from `scripts/perf/probes/rounds.py`). A full run takes about 30 minutes.
 
 1. **Start the stack.** Use the WP-1a stack, or your own copy with the `PERF_*` ports and project set as in the header of `stack.sh`.
    ```bash

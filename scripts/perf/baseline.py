@@ -114,9 +114,11 @@ P95_REGRESSION_LIMIT = 0.10
 # every case (case_alpha).
 FAMILY_ALPHA = 0.05
 BOOTSTRAP_RESAMPLES = 4000
-# Below this, a bootstrap of p95 resamples little more than the maximum and an
-# A/A case fails its bound two to three times as often as the level says.
-MIN_PAIRED_ROUNDS = 20
+# Over fewer rounds a bootstrap of p95 resamples little more than the maximum,
+# so an A/A case's bound exceeds 1 more often than its level says: at 4 to 10
+# rounds two to three times as often (probes/2026-10-06-rounds.txt). Decision
+# 0011 sets the floor at 30.
+MIN_PAIRED_ROUNDS = 30
 REQUEST_LOG_SETTLE_SECONDS = 0.05
 # A WP's reference is its merge base with this branch (decision 0011).
 BASE_BRANCH = 'mig/integration'

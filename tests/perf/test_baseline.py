@@ -391,8 +391,8 @@ def test_a_paired_run_writes_both_sides_and_fails_on_a_clear_regression(
 ):
     stem = baseline.paired_stem(tmp_path, '2026-10-05', 'a' * 40, 'b' * 40, 'aa')
     assert stem == tmp_path / 'paired' / '2026-10-05-aaaaaaaaaa-vs-bbbbbbbbbb-aa'
-    ms = [float(v) for v in range(100, 121)]
-    reference = [sample('q', 119.0), sample('perf-mixed-6', 119.0)]
+    ms = [float(v) for v in range(100, 131)]
+    reference = [sample('q', 128.5), sample('perf-mixed-6', 128.5)]
     rounds = {'q': (ms, ms), 'perf-mixed-6': (ms, ms)}
     assert (
         baseline.finish_paired(stem, reference, reference, rounds, _paired_meta()) == 0
@@ -405,7 +405,7 @@ def test_a_paired_run_writes_both_sides_and_fails_on_a_clear_regression(
     ]
     assert recorded[0] == {'case_id': 'q', 'reference_ms': ms, 'candidate_ms': ms}
     text = Path(f'{stem}.md').read_text()
-    assert '| q | 119.0 | 119.0 | 1.000 | 1.000 | 1.000 | 1.000 | 1.100 | ok |' in text
+    assert '| q | 128.5 | 128.5 | 1.000 | 1.000 | 1.000 | 1.000 | 1.100 | ok |' in text
     assert 'every case would have failed a slowdown of 1.100 or more' in text
     assert (
         'every case would have failed a slowdown of 1.100 or more'
@@ -440,7 +440,7 @@ def test_a_paired_run_judges_each_bound_at_the_split_level(tmp_path: Path, capsy
 
 
 @given(
-    st.lists(st.floats(min_value=1, max_value=1e4), min_size=20, max_size=120),
+    st.lists(st.floats(min_value=1, max_value=1e4), min_size=30, max_size=120),
     st.floats(min_value=0.5, max_value=2),
 )
 def test_a_candidate_slower_by_a_constant_factor_fails_exactly_above_ten_percent(
@@ -455,7 +455,7 @@ def test_a_candidate_slower_by_a_constant_factor_fails_exactly_above_ten_percent
     assert result.regressed == (result.ratio > 1.10)
 
 
-@given(st.lists(st.floats(min_value=1, max_value=1e4), min_size=20, max_size=120))
+@given(st.lists(st.floats(min_value=1, max_value=1e4), min_size=30, max_size=120))
 def test_identical_sides_never_regress(ms):
     result = baseline.paired_result('c', ms, list(ms), 0.05, resamples=50)
     assert result.ratio == 1 and not result.regressed
@@ -560,7 +560,7 @@ def test_a_tail_regression_fails_on_p95_even_when_the_typical_request_is_unchang
 
 
 @given(
-    st.lists(st.tuples(st.floats(1, 1e4), st.floats(1, 1e4)), min_size=20, max_size=60),
+    st.lists(st.tuples(st.floats(1, 1e4), st.floats(1, 1e4)), min_size=30, max_size=60),
     st.floats(min_value=0.5, max_value=3),
 )
 def test_detects_is_the_smallest_uniform_slowdown_the_run_would_fail(pairs, factor):
@@ -583,20 +583,21 @@ def test_paired_is_the_default_and_compare_selects_the_committed_baseline():
     assert (committed.mode, committed.compare) == ('committed', '')
 
 
-def test_a_paired_verdict_needs_twenty_rounds():
-    # Below about 20 pairs a bootstrap of p95 resamples little more than the
-    # maximum, and an A/A case fails two to three times as often as its level.
-    ms = [float(v) for v in range(1, 20)]
-    with pytest.raises(ValueError, match='at least 20 rounds'):
+def test_a_paired_verdict_needs_thirty_rounds():
+    # Over few pairs a bootstrap of p95 resamples little more than the
+    # maximum, so an A/A case's bound exceeds 1 more often than its level
+    # (probes/2026-10-06-rounds.txt); decision 0011 sets the floor at 30.
+    ms = [float(v) for v in range(1, 30)]
+    with pytest.raises(ValueError, match='at least 30 rounds'):
         baseline.paired_result('c', ms, ms, 0.05)
-    baseline.paired_result('c', ms + [20.0], ms + [20.0], 0.05)
+    baseline.paired_result('c', ms + [30.0], ms + [30.0], 0.05)
 
 
 @pytest.mark.parametrize('flag', ['--rounds', '--dashboard-rounds'])
-def test_paired_mode_refuses_fewer_than_twenty_rounds(flag):
+def test_paired_mode_refuses_fewer_than_thirty_rounds(flag):
     with pytest.raises(SystemExit):
-        baseline.parse_args([flag, '19'])
-    assert baseline.parse_args([flag, '20']).mode == 'paired'
+        baseline.parse_args([flag, '29'])
+    assert baseline.parse_args([flag, '30']).mode == 'paired'
     assert baseline.parse_args(['--committed', flag, '5']).mode == 'committed'
 
 

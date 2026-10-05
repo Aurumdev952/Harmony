@@ -31,6 +31,8 @@ from tests.authz.http.stack import (
     password_session,
 )
 
+pytestmark = pytest.mark.usefixtures('own_accounts')
+
 # Any signed-in user may list roles (sitewide view_resource); anonymous gets 401.
 PROBE = '/api2/role'
 TAKEN_USERNAME = 'Another account has this username.'

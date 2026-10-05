@@ -29,6 +29,8 @@ import pytest
 
 from tests.authz.http.stack import TIMEOUT_SECONDS, USER_DOMAIN, new_session
 
+pytestmark = pytest.mark.usefixtures('own_accounts')
+
 # config/harmony_demo/general.py DEPLOYMENT_BASE_URL, the deployment the stack runs.
 ORIGIN = 'https://harmony_demo.zenysis.com'
 ATTACKER = 'attacker.invalid'

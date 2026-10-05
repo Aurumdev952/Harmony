@@ -27,6 +27,8 @@ from __future__ import annotations
 import secrets
 import time
 
+import pytest
+
 from tests.authz.http.stack import (
     PENDING,
     USER_DOMAIN,
@@ -34,6 +36,8 @@ from tests.authz.http.stack import (
     mint_token,
     new_session,
 )
+
+pytestmark = pytest.mark.usefixtures('own_accounts')
 
 # Any signed-in user may list roles (sitewide view_resource); anonymous gets 401.
 PROBE = '/api2/role'

@@ -450,16 +450,17 @@ class Stack:
             if group['name'] == name:
                 self.admin_json('DELETE', group['$uri'])
 
-    def cleanup(self) -> None:
+    def cleanup(self, keep_users=(), keep_dashboards=()) -> None:
         '''Deletes every dashboard this run created, then every user it created
-        or reset. Saved queries go with their users (user_query_session.user_id
-        cascades).'''
-        for uri in sorted(self.created_dashboards):
+        or reset, except those in `keep_*`. Saved queries go with their users
+        (user_query_session.user_id cascades).'''
+        for uri in sorted(set(self.created_dashboards) - set(keep_dashboards)):
             response = self.request(self.admin, 'DELETE', uri)
             assert response.status_code in (204, 404), (uri, response.status_code)
-        self.created_dashboards.clear()
-        for uri in sorted(self.created_users):
+            self.created_dashboards.discard(uri)
+        for uri in sorted(set(self.created_users) - set(keep_users)):
             response = self.request(self.admin, 'DELETE', uri)
             assert response.status_code in (204, 404), (uri, response.status_code)
-        self.created_users.clear()
-        self._users.clear()
+            self.created_users.discard(uri)
+        if not keep_users:
+            self._users.clear()

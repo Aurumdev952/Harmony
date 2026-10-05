@@ -25,3 +25,17 @@ def fixture_stack() -> Iterator[Stack]:
     stack = Stack.from_env()
     yield stack
     stack.cleanup()
+
+
+@pytest.fixture(name='own_accounts')
+def fixture_own_accounts(stack) -> Iterator[None]:
+    '''Deletes the users and dashboards a test made when it ends. The account
+    pins make over a hundred users, and the list pins read the first page
+    (`per_page=100`) of `/api2/user`. Only for tests that never call
+    `role_user`, whose users the session reuses.'''
+    users, dashboards = set(stack.created_users), set(stack.created_dashboards)
+    yield
+    stack.cleanup(
+        keep_users=users | {s.user_uri for s in stack._users.values()},
+        keep_dashboards=dashboards,
+    )

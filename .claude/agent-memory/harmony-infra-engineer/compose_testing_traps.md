@@ -15,7 +15,7 @@ Lessons from WP-0b (2026-10-04) for checking Compose files without touching `.en
 - **Host ports 5432 and 6379 are taken** by host services on the dev machine. For runtime checks, use a throwaway project (`-p wp<id>-check`) plus a /tmp overlay with `ports: !override [...]`.
 - **`volumes: !reset []` does not avoid volumes.** postgres and redis declare `VOLUME`, so Docker creates anonymous volumes that `down` (without `-v`) leaves behind, and they cannot be told apart from other agents' volumes afterwards. Use `tmpfs: [/var/lib/postgresql/data]` / `tmpfs: [/data]` in the overlay instead.
 - **`redis-cli` exits 0 on NOAUTH/WRONGPASS.** Healthchecks must match the reply (`redis-cli ping | grep -qx PONG`). Use `REDISCLI_AUTH` env for the password.
-- **Pass `-p` to `uv run --no-project`.** Since `pyproject.toml` (`requires-python = "==3.9.*"`) landed, a bare run picks 3.9. Use `-p 3.13` for `tests/core` and `tests/infra`, and `-p 3.8` with the web requirements for `tests/web`, until WP-3b unifies the interpreter.
+- **`uv run --no-project` from the repo root reads `[tool.uv] required-version`** (>= 0.12.16 since WP-3b), so an older uv fails there too; pass `-p 3.13` explicitly for ad-hoc scripts.
 - Repo Python style is black with `--skip-string-normalization`. Check with `uvx ruff format --check --config "format.quote-style='single'"` until WP-2f adds ruff config.
 
 **Why:** each of these cost a retry or left something to clean up in WP-0b.

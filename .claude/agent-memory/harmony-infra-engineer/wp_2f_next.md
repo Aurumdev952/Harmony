@@ -1,38 +1,25 @@
 ---
 name: wp-2f-next
-description: How Harmony's Python toolchain is wired after WP-2f (two uv lanes, generated requirements, changed-file ruff) and the traps found building it
+description: How Harmony's Python toolchain is wired after WP-3b (one 3.13 lane, uv >= 0.12.16, no requirements files) and the traps found building it
 metadata:
   type: project
 ---
 
-WP-2f (branch `mig/WP-2f-uv-ruff-mypy-ci`, 2026-10-04) set up this toolchain.
+WP-2f (2026-10-04) set up uv, ruff, mypy and CI. WP-3b (branch `mig/WP-3b-cpython-313`, 2026-10-05) folded the two lanes into one.
 
-**Two Python lanes until WP-3b:**
-- Root `pyproject.toml` and `uv.lock` give the app's lane: CPython 3.9, CPython-only lock.
-- `ci/tools313` gives the 3.13 lane for the PEP 723 tools and `tests/infra`.
-- `tests/infra/conftest.py` stops the 3.9 run collecting `tests/infra`.
-
-WP-3b collapses the lanes with two changes:
-- set `requires-python` to `"==3.13.*"` and re-lock;
-- delete `ci/tools313` and the conftest guard.
-
-**Why:** the web image is CPython 3.8, the pipeline image installs into a PyPy venv, and the newer tools target 3.13.
-
-**How to apply:**
-- `requirements*.txt` are generated verbatim from `pyproject.toml` by `docker/export_requirements.py` (`make requirements`). Never edit them by hand. A test fails on drift.
-- Lock-only overrides (`psycopg2-binary` 2.8.6) do not reach the images.
+**After WP-3b:**
+- There is one root `pyproject.toml`/`uv.lock`, with `requires-python = "==3.13.*"`.
+- `ci/tools313`, the `tests/infra` conftest guard, `requirements*.txt` and `docker/export_requirements.py` are gone.
+- `[tool.uv] required-version = ">=0.12.16"`, because the build constraints are hashed. The build host's `uv` was 0.12.5, so every `uv` command in a checkout of the branch fails. That includes `uv run --no-project` and the hook-mandated `uv run python scripts/agents/...`. Use a 0.12.23 binary (`uvx uv@0.12.23` caches one) until the host is updated.
+- The standalone tools get their strict mypy flags from a per-module override in the root config. The app is on mypy 1.3; mypy 1.11 and later find 6 or 7 errors in core/backend files.
 
 **Traps**
-- The `pytest-selenium` 4.0.1 dev pin crashes pytest 8 on any test failure (INTERNALERROR, exit 3, failing test hidden). Keep `-p no:selenium`.
-- `pytest-flask` (dev pin) auto-pushes a request context around any test with an `app` fixture, which leaked Flask-Login state into `tests/web`. Keep `-p no:flask`. When a suite passes on a branch's own environment but fails under the full dev group, suspect auto-loaded pytest plugins first.
-- ruff ignores `# pylint: disable` comments.
-- ruff format is black 24 style, so a touched legacy file gets a whole-file reformat. The lead was asked for one repo-wide format commit.
-- `uv pip` is blocked by a hook; use a small uv project to lock tool sets instead.
-- mypy run from the repo root needs `explicit_package_bases`, because the root has an `__init__.py`.
-- Security wants build tools locked as well as runtime packages. Find them with a fresh-cache `UV_CACHE_DIR=<new> UV_PROJECT_ENVIRONMENT=<new> uv sync --locked -v` and grep `Installing build requirement:`. Pin each one in `[tool.uv] build-constraint-dependencies`. A new sdist dependency can bring in a new build requirement, so re-run that check whenever the lock gains source builds.
-- Diff changed files against the merge-base (`git diff --merge-base <base>`), not two-dot: a moved base otherwise lints and `--fix`es files the branch never touched. Use `-z` with `core.quotePath=false` and a `read -d ''` loop (macOS bash 3.2 has no mapfile), and put `--` before file lists.
-- ruff `S`: ignore S603 and S607 (they fire on every subprocess call); in tests, ignore S101 and S311.
-- To prove "a broken case turns CI red", break one case per suite. A break that touches nothing a test pins stays green: renaming a format tag no offline test covers did exactly that.
-- `CI=true` changes pipeline-suite behaviour (a Hypothesis profile plus one extra test). Set it when replaying CI locally.
+- The `pytest-selenium` 4.0.1 dev pin crashed pytest 8 on any test failure. It left the lock in WP-3b.
+- `pytest-flask` auto-pushes a request context around any test with an `app` fixture. Keep `-p no:flask`.
+- ruff ignores `# pylint: disable`. ruff format is black 24 style. The tree is not formatted (about 270 files), so CI checks formatting on changed files only.
+- `uv pip` is blocked by a hook. Use a small uv project, `uv run --with`, or `uv sync --inexact` instead.
+- Security wants build tools locked with hashes: `build-constraint-dependencies = [{ requirement = "setuptools==X", hashes = [...] }]`. Find the build tools with a fresh-cache `UV_CACHE_DIR=<new> UV_PROJECT_ENVIRONMENT=<new> uv sync --locked -v` and grep for `Installing build requirement:`.
+- `uv run --locked` on an older branch (requires-python 3.9) silently replaces the worktree `.venv` with a 3.9 one. Re-run `uv sync --locked` after switching back.
+- Diff changed files against the merge-base, not two-dot. `CI=true` changes how the pipeline suite behaves.
 
-Related: [[ci-tooling-and-guards]].
+Related: [[ci-tooling-and-guards]], [[image-verification-recipes]].

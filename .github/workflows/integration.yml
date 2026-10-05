@@ -61,6 +61,29 @@ jobs:
         if: '!cancelled()'
         run: ci/pytest_suites.sh
 
+  python-stack:
+    name: Python 3.13 - tests that start containers
+    # The runner's Docker daemon starts the containers these tests need, such as
+    # the throwaway Postgres of the WP-0k clock test. Tests that need the whole
+    # compose stack skip themselves without CONTRACT_BASE_URL.
+    runs-on: ubuntu-24.04
+    permissions:
+      contents: read
+    steps:
+      - name: Checkout repo
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - name: Set up uv
+        uses: astral-sh/setup-uv@c18668ad3cf93ea998bef934396af7bb5c839dc7 # v10.2.0
+        with:
+          version: '0.12.23'
+          enable-cache: true
+      - name: Install
+        run: uv sync --locked
+      - name: Pytest (stack)
+        run: ci/pytest_suites.sh -m stack
+
   lint-js:
     name: JS - Lint
     runs-on: ubuntu-24.04

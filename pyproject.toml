@@ -304,5 +304,5 @@ testpaths = ["tests"]
 # fixture, so Flask-Login state leaks into tests/web. No suite uses it.
 addopts = "-p no:flask"
 markers = [
-    "stack: needs the running docker compose stack; CI's unit job deselects it",
+    "stack: needs Docker, to start its own containers or the compose stack (CONTRACT_BASE_URL); CI's unit job deselects it and its python-stack job runs it",
 ]

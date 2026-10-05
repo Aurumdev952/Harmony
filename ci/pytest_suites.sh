@@ -7,6 +7,7 @@
 #
 #   ci/pytest_suites.sh
 #   ci/pytest_suites.sh -x -q
+#   ci/pytest_suites.sh -m stack   # only the stack-marked tests (the last -m wins)
 set -euo pipefail
 shopt -s nullglob
 cd "$(git rev-parse --show-toplevel)"

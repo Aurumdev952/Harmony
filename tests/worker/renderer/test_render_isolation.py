@@ -4,6 +4,7 @@ once it overruns its deadline plus the clean-up grace.
 The targets are module-level so the spawned child can import them by name.
 """
 
+import contextlib
 import os
 import signal
 import subprocess
@@ -85,7 +86,8 @@ def hangs_with_a_detached_helper(
 def _is_running(pid: int) -> bool:
     try:
         state = Path(f'/proc/{pid}/stat').read_text().rsplit(')', 1)[1].split()[0]
-    except FileNotFoundError:
+    except OSError:
+        # Gone: FileNotFoundError, or ProcessLookupError if it exited mid-read.
         return False
     return state != 'Z'
 
@@ -139,7 +141,8 @@ def test_an_overrun_kills_the_child_and_everything_it_started(tmp_path, monkeypa
         assert not _is_running(helper)
     finally:
         if _is_running(helper):
-            os.kill(helper, signal.SIGKILL)
+            with contextlib.suppress(ProcessLookupError):
+                os.kill(helper, signal.SIGKILL)
 
 
 def answers_late_and_lingers(

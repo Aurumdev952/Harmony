@@ -1,6 +1,6 @@
 # Harmony modernisation specification
 
-Version 1.7, 2026-10-05 (decisions 0001, 0003, 0004, 0005, 0006, 0007). Status: approved for execution.
+Version 1.8, 2026-10-05 (decisions 0001, 0003, 0004, 0005, 0006, 0007, 0008). Status: approved for execution.
 
 This is the binding guide for every agent and engineer working on the Harmony migration. Where this spec and another document disagree, this spec wins. The other documents explain why and describe the work in detail:
 
@@ -78,7 +78,7 @@ Each requirement names the work packages (WP, section 5) that satisfy it.
 | ID | Requirement | WP |
 |---|---|---|
 | BE-1 | `harmony/core` MUST NOT import `flask`, `fastapi` or `starlette`. An import-linter contract enforces this. | 4a-4f |
-| BE-2 | All runtime configuration MUST load through `harmony.core.settings` (pydantic-settings). Deployment modules MUST NOT perform I/O when imported. | 3a, 4a |
+| BE-2 | All runtime configuration MUST load through `harmony.core.settings` (pydantic-settings). Deployment modules MUST NOT perform I/O when imported. | 3a, 4a, 4b, 4c, 4f, 5a, 8d, 8e |
 | BE-3 | Database access MUST go through `harmony.core.db`, using the SQLAlchemy 2 `select()` style. Sessions are synchronous. | 3c, 3e, 4b |
 | BE-4 | Every HTTP route MUST live under `harmony/api/` and be declared with typed Pydantic request and response models. | 5a-5h |
 | BE-5 | New endpoints MUST live under `/api/v3/`. Errors MUST use the `ApiError` envelope (C-10). | 5a |

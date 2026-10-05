@@ -10,11 +10,13 @@ accounts' other spellings matching nobody.
 """
 
 from contextlib import nullcontext
+from types import SimpleNamespace
 
 import pytest
 import sqlalchemy
 from werkzeug.exceptions import BadRequest
 
+from models.alchemy.user import User
 from tests.web.usernames.accounts import PASSWORD
 from tests.web.usernames.tokens import (
     login,
@@ -109,3 +111,38 @@ def test_user_patch_refuses_another_accounts_name_in_any_case(
             update_user(None, db_user, {'username': new_username})
 
     assert _username(app, 8) == 'jane.doe@moh.gov.rw'
+
+
+def test_a_look_alike_rename_by_patch_signs_in_only_the_renamed_account(
+    app, request_ctx, user_api, monkeypatch
+):
+    """`PATCH /api2/user/<id>` writes the username through Potion's manager;
+    the steps after it need tables this app does not have."""
+    for step in (
+        'update_user_acls',
+        'update_user_groups',
+        'update_user_api_tokens',
+        'invalidate_user_identity_cache',
+    ):
+        monkeypatch.setattr(user_api, step, lambda *args: None)
+    monkeypatch.setattr(
+        user_api, 'build_user_updates', lambda obj: {'username': obj['username']}
+    )
+
+    def update(user, updates):
+        for name, value in updates.items():
+            setattr(user, name, value)
+        app.extensions['sqlalchemy'].db.session.commit()
+        return user
+
+    resource = SimpleNamespace(manager=SimpleNamespace(update=update))
+    with app.app_context():
+        db_user = User.query.get(6)
+        user_api.UserResource.update_user.view_func(
+            resource, db_user, {'username': LOOK_ALIKE}
+        )
+
+    assert _username(app, 6) == LOOK_ALIKE
+    assert signed_in_id(app, login(app, LOOK_ALIKE)) == 6
+    assert signed_in_id(app, session_token_without_account_id(app, LOOK_ALIKE)) == 6
+    assert signed_in_id(app, login(app, 'john.doe@moh.gov.rw')) == 1

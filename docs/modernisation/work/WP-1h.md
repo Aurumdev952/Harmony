@@ -361,6 +361,14 @@ Round 3 (the WP-0k security gate, on the lead's instruction): a render token als
   - 8 failed or errored, then passed: the 2 token tests (id binding, and the spent-token predicate over 5 cases), the 5 route cases, the emailed-recipient test, the no-account test, and the render-views test;
   - `tests/web` 397 passed, 1 xfailed; `tests/authz` 4681 passed, 583 skipped (4 render cases failed on the `user_id` claim before the overlay change);
   - ruff: clean on the touched files.
+- 2026-10-06 backend-8 round 3 gate, on b09fec0:
+  - `ci/lint_python.sh mig/integration`: clean;
+  - `ci/check_py38_syntax.py` on CPython 3.8.20: 870 files, 0 problems;
+  - `ci/pytest_suites.sh`: all 14 suites passed, including `tests/authz` (4681 passed, 583 skipped), `tests/web` (397 passed, 1 xfailed) and `tests/worker` (151 passed, 1 skipped, the browser tests);
+  - `uv run --locked mypy`: no issues in 531 files;
+  - tools313 lane: mypy no issues, `tests/infra` 503 passed;
+  - in-image suite: renderer and test images built from the head with `--network host`, then run with `--network none`, seccomp, `cap-drop ALL` plus `SYS_CHROOT`, `--init`, read-only, 2g and pids 512. 176 passed, 0 skipped. The images were deleted, and no prune was run;
+  - `task_gate.py WP-1h`: only the status line and the reviewer verdict remain. WP-0i's files cleared with the merge.
 
 ## Evidence
 

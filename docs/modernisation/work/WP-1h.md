@@ -81,7 +81,7 @@ Phase 1 section 1h; 03-target-architecture (render path); decision 0004. Builds 
   - The response is streamed and refused once it passes 25 MiB, by `Content-Length` or by bytes read; it is then checked for status and content type. Callers get `RenderedDashboard(content, content_type)` or `None`. The routes keep their URLs, auth (WP-0i) and content types: `application/pdf`, `image/png` and `image/jpeg`.
   - The routes pass `width`, `height`, `full_page`, `pdf_page_size` and `pdf_orientation` from the request args; a value outside the renderer's ranges falls back to the default. The other urlbox args (`delay`, `wait_timeout` and so on) are gone. Thumbnails and emailed renders take no args (before, an emailed render read the share request's args).
 - **Render token** (`web/server/security/render_tokens.py`, SEC-7).
-  - It is an HS256 `accessKey` JWT in the existing flask-jwt-extended 3 layout. `identity` is the requesting user, never a bot. `needs` is `[["view_resource", <resource_id>, "dashboard"]]`.
+  - It is an HS256 `accessKey` JWT in the existing flask-jwt-extended 3 layout. `identity` is the requesting user, never a bot, and `user_id` (WP-0k's `USER_ID_CLAIM`) names that account by id. `needs` is `[["view_resource", <resource_id>, "dashboard"]]`.
   - `query_needs` stays `['*']`, so each page request resolves the account's own policy. When the caller renders as themselves (the routes and the thumbnail), a `policy` claim pins the digest of their policy at request time (`query_policy_fingerprint`, the thumbnail cache key). If the account's digest differs when the page loads, `_install_token_needs` grants nothing, so a policy change during the render fails the render instead of widening it or caching it under the old key (WP-0i carried risk 2). A caller signed in with a narrowed API token pins the narrowed digest, which the account's digest never matches, so that render fails closed. Emailed renders run as the recipient, so no digest is pinned and the recipient's account decides.
   - It carries a `render` claim holding a random id that is registered in `app.cache` for the render's lifetime and deleted when the renderer returns. `login_from_request` refuses a render token whose id is no longer live. The token is therefore usable for exactly one render: short-lived (deadline + 15 s) and single-use per render.
   - The browser needs it for every request the page makes, so "single use" means one render, not one HTTP request.
@@ -189,9 +189,15 @@ Round 3 (the WP-0k security gate, on the lead's instruction): a render token als
 
 **Merge rule for WP-0k and WP-1h, for whichever lands second** (0k merges into integration first):
 - WP-0k's `account_for_token` returns None when `is_spent_render_token(claims)` is true, before any account lookup. This keeps render tokens single-use (SEC-7), and it replaces WP-1h's `elif is_spent_render_token(claims)` branch in `login_from_request`. WP-0k removes the token-validity cache, so the branch has nowhere else to go.
-- Render tokens are minted by WP-1h's `render_token(account, …)` with `USER_ID_CLAIM`, never by WP-0k's urlbox `grid_dashboard_urlbox_renderer`, which WP-1h deletes. WP-0k's rows T-1, T-2, U-1 and D-3 then hold for render tokens: they are bound by id, exact username, active status and `iat`.
+- Render tokens are minted by WP-1h's `render_token(account, …)` with `USER_ID_CLAIM`, never by WP-0k's urlbox `grid_dashboard_urlbox_renderer`, which WP-1h deletes. WP-0k's rows T-1, T-3, U-1 and D-3 then hold for render tokens: they are bound by id (T-1), exact username (U-1), active status (D-3) and `iat` (T-3). T-2 is API tokens only.
 - Tests for both: WP-1h's `test_token_names_its_account_by_id`, `test_only_a_render_token_whose_render_returned_is_spent`, `test_a_render_token_names_the_callers_account_by_id` and `test_an_emailed_render_token_names_the_recipients_account_by_id` stay. The merge adds a test through `account_for_token` that a spent render token for an active account is None, and one that a render token for a deactivated or renamed account is None.
-- `render_fakes.FakeTransaction.find_one_by_fields` has WP-0k's exact username lookup, so that file merges without conflict. Expect conflicts in `signal_handlers.login_from_request` (take WP-0k's body plus the rule above), `page_renderer.py` (take WP-1h's) and `dashboard.py` (WP-0k's `page_args` and `shared_page_url`, plus WP-1h's `_render_for_email`).
+- `render_fakes.FakeTransaction.find_one_by_fields` has WP-0k's exact username lookup, so that file merges without conflict. A trial merge of WP-0k 3e22301 into this branch conflicts in six files:
+  - `web/server/security/signal_handlers.py`: take WP-0k's `login_from_request` and `account_for_token`, plus the single-use rule above;
+  - `web/server/routes/views/page_renderer.py`: take WP-1h's renderer client, but delete `dashboard_page_args`, `deployment_origin` and `deployment_dashboard_url` in favour of WP-0k's `web/server/util/deployment_links.py` (`page_args`, `deployment_origin`, `deployment_url`, `shared_page_url`), and point `web/server/app.py`'s startup check at `deployment_links.deployment_origin`;
+  - `web/server/routes/views/dashboard.py`: WP-0k's `page_args` and `shared_page_url`, plus WP-1h's `_render_for_email` and `EMAIL_SLOT_WAIT_SECONDS`;
+  - `web/server/api/dashboard_api_models.py`: keep both sides' imports;
+  - `tests/web/render/test_render_origin.py`: keep `SENDER` and `USERS`, and point the origin tests at `deployment_links.deployment_origin`;
+  - `tests/web/render/test_render_route_guards.py`: keep `SENDER` and `USERS`.
 
 ## Requests
 
@@ -369,6 +375,18 @@ Round 3 (the WP-0k security gate, on the lead's instruction): a render token als
   - tools313 lane: mypy no issues, `tests/infra` 503 passed;
   - in-image suite: renderer and test images built from the head with `--network host`, then run with `--network none`, seccomp, `cap-drop ALL` plus `SYS_CHROOT`, `--init`, read-only, 2g and pids 512. 176 passed, 0 skipped. The images were deleted, and no prune was run;
   - `task_gate.py WP-1h`: only the status line and the reviewer verdict remain. WP-0i's files cleared with the merge.
+- 2026-10-06 backend-8: the lead confirmed that the R3-8 edit to QA's authz overlay (accepting `user_id` among a render token's claims and asserting it is the signed-in id) stands as part of the `qa-1h-flip` instance. qa-2b sees it at the gate.
+- 2026-10-06 backend-8: security re-checked R3-5 and R3-8 and approved at 93c7e80 with no new findings. The reviewer approved round 3 at 93c7e80. Both rows were recorded in 6e0cf21.
+- 2026-10-06 backend-8 R4 (the reviewer's round-3 low and info items, folded into the ready commit on the lead's instruction):
+  - merged `mig/integration` 290cd65 in 5632646, with no conflicts;
+  - the late-answer margin test now uses timeout 2 s, grace 3 s and an answer at 4.6 s, asserting under 6.5 s, so a slow spawn under load cannot fail it;
+  - the WP-0k merge rule lists the six files that conflict, with a resolution for each, and its `iat` row is T-3, not T-2;
+  - the Design render-token bullet names the `user_id` claim.
+
+  check:
+  - with the pre-af6260f `isolation.py` swapped in, the margin test failed at 7.88 s;
+  - on the head, a loop of the isolation file gave 20 of 20 runs passed;
+  - `git merge-tree` of WP-0k 3e22301 against this branch lists exactly those six files.
 
 ## Evidence
 

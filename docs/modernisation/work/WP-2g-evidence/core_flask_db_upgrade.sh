@@ -2,7 +2,8 @@
 # `flask db upgrade` from an empty throwaway Postgres, as initialize_new_container.sh
 # runs it, with LOG_FORMAT=json. Seed 93bb8d693499 asks the Druid coordinator (port
 # 8081) for datasources, so a stub container answers `[]` to every request and the
-# seed takes its "no datasource" branch. Prints the raw stderr, then a summary.
+# seed takes its "no datasource" branch. Prints the raw stdout and stderr, then a
+# summary that counts the lines on each stream that are not JSON.
 # Usage: core_flask_db_upgrade.sh <python with requirements-web installed> [LOG_LEVEL]
 set -euo pipefail
 
@@ -11,6 +12,7 @@ LEVEL="${2:-INFO}"
 PG="core-wp2g-pg-$$"
 DRUID="core-wp2g-druid-$$"
 REPO_ROOT=$(cd "$(dirname "$0")/../../../.." && pwd -P)
+OUT=$(mktemp)
 ERR=$(mktemp)
 # The coordinator URL always carries :8081, so the stub takes that port on a spare
 # loopback address.
@@ -18,7 +20,7 @@ DRUID_IP=127.0.82.1
 
 cleanup() {
   docker stop "$PG" "$DRUID" > /dev/null 2>&1 || true
-  rm -f "$ERR"
+  rm -f "$OUT" "$ERR"
 }
 trap cleanup EXIT
 
@@ -44,9 +46,14 @@ env -i PATH="$PATH" PYTHONPATH=. FLASK_APP=web.server.app ZEN_OFFLINE=1 \
   ZEN_ENV=harmony_demo DEFAULT_SECRET_KEY=scratch DRUID_HOST="http://${DRUID_IP}" \
   DATABASE_URL="postgresql://postgres:scratch@127.0.0.1:${PORT}/zenysis" \
   LOG_FORMAT=json LOG_LEVEL="$LEVEL" \
-  "$PYTHON" -m flask db upgrade 2> "$ERR" > /dev/null || status=$?
+  "$PYTHON" -m flask db upgrade 2> "$ERR" > "$OUT" || status=$?
+echo "--- stdout"
+cat "$OUT"
+echo "--- stderr"
 cat "$ERR"
-echo "--- exit: $status, stderr lines: $(wc -l < "$ERR")," \
+echo "--- exit: $status," \
+  "stdout lines: $(wc -l < "$OUT"), non-JSON: $(grep -cv '^{' "$OUT" || true);" \
+  "stderr lines: $(wc -l < "$ERR")," \
   "non-JSON: $(grep -cv '^{' "$ERR" || true)," \
   "alembic.runtime.migration: $(grep -c '"logger": "alembic.runtime.migration"' "$ERR" || true)," \
   "version: $(docker exec "$PG" psql -U postgres -d zenysis -tAc 'SELECT version_num FROM alembic_version')"

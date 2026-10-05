@@ -1,7 +1,7 @@
 ---
 wp: "1h"
 title: "Self-hosted export renderer"
-status: review
+status: ready
 owner_role: "backend"
 instances:
   - name: "backend-8"
@@ -180,6 +180,54 @@ The phase-1 1h verification asks for PDF and PNG exports of three reference dash
 - **Origins:** `RENDER_WEB_ORIGIN` stays configuration-only. Once dashboards call FastAPI, it must point at an internal router on the `render` network, updated together with `RENDERER_ALLOWED_ORIGIN`, and never at the public URL.
 - **WP-5d:** decide how narrowed scoped tokens render; that will be an authorisation-outcome change for the human. Port the creation email to `DEPLOYMENT_BASE_URL` (`dashboard_api_models.py:1104`).
 - **Infra (SEC-9):** deployments still use the renderer image by tag (`:latest`), the same as web.
+
+## PR summary
+
+Dashboard PDF, JPEG and PNG exports and thumbnails no longer go to urlbox.io. They are rendered by `renderer`, a sandboxed Playwright and Chromium sidecar on an internal Compose network. The browser is signed in with a single-use render token for one dashboard. Map tiles reach Mapbox only through `render-egress`, a proxy that relays to the map origins alone and strips cookies.
+
+This branch was cut from `mig/integration` (#1), so the diff against `main` also contains the integration commits. Merge #1 first. WP-0k and WP-0j merge into integration before this branch; the WP-0k merge rule is recorded under "Contract changes" in the WP file.
+
+#### Verdicts
+
+QA approved at abda42c. The reviewer approved round 3 at 93c7e80. Security approved at abda42c, round 2 at 20e5c0e (also covering af6260f) and round 3 at 93c7e80. `task_gate.py WP-1h` passes. Each verdict's notes are in `docs/modernisation/work/WP-1h.md`.
+
+#### Requirements
+
+- **SEC-7 (render tokens).** A render token is an HS256 `accessKey` JWT for the requesting account. It is named by `identity` and by WP-0k's `user_id` claim, and grants `view_resource` on one dashboard.
+  - Its `render` claim must be live in the app cache, so the token is refused once its render returns (`is_spent_render_token`). Its lifetime is the deadline plus 15 s.
+  - A `policy` claim pins the caller's query-policy digest, so a policy change while the render is queued gets the render nothing. Two tests check this through a real page load.
+  - Render page loads no longer count as dashboard views. The render URL comes from configuration (`RENDER_WEB_ORIGIN` plus the URL map), never from the request's Host or `SCRIPT_NAME`.
+- **SEC-10 (renderer sandbox and egress).**
+  - Chromium keeps its sandbox: seccomp profile, `cap_drop ALL` plus `SYS_CHROOT`, uid 1001, read-only root, no published ports, `mem_limit` and `pids_limit`.
+  - Three egress fences: a request guard, a proxy bypass list allowing only the dashboard origin, and an internal network whose only route out is `render-egress`.
+  - Only a refused fetch or XHR starts the 10 s fail-fast timer; a blocked iframe tile exports as a blank frame.
+  - Each render runs in a child process. At the deadline plus a 10 s grace, that process is killed with everything it started; a slot still held after that fails `/healthz` and exits the service.
+  - `render-egress` relays one response per plain-http connection.
+- **Limits.**
+  - One render in flight per account, below the renderer's concurrency of 2, pinned by a drift test. Slot claims are an atomic `SET NX EX`.
+  - Thumbnail retrieves wait up to 10 s for the account's slot, emailed renders up to 30 s; exports get a 503 at once.
+  - The web side reads at most 25 MiB of the answer and logs only a validated renderer error code.
+- **INV-7.** Covered by decision 0009, pending human ratification. `renderer` stays a separate service and counts against Hasura, which WP-5c retires. `render-egress` is time-boxed to WP-7g.
+- **INV-1, INV-3, INV-8.**
+  - All 14 CI suites pass, including `tests/authz` (4681 passed, 583 skipped). The authz render overlay is flipped to the renderer client under the `qa-1h-flip` instance.
+  - The in-image renderer suite gives 176 passed, 0 skipped under full hardening. Lint, the 3.8 syntax guard (870 files), strict mypy over `harmony` (531 files) and the tools313 lane (503) are clean.
+  - The end-to-end Compose run rendered real PDF, JPEG and PNG through the Flask routes.
+
+#### Hand-offs (detail in the WP's Hand-offs section)
+
+- **WP-5f:** the Celery move. Security's carry list, verbatim, covers the C-5 `PrincipalDep` points (refuse spent render tokens, the policy pin, read-only render principals), the Celery job rules (mint inside the worker, `SET NX EX` cap keyed on the requester, cap below `RENDERER_CONCURRENCY`, downloads bound to the requester) and `RENDER_WEB_ORIGIN` as an internal router once dashboards call FastAPI.
+- **WP-5d:** how narrowed scoped tokens render (an authorisation-outcome change for the human); the creation email moves to `DEPLOYMENT_BASE_URL`.
+- **WP-7g:** retire `render-egress` (decision 0009), empty the telemetry ignore list, and replace `waitForMapboxMapLoad`'s ready signal, which reads React internals and breaks with React 19 and MapLibre.
+- **Phase-1 verification:** the visual match against urlbox output is replaced by the Compose evidence (`WP-1h-evidence/unit-6-end-to-end.md`). Agents may not call urlbox, and no urlbox output was recorded.
+
+#### Open requests (none block this merge)
+
+- **Human:** remove `URLBOX_API_KEY` and `RENDERBOT_EMAIL` from `.env.example` (agents may not touch it).
+- **Human:** render a dashboard with a map tile on staging once `render-egress` is deployed (agents have no Mapbox token).
+- **Human:** ratify or overturn decision 0009.
+- **Infra:** type-check the renderer against Playwright's real types in CI (`ci/tools313`).
+- **Infra:** give `renderer` a restart policy outside prod, since it exits when a render slot is stuck.
+- **QA, next contract touch:** `tests/contract/stack/seed_cache.py`, `tests/contract/stack/compose.yaml`, `tests/contract/stack/port_forward.py`, `tests/contract/INVENTORY.md` (rows 119 and 164 to 167) and the note in `cases/30-dashboards.json` still describe renders as going through Urlbox. The four deferred export rows can now be recorded against the renderer.
 
 ## Contract changes
 
@@ -387,6 +435,12 @@ Round 3 (the WP-0k security gate, on the lead's instruction): a render token als
   - with the pre-af6260f `isolation.py` swapped in, the margin test failed at 7.88 s;
   - on the head, a loop of the isolation file gave 20 of 20 runs passed;
   - `git merge-tree` of WP-0k 3e22301 against this branch lists exactly those six files.
+- 2026-10-06 backend-8: status ready, on 19c8e28 plus this commit.
+  - `ci/pytest_suites.sh` after the 290cd65 merge: 13 of 14 suites passed (`tests/authz` 4681 passed, 583 skipped; `tests/web` 397 passed, 1 xfailed; `tests/worker` 151 passed, 1 skipped; `tests/contract` 62 passed). `tests/privilege_escalation` errored on all 86 tests: Docker refused its throwaway Postgres, because the host port it picked (127.0.0.1:33428) was already bound while other agents' stacks were running. Rerun alone, it gave 86 passed.
+  - `ci/lint_python.sh mig/integration`: clean. 3.8 guard: 870 files, 0 problems. mypy: 531 files, no issues.
+  - The renderer image is unchanged since the 176-test in-image run.
+  - `task_gate.py WP-1h`: meets the definition of done gates.
+  - The PR summary is under "PR summary".
 
 ## Evidence
 

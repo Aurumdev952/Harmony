@@ -54,11 +54,6 @@ class HarmonyUserManager(UserManager):
             own_id = None
         return not username_taken(new_username, self.db_adapter.db.session, own_id)
 
-    def get_user_by_id(self, user_id):
-        '''The account a flask-login session names, only while it is active.'''
-        user = super().get_user_by_id(user_id)
-        return user if user is not None and user.is_active else None
-
 
 def initialize_user_manager(app, db):
     db_adapter = UsernameAdapter(db, UserClass=User)
@@ -76,6 +71,14 @@ def initialize_user_manager(app, db):
         unauthenticated_view_function=unauthenticated,
         unauthorized_view_function=app.user_authentication_router.unauthorized,
     )
+
+    # Replaces flask-user's loader: a flask-login session signs in its account
+    # only while it is active. flask-user's own reset and confirm views still
+    # find accounts of every status through `get_user_by_id`.
+    @login_manager.user_loader
+    def load_active_user(user_id):
+        user = app.user_manager.get_user_by_id(int(user_id))
+        return user if user is not None and user.is_active else None
 
 
 def initialize_database_seed_values(database_connection_string):

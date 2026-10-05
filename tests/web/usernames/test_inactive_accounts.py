@@ -22,6 +22,7 @@ from tests.web.usernames.tokens import (
     session_token_without_account_id,
     signed_in_id,
 )
+from web.server.api.authentication_api_models import AuthenticationResource
 from web.server.routes.views.authentication import authentication_required
 from web.server.util.api_validation import GenericValidationError
 
@@ -116,3 +117,60 @@ def test_authentication_required_refuses_a_deactivated_account(app, monkeypatch)
         login_user(user, force=True)
         with pytest.raises(Unauthorized):
             protected()
+
+
+NEW_PASSWORD = 'a new password 2B!'
+
+
+def _complete_reset(app, user_id):
+    '''`POST /api2/authentication/reset_password` with a valid reset token.'''
+    reset = AuthenticationResource.reset_password.view_func
+    with app.test_request_context('/api2/authentication/reset_password', method='POST'):
+        token = app.user_manager.generate_token(user_id)
+        return reset(None, token=token, password=NEW_PASSWORD)
+
+
+def _status(app, user_id):
+    with app.app_context():
+        engine = app.extensions['sqlalchemy'].db.engine
+        with engine.connect() as connection:
+            return connection.execute(
+                sqlalchemy.text('SELECT status_id FROM "user" WHERE id = :id'),
+                {'id': user_id},
+            ).scalar()
+
+
+def test_a_pending_account_completing_a_reset_is_activated(app):
+    '''An invitee who follows a reset link an admin sent, rather than the
+    invitation, sets a password and becomes active, as registering would.'''
+    response = _complete_reset(app, 4)
+
+    assert response.status_code == 200
+    assert _status(app, 4) == UserStatusEnum.ACTIVE.value
+    assert signed_in_id(app, login(app, 'Pending.User@moh.gov.rw', NEW_PASSWORD)) == 4
+
+
+def test_a_deactivated_account_cannot_complete_a_reset(app):
+    _deactivate(app)
+
+    with pytest.raises(GenericValidationError) as raised:
+        _complete_reset(app, 8)
+
+    assert 'invalid_reset_link' in json.dumps(raised.value.errors, default=str)
+    assert _status(app, 8) == UserStatusEnum.INACTIVE.value
+
+
+def test_a_pending_twin_of_an_active_account_cannot_complete_a_reset(app):
+    with pytest.raises(GenericValidationError):
+        _complete_reset(app, 11)
+
+    assert _status(app, 11) == UserStatusEnum.PENDING.value
+
+
+def test_flask_user_finds_accounts_of_every_status(app, request_ctx):
+    '''flask-user's own reset and confirm views look accounts up by id; only
+    signing in checks the status.'''
+    _deactivate(app)
+
+    assert app.user_manager.get_user_by_id(8).id == 8
+    assert app.user_manager.get_user_by_id(4).id == 4

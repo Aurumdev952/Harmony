@@ -36,6 +36,8 @@ Units, in order. Each line names the change and the check that ends it.
 5. **Visual baseline** (`e2e/visual/`). Screenshots of every page and every chart type at 390, 1024 and 1440 px (testing.md), with volatile regions masked; charts draw from the stack's deterministic Druid broker. The snapshots are rendered in the pinned Playwright image, so they do not depend on the host's fonts. Check: two consecutive runs on fresh stacks match the committed snapshots; a one-pixel change to a snapshot turns its test red.
 6. **Runner and CI hand-off.** `e2e/run.sh` builds the client if needed (in the web-client image's pinned Node 18.17), brings the stack up, runs the visual, a11y and e2e projects in that order, writes a report per project, and always takes the stack down; `yarn e2e` calls it. A deliberately broken case turns it red (phase 2 exit check). Check: run from a clean clone of the branch head.
 
+Deviation from testing.md (recorded here; the lead updates testing.md on integration): the frontend unit tests live in `tests/frontend/unit/`, not next to the code as `web/client/**/*.test.ts`. `tests/` is qa's path, `web/client` belongs to the frontend roles, and the suite has to stay put while WP-6 converts `web/client` to TypeScript.
+
 Deviation from the phase file (SHOULD, recorded here): phase-2 says Jest now and Vitest in phase 6. The unit harness uses Vitest 2.1.9 with Babel for Flow, so WP-6d does not need to port the tests. 2.1.9 is the newest Vitest whose engines accept the Node 18.17 that CI and the web-client image still run. WP-6b/6d can bump it with Node 24.
 
 Playwright lives in its own package (`e2e/package.json`, `e2e/yarn.lock`), not in the root one. The root `.yarnclean` deletes every directory named `test` from `node_modules`, and that includes `@playwright/test` and parts of `playwright/lib`. The root package therefore keeps only Vitest and jsdom. The pins `@playwright/test` and `@axe-core/playwright` that 874562a added to the root moved to `e2e/`.
@@ -68,6 +70,7 @@ None of these block WP-2e.
 ## Deferrals
 
 - QA-4, CI half: the phase-2 exit check ("CI runs every suite above that exists by then, and a deliberately broken case turns CI red") and 2e's own check ("`yarn test` and `yarn e2e` pass ... in CI") need the CI job in the infra (WP-2f) request above. This WP proves both locally. `yarn e2e` passes from a clean archive of the head, and a deliberately broken view turns it red. The CI half closes when infra lands the job and its first run is compared against `e2e/visual/`.
+- Visual determinism across machines: proven on one host only, though over many fresh stacks and a client built from scratch. Whether the pinned image renders the same pixels on another CPU (the map canvases go through a software rasteriser) is part of the same CI condition.
 
 ## Log
 
@@ -110,6 +113,7 @@ None of these block WP-2e.
   - Failing first: the new spec failed (`watchContext is not a function`), and a copy driven through the old `watch(page)` recorded `[]`, missing all three. With the change it passes.
   - `e2e/run.sh e2e` passes 77 (76 plus the guard spec).
 - 2026-10-06 qa-5t round 2, unit 12 (QA gate finding 4): the present-mode case is now the last of the serial dashboard flow. A failure there can no longer skip the share and export cases. Check: with the present case broken on purpose (`Add Content` expected 5 times), `--grep @dashboard` gives 1 failed and 6 passed, with nothing skipped (`/tmp/wp2e-present-mutant.log`). Restored, the full e2e project passes 77.
+- 2026-10-06 qa-5t round 2, unit 13 (QA gate findings 6 and 7): recorded the unit-test location deviation (`tests/frontend/unit/` instead of `web/client/**/*.test.ts`) and the one-host limit of visual determinism, as a deferral tied to the CI job. Unit 3's `pages.spec.ts` count was corrected to 42 in unit 8.
 
 ## Evidence
 

@@ -13,6 +13,7 @@ from db.druid.aggregations.last_value_aggregation import build_last_value
 
 DRUID_DATE_FORMAT = '%Y-%m-%d'  # TODO: Add time portion
 
+
 ##### Hack
 # TODO: either fork pydruid master branch or submit pull request to
 # project and remove this workaround from here
@@ -83,6 +84,7 @@ def _build_aggregator_workaround(name, kwargs):
 # pylint: disable=protected-access
 pydruid.utils.aggregators._build_aggregator = _build_aggregator_workaround
 
+
 # NOTE: The stupid pydruid library allowed another dumb bug in
 # when they patched pull #74 in. It added validation to the datasource being
 # passed in, but left out support for the 'query' datasource type. We are
@@ -94,6 +96,7 @@ def _parse_datasource_workaround(datasource, _):
 
 pydruid.query.QueryBuilder.parse_datasource = _parse_datasource_workaround
 ##### End Hack
+
 
 # Empty filter object that acts like a normal druid filter for bitwise
 # operations.
@@ -144,6 +147,7 @@ def _filter_or_workaround(self, other_filter):
 
 Filter.__and__ = _filter_and_workaround
 Filter.__or__ = _filter_or_workaround
+
 
 # Add support for the undocumented Expression post aggregator.
 class ExpressionPostAggregator(Postaggregator):
@@ -301,7 +305,9 @@ def build_query_filter_from_aggregations(aggregations):
         if len(values) == 1:
             output |= Filter(dimension=dimension, value=values.pop())
         else:
-            output |= Filter(type='in', dimension=dimension, values=sorted(values))
+            output |= Filter(
+                type='in', dimension=dimension, values=sorted(values, key=null_first)
+            )
 
     for dimension, patterns in regex_output.items():
         regex = f"({')|('.join(patterns)})"
@@ -312,6 +318,11 @@ def build_query_filter_from_aggregations(aggregations):
     if len(output.filter['filter']['fields']) == 1:
         return output.filter['filter']['fields'][0]
     return output
+
+
+def null_first(value):
+    '''Sort key for dimension values that may hold null (an empty value).'''
+    return (value is not None, value or '')
 
 
 # Retrieve a list of the dimension values and regex patterns being
@@ -334,8 +345,8 @@ _DIMENSION_VALUE_FIELD_MAP = {'in': 'values', 'regex': 'pattern', 'selector': 'v
 
 # Only care about filters that either filter a dimension or could
 # contain a dimension filter in its child filters.
-# TODO: Javascript filter?
 _ALLOWED_FILTERS = {'and', 'or', *_DIMENSION_VALUE_FIELD_MAP.keys()}
+
 
 # Traverse a nested filter tree and extract the dimension values and
 # regex patterns that are being filtered on. If a filter type is found that
@@ -364,8 +375,8 @@ def _recursive_get_dimension_filters(
         value_field = _DIMENSION_VALUE_FIELD_MAP[filter_type]
         values = raw_filter[value_field]
 
-        # Selector and regex filters return a string value.
-        if isinstance(values, str) or isinstance(values, str):
+        # Selector and regex filters hold one value, null for an empty selector.
+        if values is None or isinstance(values, str):
             values = [values]
 
         # Treat regex patterns differently

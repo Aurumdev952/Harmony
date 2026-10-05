@@ -9,7 +9,7 @@ from urllib.parse import parse_qs, urlsplit
 import pytest
 import requests
 
-from tests.web.render.fakes import DASHBOARD_SLUG, SENDER, USERS, FakeRenderResponse
+from render_fakes import DASHBOARD_SLUG, SENDER, USERS, FakeRenderResponse
 from web.server.routes.views import page_renderer
 from web.server.routes.views.dashboard import get_email_attachments
 

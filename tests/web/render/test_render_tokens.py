@@ -20,7 +20,7 @@ from freezegun import freeze_time
 
 from config.loader import import_configuration_module
 from models.python.permissions import DimensionFilter, QueryNeed
-from tests.web.render.fakes import DictCache
+from render_fakes import DictCache
 from web.server.security.render_tokens import (
     RENDER_CLAIM,
     RENDER_POLICY_CLAIM,

@@ -1,6 +1,6 @@
 """A minimal Flask app that mounts the real render blueprint and the real
 `/api2/storage/retrieve` resource behind the same Potion decorator as
-`web/server/app.py`. Only the edges are faked (`tests/web/render/fakes.py`): the
+`web/server/app.py`. Only the edges are faked (`render_fakes.py`): the
 dashboard table, the configuration store, the cache, the login loader and the
 call to the renderer service.
 """
@@ -29,7 +29,7 @@ from flask_potion import Api
 from flask_principal import AnonymousIdentity, Identity, Principal, identity_loaded
 
 from config.loader import import_configuration_module
-from tests.web.render.fakes import (
+from render_fakes import (
     DEPLOYMENT_ORIGIN,
     PUBLIC_ACCESS,
     USERS,

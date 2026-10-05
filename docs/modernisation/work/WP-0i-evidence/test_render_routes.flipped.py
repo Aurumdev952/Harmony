@@ -12,6 +12,7 @@ from __future__ import annotations
 
 import logging
 import os
+from contextlib import ExitStack
 from types import SimpleNamespace
 from unittest import mock
 
@@ -156,12 +157,16 @@ def fixture_render_app(app: Flask) -> Flask:
 
 def _get(render_app, principal, path, headers=None):
     spec = principal_specs()[principal]
-    with (
-        configuration(spec.public_access),
-        mock.patch.object(
-            authentication_views, 'get_configuration', lambda key: spec.public_access
-        ),
-    ):
+    # ExitStack, not a parenthesised `with`: the web image runs Python 3.8.
+    with ExitStack() as stack:
+        stack.enter_context(configuration(spec.public_access))
+        stack.enter_context(
+            mock.patch.object(
+                authentication_views,
+                'get_configuration',
+                lambda key: spec.public_access,
+            )
+        )
         return render_app.test_client().get(
             path, headers={PRINCIPAL_HEADER: principal, **(headers or {})}
         )
@@ -214,6 +219,50 @@ def test_render_route(principal, route, status, rendered_as, render_app, renders
         'needs': [['view_resource', RESOURCE_ID, 'dashboard']],
         'query_needs': ['*'],
     }
+
+
+ATTACKER_URL = 'https://attacker.invalid/steal'
+
+
+@pytest.mark.parametrize(
+    'principal,path,rendered_as',
+    [
+        (
+            'dashboard_acl_viewer',
+            f'/dashboard/{SLUG}/png/thumbnail',
+            'dashboard_acl_viewer@authz.invalid',
+        ),
+        (
+            'dashboard_acl_viewer',
+            f'/dashboard/{SLUG}/pdf',
+            'dashboard_acl_viewer@authz.invalid',
+        ),
+        (
+            'role:admin',
+            f'/api2/storage/retrieve?key={SLUG}',
+            'role:admin@authz.invalid',
+        ),
+    ],
+)
+def test_caller_chosen_url_does_not_receive_the_minted_render_token(
+    principal, path, rendered_as, render_app, renders
+):
+    '''WP-0i N7, flipped: `url` and `cookie` are no longer passed through to
+    urlbox, so the minted token only goes to this deployment's own dashboard
+    page on its configured DEPLOYMENT_BASE_URL.'''
+    render_app.cache.values.clear()
+    separator = '&' if '?' in path else '?'
+    response = _get(
+        render_app,
+        principal,
+        f'{path}{separator}url={ATTACKER_URL}&cookie=accessKey=planted',
+    )
+
+    assert response.status_code == 200
+    (call,) = renders
+    origin = render_app.zen_config.general.DEPLOYMENT_BASE_URL.rstrip('/')
+    assert call['url'].startswith(f'{origin}/dashboard/{SLUG}?')
+    assert _token_claims(render_app, call)['identity'] == rendered_as
 
 
 def test_stored_thumbnail_is_rendered_as_each_policy_holder(render_app, renders):

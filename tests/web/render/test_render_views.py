@@ -16,7 +16,7 @@ from flask_jwt_extended import (
     verify_jwt_in_request_optional,
 )
 
-from tests.web.render.fakes import DictCache
+from render_fakes import DictCache
 from web.server.api import dashboard_api_models
 from web.server.security.render_tokens import render_token
 

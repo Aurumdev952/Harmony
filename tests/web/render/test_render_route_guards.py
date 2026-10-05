@@ -10,13 +10,12 @@ from datetime import timedelta
 
 import pytest
 
-from tests.web.render.fakes import (
+from render_fakes import (
     DASHBOARDS,
     DASHBOARD_SLUG,
     DEPLOYMENT_ORIGIN,
     SENDER,
     FakeDashboard,
-    FakeRenderResponse,
 )
 from web.server.routes.views.dashboard import get_email_attachments
 from web.server.util.authentication import create_user_access_token
@@ -187,12 +186,33 @@ def test_thumbnail_retrieve_args_cannot_redirect_the_minted_token(client, render
     assert call.params['url'].split('?')[0].endswith(f'/dashboard/{SLUG}')
 
 
+# Each would shape a thumbnail that is cached and shared with other viewers.
+THUMBNAIL_SHAPING_ARGS = {'width': '1', 'delay': '99', 'fail_if_selector_present': 'x'}
+
+
+@pytest.mark.parametrize(
+    'path, args',
+    [
+        ('/api2/storage/retrieve', {'key': SLUG}),
+        (f'/dashboard/{SLUG}/png/thumbnail', {}),
+    ],
+)
+def test_thumbnail_ignores_every_caller_render_arg(client, renderer, path, args):
+    response = client.get(
+        path,
+        query_string={**args, **THUMBNAIL_SHAPING_ARGS},
+        headers=as_user(VIEWER),
+    )
+
+    assert response.status_code == 200
+    [call] = renderer.calls
+    assert set(THUMBNAIL_SHAPING_ARGS) & set(call.params) == set()
+
+
 def test_failed_thumbnail_render_does_not_leave_the_cache_pending(
-    app, client, renderer, monkeypatch
+    app, client, renderer
 ):
-    failed = FakeRenderResponse(b'')
-    failed.status_code = 500
-    monkeypatch.setattr(renderer, 'post', lambda *args, **kwargs: failed)
+    renderer.status_code = 500
 
     assert retrieve_thumbnail(client, VIEWER) == ''
     assert 'PENDING' not in app.cache.values.values()

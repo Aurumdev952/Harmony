@@ -7,10 +7,10 @@ network, signed in with a render token for the user the export is made as.
 from contextlib import contextmanager
 from dataclasses import dataclass
 from typing import Iterator, Mapping, Optional
-from urllib.parse import urlparse
+from urllib.parse import urlparse, urlsplit
 
 import requests
-from flask import current_app, url_for
+from flask import current_app
 from flask_user import current_user
 from werkzeug.exceptions import HTTPException, ServiceUnavailable, Unauthorized
 
@@ -74,19 +74,56 @@ def dashboard_page_args(dashboard_url):
     return locale, session_hash
 
 
+def deployment_origin(deployment_base_url):
+    """The configured DEPLOYMENT_BASE_URL as a bare https origin, or ValueError.
+
+    Renders send a minted token to this origin and emails send links to it, so it
+    must name exactly one host: no userinfo (`https://real@attacker`), path,
+    query or fragment.
+    """
+    parts = urlsplit(deployment_base_url or "")
+    try:
+        has_valid_port = parts.port is None or parts.port > 0
+    except ValueError:
+        has_valid_port = False
+    if (
+        not has_valid_port
+        or parts.scheme != "https"
+        or not parts.hostname
+        or "@" in parts.netloc
+        or parts.path not in ("", "/")
+        or parts.query
+        or parts.fragment
+    ):
+        raise ValueError(
+            "DEPLOYMENT_BASE_URL must be an https origin with no userinfo, path, "
+            f"query or fragment: {deployment_base_url!r}"
+        )
+    return f"https://{parts.netloc}"
+
+
 def deployment_dashboard_url(name, locale=None):
     '''The dashboard page's public URL, for links sent to people.
 
-    Built from the configured DEPLOYMENT_BASE_URL, never from the request's Host
-    header, so a forged Host cannot point an emailed link elsewhere. Renders use
+    Built from the configured DEPLOYMENT_BASE_URL, never from the request, so a
+    forged Host cannot point an emailed link elsewhere. Renders use
     RENDER_WEB_ORIGIN instead.
     '''
-    origin = current_app.zen_config.general.DEPLOYMENT_BASE_URL.rstrip('/')
-    return origin + url_for('dashboard.grid_dashboard', locale=locale, name=name)
+    origin = deployment_origin(current_app.zen_config.general.DEPLOYMENT_BASE_URL)
+    return origin + _dashboard_path(name, locale)
+
+
+def _dashboard_path(name, locale=None):
+    '''The dashboard page's path. `url_for` would prefix the request's script
+    root, which gunicorn takes from a `SCRIPT_NAME` request header.
+    '''
+    return current_app.url_map.bind('').build(
+        'dashboard.grid_dashboard', {'locale': locale, 'name': name}
+    )
 
 
 def _page_url(locale, name, output_format, session_hash, is_thumbnail):
-    path = url_for('dashboard.grid_dashboard', locale=locale, name=name)
+    path = _dashboard_path(name, locale)
     query = 'screenshot=1'
     if output_format == 'pdf':
         query += '&pdf=1'

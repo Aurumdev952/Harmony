@@ -159,10 +159,11 @@ class RenderCall:
 
 
 class FakeRenderResponse:
-    status_code = 200
-
-    def __init__(self, body: bytes, content_type: str = 'image/png') -> None:
+    def __init__(
+        self, body: bytes, content_type: str = 'image/png', status_code: int = 200
+    ) -> None:
         self.content = body
+        self.status_code = status_code
         self.headers = {'Content-Type': content_type, 'Server-Timing': 'render;dur=42'}
 
     def iter_content(self, chunk_size: int):
@@ -177,7 +178,8 @@ class FakeRenderer:
     """Replaces the `requests` module the web app calls the renderer service with.
 
     The body names the identity the minted `accessKey` token logs in as, so a
-    test can tell whose data a render (and any cached copy of it) shows.
+    test can tell whose data a render (and any cached copy of it) shows. Set
+    `status_code` to make the renderer answer with an error.
     """
 
     RequestException = requests.RequestException
@@ -185,6 +187,7 @@ class FakeRenderer:
     def __init__(self, app: Flask) -> None:
         self._app = app
         self.calls: List[RenderCall] = []
+        self.status_code = 200
 
     def post(self, url, json=None, timeout=None, stream=False):
         params = dict(json or {})
@@ -210,4 +213,5 @@ class FakeRenderer:
         return FakeRenderResponse(
             f'render-as:{identity}'.encode(),
             CONTENT_TYPES.get(params.get('format'), 'application/octet-stream'),
+            status_code=self.status_code,
         )

@@ -7,8 +7,12 @@ render's policy is the real Druid filter `query_policy` would apply.
 """
 
 import json
+import os
+import subprocess
+import sys
+from pathlib import Path
 from types import SimpleNamespace
-from typing import Dict, Optional
+from typing import Dict, Optional, Tuple
 
 import pytest
 from flask import g
@@ -16,7 +20,7 @@ from flask_principal import Identity
 from pydruid.utils.filters import Filter
 
 from models.python.permissions import DimensionFilter, QueryNeed
-from tests.web.render.fakes import DASHBOARD_RESOURCE_ID, VIEW_DASHBOARD
+from render_fakes import DASHBOARD_RESOURCE_ID, VIEW_DASHBOARD
 from web.server.routes.views.query_policy import caller_policy_filter, canonical_policy
 from web.server.security.permissions import SUPERUSER_NEED
 from web.server.security.signal_handlers import (
@@ -77,14 +81,16 @@ ACCOUNTS = {
 }
 
 
+# Two hierarchical authorisable dimensions, so the hierarchical OR is exercised.
+POLICY_ZEN_CONFIG = SimpleNamespace(
+    filters=SimpleNamespace(AUTHORIZABLE_DIMENSIONS={STATE, MUNICIPALITY, SOURCE}),
+    datatypes=SimpleNamespace(HIERARCHICAL_DIMENSIONS=[STATE, MUNICIPALITY]),
+)
+
+
 @pytest.fixture(name='policy_app')
 def fixture_policy_app(app, renderer, monkeypatch):
-    """Two hierarchical authorisable dimensions, so the hierarchical OR is exercised."""
-    zen_config = SimpleNamespace(
-        filters=SimpleNamespace(AUTHORIZABLE_DIMENSIONS={STATE, MUNICIPALITY, SOURCE}),
-        datatypes=SimpleNamespace(HIERARCHICAL_DIMENSIONS=[STATE, MUNICIPALITY]),
-    )
-    monkeypatch.setattr(app, 'zen_config', zen_config)
+    monkeypatch.setattr(app, 'zen_config', POLICY_ZEN_CONFIG)
     return app
 
 
@@ -123,15 +129,20 @@ def render_filter(account) -> Optional[dict]:
     return _canonical_filter(Filter.build_filter(policy_filter))
 
 
+def all_digests() -> Dict[Tuple[str, str], str]:
+    """Each account's digest per sign-in channel."""
+    return {
+        (name, channel): digest(account, claims)
+        for name, account in ACCOUNTS.items()
+        for channel, claims in (('header', None), ('cookie', LOGIN_CLAIMS))
+    }
+
+
 @pytest.fixture(name='measured')
 def fixture_measured(policy_app):
     """Each account's digest per sign-in channel and its render's filter."""
     with policy_app.test_request_context('/'):
-        digests = {
-            (name, channel): digest(account, claims)
-            for name, account in ACCOUNTS.items()
-            for channel, claims in (('header', None), ('cookie', LOGIN_CLAIMS))
-        }
+        digests = all_digests()
         filters = {name: render_filter(account) for name, account in ACCOUNTS.items()}
     return digests, filters
 
@@ -181,6 +192,42 @@ def test_policies_that_render_differently_do_not_share_a_digest(
     digests, filters = measured
 
     assert digests[(first, 'header')] != digests[(second, 'header')]
+
+
+# Run in a fresh interpreter, where PYTHONHASHSEED decides every set's order.
+_DIGESTS_IN_A_FRESH_INTERPRETER = """
+import json
+from flask import Flask
+import test_thumbnail_policy_digest as digests
+
+app = Flask('tests.web', root_path='.', instance_path='/tmp')
+app.zen_config = digests.POLICY_ZEN_CONFIG
+with app.test_request_context('/'):
+    measured = digests.all_digests()
+print(json.dumps(sorted([list(key), value] for key, value in measured.items())))
+"""
+
+
+def _digests_under_hash_seed(seed: str) -> Dict[Tuple[str, str], str]:
+    repo_root = Path(__file__).resolve().parents[3]
+    # This directory first: its modules import each other by basename.
+    path = os.pathsep.join([str(Path(__file__).parent), str(repo_root)])
+    env = {**os.environ, 'PYTHONHASHSEED': seed, 'PYTHONPATH': path}
+    output = subprocess.run(
+        [sys.executable, '-c', _DIGESTS_IN_A_FRESH_INTERPRETER],
+        cwd=repo_root,
+        env=env,
+        capture_output=True,
+        check=True,
+        text=True,
+    ).stdout
+    return {tuple(key): value for key, value in json.loads(output.splitlines()[-1])}
+
+
+def test_digest_does_not_depend_on_the_hash_seed(measured):
+    digests, _filters = measured
+
+    assert _digests_under_hash_seed('1') == _digests_under_hash_seed('2') == digests
 
 
 def test_digest_does_not_depend_on_query_need_order(policy_app):

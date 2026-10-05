@@ -137,6 +137,13 @@ _SECRETS = [
     ),
     ('broker redis://:hunter2@redis:6379/0', 'hunter2'),
     ('db postgresql://zen:hunter2@db/zenysis', 'hunter2'),
+    # A URL glued to the text before it, whatever character that run starts with.
+    ('1redis://:hunter2@redis', 'hunter2'),
+    ('id=3-redis://:hunter2@redis', 'hunter2'),
+    ('.postgres://zen:hunter2@db', 'hunter2'),
+    # A JWT glued to a dash or underscore.
+    ('id-eyJhbGciOiJIUzI1NiJ9.eyJzdWIiOiJ4In0.c2lnbmF0dXJl', 'eyJzdWIiOiJ4In0'),
+    ('id_eyJhbGciOiJIUzI1NiJ9.eyJzdWIiOiJ4In0.c2lnbmF0dXJl', 'c2lnbmF0dXJl'),
     ('Cookie: accessKey=abc123; session=def456', 'abc123'),
     ('Cookie: theme=dark; sid=s3cr3t', 's3cr3t'),
     ('set accessKey=abc123; Path=/', 'abc123'),
@@ -354,6 +361,9 @@ _HOSTILE = {
     'tuples': "'token', " * 800,
     'basic': 'Basic ' + 'A' * 8000,
     'cookies': 'HTTP_COOKIE_' * 666,
+    # 64 KB: a pattern that is quadratic only in a short prefix needs a long input
+    # to show it. gunicorn reads request bodies far longer than its header limit.
+    'chunk terminators': 'Invalid chunk terminator' * 2731,
 }
 
 

@@ -55,9 +55,10 @@ REDACTED = '[REDACTED]'
 
 # Log lines carry client-controlled text, so every pattern must run in linear time.
 # A pattern that may start anywhere inside a long run and scan to its end is
-# quadratic. So each pattern starts only at the start of a run (a lookbehind), and
-# the key pattern scans its run once: Python never backtracks into a lookahead, and
-# the backreference re-matches what the lookahead captured.
+# quadratic. So each pattern starts at a literal that cannot repeat inside the run
+# it scans (`://`, `.eyJ`), or only at the start of a run (a lookbehind), or scans a
+# bounded span. The key pattern scans its run once: Python never backtracks into a
+# lookahead, and the backreference re-matches what the lookahead captured.
 _SENSITIVE_WORD = (
     r'(?:password|passwd|secret|token|api[_-]?key|access[_-]?key|private[_-]?key'
     r'|authorization)'
@@ -89,13 +90,8 @@ def _redact_basic_credentials(match: Match[str]) -> str:
 _REDACTIONS: Tuple[
     Tuple[Pattern[str], Union[str, Callable[[Match[str]], str]]], ...
 ] = (
-    # scheme://user:password@host
-    (
-        re.compile(
-            r'(?<![a-zA-Z0-9+.-])([a-zA-Z][a-zA-Z0-9+.-]*://[^\s/:@]*:)[^\s/@]+@'
-        ),
-        r'\1' + REDACTED + '@',
-    ),
+    # scheme://user:password@host, whatever the scheme is glued to.
+    (re.compile(r'(://[^\s/:@]*:)[^\s/@]+@'), r'\1' + REDACTED + '@'),
     (
         re.compile(
             r'(?i)(["\']?' + _SENSITIVE_KEY + _SEPARATOR + r')(?!b?["\']?\[REDACTED\])'
@@ -126,12 +122,8 @@ _REDACTIONS: Tuple[
         re.compile(r'(?i)(?<![\w-])(basic\s+)([A-Za-z0-9+/]+={0,2})'),
         _redact_basic_credentials,
     ),
-    (
-        re.compile(
-            r'(?<![A-Za-z0-9_-])eyJ[A-Za-z0-9_-]+\.eyJ[A-Za-z0-9_-]+\.[A-Za-z0-9_-]*'
-        ),
-        REDACTED,
-    ),
+    # A JWT's payload and signature; its header names only the algorithm.
+    (re.compile(r'\.eyJ[A-Za-z0-9_-]+\.[A-Za-z0-9_-]*'), '.' + REDACTED),
     # Flask-User's reset and confirmation links carry the token in the path.
     (
         re.compile(r'(?i)(/(?:reset[-_]password|confirm[-_]email)/)[^\s/?"\']+'),
@@ -142,7 +134,7 @@ _REDACTIONS: Tuple[
     # int(size, 16), whose ValueError is chained into the same traceback.
     (
         re.compile(
-            r'(No more data after|Invalid chunk size|Invalid chunk terminator[^:\n]*'
+            r'(No more data after|Invalid chunk size|Invalid chunk terminator[^:\n]{0,32}'
             r'|invalid literal for int\(\) with base 16): [^\n]+'
         ),
         r'\1: ' + REDACTED,

@@ -80,3 +80,31 @@ def test_an_annotation_on_a_filled_connection_is_stale(tmp_path):
 def test_an_annotated_empty_connection_passes(tmp_path):
     cases, rows = _relay_fixture(tmp_path, "recorded (empty connection, F13)", EMPTY)
     assert catalogue.empty_connection_problems(cases, rows, tmp_path) == []
+
+
+def _route_case(case_id):
+    return Case.from_json({"id": case_id, "route": "GET /api2/x"})
+
+
+def _write(tmp_path, case_id, schema):
+    (tmp_path / f"{case_id}.json").write_text(json.dumps({"response_schema": schema}))
+
+
+def test_a_list_empty_in_every_recording_of_a_route_is_listed(tmp_path):
+    cases = [_route_case("x.one"), _route_case("x.two")]
+    _write(tmp_path, "x.one", {"properties": {"a": EMPTY, "b": EMPTY}})
+    _write(tmp_path, "x.two", {"properties": {"a": EMPTY, "b": FILLED}})
+    assert catalogue.always_empty_lists(cases, tmp_path) == {"GET /api2/x": ["$.a"]}
+
+
+def test_nested_and_nullable_lists_are_scanned(tmp_path):
+    item = {"properties": {"c": {"maxItems": 0, "type": ["array", "null"]}}}
+    _write(tmp_path, "x.one", {"items": item, "type": "array"})
+    assert catalogue.always_empty_lists([_route_case("x.one")], tmp_path) == {
+        "GET /api2/x": ["$[].c"]
+    }
+
+
+def test_relay_lists_are_grouped_by_operation(tmp_path):
+    cases, _ = _relay_fixture(tmp_path, "recorded", EMPTY)
+    assert catalogue.always_empty_lists(cases, tmp_path) == {"XQuery": ["$.c.edges"]}

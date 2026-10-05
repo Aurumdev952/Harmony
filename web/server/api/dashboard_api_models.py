@@ -21,7 +21,6 @@ from models.alchemy.permission import (
     RESOURCE_ROLE_NAMES,
     SitewideResourceAcl,
 )
-from models.alchemy.schedule import SchedulerEntry
 from models.alchemy.security_group import Group
 from web.server.api.model_schemas import (
     QUERY_LINK_PATTERN,
@@ -35,6 +34,7 @@ from web.server.configuration.bots import BOT_USERS
 from web.server.data.data_access import Transaction
 from web.server.errors import NotificationError
 from web.server.potion.filters import UserFilter
+from web.server.potion.managers import visible_username
 from web.server.query.request import QueryRequest
 from web.server.routes.views.authorization import (
     AuthorizedOperation,
@@ -151,6 +151,7 @@ AUTHOR_USERNAME_SCHEMA = fields.Custom(
     fields.Email(pattern=EMAIL_PATTERN, nullable=True),
     description='The author\'s username. If not visible to the user, this will be null.',
     attribute='author_username',
+    formatter=visible_username,
     io='r',
 )
 
@@ -642,8 +643,7 @@ class DashboardResource(PrincipalResource):
         title='Update Dashboard \'official\' flag',
         description='Marks a Dashboard as official or not.',
         schema=fields.Boolean(
-            description='The updated value of the "isOfficial" flag for the '
-            'dashboard.'
+            description='The updated value of the "isOfficial" flag for the dashboard.'
         ),
     )
     @authorization_required('publish_resource', 'dashboard')
@@ -656,8 +656,7 @@ class DashboardResource(PrincipalResource):
         title='Update Dashboard \'favorite\' flag',
         description='Marks a Dashboard as a user favorite or not.',
         schema=fields.Boolean(
-            description='The updated value of the "isFavorite" flag for the '
-            'dashboard.'
+            description='The updated value of the "isFavorite" flag for the dashboard.'
         ),
     )
     def set_favorite(self, dashboard, is_favorite):

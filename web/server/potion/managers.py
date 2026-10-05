@@ -1,10 +1,11 @@
 from abc import ABCMeta, abstractmethod
 import collections
 
-from flask import current_app
+from flask import current_app, request
 from flask_login import current_user
 from psycopg2.errorcodes import UNIQUE_VIOLATION
 from sqlalchemy.orm import class_mapper
+from sqlalchemy import or_
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm.attributes import flag_modified
 
@@ -17,7 +18,8 @@ from flask_potion.utils import get_value
 from models.alchemy.permission import Role
 from models.alchemy.query_policy import QueryPolicyRole
 from models.alchemy.security_group import Group
-from web.server.data.data_access import Transaction
+from models.alchemy.user import User
+from web.server.data.data_access import Transaction, get_db_adapter
 from web.server.security.grants import held_role_ids, member_group_ids
 from web.server.security.permissions import SUPERUSER_ROLENAME, SuperUserPermission
 
@@ -329,6 +331,11 @@ class GroupResourceManager(SQLAlchemyManager):
         return query.filter(getattr(self.model, 'id').in_(member_group_ids()))
 
 
+def _administrators():
+    is_admin = Role.name == SUPERUSER_ROLENAME
+    return or_(User.roles.any(is_admin), User.groups.any(Group.roles.any(is_admin)))
+
+
 class UserResourceManager(SQLAlchemyManager):
     '''Administrators, direct or through a group, are hidden from every
     non-superuser identity (decision 0010): no user route reaches them.
@@ -338,11 +345,25 @@ class UserResourceManager(SQLAlchemyManager):
         query = super()._query()
         if SuperUserPermission().can():
             return query
-        is_admin = Role.name == SUPERUSER_ROLENAME
-        return query.filter(
-            ~self.model.roles.any(is_admin),
-            ~self.model.groups.any(Group.roles.any(is_admin)),
-        )
+        return query.filter(~_administrators())
+
+
+def visible_username(username):
+    '''`username`, or None when `UserResourceManager` hides its user from the
+    caller. For fields that name a user outside the user routes, such as a
+    dashboard's author.
+    '''
+    if username is None or SuperUserPermission().can():
+        return username
+    # One query per request, however many items a list formats.
+    hidden = request.environ.get('harmony.hidden_usernames')
+    if hidden is None:
+        session = get_db_adapter().session
+        hidden = {
+            name for (name,) in session.query(User.username).filter(_administrators())
+        }
+        request.environ['harmony.hidden_usernames'] = hidden
+    return None if username in hidden else username
 
 
 class QueryPolicyResourceManager(SQLAlchemyManager):

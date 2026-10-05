@@ -738,3 +738,60 @@ def test_a_narrowed_admin_token_does_not_see_admins(app, db, make_user, kind, na
     assert _listed(caller, target.username) is not narrowed
     status = caller.request('GET', f'/api2/user/{target.id}').status_code
     assert status == (404 if narrowed else 200)
+
+
+def _dashboard_by(db, author_id: int) -> tuple:
+    '''A dashboard written by `author_id`; returns its resource id and slug.'''
+    # pylint: disable=import-outside-toplevel
+    from models.alchemy.dashboard import Dashboard
+
+    resource_id = _make_dashboard(db)
+    slug = _name('dashboard')
+    db.session.add(
+        Dashboard(
+            slug=slug,
+            specification={
+                'version': '2023-06-30',
+                'items': [],
+                'options': {'title': slug},
+            },
+            resource_id=resource_id,
+            author_id=author_id,
+        )
+    )
+    db.session.commit()
+    return resource_id, slug
+
+
+def _author_usernames(caller, resource_id: int, slug: str) -> tuple:
+    item = caller.request('GET', f'/api2/dashboard/{resource_id}')
+    listed = caller.request(
+        'GET', f'/api2/dashboard?where={json.dumps({"slug": slug})}'
+    )
+    assert (item.status_code, listed.status_code) == (200, 200)
+    return (
+        item.get_json()['authorUsername'],
+        [dashboard['authorUsername'] for dashboard in listed.get_json()],
+    )
+
+
+@pytest.mark.parametrize('kind', [_DIRECT_ADMIN, _GROUP_ADMIN, 'not_admin'])
+def test_a_dashboard_names_its_author_only_to_callers_who_see_the_author(
+    db, make_user, kind
+):
+    author = (
+        make_user(['group_admin'])
+        if kind == 'not_admin'
+        else _admin_target(db, make_user, kind)
+    )
+    resource_id, slug = _dashboard_by(db, author.id)
+    viewer = make_user()
+    _give_acl(db, viewer.id, 'dashboard_viewer', resource_id)
+    superuser = _admin_target(db, make_user, _GROUP_ADMIN)
+
+    shown = author.username if kind == 'not_admin' else None
+    assert _author_usernames(viewer, resource_id, slug) == (shown, [shown])
+    assert _author_usernames(superuser, resource_id, slug) == (
+        author.username,
+        [author.username],
+    )

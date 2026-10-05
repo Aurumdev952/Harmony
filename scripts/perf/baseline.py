@@ -395,8 +395,10 @@ def paired_verdict(result: PairedResult) -> str:
 
 def paired_table(results: list[PairedResult]) -> str:
     rows = [
-        '| case | reference p95 ms | candidate p95 ms | p95 ratio | lower bound '
-        '| paired median ratio | lower bound | detects | verdict |',
+        (
+            '| case | reference p95 ms | candidate p95 ms | p95 ratio | lower bound '
+            '| paired median ratio | lower bound | detects | verdict |'
+        ),
         '|---|---:|---:|---:|---:|---:|---:|---:|---|',
     ]
     for r in results:

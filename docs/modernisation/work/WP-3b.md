@@ -15,9 +15,12 @@ instances:
       - Makefile
       - ci/**
       - .github/workflows/**
+      - .github/dependabot.yml
+      - prod/browser_share/**
       - tests/infra/**
       - tests/toolchain/**
       - docs/modernisation/work/WP-3b.md
+      - docs/modernisation/work/WP-3b-evidence/**
 branch: "mig/WP-3b-cpython-313"
 requirements: [INV-1, INV-2, INV-8, SEC-9, QA-4]
 contracts_consumed: []
@@ -35,7 +38,7 @@ Units, in order. Each line names the change and the check that ends it.
 
 1. **The root lock moves to CPython 3.13.** `requires-python = "==3.13.*"`; every pin that has no CPython 3.13 build or fails at import on 3.13 moves to the lowest release that works; PyPy markers and the PyPy numpy pin go; the lock-only psycopg2 override goes; build constraints are re-derived from a fresh-cache sync; `flask db current` works again (the lead's request from WP-2g). Check: `uv lock --check`; fresh-cache `uv sync --locked`; an import sweep of every first-party module on 3.13 matches the 3.9 sweep; every suite under `tests/` passes on 3.13, golden with `record.py --check` at 0 drift and the pipeline suite at 130; `flask db upgrade` and `flask db current` on a scratch Postgres.
    - 1a, the lock (done). 1b, golden green on 3.13: waits on core's pandas 2 fixes (Requests).
-2. **One CI lane.** `ci/tools313` and the `tests/infra` conftest guard are deleted; `tests/infra` joins `ci/pytest_suites.sh`; the strict mypy check of the standalone tools moves into the root config; `integration.yml` has one Python 3.13 job; uv moves to 0.12.23, and the setuptools build constraint carries its hashes (uv 0.12.16+, security's note on WP-2f); `lint-js` installs with `yarn install --frozen-lockfile` (security's low finding from the WP-2f confirmation, routed by the lead); `make test` follows. Check: actionlint, zizmor, the WP-0f policy script, and the job's commands locally, with one broken case making it exit non-zero.
+2. **One CI lane** (done). `ci/tools313` and the `tests/infra` conftest guard are deleted; `tests/infra` joins `ci/pytest_suites.sh`; the strict mypy check of the standalone tools moves into the root config; `integration.yml` has one Python 3.13 job; uv moves to 0.12.23, and the setuptools build constraint carries its hashes (uv 0.12.16+, security's note on WP-2f); `lint-js` installs with `yarn install --frozen-lockfile` (security's low finding from the WP-2f confirmation, routed by the lead); `make test` follows. Check: actionlint, zizmor, the WP-0f policy script, and the job's commands locally, with one broken case making it exit non-zero.
 3. **Web image on `python:3.13-slim-bookworm` with uv.** Multi-stage: `uv sync --locked --no-install-project` then the app; runtime stage holds `.venv` and the app, running as a non-root user. One image serves web and worker. Check: `docker build --check`; the image builds; an import sweep inside it; `docker compose config --quiet` for every overlay; the web and worker containers start against the compose stack and the web healthcheck passes.
 4. **Pipeline image on CPython 3.13 with uv, no PyPy.** The PyPy venv goes; `SetupEnvForPyPy` already falls back to the active venv when `venv_pypy3` is absent, so pipeline steps run on CPython with no pipeline-owned change. Check: the image builds; the pipeline fixture suite passes inside it; a `harmony_demo` step runs; wall-clock of the pipeline suite on CPython 3.13 against PyPy 3.9 recorded.
 5. **Dev image on CPython 3.13.** The Python 3.9 source build and the PyPy download go; the dev Compose overlay drops the `venv_pypy3` volume. Check: the image builds; `make up DEV=1` brings up web with the dev overlay.
@@ -66,11 +69,15 @@ Each item names the owner, the change, and what it blocks. Reproduce on this bra
   - Low: `web/server/util/data_catalog.py:205` invalid escape `"\^"` (SyntaxWarning on 3.12+, an error in a later Python); `web/dev_reloader.py:16` still watches `venv_pypy3`.
 - [ ] **pipeline (non-blocking, after unit 4):** drop `SetupEnvForPyPy` from `util/pipeline/bash/common.sh` and its callers in `pipeline/{harmony_demo,template}/process/run/*`, and the `_pypyjson`/`__pypy__` branches in `data/pipeline/datatypes/base_row.py` and `data/pipeline/io/druid_writer.py`. Without `venv_pypy3` the function prints a warning and keeps the CPython venv, so nothing breaks meanwhile. Also the invalid escapes in `data/pipeline/scripts/fetch_database_tables.py` and `xlsx_to_csv.py`. FYI: `savReaderWriter` left the `pipeline` group; it cannot import on Python 3.10+ (`from collections import Iterable`) and nothing in the repository imports it.
 - [ ] **qa (non-blocking):** `tests/pipeline/run.sh` defaults to 3.9 and says 3.12+ cannot import `config/`; `tests/pipeline/requirements.txt` pins `future==0.18.3`, which imports `imp` (gone in 3.12), and README line 29 says the same. On this branch the suite passes on 3.13 from the root lock (130 passed).
+- [ ] **lead and human (before this branch merges):** the root `pyproject.toml` now needs uv 0.12.16 or later (hashed build constraints, `required-version`). The build host's `uv` is 0.12.5, and every uv command in a checkout of this branch stops with "Required uv version `>=0.12.16` does not match", including `uv run --no-project` from the repo root. Update uv on the host (`uv self update` to 0.12.23) and tell the other roles. The CI job is renamed "Python 3.13 - lint, types, tests" and the "Python 3.13 - standalone tools" job is gone; if branch protection lists check names, update it.
 - [ ] **lead (non-blocking):** `scripts/watch/watch_util.py` invalid escape (SyntaxWarning); `.vscode/settings.json` excludes `venv_pypy3`.
 
 ## Log
 
 - 2026-10-04 infra-3 unit 1a: `pyproject.toml` and `uv.lock` on CPython 3.13 (`14079e1`). Check: `uv lock --check` with uv 0.12.5 and 0.12.23; fresh-cache `uv sync --locked -v` builds 22 packages, all with setuptools 82.0.1 only; import sweep 722 OK / 50 ERR on 3.9 (base) and on 3.13, identical module by module and message by message; suites on 3.13: core 25, druid 1, druid_setup 79, graphql 5, infra 159, pipeline 130, toolchain 9, web 95 passed, golden 38 failed / 231 passed (core request); mypy "no issues found in 517 source files"; `ci/lint_python.sh mig/integration` passes; `flask db upgrade` then `flask db current` exit 0 on a scratch Postgres (base: `current` crashes).
+- 2026-10-05 infra-3 resumed: rebased on `mig/integration` `8638861` (no conflicts); `uv lock --check` and the `flask db` check re-run green.
+- 2026-10-05 infra-3 unit 2: one CI lane (`ci/tools313`, the `tests/infra` conftest guard and the `python-313` job deleted; `tests/infra` runs in `ci/pytest_suites.sh`; the standalone tools' strict mypy in the root config; uv 0.12.23 with hashed setuptools build constraint; `yarn install --frozen-lockfile`). Check: actionlint 0, zizmor 0, workflow policy OK, `uv lock --check`, lint gate and mypy (519 files) pass, suites as unit 1a plus `tests/infra` 159; broken cases exit 1 (below).
+
 
 ## Evidence
 
@@ -110,6 +117,16 @@ Logs and scripts are under `/tmp/wp3b/` on the build host; the commands are belo
   - Choice: Flask-Migrate 2.5 passes `head_only=`, which alembic removed in 1.5.0, so the alternative was alembic 1.4.3 (2020), below the `alembic>=1.7.1` floor and with no 3.13 support. Flask-Migrate 2.6 dropped `head_only` and 2.7.0 is the last 2.x; its requirements are unchanged (Flask >= 0.9, alembic >= 0.7).
 - **Pipeline suite on 3.13:** 130 passed in 8.9 s from the root lock (3.9: 13.2 s).
 - **SyntaxWarnings on 3.12+** (`compileall -W error::SyntaxWarning`): four files, routed in Requests.
+
+### Unit 2: one CI lane
+
+- **Scripts.** `WP-3b-evidence/workflow_policy.py` is WP-0f's workflow policy (SHA pins with tag comment, `ubuntu-24.04`, `permissions: {}` plus per-job grants, no `${{ }}` in `run:`, `GH_TOKEN` only on "List changed files" steps), now in the repo so it can be re-run: `uv run docs/modernisation/work/WP-3b-evidence/workflow_policy.py`. `WP-3b-evidence/flask_db_check.sh <tree> <python>` is unit 1a's `flask db` check.
+- **Workflows.** actionlint 1.7.12 (release binary, `sha256sum -c` against its checksums file) with shellcheck 0.11.0: exit 0, no output. zizmor 1.30.1 `--offline .github/`: no findings (12 suppressed, the same count as `mig/integration`). Policy: `policy OK (3 workflows)`; a copy of `integration.yml` with `ubuntu-latest` and `${{ github.head_ref }}` in a `run:` gives 3 breaches, exit 1.
+- **The job's commands, uv 0.12.23, `CI=true`.** `uv lock --check` exit 0; `ci/lint_python.sh mig/integration` exit 0; `uv run --locked mypy`: "no issues found in 519 source files" (517 plus the two tools); `ci/pytest_suites.sh`: core 25, druid 1, druid_setup 79, graphql 22, infra 159, pipeline 130, toolchain 9, web 95 passed; golden 38 failed / 231 passed (the core request, unchanged), so the script exits 1 and names `tests/golden`.
+- **Strict tools check.** Appending `def untyped(x): return x` to `browser_share.py` makes `uv run --locked mypy` exit 1 (`no-untyped-def`). mypy 1.3's typeshed types `TextIOWrapper`'s buffer as `IO[bytes]`, which `GzipFile` is not, so `read_lines` casts; mypy 2.4 (the old lane) accepted it. Moving the app to mypy 1.11+ finds 6 or 7 errors in `web/server` (core and backend files), so the app stays on 1.3 here.
+- **Hashed build constraint.** Fresh cache, uv 0.12.23 (`/tmp/wp3b/build_constraint_hash.sh`): `uv sync --locked` exit 0, 22 `Installing build requirement: setuptools==82.0.1`; with both setuptools hashes zeroed in a copy of `pyproject.toml` and `uv.lock`, the sync exits 1 with `Hash mismatch for setuptools==82.0.1`. The hashes are PyPI's for the 82.0.1 wheel and sdist. uv 0.12.5 cannot parse the table form, so `[tool.uv] required-version = ">=0.12.16"` makes older uv stop with "Required uv version `>=0.12.16` does not match the running version" instead of a parse error.
+- **`yarn install --frozen-lockfile`.** `node:18.17` (pinned digest) over a copy of `package.json` and `yarn.lock`, `--ignore-scripts`: exit 0. With `left-pad` added to `package.json` only: exit 1, "Your lockfile needs to be updated".
+- **The lead's alembic request.** The lead asked to pin alembic to the last release Flask-Migrate 2.5.2 supports. Unit 1a moved Flask-Migrate to 2.7.0 instead: 2.5.2 needs alembic below 1.5.0 (1.4.3, from 2020), which is below the `alembic>=1.7.1` floor and does not support Python 3.13. On the rebased branch `flask db upgrade` exits 0 (head `2b730c14f514`) and `flask db current` exits 0 and prints `2b730c14f514 (head)`.
 
 ## Verdicts
 

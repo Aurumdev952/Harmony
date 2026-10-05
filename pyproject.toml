@@ -150,14 +150,20 @@ dev = [
 
 [tool.uv]
 package = false
+# Hashed build constraints (below) need 0.12.16; CI and the images run 0.12.23.
+required-version = ">=0.12.16"
 default-groups = "all"
 # Only CPython runs Harmony; the lock skips other implementations' forks.
 environments = ["platform_python_implementation == 'CPython'"]
 # `uv sync` builds 22 packages from source (2 git, 20 sdists), all with setuptools.
-# Their build tools are pinned here, recorded in uv.lock and enforced by --locked.
-# The list is every build requirement a fresh-cache `uv sync --locked -v` installs.
+# Their build tools are pinned here with hashes, recorded in uv.lock and enforced
+# by --locked (hashed entries need uv 0.12.16 or later). The list is every build
+# requirement a fresh-cache `uv sync --locked -v` installs.
 build-constraint-dependencies = [
-    "setuptools==82.0.1",
+    { requirement = "setuptools==82.0.1", hashes = [
+        "sha256:a59e362652f08dcd477c78bb6e7bd9d80a7995bc73ce773050228a348ce2e5bb",
+        "sha256:7d872682c5d01cfde07da7bccc7b65469d3dca203318515ada1de5eda35efbf9",
+    ] },
 ]
 
 [tool.uv.sources]
@@ -197,7 +203,13 @@ ignore = ["S603", "S607"]
 "tests/**" = ["S101", "S104", "S105", "S106", "S108", "S311"]
 
 [tool.mypy]
-files = ["web/server", "models", "db"]
+files = [
+    "web/server",
+    "models",
+    "db",
+    "prod/browser_share/browser_share.py",
+    "docker/export_requirements.py",
+]
 plugins = ["sqlmypy"]
 ignore_missing_imports = false
 show_error_codes = true
@@ -209,6 +221,22 @@ local_partial_types = true
 [[tool.mypy.overrides]]
 module = ["models.python.dashboard.*", "web.server.migrations.*"]
 ignore_errors = true
+
+[[tool.mypy.overrides]]
+# The standalone tools are checked as `mypy --strict` would, minus its two global
+# flags (warn_unused_configs, warn_redundant_casts), which mypy cannot scope.
+module = ["prod.browser_share.browser_share", "docker.export_requirements"]
+disallow_any_generics = true
+disallow_subclassing_any = true
+disallow_untyped_calls = true
+disallow_untyped_defs = true
+disallow_incomplete_defs = true
+check_untyped_defs = true
+disallow_untyped_decorators = true
+warn_unused_ignores = true
+warn_return_any = true
+implicit_reexport = false
+strict_equality = true
 
 [[tool.mypy.overrides]]
 # config.* is loaded dynamically per deployment; the rest ship no type information.

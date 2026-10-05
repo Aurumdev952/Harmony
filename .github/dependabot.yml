@@ -22,14 +22,3 @@ updates:
     cooldown:
       default-days: 7
     open-pull-requests-limit: 0
-
-  # Tools for the CPython 3.13 lane.
-  - package-ecosystem: uv
-    directory: /ci/tools313
-    schedule:
-      interval: weekly
-    cooldown:
-      default-days: 7
-    groups:
-      tools313:
-        patterns: ['*']

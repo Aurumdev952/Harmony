@@ -20,7 +20,7 @@ concurrency:
 
 jobs:
   python:
-    name: Python 3.9 - lint, types, tests
+    name: Python 3.13 - lint, types, tests
     runs-on: ubuntu-24.04
     permissions:
       contents: read
@@ -34,13 +34,10 @@ jobs:
       - name: Set up uv
         uses: astral-sh/setup-uv@c18668ad3cf93ea998bef934396af7bb5c839dc7 # v10.2.0
         with:
-          version: '0.12.5'
+          version: '0.12.23'
           enable-cache: true
-          cache-suffix: app39
       - name: Lockfiles match pyproject.toml
-        run: |
-          uv lock --check
-          uv lock --check --project ci/tools313
+        run: uv lock --check
       - name: Install
         run: uv sync --locked
       - name: Pipeline suite tools
@@ -63,33 +60,11 @@ jobs:
         if: '!cancelled()'
         run: uv run --locked mypy
       - name: Pytest
-        # Every directory under tests/ runs, each in its own process; tests/infra
-        # runs in the 3.13 job. The contract replay needs the compose stack: it
-        # skips without CONTRACT_BASE_URL, and tests marked `stack` are deselected.
+        # Every directory under tests/ runs, each in its own process. The contract
+        # replay needs the compose stack: it skips without CONTRACT_BASE_URL, and
+        # tests marked `stack` are deselected.
         if: '!cancelled()'
         run: ci/pytest_suites.sh
-
-  python-313:
-    name: Python 3.13 - standalone tools
-    runs-on: ubuntu-24.04
-    permissions:
-      contents: read
-    steps:
-      - name: Checkout repo
-        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-        with:
-          persist-credentials: false
-      - name: Set up uv
-        uses: astral-sh/setup-uv@c18668ad3cf93ea998bef934396af7bb5c839dc7 # v10.2.0
-        with:
-          version: '0.12.5'
-          enable-cache: true
-          cache-suffix: tools313
-      - name: Mypy (strict)
-        run: uv run --project ci/tools313 --locked mypy --config-file ci/tools313/pyproject.toml
-      - name: Pytest
-        if: '!cancelled()'
-        run: uv run --project ci/tools313 --locked pytest tests/infra
 
   lint-js:
     name: JS - Lint
@@ -120,8 +95,7 @@ jobs:
           key: ${{ runner.os }}-node-${{ steps.setup-node.outputs.node-version }}-node_modules-${{ hashFiles('package.json', 'yarn.lock') }}
       - name: Install dependencies
         if: steps.cache-node_modules.outputs.cache-hit != 'true'
-        run: |
-          yarn install
+        run: yarn install --frozen-lockfile
       - name: Cache dependencies
         uses: actions/cache/save@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
         if: steps.cache-node_modules.outputs.cache-hit != 'true'

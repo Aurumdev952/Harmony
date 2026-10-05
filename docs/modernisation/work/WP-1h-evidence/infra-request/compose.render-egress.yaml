@@ -1,0 +1,41 @@
+# WP-1h request to infra: the renderer's egress proxy (maps), merged into
+# docker-compose.yaml next to `renderer`. Verified by hand in
+# WP-1h-evidence/unit-8-maps-egress.md ("Container check").
+
+networks:
+  # A route out for the egress proxy only. The renderer stays on `render`
+  # (internal: true) and reaches the map origins only through render-egress.
+  render-egress:
+
+services:
+  renderer:
+    environment:
+      # Added to the existing list.
+      - RENDERER_EGRESS_PROXY=http://render-egress:3128
+      - RENDERER_MAP_ORIGINS=${RENDERER_MAP_ORIGINS:-https://api.mapbox.com}
+    depends_on: [render-egress]
+
+  render-egress:
+    platform: linux/amd64
+    # The renderer image: the proxy is harmony/worker/renderer/egress_proxy.py,
+    # stdlib only.
+    image: ${DOCKER_NAMESPACE:-ghcr.io/zenysis}/${DOCKER_IMAGE_PREFIX:-harmony}-renderer:${DOCKER_TAG:-latest}
+    entrypoint: ["python", "-m", "harmony.worker.renderer.egress_proxy"]
+    # No published port: only the renderer uses it.
+    networks: [render, render-egress]
+    environment:
+      # The same list the renderer's guard allows; the proxy refuses the rest.
+      - EGRESS_ALLOWED_ORIGINS=${RENDERER_MAP_ORIGINS:-https://api.mapbox.com}
+    read_only: true
+    cap_drop: [ALL]
+    security_opt:
+      - no-new-privileges:true
+    mem_limit: 128m
+    pids_limit: 128
+    healthcheck:
+      # Overrides the image's /healthz probe, which is the renderer's.
+      test: ["CMD", "python", "-c", "import socket; socket.create_connection(('127.0.0.1', 3128), 3).close()"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+    logging: *default-logging

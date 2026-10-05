@@ -24,7 +24,7 @@ import re
 import secrets
 import subprocess
 from dataclasses import dataclass, field
-from datetime import timedelta
+from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from urllib.parse import urlparse
 
@@ -44,6 +44,29 @@ _BACKEND_JSON = re.compile(r'window\.__JSON_FROM_BACKEND = (.*?);\s*\n')
 # Every signed-in user gets this page, and it carries the signed-in user's id.
 WHOAMI_PAGE = '/overview'
 _FIELD_SEPARATOR = '\x1f'
+# The smallest specification `POST /api2/dashboard` accepts (WP-2c's case).
+EMPTY_DASHBOARD = {
+    'version': '2023-06-30',
+    'items': [],
+    'options': {'title': 'Authz dashboard', 'columnCount': 100},
+    'commonSettings': {
+        'filterSettings': {
+            'enabledCategories': [],
+            'excludedTiles': [],
+            'items': [],
+            'visible': False,
+            'enabledFilterHierarchy': [],
+        },
+        'groupingSettings': {
+            'enabledCategories': [],
+            'excludedTiles': [],
+            'items': [],
+            'visible': False,
+        },
+        'panelAlignment': 'LEFT',
+    },
+    'legacy': False,
+}
 
 
 def outcome(response: requests.Response) -> str:
@@ -100,15 +123,28 @@ def password_session(username: str, password: str) -> requests.Session:
     return session
 
 
-def mint_token(identity: str, user_claims: dict) -> str:
+def mint_token(identity: str, user_claims: dict, with_iat: bool = True) -> str:
     '''An access token signed with the stack's JWT key, encoded by the
     flask-jwt-extended the web app runs, with the given identity and claims.
     Mints tokens in the shapes older code issued, which today's code no
     longer does (a session with no `user_id`), and render tokens, which go
-    only to the renderer.'''
+    only to the renderer. Without `with_iat` the token has no `iat` and no
+    `nbf`, which the library never omits but PyJWT accepts.'''
     # pylint: disable=import-outside-toplevel
+    import jwt
     from flask_jwt_extended.tokens import encode_access_token
 
+    if not with_iat:
+        payload = {
+            'jti': secrets.token_hex(16),
+            'exp': datetime.now(timezone.utc) + timedelta(days=365),
+            'identity': identity,
+            'fresh': False,
+            'type': 'access',
+            'user_claims': user_claims,
+        }
+        token = jwt.encode(payload, stack_credential('JWT_SECRET_KEY'), 'HS256')
+        return token.decode() if isinstance(token, bytes) else token
     return encode_access_token(
         identity=identity,
         secret=stack_credential('JWT_SECRET_KEY'),
@@ -157,6 +193,8 @@ class Stack:
     admin: requests.Session
     _users: dict = field(default_factory=dict, repr=False)
     created_users: set = field(default_factory=set, repr=False)
+    created_dashboards: set = field(default_factory=set, repr=False)
+    _admin_bearer: requests.Session | None = field(default=None, repr=False)
 
     @classmethod
     def from_env(cls) -> Stack:
@@ -224,14 +262,25 @@ class Stack:
             id=uri.rsplit('/', 1)[1],
         )
 
-    def mail_recipients(self) -> list:
-        '''The recipient addresses of every message the stack's mail sink holds,
-        newest first.'''
+    def mail(self) -> list:
+        '''Every message the stack's mail sink holds, oldest first, as
+        `{'to': [address, ...], 'subject': str, 'links': [url, ...]}`; links are
+        the `href` targets and bare URLs in the message, in order, deduplicated.'''
         script = (
-            'import json, requests\n'
-            "page = requests.get('http://mailpit:8025/api/v1/messages', timeout=30)\n"
-            "print(json.dumps([[to['Address'] for to in message['To']]"
-            " for message in page.json()['messages']]))\n"
+            'import json, re, requests\n'
+            "api = 'http://mailpit:8025/api/v1'\n"
+            "listing = requests.get(api + '/messages', timeout=30).json()\n"
+            'out = []\n'
+            "for summary in reversed(listing['messages']):\n"
+            "    message = requests.get(api + '/message/' + summary['ID'], timeout=30)\n"
+            '    message = message.json()\n'
+            "    body = (message.get('HTML') or '') + ' ' + (message.get('Text') or '')\n"
+            '    links = re.findall(r\'href="([^"]*)"|(https?://[^\\s"<>]+)\', body)\n'
+            '    links = [a or b for a, b in links]\n'
+            "    out.append({'to': [to['Address'] for to in message['To']],\n"
+            "                'subject': message['Subject'],\n"
+            "                'links': list(dict.fromkeys(links))})\n"
+            'print(json.dumps(out))\n'
         )
         output = _docker(f'{self.project}-web-1', ['python', '-'], script)
         return json.loads(output.strip().splitlines()[-1])
@@ -287,6 +336,32 @@ class Stack:
         self.created_users.add(uri)
         self.admin_json('POST', f'{uri}/password', {'newPassword': password})
         return uri
+
+    def admin_bearer(self) -> requests.Session:
+        '''The admin signed in by an `Authorization` header instead of the
+        cookie: requests matches cookies to a request's `Host` header, so a
+        request with a forged Host carries no cookie.'''
+        if self._admin_bearer is None:
+            _, response = self.login(
+                os.environ['AUTHZ_ADMIN_USERNAME'], _admin_password()
+            )
+            assert response.status_code == 200, response.text[:300]
+            self._admin_bearer = bearer(response.json()['access_token'])
+        return self._admin_bearer
+
+    def create_dashboard(self, slug: str, headers=None, path_prefix: str = '') -> dict:
+        '''Creates an empty dashboard as admin, sending `headers` with the
+        request and `path_prefix` before its path; returns the dashboard.'''
+        response = self.admin_bearer().post(
+            f'{self.base_url}{path_prefix}/api2/dashboard',
+            json={'slug': slug, 'specification': EMPTY_DASHBOARD},
+            headers=headers or {},
+            timeout=TIMEOUT_SECONDS,
+        )
+        assert response.status_code < 300, (slug, response.text[:500])
+        dashboard = response.json()
+        self.created_dashboards.add(dashboard['$uri'])
+        return dashboard
 
     def patch_user(self, uri: str, **changes):
         '''A full-object `PATCH /api2/user/<id>` as admin, keeping every field
@@ -372,8 +447,13 @@ class Stack:
                 self.admin_json('DELETE', group['$uri'])
 
     def cleanup(self) -> None:
-        '''Deletes every user this run created or reset. Saved queries go with
-        their users (user_query_session.user_id cascades).'''
+        '''Deletes every dashboard this run created, then every user it created
+        or reset. Saved queries go with their users (user_query_session.user_id
+        cascades).'''
+        for uri in sorted(self.created_dashboards):
+            response = self.request(self.admin, 'DELETE', uri)
+            assert response.status_code in (204, 404), (uri, response.status_code)
+        self.created_dashboards.clear()
         for uri in sorted(self.created_users):
             response = self.request(self.admin, 'DELETE', uri)
             assert response.status_code in (204, 404), (uri, response.status_code)

@@ -203,14 +203,19 @@ def test_session_minted_before_wp0k_signs_in_the_registered_account_not_a_pendin
     '''WP-0k INV-3 rows U-4 and T-6. A registered `legacy.twin@` and a pending
     invitation `Legacy.Twin@` (made by the case-blind invitations before WP-0k).
     Before WP-0k: ILIKE with `first()` and no ORDER BY gave whichever row the
-    table scan met first, which can be the pending account; the shell is made
-    first so that it usually is.
+    table scan met first, which can be the pending account (here it is: the
+    shell's row is written first).
     After: the one account that is not pending, for every spelling.'''
-    shell = stack.create_account(f'legacy.twin-shell@{USER_DOMAIN}', 'unused-password')
-    stack.rewrite_account(shell, f'Legacy.Twin@{USER_DOMAIN}', PENDING)
-    account = stack.create_account(
-        f'legacy.twin@{USER_DOMAIN}', secrets.token_urlsafe(18)
+    shell = stack.create_account(
+        f'legacy.twin-shell@{USER_DOMAIN}', secrets.token_urlsafe(18)
     )
+    account = stack.create_account(
+        f'legacy.twin-account@{USER_DOMAIN}', secrets.token_urlsafe(18)
+    )
+    # Written last, the registered account's row follows the shell's in the
+    # table; `POST /api2/user` refuses a case twin of the pending shell.
+    stack.rewrite_account(shell, f'Legacy.Twin@{USER_DOMAIN}', PENDING)
+    stack.rewrite_account(account, f'legacy.twin@{USER_DOMAIN}')
 
     for typed in (
         f'legacy.twin@{USER_DOMAIN}',
@@ -252,7 +257,9 @@ def test_session_minted_before_wp0k_never_signs_in_a_pending_account(stack):
     is a pending invitation.
     Before WP-0k: the session signed in the pending account.
     After: anonymous; a pending account never signed in.'''
-    shell = stack.create_account(f'legacy-pending@{USER_DOMAIN}', 'unused-password')
+    shell = stack.create_account(
+        f'legacy-pending@{USER_DOMAIN}', secrets.token_urlsafe(18)
+    )
     stack.rewrite_account(shell, f'legacy-pending@{USER_DOMAIN}', PENDING)
 
     assert (
@@ -282,3 +289,111 @@ def test_session_minted_before_wp0k_does_not_sign_in_an_account_created_after_it
 
     assert stack.signed_in_as(bearer(token)) == 'login'
     assert stack.signed_in_as(bearer(_pre_wp0k_session(username))) == recreated
+
+
+def test_session_minted_before_wp0k_without_iat_signs_in_nobody(stack):
+    '''WP-0k C-5 rule 2: a token with no `iat` signs in nobody, since nothing
+    says when it was issued.
+    Before WP-0k: a session naming the username signed it in, `iat` or not.
+    After: anonymous. Control: the same session with an `iat` signs it in.'''
+    username = f'legacy-no-iat@{USER_DOMAIN}'
+    account = stack.create_account(username, secrets.token_urlsafe(18))
+
+    no_iat = mint_token(username, PRE_WP0K_SESSION_CLAIMS, with_iat=False)
+    assert stack.signed_in_as(bearer(no_iat)) == 'login'
+    assert stack.signed_in_as(bearer(_pre_wp0k_session(username))) == account
+
+
+def test_a_case_only_rename_ends_the_accounts_session_and_api_token(stack):
+    '''WP-0k INV-3 row T-4. An account's username changes case only
+    (`case.rename@` to `Case.Rename@`).
+    Before WP-0k: its session and API token, looked up with ILIKE, kept
+    signing it in.
+    After: both are anonymous; they name the exact old username. Control: a
+    login with the new spelling signs the account in.'''
+    username, password = f'case.rename@{USER_DOMAIN}', secrets.token_urlsafe(18)
+    account = stack.create_account(username, password)
+    _, login = stack.login(username, password)
+    assert login.status_code == 200, login.text[:300]
+    session = bearer(login.json()['access_token'])
+    api = bearer(stack.admin_json('POST', f'{account}/generate_api_token')['token'])
+    assert stack.signed_in_as(session) == account
+    assert stack.signed_in_as(api) == account
+
+    renamed = stack.patch_user(account, username=f'Case.Rename@{USER_DOMAIN}')
+    assert renamed.status_code == 200, renamed.text[:300]
+
+    assert stack.signed_in_as(session) == 'login'
+    assert stack.signed_in_as(api) == 'login'
+    _, login = stack.login(f'Case.Rename@{USER_DOMAIN}', password)
+    assert stack.signed_in_as(bearer(login.json()['access_token'])) == account
+
+
+# Deletes an account and writes it back with the same id and username, as an
+# account recreated under a reused id (SQLite reuses ids; a restore can too).
+_RECREATE = (
+    'CREATE TEMP TABLE recreated AS SELECT * FROM "user" WHERE id = :\'id\';\n'
+    'DELETE FROM "user" WHERE id = :\'id\';\n'
+    'UPDATE recreated SET created = {created};\n'
+    'INSERT INTO "user" SELECT * FROM recreated;\n'
+)
+
+
+def _sessions_then_recreate(stack, local_part: str, created: str):
+    username, password = f'{local_part}@{USER_DOMAIN}', secrets.token_urlsafe(18)
+    account = stack.create_account(username, password)
+    _, login = stack.login(username, password)
+    assert login.status_code == 200, login.text[:300]
+    sessions = {
+        'session': bearer(login.json()['access_token']),
+        'pre-WP-0k session': bearer(_pre_wp0k_session(username)),
+    }
+    for session in sessions.values():
+        assert stack.signed_in_as(session) == account
+
+    time.sleep(1.1)  # `iat` and `created` compare to the second.
+    stack.sql(_RECREATE.format(created=created), id=account.rsplit('/', 1)[1])
+    return account, sessions
+
+
+def test_an_account_recreated_with_its_id_and_username_ends_its_sessions(stack):
+    '''WP-0k INV-3 rows T-1 and T-3. The account is deleted and written back
+    with the same id and username, created in a later second than its
+    sessions were issued.
+    Before WP-0k: its session and its pre-WP-0k session signed in the new row.
+    After: both anonymous: the account was created after their `iat`.'''
+    account, sessions = _sessions_then_recreate(stack, 'recreated-same-id', 'now()')
+
+    assert {kind: stack.signed_in_as(s) for kind, s in sessions.items()} == {
+        kind: 'login' for kind in sessions
+    }, account
+
+
+def test_an_account_recreated_with_no_created_time_keeps_its_sessions(stack):
+    '''Residual, accepted (WP-0k INV-3 T-3, "No `created`"; human acceptance
+    list). The same recreate, but the row has no `created`, as rows written
+    outside the ORM or before migration 853e0e8aa6a0 do: nothing says when it
+    was created, so its sessions sign it in, before and after WP-0k.'''
+    account, sessions = _sessions_then_recreate(stack, 'recreated-no-created', 'NULL')
+
+    assert {kind: stack.signed_in_as(s) for kind, s in sessions.items()} == {
+        kind: account for kind in sessions
+    }
+
+
+def test_an_api_token_revoked_in_the_database_is_refused_on_the_next_request(stack):
+    '''WP-0k INV-3 row T-2: nothing caches a token's validity.
+    Before WP-0k: the validity was memoised in Redis for 10 minutes, so a
+    token revoked outside `update_user_api_tokens` (which cleared the memo)
+    kept answering 200.
+    After: 401 on the next request.'''
+    holder = stack.ensure_user('token-sql-revoked', [])
+    issued = stack.admin_json('POST', f'{holder.user_uri}/generate_api_token')
+    used = bearer(issued['token'])
+    assert stack.request(used, 'GET', PROBE).status_code == 200
+
+    stack.sql(
+        'UPDATE api_token SET is_revoked = true WHERE id = :\'id\';', id=issued['id']
+    )
+
+    assert stack.request(used, 'GET', PROBE).status_code == 401

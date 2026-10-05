@@ -18,8 +18,11 @@ docs/modernisation/work/WP-1h.md):
 Chromium keeps its sandbox.
 
 A dashboard whose map needs a host it cannot reach would wait out the whole
-deadline, so once the page needed something it could not get, it has
-`blocked_grace_seconds` left to signal ready.
+deadline, so once a fetch or XHR the page made was refused or failed at a map
+origin, it has `blocked_grace_seconds` left to signal ready. The ready signal
+waits only on those: a blocked frame, image, font, stylesheet or WebSocket
+renders as an empty box and does not start the clock, so an iframe tile to a
+host off the list exports as a blank frame.
 '''
 
 import asyncio
@@ -29,6 +32,7 @@ from urllib.parse import urlsplit
 from playwright.async_api import Error as PlaywrightError
 from playwright.async_api import (
     ProxySettings,
+    Request,
     Route,
     WebSocketRoute,
     async_playwright,
@@ -59,6 +63,8 @@ CHROMIUM_ARGS = [
 NET_ERROR = re.compile(r'net::ERR_[A-Z_]+')
 # The page cancelled the request itself (a replaced image, a superseded fetch).
 CANCELLED = 'net::ERR_ABORTED'
+# The requests the ready signal waits on: tile data and map styles and tiles.
+AWAITED_RESOURCE_TYPES = frozenset({'fetch', 'xhr'})
 
 # Carried over from the urlbox PDF options: charts whose SVG overflows its box
 # would otherwise be clipped in print.
@@ -151,8 +157,10 @@ async def _render(spec: RenderSpec, settings: RendererSettings, blocked: set[str
     needed: set[str] = set()
     egress_failed = asyncio.Event()
 
-    def refused(host: str) -> None:
-        if host not in settings.ignored_blocked_hosts:
+    def refused(request: Request) -> None:
+        host = _host(request.url)
+        awaited = request.resource_type in AWAITED_RESOURCE_TYPES
+        if awaited and host not in settings.ignored_blocked_hosts:
             needed.add(host)
             egress_failed.set()
 
@@ -167,26 +175,25 @@ async def _render(spec: RenderSpec, settings: RendererSettings, blocked: set[str
             await route.continue_()
         else:
             blocked.add(_host(request.url))
-            refused(_host(request.url))
+            refused(request)
             await route.abort('blockedbyclient')
 
     async def refuse_web_socket(web_socket: WebSocketRoute) -> None:
         # Never connected to a server: the page's socket just closes.
         blocked.add(_host(web_socket.url))
-        refused(_host(web_socket.url))
         await web_socket.close()
 
     def map_request_failed(request) -> None:
         # The egress proxy refused or could not reach a map origin.
         if _is_map_url(request.url, settings) and request.failure != CANCELLED:
-            refused(_host(request.url))
+            refused(request)
 
     def map_response(response) -> None:
         # A map style or tile that answers with an error never loads; a 404 is a
         # tile outside the map's coverage, which the map draws without.
         if _is_map_url(response.url, settings) and response.status >= 400:
             if response.status != 404:
-                refused(_host(response.url))
+                refused(response.request)
 
     async with async_playwright() as playwright:
         browser = await playwright.chromium.launch(

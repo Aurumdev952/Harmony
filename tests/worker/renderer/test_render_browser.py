@@ -92,6 +92,25 @@ PAGES = {
         "window.location.href = '{map}/dashboard/navigate-to-map';"
         f'setTimeout(() => {{ {SIGNAL_READY} }}, 1000);',
     ),
+    # An iframe tile, an image, a stylesheet, a font and a WebSocket to hosts the
+    # page may not reach: none of them is what the ready signal waits on.
+    '/dashboard/blocked-frames': _page(
+        '<style>@font-face { font-family: tile; src: url(http://fonts.invalid/t.woff2); }'
+        'body { font-family: tile; }</style>'
+        '<iframe src="http://frame.invalid/tile"></iframe>'
+        '<img src="http://tiles.invalid/0/0/0.png">'
+        '<link rel="stylesheet" href="http://styles.invalid/tile.css">'
+        '<p>Tile text</p>',
+        "try { new WebSocket('ws://socket.invalid/live'); } catch (e) {}"
+        f'setTimeout(() => {{ {SIGNAL_READY} }}, 2500);',
+    ),
+    '/dashboard/xhr-off-the-list': _page(
+        '',
+        "const xhr = new XMLHttpRequest();"
+        "xhr.open('GET', 'http://data.invalid/rows');"
+        f"xhr.onload = () => {{ {SIGNAL_READY} }};"
+        'xhr.send();',
+    ),
     '/dashboard/storage': _page(
         '',
         "fetch('/seen?value=' + (localStorage.getItem('seen') || 'none'))"
@@ -471,6 +490,39 @@ def test_a_map_needing_a_host_off_the_list_fails_fast_not_at_the_deadline(mapped
         render(_spec(origin, '/dashboard/map-off-the-list'), settings)
 
     assert time.monotonic() - started < 10
+
+
+def test_a_blocked_xhr_fails_fast_not_at_the_deadline(origins):
+    origin, _, _ = origins
+    started = time.monotonic()
+
+    with pytest.raises(EgressBlocked, match='data.invalid'):
+        render(
+            _spec(origin, '/dashboard/xhr-off-the-list'),
+            _settings(origin, blocked_grace_seconds=1.0),
+        )
+
+    assert time.monotonic() - started < 10
+
+
+def test_blocked_frames_images_fonts_and_styles_do_not_start_the_clock(origins):
+    # An iframe tile whose host is off the list exports as an empty frame (SEC-10);
+    # its slow neighbours still get the whole deadline to load.
+    origin, _, _ = origins
+
+    output = render(
+        _spec(origin, '/dashboard/blocked-frames'),
+        _settings(origin, blocked_grace_seconds=1.0),
+    )
+
+    assert _png_size(output.content) == (1280, 800)
+    assert {
+        'frame.invalid',
+        'tiles.invalid',
+        'styles.invalid',
+        'fonts.invalid',
+        'socket.invalid',
+    } <= set(output.blocked_hosts)
 
 
 def test_an_unreachable_map_origin_fails_fast(origins):

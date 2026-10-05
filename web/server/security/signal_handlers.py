@@ -20,7 +20,7 @@ from flask_principal import (
     identity_changed,
     identity_loaded,
 )
-from jwt import ExpiredSignatureError
+from jwt import ExpiredSignatureError, InvalidSignatureError
 from werkzeug.exceptions import BadRequest
 
 from log import LOG
@@ -33,6 +33,7 @@ from web.server.routes.views.authorization import (
     AuthorizedOperation,
     WhitelistedPermission,
 )
+from web.server.routes.views.query_policy import canonical_policy
 from web.server.security.permissions import SuperUserPermission
 from web.server.security.render_tokens import (
     RENDER_CLAIM,
@@ -185,25 +186,8 @@ def query_policy_fingerprint():
     if SuperUserPermission().can():
         policy = 'superuser'
     else:
-        policy = sorted(
-            (
-                sorted(
-                    (
-                        [
-                            dimension_filter.dimension_name,
-                            dimension_filter.all_values,
-                            sorted(dimension_filter.include_values, key=str),
-                            sorted(dimension_filter.exclude_values, key=str),
-                        ]
-                        for dimension_filter in need.dimension_filters
-                    ),
-                    key=json.dumps,
-                )
-                for need in render_token_query_needs()
-            ),
-            key=json.dumps,
-        )
-    return hashlib.sha256(json.dumps(policy).encode()).hexdigest()
+        policy = canonical_policy(render_token_query_needs())
+    return hashlib.sha256(json.dumps(policy, sort_keys=True).encode()).hexdigest()
 
 
 def _compute_token_provides(claims):
@@ -341,10 +325,12 @@ def install_login_manager_signal_handlers(app, login_manager):
 
         try:
             verify_jwt_in_request_optional()
-        except ExpiredSignatureError:
-            # bypass jwt-extended's expiration callback for now, our own
+        except (ExpiredSignatureError, InvalidSignatureError):
+            # bypass jwt-extended's error callbacks for now, our own
             # `auth_decorator` will return JSON for API calls and redirects
-            # otherwise, and it's not really feasible with the callback
+            # otherwise, and it's not really feasible with the callback.
+            # A bad signature (a token signed with a previous JWT_SECRET_KEY, or a
+            # forged one) makes the request anonymous, like an expired token.
             pass
 
         auth_email = get_jwt_identity()

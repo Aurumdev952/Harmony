@@ -48,7 +48,6 @@ from web.server.routes.views.validate_data_catalog import (
     is_file_key_valid,
     DATA_CATALOG_TABLES,
 )
-from web.server.security.permissions import ROOT_SITE_RESOURCE_ID
 from web.server.util.data_catalog import populate_fields, zip_data_catalog_metadata
 from web.server.util.authentication import is_session_persisted
 from web.server.util.hasura import build_hasura_headers

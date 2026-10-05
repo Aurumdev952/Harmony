@@ -64,6 +64,17 @@ def dashboard_page_args(dashboard_url):
     return locale, session_hash
 
 
+def deployment_dashboard_url(name, locale=None):
+    '''The dashboard page's public URL, for links sent to people.
+
+    Built from the configured DEPLOYMENT_BASE_URL, never from the request's Host
+    header, so a forged Host cannot point an emailed link elsewhere. Renders use
+    RENDER_WEB_ORIGIN instead.
+    '''
+    origin = current_app.zen_config.general.DEPLOYMENT_BASE_URL.rstrip('/')
+    return origin + url_for('dashboard.grid_dashboard', locale=locale, name=name)
+
+
 def _page_url(locale, name, output_format, session_hash, is_thumbnail):
     path = url_for('dashboard.grid_dashboard', locale=locale, name=name)
     query = 'screenshot=1'

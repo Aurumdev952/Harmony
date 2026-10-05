@@ -1,5 +1,6 @@
 """Fakes for the render-route tests: users, dashboards, the cache and the renderer
 service."""
+
 from dataclasses import dataclass, field
 from typing import Dict, FrozenSet, List, Optional
 
@@ -11,6 +12,9 @@ from jwt import PyJWTError
 
 from models.python.permissions import DimensionFilter, QueryNeed
 from web.server.security.permissions import SUPERUSER_NEED
+
+# The deployment's configured origin (DEPLOYMENT_BASE_URL) in these tests.
+DEPLOYMENT_ORIGIN = 'https://harmony.tests.invalid'
 
 DASHBOARD_SLUG = 'malaria-overview'
 DASHBOARD_RESOURCE_ID = 7
@@ -36,9 +40,13 @@ class FakeUser:
     is_authenticated: bool = True
     is_active: bool = True
     is_anonymous: bool = False
+    from_jwt: bool = False
 
     def get_id(self) -> str:
         return str(self.id)
+
+    def get_permissions(self) -> set:
+        return set(self.provides)
 
 
 USERS: Dict[str, FakeUser] = {

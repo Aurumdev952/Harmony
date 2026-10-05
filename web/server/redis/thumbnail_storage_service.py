@@ -31,12 +31,17 @@ def retrieve_item(dashboard):
     '''
     cache = current_app.cache
     storage_key = get_thumbnail_storage_name(dashboard)
+    deadline = time.monotonic() + PENDING_STATE_TIMEOUT
     while not cache.add(storage_key, PENDING, timeout=PENDING_STATE_TIMEOUT):
         value = cache.get(storage_key)
-        if value == PENDING:
-            time.sleep(1)
-        elif value:
+        if value and value != PENDING:
             return value
+        if time.monotonic() >= deadline:
+            return ''
+        if value is None:
+            # FileSystemCache keeps an expired entry: `get` misses but `add` fails.
+            cache.delete(storage_key)
+        time.sleep(1)
 
     new_base64_img = ''
     try:

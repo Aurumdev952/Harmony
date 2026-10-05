@@ -5,13 +5,7 @@
 - [JWT key rotation](jwt_key_rotation.md) — rotating JWT/session keys breaks old accessKey cookies unless the loader swallows InvalidSignatureError
 - [Celery startup checks](celery_startup_checks.md) — refusals in worker_process_init are swallowed; put them at import of the -A module
 - [Template render diff](template_render_diff.md) — prove Jinja template edits without a running app; known baseline failures
-- [Flask local test env](flask_local_test_env.md) — offline Python 3.8 env, env placeholders and mocks to build the Flask route map; worktree-guard traps
 - [Flask web tests](flask_web_tests.md) — run tests/web on py3.8, call handlers directly, worktree-guard and auth/policy traps
-- [Py3.8 web tests](py38_web_tests.md) — run tests/web with uv when the worktree guard rejects compound shell commands
-- [Flask local test env](flask_local_test_env.md) — import and build the Flask app without Docker: env placeholders, route mocks
-- [Local Flask stack](local-flask-stack.md) — run the legacy app, Alembic and tests locally: py3.8 venv, Druid stub, bcrypt pin
-- [JWT key rotation](jwt_key_rotation.md) — old accessKey cookies break every request unless the loader swallows InvalidSignatureError
-- [Celery startup checks](celery_startup_checks.md) — refusals in worker_process_init are swallowed; check at import of the -A module
-- [Hasura roles](hasura-roles.md) — WP-0a user/anonymous role model, what WP-5e still owns, GraphQL parity tools
 - [Potion route test harness](potion_route_test_harness.md) — test /api2 routes through the real app on a throwaway Postgres; WP-0h authz traps
 - [Flask route tests in-process](flask-route-tests-in-process.md) — conftest double import, subclass Potion resources, AUTHORIZABLE_DIMENSIONS, urlbox recorder
+- [Post-WP-2f tooling](post_wp2f_tooling.md) — tests/web on plain uv py3.9, lint-gate and noqa traps, guard workarounds, graphql stub

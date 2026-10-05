@@ -23,11 +23,13 @@ The admin secret is read from HASURA_ADMIN_SECRET, never from the command line.
 
 Usage: scripts/db/hasura/check_role_permissions.py --hasura_host http://localhost:8088
 '''
+
 import argparse
 import json
 import os
 import re
 import sys
+import urllib.parse
 import urllib.request
 from pathlib import Path
 
@@ -51,6 +53,9 @@ PUBLIC_OPERATIONS = frozenset({'patchDimensionServiceQuery'})
 # visitor can smuggle this one in as a second operation; it reveals nothing new.
 ANONYMOUS_SUBSET_OPERATIONS = frozenset({'EditableCalculationQuery'})
 ROLES = ('user', 'anonymous')
+# Hosts the admin secret may reach over plain http: this machine and the compose
+# service.
+PLAIN_HTTP_HOSTS = frozenset({'localhost', '127.0.0.1', '::1', 'hasura'})
 TEXT_PATTERN = re.compile(r'"text": ("(?:[^"\\]|\\.)*")')
 # Relay documents select one root field twice under mutually exclusive
 # @include/@skip, which Hasura runs but the spec's field-merge rule rejects.
@@ -69,8 +74,40 @@ def load_operations(src_root: Path) -> dict[str, str]:
     return operations
 
 
+def parse_hasura_host(raw: str) -> str:
+    '''Return `raw` without a trailing slash if it is a plain http(s) base URL.
+
+    The admin secret goes to this host, so it must have no credentials, query or
+    fragment, and plain http is allowed only for local and compose hosts.
+    '''
+    host = raw.rstrip('/')
+    parts = urllib.parse.urlsplit(host)
+    if (
+        parts.scheme not in ('http', 'https')
+        or not parts.hostname
+        or parts.username is not None
+        or parts.password is not None
+        or parts.query
+        or parts.fragment
+    ):
+        raise ValueError(f'--hasura_host must be a plain http(s) URL, got {raw!r}')
+    if parts.scheme == 'http' and parts.hostname not in PLAIN_HTTP_HOSTS:
+        raise ValueError(f'--hasura_host must use https for {parts.hostname}')
+    return host
+
+
+class _RefuseRedirects(urllib.request.HTTPRedirectHandler):
+    '''Turn every redirect into an HTTPError, so the admin secret is never re-sent.'''
+
+    def redirect_request(self, req, fp, code, msg, headers, newurl):
+        return None
+
+
+_OPENER = urllib.request.build_opener(_RefuseRedirects)
+
+
 def fetch_schema(hasura_host: str, admin_secret: str, role: str) -> GraphQLSchema:
-    request = urllib.request.Request(
+    request = urllib.request.Request(  # noqa: S310  # scheme and host checked in main()
         f'{hasura_host}/v1beta1/relay',
         data=json.dumps({'query': get_introspection_query()}).encode(),
         headers={
@@ -79,7 +116,7 @@ def fetch_schema(hasura_host: str, admin_secret: str, role: str) -> GraphQLSchem
             'X-Hasura-Role': role,
         },
     )
-    with urllib.request.urlopen(request, timeout=60) as response:
+    with _OPENER.open(request, timeout=60) as response:
         body = json.load(response)
     if 'errors' in body:
         raise RuntimeError(f'Introspection as {role} failed: {body["errors"]}')
@@ -120,23 +157,34 @@ def main() -> int:
     parser = argparse.ArgumentParser(
         description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter
     )
-    parser.add_argument('--hasura_host', required=True)
+    parser.add_argument(
+        '--hasura_host',
+        required=True,
+        help='base URL of a Hasura the operator runs: https, or http for localhost '
+        'and the compose service hasura (sync_graphql_schema.sh passes HASURA_HOST, '
+        'default http://localhost:8088)',
+    )
     parser.add_argument('--print-schema', choices=ROLES, dest='print_schema_role')
     args = parser.parse_args()
+    try:
+        hasura_host = parse_hasura_host(args.hasura_host)
+    except ValueError as error:
+        print(error, file=sys.stderr)
+        return 2
     admin_secret = os.environ.get('HASURA_ADMIN_SECRET', '')
     if not admin_secret:
         print('HASURA_ADMIN_SECRET must be set', file=sys.stderr)
         return 2
 
     if args.print_schema_role:
-        schema = fetch_schema(args.hasura_host, admin_secret, args.print_schema_role)
+        schema = fetch_schema(hasura_host, admin_secret, args.print_schema_role)
         print(print_schema(schema))
         return 0
 
     operations = load_operations(SRC_ROOT)
     failures = check(
         operations,
-        *(fetch_schema(args.hasura_host, admin_secret, role) for role in ROLES),
+        *(fetch_schema(hasura_host, admin_secret, role) for role in ROLES),
     )
     for failure in failures:
         print(failure, file=sys.stderr)

@@ -3,18 +3,22 @@
 The call to the renderer service is replaced by `FakeRenderer`; nothing leaves the
 process.
 """
+
 import base64
 import json
+from datetime import timedelta
 
 import pytest
 
 from tests.web.render.fakes import (
     DASHBOARDS,
     DASHBOARD_SLUG,
+    DEPLOYMENT_ORIGIN,
     FakeDashboard,
     FakeRenderResponse,
 )
 from web.server.routes.views.dashboard import get_email_attachments
+from web.server.util.authentication import create_user_access_token
 
 SLUG = DASHBOARD_SLUG
 RENDER_ROUTES = [
@@ -142,7 +146,7 @@ def test_thumbnail_retrieve_refuses_a_caller_without_view_resource(client, rende
         f'/api2/storage/retrieve?key={SLUG}', headers=as_user(OUTSIDER)
     )
 
-    assert response.status_code in (401, 403)
+    assert response.status_code == 403
     assert renderer.calls == []
 
 
@@ -200,7 +204,7 @@ def test_thumbnail_retrieve_refuses_an_anonymous_caller_under_public_access(
 
     response = client.get(
         f'/api2/storage/retrieve?key={SLUG}',
-        headers={'Referer': f'http://harmony.tests.invalid/dashboard/{SLUG}'},
+        headers={'Referer': f'{DEPLOYMENT_ORIGIN}/dashboard/{SLUG}'},
     )
 
     assert response.status_code == 401
@@ -252,3 +256,33 @@ def test_emailed_render_loads_this_apps_dashboard_whatever_link_is_sent(
     [call] = renderer.calls
     assert call.params['url'] == page
     assert call.identity == VIEWER
+
+
+def _sign_in_with_cookie(app, client, username):
+    with app.app_context():
+        token = create_user_access_token(username, timedelta(minutes=5))
+    client.set_cookie('localhost', 'accessKey', token)
+
+
+def test_cookie_session_shares_the_render_of_a_header_caller_with_its_policy(
+    app, client, renderer
+):
+    retrieve_thumbnail(client, NORTH_2)
+    _sign_in_with_cookie(app, client, NORTH)
+
+    response = client.get(f'/api2/storage/retrieve?key={SLUG}')
+
+    assert response.status_code == 200
+    assert (
+        base64.b64decode(json.loads(response.data)) == f'render-as:{NORTH_2}'.encode()
+    )
+    assert len(renderer.calls) == 1
+
+
+def test_cookie_session_without_view_resource_is_forbidden(app, client, renderer):
+    _sign_in_with_cookie(app, client, OUTSIDER)
+
+    response = client.get(f'/api2/storage/retrieve?key={SLUG}')
+
+    assert response.status_code == 403
+    assert renderer.calls == []

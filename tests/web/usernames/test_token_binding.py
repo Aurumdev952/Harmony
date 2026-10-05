@@ -11,6 +11,7 @@ created no later than the second it was issued.
 
 from datetime import datetime, timedelta, timezone
 
+import pytest
 import sqlalchemy
 from flask_jwt_extended import decode_token
 
@@ -186,3 +187,46 @@ def test_session_minted_before_wp0k_follows_its_username_to_a_renamed_account(ap
     _rename(app, 3, JOHN_DOT_DOE)
 
     assert signed_in_id(app, token) == 3
+
+
+def test_session_is_refused_by_an_account_recreated_with_its_id_and_username(app):
+    token = login(app, JOHN_DOE)
+    assert signed_in_id(app, token) == 2
+
+    _delete_and_recreate(
+        app,
+        JOHN_DOE,
+        old_id=2,
+        new_id=2,
+        created=_issued_at(app, token) + timedelta(seconds=1),
+    )
+
+    assert signed_in_id(app, token) is None
+
+
+@pytest.mark.parametrize('kind', ['session', 'api token'])
+def test_a_token_is_refused_once_its_account_changes_the_case_of_its_username(
+    app, kind
+):
+    """A bound token names its account by id and by the exact username it was
+    issued under."""
+    if kind == 'session':
+        token = login(app, JOHN_DOE)
+    else:
+        _run(
+            app,
+            'INSERT INTO api_token (id, user_id, is_revoked) VALUES (:id, 2, 0)',
+            id=TOKEN_ID,
+        )
+        token = api_token(app, JOHN_DOE, TOKEN_ID)
+    assert signed_in_id(app, token) == 2
+
+    _rename(app, 2, 'John_Doe@moh.gov.rw')
+
+    assert signed_in_id(app, token) is None
+
+
+def test_a_bound_token_signs_in_its_account_of_a_case_only_pair(app):
+    """Account 5 `Ann@` has a twin `ann@`; its session names it by id."""
+    assert signed_in_id(app, login(app, 'Ann@moh.gov.rw')) == 5
+    assert signed_in_id(app, login(app, 'ann@moh.gov.rw')) == 6

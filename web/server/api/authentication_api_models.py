@@ -23,6 +23,7 @@ from web.server.errors import ItemNotFound
 from web.server.routes.views.admin import send_reset_password
 from web.server.routes.views.authentication import try_authenticate_user
 from web.server.util.api_validation import GenericValidationError
+from web.server.security.usernames import username_taken
 from web.server.util.authentication import create_user_access_token, login_user
 
 
@@ -103,6 +104,17 @@ class AuthenticationResource(Resource):
 
             if email != pending_user.username:
                 raise BadRequest("Registered email does not match the invited email")
+
+            # A pending account made by the case-blind invitations before WP-0k
+            # must not become a second active account equal to another
+            # ignoring case: that would move older sessions to it.
+            if username_taken(
+                pending_user.username,
+                transaction.run_raw(),
+                except_user_id=pending_user.id,
+                ignore_pending=True,
+            ):
+                raise BadRequest("Another account has this email address")
 
             # Enable user account
             pending_user.status_id = UserStatusEnum.ACTIVE.value

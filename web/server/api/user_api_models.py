@@ -9,7 +9,7 @@ from flask import current_app, g
 from flask_potion import fields
 from flask_potion.routes import ItemRoute, Route
 from flask_potion.schema import FieldSet
-from flask_potion.signals import before_delete, after_delete
+from flask_potion.signals import before_create, before_delete, after_delete
 from flask_user import current_user
 from werkzeug.exceptions import BadRequest
 
@@ -35,7 +35,7 @@ from web.server.potion.managers import UserResourceManager
 from web.server.routes.views.authorization import (
     AuthorizedOperation,
 )
-from web.server.routes.views.admin import send_reset_password
+from web.server.routes.views.admin import send_reset_password_for_account
 from web.server.api.user_api_schemas import (
     FRONTEND_USER_UPDATE_SCHEMA,
     INVITE_OBJECT_SCHEMA,
@@ -56,6 +56,7 @@ from web.server.routes.views.users import (
     update_user_groups,
     update_user_roles_from_map,
 )
+from web.server.data.data_access import get_db_adapter
 from web.server.security.usernames import username_taken
 from web.server.security.permissions import (
     SuperUserPermission,
@@ -140,7 +141,9 @@ class UserResource(PrincipalResource):
     )
     def update_user(self, db_user, obj):
         with AuthorizedOperation('edit_user', 'site'):
-            if username_taken(obj['username'], except_user_id=db_user.id):
+            if obj['username'] != db_user.username and username_taken(
+                obj['username'], except_user_id=db_user.id
+            ):
                 raise BadRequest('Another account has this username.')
             # NOTE: this whole block must run in the same transaction
             # and can leave db in incosistent state like this but should be
@@ -214,7 +217,7 @@ class UserResource(PrincipalResource):
                 message = f'User {username} does not have a valid e-mail address.'
                 return StandardResponse(message, BAD_REQUEST, False), BAD_REQUEST
 
-            send_reset_password(username)
+            send_reset_password_for_account(user.id)
 
             message = (
                 f'User password has been reset and instructions e-mailed to {username}.'
@@ -377,6 +380,16 @@ class UserResource(PrincipalResource):
     def get_is_user_in_group(self, user, group_name):
         group_names = [group.name for group in user.groups]
         return group_name in group_names
+
+
+@before_create.connect_via(UserResource)
+def before_create_user(sender, item):
+    '''`POST /api2/user` may not add an account equal to another ignoring
+    case. The new item may already be in the session, so no flush runs first.'''
+    session = get_db_adapter().session
+    with session.no_autoflush:
+        if username_taken(item.username, session):
+            raise BadRequest('Another account has this username.')
 
 
 @before_delete.connect_via(UserResource)

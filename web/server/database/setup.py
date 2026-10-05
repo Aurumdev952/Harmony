@@ -43,9 +43,21 @@ class UsernameAdapter(SQLAlchemyAdapter):
 class HarmonyUserManager(UserManager):
     def username_is_available(self, new_username):
         '''For a rename on flask-user's change-username page: no other
-        account may equal the new username ignoring case.'''
-        own_id = current_user.id if current_user.is_authenticated else None
+        account may equal the new username ignoring case. Keeping one's own
+        username is not a rename, so an account of a case-only pair made
+        before WP-0k can still submit the page.'''
+        if current_user.is_authenticated:
+            if new_username == current_user.username:
+                return True
+            own_id = current_user.id
+        else:
+            own_id = None
         return not username_taken(new_username, self.db_adapter.db.session, own_id)
+
+    def get_user_by_id(self, user_id):
+        '''The account a flask-login session names, only while it is active.'''
+        user = super().get_user_by_id(user_id)
+        return user if user is not None and user.is_active else None
 
 
 def initialize_user_manager(app, db):

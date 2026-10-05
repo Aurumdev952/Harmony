@@ -114,6 +114,10 @@ class FakeTransaction:
         return _FakeQuery(_lookup(search_fields, case_sensitive))
 
     def find_one_by_fields(self, _model, case_sensitive, search_fields):
+        if 'username' in search_fields:
+            # The renderer finds the account its token is bound to.
+            assert case_sensitive
+            return USERS.get(search_fields['username'])
         return _FakeQuery(_lookup(search_fields, case_sensitive)).first()
 
 

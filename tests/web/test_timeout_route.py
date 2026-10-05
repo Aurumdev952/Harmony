@@ -24,7 +24,7 @@ class _User(UserMixin):
     username = USERNAME
 
 
-def _find_user_by_username(username):
+def _account_for_token(username, claims, issued_at):
     return _User() if username == USERNAME else None
 
 
@@ -61,8 +61,8 @@ def fixture_app(bare_flask_app) -> Flask:
 @pytest.fixture(autouse=True)
 def fixture_users_table():
     with mock.patch(
-        'web.server.security.signal_handlers.find_user_by_username',
-        _find_user_by_username,
+        'web.server.security.signal_handlers.account_for_token',
+        _account_for_token,
     ):
         yield
 

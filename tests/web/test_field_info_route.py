@@ -125,7 +125,7 @@ def fixture_request_field_info(bare_flask_app, druid):
             ),
             mock.patch(
                 'web.server.routes.views.authentication.current_user',
-                SimpleNamespace(is_authenticated=True),
+                SimpleNamespace(is_authenticated=True, is_active=True),
             ),
             mock.patch(
                 'web.server.routes.views.authentication.get_user_string',

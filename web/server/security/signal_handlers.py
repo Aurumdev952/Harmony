@@ -21,14 +21,14 @@ from flask_principal import (
     identity_loaded,
 )
 from jwt import ExpiredSignatureError, InvalidSignatureError
-from sqlalchemy import DateTime
+from sqlalchemy import DateTime, or_
 from sqlalchemy.ext.compiler import compiles
 from sqlalchemy.sql.expression import FunctionElement
 from werkzeug.exceptions import BadRequest
 
 from log import LOG
 from models.alchemy.api_token import APIToken
-from models.alchemy.user import User
+from models.alchemy.user import User, UserStatusEnum
 from models.python.permissions import DimensionFilter, QueryNeed
 from web.server.data.data_access import get_db_adapter
 from web.server.routes.views.authentication import try_authenticate_user
@@ -37,7 +37,7 @@ from web.server.routes.views.authorization import (
     WhitelistedPermission,
 )
 from web.server.security.permissions import SuperUserPermission
-from web.server.security.usernames import find_user_by_username
+from web.server.security.usernames import find_legacy_token_account
 from web.server.util.authentication import USER_ID_CLAIM
 from web.server.util.util import get_user_string, get_remote_ip_address
 
@@ -302,12 +302,19 @@ def api_token_user_id(token_id: str) -> Optional[int]:
 
 
 class database_time_from_epoch(FunctionElement):  # pylint: disable=invalid-name
-    '''Epoch seconds as a naive timestamp on the clock `current_timestamp()`
-    writes `user.created` with: the session time zone on Postgres, UTC on
-    SQLite.'''
+    '''Epoch seconds as a naive timestamp in the time zone `user.created` is
+    written in by `current_timestamp()`: the session time zone on Postgres,
+    UTC on SQLite. Both sides share a time zone, not a clock: if the server's
+    `TimeZone` setting changes, rows written before the change are misread by
+    the difference (WP-0k INV-3, T-3).'''
 
     type = DateTime()
     name = 'database_time_from_epoch'
+
+
+@compiles(database_time_from_epoch)
+def _unsupported_time_from_epoch(element, compiler, **kwargs):
+    raise NotImplementedError(f'database_time_from_epoch on {compiler.dialect.name}')
 
 
 @compiles(database_time_from_epoch, 'postgresql')
@@ -320,49 +327,50 @@ def _sqlite_time_from_epoch(element, compiler, **kwargs):
     return f"datetime({compiler.process(element.clauses, **kwargs)}, 'unixepoch')"
 
 
-def issued_before_account(user, issued_at: Optional[int]) -> bool:
-    '''Whether a token issued at `issued_at` (its `iat`) predates `user`'s
-    account, so it was issued to an earlier account with the same username.
+def account_for_token(username: str, claims: dict, issued_at: Optional[int]):
+    '''The active account a JWT was issued to, or None.
 
-    The database compares, so `iat` and `created` are on one clock whatever
-    its time zone. `iat` has whole seconds, so a token issued in the second the
-    account was created is accepted. An account with no `created` (older than
-    the column, added in 2019) matches nothing and keeps accepting the token.
+    The token names its account by id: an API token through its `api_token`
+    row, read on every request so nothing outlives a revoke or a user delete; a
+    session or a render token through its `user_id` claim. A token with
+    neither, a session issued before WP-0k, gets the one account its username
+    can mean. The account must still be active, still have the exact username
+    the token names, and not have been created in a later second than the
+    token was issued (`iat`), so a token never signs in a later account that
+    reuses an id or a username. The database compares the times, in one time
+    zone. An account with no `created` (written before the column existed, or
+    outside the ORM) is not checked against `iat`.
     '''
     if issued_at is None:
-        return True
-    issued_too_early = (
+        return None
+    if 'id' in claims:
+        issued_to = api_token_user_id(claims['id'])
+        if issued_to is None:
+            return None
+    else:
+        issued_to = claims.get(USER_ID_CLAIM)
+    if issued_to is None:
+        legacy = find_legacy_token_account(username)
+        if legacy is None:
+            return None
+        issued_to, username = legacy.id, legacy.username
+    return (
         get_db_adapter()
-        .session.query(User.id)
+        .session.query(User)
         .filter(
-            User.id == user.id,
-            User.created >= database_time_from_epoch(issued_at + 1),
+            User.id == issued_to,
+            User.username == username,
+            User.status_id == UserStatusEnum.ACTIVE.value,
+            or_(
+                User.created.is_(None),
+                User.created < database_time_from_epoch(issued_at + 1),
+            ),
         )
         .first()
     )
-    return issued_too_early is not None
 
 
 def install_login_manager_signal_handlers(app, login_manager):
-    def user_for_token(username, claims, issued_at):
-        # The account the token was issued to: an API token's through its row,
-        # read on every request so no cache outlives a revoke or a user delete;
-        # a session's through its user_id claim since WP-0k. A token with
-        # neither (an older session, a render token) has only its username and
-        # the time it was issued.
-        if 'id' in claims:
-            issued_to = api_token_user_id(claims['id'])
-            if issued_to is None:
-                return None
-        else:
-            issued_to = claims.get(USER_ID_CLAIM)
-        user = find_user_by_username(username)
-        if user is None or issued_to not in (None, user.id):
-            return None
-        if issued_to is None and issued_before_account(user, issued_at):
-            return None
-        return user
-
     @login_manager.request_loader
     def login_from_request(request_object=None):
         request_object = request_object or request
@@ -379,7 +387,7 @@ def install_login_manager_signal_handlers(app, login_manager):
 
         auth_email = get_jwt_identity()
         user = (
-            user_for_token(auth_email, get_jwt_claims(), get_raw_jwt().get('iat'))
+            account_for_token(auth_email, get_jwt_claims(), get_raw_jwt().get('iat'))
             if auth_email
             else None
         )

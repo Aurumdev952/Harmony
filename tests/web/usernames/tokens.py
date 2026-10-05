@@ -32,9 +32,9 @@ def api_token(app, identity, token_id):
         )
 
 
-def login(app, email):
+def login(app, email, password=PASSWORD):
     """The access token `/api2/authentication/login` returns."""
     login_route = AuthenticationResource.login_user_route.view_func
     with app.test_request_context('/api2/authentication/login?set_cookie=false'):
-        response = login_route(None, email=email, password=PASSWORD, remember_me=False)
+        response = login_route(None, email=email, password=password, remember_me=False)
         return json.loads(response.get_data())['access_token']

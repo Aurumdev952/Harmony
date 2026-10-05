@@ -48,6 +48,12 @@ LOOKUPS = [
     ('Dup.Shell@moh.gov.rw', 10),
     ('DUP.SHELL@moh.gov.rw', 10),
 ]
+# Two active accounts, or only pending invitations, equal these ignoring case.
+AMBIGUOUS_FOR_TOKENS = {
+    'ann@moh.gov.rw',
+    'jane_doe@moh.gov.rw',
+    'pending.user@moh.gov.rw',
+}
 CASES = pytest.mark.parametrize(
     'sent, expected_id', LOOKUPS, ids=[c[0] for c in LOOKUPS]
 )
@@ -57,7 +63,19 @@ def _signed_in_id(app, identity):
     return signed_in_id(app, session_token_without_account_id(app, identity))
 
 
-@CASES
+# A token minted before WP-0k holds the string the user typed, so its spelling
+# says nothing about which of two accounts equal ignoring case it was issued
+# to: it signs in only the one account equal to it that is not a pending
+# invitation, and nobody when there are two.
+LEGACY_TOKEN_LOOKUPS = [
+    (sent, None if sent.lower() in AMBIGUOUS_FOR_TOKENS else expected_id)
+    for sent, expected_id in LOOKUPS
+]
+
+
+@pytest.mark.parametrize(
+    'sent, expected_id', LEGACY_TOKEN_LOOKUPS, ids=[c[0] for c in LOOKUPS]
+)
 def test_jwt_identity_signs_in_the_matching_account(app, sent, expected_id):
     assert _signed_in_id(app, sent) == expected_id
 

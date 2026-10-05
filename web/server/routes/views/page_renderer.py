@@ -9,8 +9,11 @@ from flask_jwt_extended import create_access_token
 from config import settings
 from log import LOG
 from models.alchemy.dashboard import Dashboard
+from models.alchemy.user import User
 from web.server.data.data_access import Transaction
+from web.server.errors import ItemNotFound
 from web.server.security.signal_handlers import RENDER_TOKEN_QUERY_NEEDS
+from web.server.util.authentication import USER_ID_CLAIM
 from web.server.util.deployment_links import deployment_url
 
 # Make the URLBOX API URL configurable in case a reverse proxy is necessary.
@@ -87,6 +90,12 @@ def grid_dashboard_urlbox_renderer(
         resource_id = (
             transaction.find_all_by_fields(Dashboard, {"slug": name}).one().resource_id
         )
+        # Callers pass a stored username, so it matches exactly.
+        account = transaction.find_one_by_fields(
+            User, True, {"username": auth_user_email}
+        )
+    if account is None:
+        raise ItemNotFound("user", {"username": auth_user_email})
     token = create_access_token(
         identity=auth_user_email,
         expires_delta=timedelta(seconds=JWT_TOKEN_EXPIRATION_TIME),
@@ -95,6 +104,7 @@ def grid_dashboard_urlbox_renderer(
                 ["view_resource", resource_id, "dashboard"],
             ],
             "query_needs": RENDER_TOKEN_QUERY_NEEDS,
+            USER_ID_CLAIM: account.id,
         },
     )
 

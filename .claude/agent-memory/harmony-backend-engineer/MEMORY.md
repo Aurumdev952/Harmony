@@ -11,3 +11,4 @@
 - [Post-WP-2f tooling](post_wp2f_tooling.md) — tests/web on plain uv py3.9, lint-gate and noqa traps, guard workarounds, graphql stub
 - [ruff format vs py3.8](ruff_format_py38_trap.md) — ruff format writes parenthesized `with` that the 3.8 web image rejects; nest them, parse under 3.8
 - [Absolute URLs and script root](absolute_urls_and_script_root.md) — Host and SCRIPT_NAME are caller-controlled; build token URLs from url_map on the configured origin
+- [Token identity rules](token_identity_rules.md) — JWTs bind to user_id / api_token row / iat vs created in the DB clock; Postgres created is session-TZ

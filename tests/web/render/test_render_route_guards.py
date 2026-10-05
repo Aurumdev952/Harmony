@@ -92,6 +92,9 @@ def test_viewer_gets_a_render_made_as_themselves(client, renderer, route):
     [call] = renderer.calls
     assert call.identity == VIEWER
     assert call.claims['needs'] == [['view_resource', 7, 'dashboard']]
+    # Bound to the account, so it never signs in a later account that reuses
+    # the username (WP-0k).
+    assert call.claims['user_id'] == USERS[VIEWER].id
 
 
 @pytest.mark.parametrize('route', RENDER_ROUTES)

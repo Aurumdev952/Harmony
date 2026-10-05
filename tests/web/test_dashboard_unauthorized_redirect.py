@@ -30,7 +30,7 @@ def test_signed_in_user_without_view_permission_is_sent_to_unauthorized_page(
     app = bare_flask_app()
     app.register_blueprint(UserAuthenticationRouter(None, 'en').generate_blueprint())
     app.register_blueprint(DashboardPageRouter(None, 'en').generate_blueprint())
-    signed_in = SimpleNamespace(is_authenticated=True)
+    signed_in = SimpleNamespace(is_authenticated=True, is_active=True)
 
     patches = (
         mock.patch(

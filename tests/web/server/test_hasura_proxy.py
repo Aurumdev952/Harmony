@@ -22,6 +22,7 @@ PUBLIC_QUERY = 'query patchDimensionServiceQuery { dimension_connection { edges 
 
 class SignedInUser:
     is_authenticated = True
+    is_active = True
     from_jwt = False
     id = 42
     username = 'analyst@example.org'

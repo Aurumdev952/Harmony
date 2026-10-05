@@ -113,16 +113,14 @@ def test_user_patch_refuses_another_accounts_name_in_any_case(
     assert _username(app, 8) == 'jane.doe@moh.gov.rw'
 
 
-def test_a_look_alike_rename_by_patch_signs_in_only_the_renamed_account(
-    app, request_ctx, user_api, monkeypatch
-):
-    """`PATCH /api2/user/<id>` writes the username through Potion's manager;
-    the steps around it need tables this app does not have. WP-0j's steps are
-    stubbed too, so the test also runs on the WP-0j merge."""
+def _patch_user(app, user_api, monkeypatch, user_id, obj):
+    """Run `PATCH /api2/user/<id>`'s handler. Potion's manager writes the
+    fields; the steps around it need tables this app does not have, so they are
+    stubbed, WP-0j's too, so the tests also run on the WP-0j merge. Returns the
+    `apiTokens` lists handed to `update_user_api_tokens`."""
     for step in (
         'update_user_acls',
         'update_user_groups',
-        'update_user_api_tokens',
         'invalidate_user_identity_cache',
         'verify_may_rename',
         'held_roles_from_uris',
@@ -131,6 +129,12 @@ def test_a_look_alike_rename_by_patch_signs_in_only_the_renamed_account(
         'replace_user_acls',
     ):
         monkeypatch.setattr(user_api, step, lambda *args, **kwargs: None, raising=False)
+    token_updates = []
+    monkeypatch.setattr(
+        user_api,
+        'update_user_api_tokens',
+        lambda user, tokens: token_updates.append(tokens),
+    )
     monkeypatch.setattr(
         user_api,
         'build_user_updates',
@@ -145,14 +149,45 @@ def test_a_look_alike_rename_by_patch_signs_in_only_the_renamed_account(
 
     manager = SimpleNamespace(update=update, can_update_item=lambda user: True)
     with app.app_context():
-        db_user = User.query.get(6)
         user_api.UserResource.update_user.view_func(
             SimpleNamespace(manager=manager),
-            db_user,
-            {'username': LOOK_ALIKE, 'roles': []},
+            User.query.get(user_id),
+            {'roles': [], **obj},
         )
+    return token_updates
+
+
+def test_a_look_alike_rename_by_patch_signs_in_only_the_renamed_account(
+    app, request_ctx, user_api, monkeypatch
+):
+    _patch_user(app, user_api, monkeypatch, 6, {'username': LOOK_ALIKE})
 
     assert _username(app, 6) == LOOK_ALIKE
     assert signed_in_id(app, login(app, LOOK_ALIKE)) == 6
     assert signed_in_id(app, session_token_without_account_id(app, LOOK_ALIKE)) == 6
     assert signed_in_id(app, login(app, 'john.doe@moh.gov.rw')) == 1
+
+
+@pytest.mark.parametrize('user_id, username', [(5, 'Ann@moh.gov.rw'), (6, ANN)])
+def test_user_patch_keeping_the_username_edits_an_account_of_a_case_only_pair(
+    app, request_ctx, user_api, monkeypatch, user_id, username
+):
+    """Only a rename is checked: `Ann@` and `ann@` predate WP-0k, and an admin
+    must still be able to change their roles, status or API tokens."""
+    revoke = [
+        {'id': 'tok0000005', '$uri': '/api2/api_token/tok0000005', 'is_revoked': True}
+    ]
+
+    token_updates = _patch_user(
+        app, user_api, monkeypatch, user_id, {'username': username, 'apiTokens': revoke}
+    )
+
+    assert token_updates == [revoke]
+    assert _username(app, user_id) == username
+
+
+def test_change_username_page_accepts_ones_own_name_in_a_case_only_pair(app):
+    response = _change_username_page(app, 'Ann@moh.gov.rw', 'Ann@moh.gov.rw')
+
+    assert response.status_code == 302
+    assert _username(app, 5) == 'Ann@moh.gov.rw'

@@ -482,13 +482,16 @@ def write_results(stem: Path, samples: list[PerfSample], meta: dict[str, Any]) -
 def markdown(title: str, samples: list[PerfSample], meta: dict[str, Any]) -> str:
     host = meta['host']
     method = meta['method']
+    end = host.get('load_average_at_end')
+    end_load = f', {end} at end' if end else ''
     lines = [
         f'# Performance baseline {title}',
         '',
         f'- Code: `{meta["git_sha"]}`{" (dirty)" if meta["git_dirty"] else ""}, run {meta["started_utc"]}',
         (
             f'- Host: {host["cpu"]}, {host["logical_cpus"]} logical CPUs, {host["memory_gib"]} GiB, '
-            f'Linux {host["kernel"]}, load {host["load_average_at_start"]} at start; '
+            f'Linux {host["kernel"]}, load {host["load_average_at_start"]} at start'
+            f'{end_load}; '
             f'Docker {meta.get("docker")}'
         ),
         f'- Druid {meta.get("druid_version")}, datasource {", ".join(meta.get("datasources", []))}',
@@ -566,6 +569,7 @@ def run(args: argparse.Namespace) -> int:
             flush=True,
         )
         samples.append(sample)
+    meta['host']['load_average_at_end'] = [round(x, 2) for x in os.getloadavg()]
     meta['finished_utc'] = dt.datetime.now(dt.timezone.utc).isoformat(
         timespec='seconds'
     )

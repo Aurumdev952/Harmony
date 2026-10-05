@@ -206,6 +206,31 @@ def test_samples_round_trip_through_jsonl(tmp_path: Path):
     assert '| b | map |' in (tmp_path / 'run.md').read_text()
 
 
+def test_markdown_reports_the_host_load_at_start_and_end():
+    meta = {
+        'git_sha': 'abc',
+        'git_dirty': False,
+        'started_utc': 'now',
+        'host': {
+            'cpu': 'x',
+            'logical_cpus': 16,
+            'memory_gib': 1,
+            'kernel': 'k',
+            'load_average_at_start': [46.1, 53.53, 37.59],
+            'load_average_at_end': [19.23, 34.08, 36.78],
+        },
+        'method': {
+            'rounds': 100,
+            'warmup_rounds': 3,
+            'concurrency': 1,
+            'interval': 'i',
+            'caches': 'warm',
+        },
+    }
+    text = baseline.markdown('run', [sample('a', 12.5)], meta)
+    assert 'load [46.1, 53.53, 37.59] at start, [19.23, 34.08, 36.78] at end' in text
+
+
 def test_summarise_dashboard_uses_the_query_percentiles_and_median_bytes():
     record = {
         'case_id': 'perf-mixed-6',

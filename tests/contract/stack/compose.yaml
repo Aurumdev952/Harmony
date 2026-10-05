@@ -7,13 +7,17 @@
 # Every service sits on an internal network with no route out, so nothing
 # reaches Mailgun, Urlbox or a CDN. Only the forwarder joins a routable
 # network, to publish web on loopback.
+#
+# web and web-init run the checkout, mounted read-only at /src. Not at
+# /zenysis: the image keeps its Python environment in /zenysis/.venv, and a
+# mount there would hide it.
 name: ${CONTRACT_PROJECT:?run tests/contract/stack/stack.sh}
 
 x-web-env: &web-env
   ZEN_ENV: harmony_demo
   ZEN_OFFLINE: "1"
-  ZEN_HOME: /zenysis
-  PYTHONPATH: /zenysis
+  ZEN_HOME: /src
+  PYTHONPATH: /src
   PYTHONDONTWRITEBYTECODE: "1"
   DATABASE_URL: postgresql://postgres:${POSTGRES_PASSWORD:?}@postgres:5432/harmony_demo-local
   SQLALCHEMY_DATABASE_URI: postgresql://postgres:${POSTGRES_PASSWORD:?}@postgres:5432/harmony_demo-local
@@ -75,14 +79,14 @@ services:
   web-init:
     image: ${CONTRACT_WEB_IMAGE:?}
     networks: [internal]
-    working_dir: /zenysis
+    working_dir: /src
     volumes:
-      - ../../..:/zenysis:ro
+      - ../../..:/src:ro
     environment:
       <<: *web-env
       CONTRACT_USERNAME: ${CONTRACT_USERNAME:?}
       CONTRACT_PASSWORD: ${CONTRACT_PASSWORD:?}
-    command: ["/bin/bash", "/zenysis/tests/contract/stack/init.sh"]
+    command: ["/bin/bash", "/src/tests/contract/stack/init.sh"]
     depends_on:
       postgres:
         condition: service_healthy
@@ -102,9 +106,9 @@ services:
   web:
     image: ${CONTRACT_WEB_IMAGE:?}
     networks: [internal]
-    working_dir: /zenysis
+    working_dir: /src
     volumes:
-      - ../../..:/zenysis:ro
+      - ../../..:/src:ro
     environment:
       <<: *web-env
       ZEN_GUNICORN_WORKER_THREADS: "2"

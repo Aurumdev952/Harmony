@@ -3,5 +3,10 @@
 - [WP-0c findings](wp-0c-findings.md): /api/timeout is live; system-client raw queries reachable from /api/field; remember_me JWT claim
 - [Phase-file dead claims](project_phase_file_dead_claims.md) — "unused" routes may be live via ZenClient (no /api/ in the call); verify before deleting
 - [Worktree shell guard](feedback_worktree_shell_guard.md) — command forms the isolation guard refuses and the workarounds that pass
-- [Tooling traps](tooling_traps.md) — multi-Python test runs, black vs ruff format, mypy flags, pipeline suite scratch runs, 3.13 wheel checks
-- [Config import hook](config_import_hook.md) — alias semantics, PathFinder precedence, __spec__ restore, lazy DATASOURCE
+- [Tooling traps](tooling_traps.md) — multi-Python test runs, black vs ruff format, 3.8 syntax proof (web image), ruff with-parens, E712 on SQLA, mypy flags, integration lint in scratch, golden case trials, pipeline suite scratch runs, 3.13 wheel checks
+- [Config import hook](config_import_hook.md) — alias semantics, PathFinder precedence, __spec__ restore, lazy DATASOURCE, WP-4a loader
+- [Postgres bulk-replace traps](postgres-bulk-replace-traps.md) — upsert before delete; setval survives rollback; last_modified trigger; OID not ::integer; create_all lacks triggers
+- [Images copy explicit dirs](images_copy_explicit_dirs.md) — a new top-level package (harmony/) needs infra COPY lines or the images break
+- [Druid expression aggregator](druid_expression_aggregator.md) — traps replacing extensions with the native expression aggregator (0.23 and 38), LAST_VALUE N3
+- [Settings import boundary](settings_import_boundary.md) — no module-level config.settings import below query_builder; toolchain suite catches it, core suite does not
+- [Alembic migration runs](alembic_migration_runs.md) — cheap env.py runs (stamp on SQLite), full upgrade needs a Druid stub on :8081, flask db current broken

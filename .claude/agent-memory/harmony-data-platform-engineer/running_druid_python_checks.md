@@ -1,16 +1,16 @@
 ---
 name: running-druid-python-checks
-description: How to import-check and pytest db/druid code with no host Python env (no pyproject, no pytest in images); env vars needed; worktree-guard traps
+description: How to run db/druid and tests/druid checks with uv, which env vars each import needs, and why CI suites must pass with settings unset
 metadata:
   type: project
 ---
 
-As of 2026-10-04 the repo has no pyproject.toml, and no image ships pytest. To check `db/druid/**` code, mount the worktree into a pipeline (CPython) image at `/src`, not `/zenysis`. Mounting at `/zenysis` hides the image's `/zenysis/venv`.
+Since integration gained `pyproject.toml` and `uv.lock` (2026-10-05), run checks on the host with `uv run pytest ...` and `uv run python`. The old route (mount the worktree into a pipeline image at `/src`) is no longer needed.
 
-- Use `--entrypoint /zenysis/venv/bin/python` (Python 3.9).
-- Set the environment: `-w /src -e PYTHONPATH=/src -e ZEN_HOME=/src -e R77_SRC_ROOT=/src -e ZEN_ENV=harmony_demo -e DRUID_HOST=http://druid.invalid -e DEFAULT_SECRET_KEY=<dummy>`. Every `db.druid.indexing.*` module then imports with `--network none`.
-- For pytest, run `pip install pytest` inside the same throwaway container through `python -c "subprocess.run(...); pytest.main(...)"`.
+- Query-engine modules (`db.druid.util`, `db.druid.query_builder`, `data.query.models`) must import with `DEFAULT_SECRET_KEY`, `DRUID_HOST` and `ZEN_ENV` unset (INV-8, `tests/core/test_import_without_settings.py`). Code that reads `config.settings` imports it inside the function.
+- `db.druid.indexing.*` still needs `ZEN_ENV` (it reads `config/<ZEN_ENV>/druid.py`). Tests that import it set the variables with `os.environ.setdefault` at module top.
+- Before handing a WP back, run `ci/pytest_suites.sh` with those three variables unset (`env -u ...`). A module-level settings import passed every WP suite but broke `tests/toolchain` in CI (WP-8a round 2, the only High).
 
-**Why:** in the web-server image, every indexing module fails with `KeyError: 'DRUID_HOST'` when that variable is unset. Without the variables above, the import checks give misleading results.
+**Why:** a test that passes only because a sibling module set the environment first is order-dependent, and reviewers run single files.
 
-**How to apply:** use this for any WP-8a, 8b or 8c import or test check until WP-2x lands a real test environment. The worktree-isolation guard refuses a Bash command that contains `/bin/sh`, a `$var`-computed command, or a heredoc piped to `uv` that mentions `git`. Split commands, or put the script in /tmp first.
+**How to apply:** for any WP-8a, 8b or 8c change that touches imports, run the single test file and the full `ci/pytest_suites.sh` with the env unset. See [[worktree-tooling-traps]].

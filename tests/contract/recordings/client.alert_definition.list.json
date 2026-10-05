@@ -1,0 +1,204 @@
+{
+  "content_type": "application/json",
+  "headers": [
+    "link",
+    "x-total-count"
+  ],
+  "id": "client.alert_definition.list",
+  "pinned": {},
+  "response_schema": {
+    "items": {
+      "properties": {
+        "$uri": {
+          "type": "string",
+          "x-format": "api-uri"
+        },
+        "checks": {
+          "items": {
+            "properties": {
+              "operation": {
+                "type": "string"
+              },
+              "threshold": {
+                "type": "integer"
+              },
+              "type": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "operation",
+              "threshold",
+              "type"
+            ],
+            "type": "object"
+          },
+          "type": "array"
+        },
+        "dimensionName": {
+          "type": "string"
+        },
+        "fields": {
+          "items": {
+            "properties": {
+              "calculation": {
+                "properties": {
+                  "filter": {
+                    "properties": {
+                      "fieldId": {
+                        "type": "string"
+                      },
+                      "type": {
+                        "type": "string"
+                      }
+                    },
+                    "required": [
+                      "fieldId",
+                      "type"
+                    ],
+                    "type": "object"
+                  },
+                  "type": {
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "filter",
+                  "type"
+                ],
+                "type": "object"
+              },
+              "canonicalName": {
+                "type": "string"
+              },
+              "id": {
+                "type": "string"
+              },
+              "shortName": {
+                "type": "string"
+              },
+              "userDefinedLabel": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "calculation",
+              "canonicalName",
+              "id",
+              "shortName",
+              "userDefinedLabel"
+            ],
+            "type": "object"
+          },
+          "type": "array"
+        },
+        "filters": {
+          "items": {
+            "properties": {
+              "dimension": {
+                "type": "string"
+              },
+              "dimensionValues": {
+                "items": {
+                  "properties": {
+                    "description": {
+                      "type": "string"
+                    },
+                    "dimension": {
+                      "type": "string"
+                    },
+                    "filter": {
+                      "properties": {
+                        "dimension": {
+                          "type": "string"
+                        },
+                        "type": {
+                          "type": "string"
+                        },
+                        "value": {
+                          "type": "string"
+                        }
+                      },
+                      "required": [
+                        "dimension",
+                        "type",
+                        "value"
+                      ],
+                      "type": "object"
+                    },
+                    "id": {
+                      "type": "string"
+                    },
+                    "name": {
+                      "type": "string"
+                    },
+                    "subtitle": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "description",
+                    "dimension",
+                    "filter",
+                    "id",
+                    "name",
+                    "subtitle"
+                  ],
+                  "type": "object"
+                },
+                "type": "array"
+              },
+              "id": {
+                "type": "string"
+              },
+              "invert": {
+                "type": "boolean"
+              }
+            },
+            "required": [
+              "dimension",
+              "dimensionValues",
+              "id",
+              "invert"
+            ],
+            "type": "object"
+          },
+          "type": "array"
+        },
+        "resourceURI": {
+          "type": "string",
+          "x-format": "api-uri"
+        },
+        "timeGranularity": {
+          "type": "string"
+        },
+        "title": {
+          "type": "string"
+        },
+        "user": {
+          "type": "string",
+          "x-format": "api-uri"
+        },
+        "userId": {
+          "type": "integer"
+        }
+      },
+      "required": [
+        "$uri",
+        "checks",
+        "dimensionName",
+        "fields",
+        "filters",
+        "resourceURI",
+        "timeGranularity",
+        "title",
+        "user",
+        "userId"
+      ],
+      "type": "object"
+    },
+    "type": "array"
+  },
+  "route": "GET /api2/alert_definitions",
+  "status": 200
+}

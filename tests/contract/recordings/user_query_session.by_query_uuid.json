@@ -1,0 +1,164 @@
+{
+  "content_type": "application/json",
+  "headers": [],
+  "id": "user_query_session.by_query_uuid",
+  "pinned": {},
+  "response_schema": {
+    "properties": {
+      "queryBlob": {
+        "properties": {
+          "querySelections": {
+            "properties": {
+              "fields": {
+                "items": {
+                  "properties": {
+                    "calculation": {
+                      "properties": {
+                        "filter": {
+                          "properties": {
+                            "fieldId": {
+                              "type": "string"
+                            },
+                            "type": {
+                              "type": "string"
+                            }
+                          },
+                          "required": [
+                            "fieldId",
+                            "type"
+                          ],
+                          "type": "object"
+                        },
+                        "type": {
+                          "type": "string"
+                        }
+                      },
+                      "required": [
+                        "filter",
+                        "type"
+                      ],
+                      "type": "object"
+                    },
+                    "canonicalName": {
+                      "type": "string"
+                    },
+                    "customizableFilterItems": {
+                      "maxItems": 0,
+                      "type": "array"
+                    },
+                    "id": {
+                      "type": "string"
+                    },
+                    "shortName": {
+                      "type": "string"
+                    },
+                    "showNullAsZero": {
+                      "type": "boolean"
+                    },
+                    "userDefinedLabel": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "calculation",
+                    "canonicalName",
+                    "customizableFilterItems",
+                    "id",
+                    "shortName",
+                    "showNullAsZero",
+                    "userDefinedLabel"
+                  ],
+                  "type": "object"
+                },
+                "type": "array"
+              },
+              "filters": {
+                "maxItems": 0,
+                "type": "array"
+              },
+              "groups": {
+                "items": {
+                  "properties": {
+                    "item": {
+                      "properties": {
+                        "dimension": {
+                          "type": "string"
+                        },
+                        "granularity": {
+                          "type": "string"
+                        },
+                        "includeAll": {
+                          "type": "boolean"
+                        },
+                        "includeNull": {
+                          "type": "boolean"
+                        },
+                        "includeTotal": {
+                          "type": "boolean"
+                        },
+                        "name": {
+                          "type": "string"
+                        }
+                      },
+                      "required": [
+                        "includeTotal",
+                        "name"
+                      ],
+                      "type": "object"
+                    },
+                    "type": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "item",
+                    "type"
+                  ],
+                  "type": "object"
+                },
+                "type": "array"
+              }
+            },
+            "required": [
+              "fields",
+              "filters",
+              "groups"
+            ],
+            "type": "object"
+          },
+          "sourceType": {
+            "type": "string"
+          },
+          "viewType": {
+            "type": "string"
+          },
+          "visualizationType": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "querySelections",
+          "sourceType",
+          "viewType",
+          "visualizationType"
+        ],
+        "type": "object"
+      },
+      "queryUuid": {
+        "type": "string"
+      },
+      "username": {
+        "type": "string",
+        "x-format": "email"
+      }
+    },
+    "required": [
+      "queryBlob",
+      "queryUuid",
+      "username"
+    ],
+    "type": "object"
+  },
+  "route": "GET /api2/user_query_session/<hash>/by_query_uuid",
+  "status": 200
+}

@@ -1,0 +1,11 @@
+{
+  "content_type": "application/json",
+  "headers": [],
+  "id": "role.delete",
+  "pinned": {},
+  "response_schema": {
+    "type": "null"
+  },
+  "route": "DELETE /api2/role/<id>",
+  "status": 200
+}

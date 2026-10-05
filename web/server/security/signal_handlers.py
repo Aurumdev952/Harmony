@@ -1,6 +1,5 @@
 import itertools
 from logging import LoggerAdapter
-from uuid import uuid4
 
 from flask import g, request, request_started, session, current_app
 from flask_jwt_extended import (
@@ -22,6 +21,7 @@ from jwt import ExpiredSignatureError, InvalidSignatureError
 from werkzeug.exceptions import BadRequest
 
 from log import LOG
+from log.context import current_request_id, new_request_id
 from models.alchemy.api_token import APIToken
 from models.alchemy.user import User
 from models.python.permissions import DimensionFilter, QueryNeed
@@ -57,8 +57,8 @@ def initialize_request_logger(app, **kwargs):
     messages associated with a specific request by a user.
     '''
 
-    # Generate a unique Request ID
-    request_id = uuid4()
+    # The id the request id middleware bound, which the response header also carries.
+    request_id = current_request_id() or new_request_id()
     username = ''
     user_id = -1
     ip_address = get_remote_ip_address()
@@ -70,7 +70,7 @@ def initialize_request_logger(app, **kwargs):
     log_fields = {
         'username': username,
         'ip_address': ip_address,
-        'request_id': str(request_id),
+        'request_id': request_id,
         'user_id': user_id,
     }
 

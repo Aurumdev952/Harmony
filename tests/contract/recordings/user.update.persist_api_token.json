@@ -1,0 +1,59 @@
+{
+  "content_type": "application/json",
+  "headers": [],
+  "id": "user.update.persist_api_token",
+  "pinned": {},
+  "response_schema": {
+    "properties": {
+      "$uri": {
+        "type": "string",
+        "x-format": "api-uri"
+      },
+      "acls": {
+        "maxItems": 0,
+        "type": "array"
+      },
+      "apiTokens": {
+        "maxItems": 0,
+        "type": "array"
+      },
+      "created": {
+        "type": "null"
+      },
+      "firstName": {
+        "type": "null"
+      },
+      "lastName": {
+        "type": "null"
+      },
+      "phoneNumber": {
+        "type": "null"
+      },
+      "roles": {
+        "maxItems": 0,
+        "type": "array"
+      },
+      "status": {
+        "type": "string"
+      },
+      "username": {
+        "type": "null"
+      }
+    },
+    "required": [
+      "$uri",
+      "acls",
+      "apiTokens",
+      "created",
+      "firstName",
+      "lastName",
+      "phoneNumber",
+      "roles",
+      "status",
+      "username"
+    ],
+    "type": "object"
+  },
+  "route": "PATCH /api2/user/<id>",
+  "status": 200
+}

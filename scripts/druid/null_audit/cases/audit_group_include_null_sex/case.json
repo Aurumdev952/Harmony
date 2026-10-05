@@ -1,0 +1,5 @@
+{
+  "description": "Group by Sex with includeNull, so the null Sex group is kept.",
+  "endpoint": "table",
+  "policy": null
+}

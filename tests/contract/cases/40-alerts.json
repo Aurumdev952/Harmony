@@ -1,0 +1,242 @@
+{
+  "cases": [
+    {
+      "id": "alert_definition.create",
+      "route": "POST /api2/alert_definitions",
+      "body": {
+        "checks": [
+          {
+            "type": "THRESHOLD",
+            "operation": "GT",
+            "threshold": 10
+          }
+        ],
+        "dimensionName": "StateName",
+        "fields": [
+          {
+            "id": "yellow_fever_cases",
+            "calculation": {
+              "type": "SUM",
+              "filter": {
+                "type": "FIELD",
+                "fieldId": "yellow_fever_cases"
+              }
+            },
+            "canonicalName": "Yellow Fever Cases",
+            "shortName": "Yellow Fever Cases",
+            "userDefinedLabel": ""
+          }
+        ],
+        "filters": [
+          {
+            "dimension": "StateName",
+            "dimensionValues": [
+              {
+                "dimension": "StateName",
+                "filter": {
+                  "dimension": "StateName",
+                  "type": "SELECTOR",
+                  "value": "Contract State"
+                },
+                "id": "contract-state",
+                "name": "Contract State",
+                "description": "",
+                "subtitle": ""
+              }
+            ],
+            "id": "contract-filter",
+            "invert": false
+          }
+        ],
+        "timeGranularity": "month",
+        "title": "Contract alert",
+        "userId": "{admin_user_id}"
+      },
+      "capture": {
+        "alert": "/$uri"
+      }
+    },
+    {
+      "id": "alert_definition.list",
+      "route": "GET /api2/alert_definitions",
+      "query": {
+        "per_page": "1000"
+      },
+      "pin": [
+        "/[]/timeGranularity",
+        "/[]/checks/[]/type",
+        "/[]/checks/[]/operation"
+      ]
+    },
+    {
+      "id": "alert_definition.list.by_user",
+      "route": "GET /api2/alert_definitions",
+      "query": {
+        "per_page": "1000",
+        "where": {
+          "user": "{env:CONTRACT_USERNAME}"
+        }
+      }
+    },
+    {
+      "id": "alert_definition.get",
+      "route": "GET /api2/alert_definitions/<id>",
+      "path": "{alert}"
+    },
+    {
+      "id": "client.alert_definition.list",
+      "route": "GET /api2/alert_definitions",
+      "query": {
+        "page": "1",
+        "per_page": "100"
+      },
+      "session": "client"
+    },
+    {
+      "id": "alert_definition.update",
+      "route": "PATCH /api2/alert_definitions/<id>",
+      "path": "{alert}",
+      "body": {
+        "checks": [
+          {
+            "type": "THRESHOLD",
+            "operation": "LT",
+            "threshold": 5
+          }
+        ],
+        "dimensionName": "StateName",
+        "fields": [
+          {
+            "id": "yellow_fever_cases",
+            "calculation": {
+              "type": "SUM",
+              "filter": {
+                "type": "FIELD",
+                "fieldId": "yellow_fever_cases"
+              }
+            },
+            "canonicalName": "Yellow Fever Cases",
+            "shortName": "Yellow Fever Cases",
+            "userDefinedLabel": ""
+          }
+        ],
+        "filters": [
+          {
+            "dimension": "StateName",
+            "dimensionValues": [
+              {
+                "dimension": "StateName",
+                "filter": {
+                  "dimension": "StateName",
+                  "type": "SELECTOR",
+                  "value": "Contract State"
+                },
+                "id": "contract-state",
+                "name": "Contract State",
+                "description": "",
+                "subtitle": ""
+              }
+            ],
+            "id": "contract-filter",
+            "invert": false
+          }
+        ],
+        "timeGranularity": "month",
+        "title": "Contract alert renamed",
+        "userId": "{admin_user_id}"
+      }
+    },
+    {
+      "id": "client.alert_notification.create_bulk",
+      "route": "POST /api2/alert_notifications/bulk",
+      "session": "client",
+      "body": [
+        {
+          "alertDefinition": {
+            "$ref": "{alert}"
+          },
+          "dimensionInfo": {
+            "StateName": "Contract State"
+          },
+          "generationDate": "2024-01-01",
+          "reportedVal": "12",
+          "comparedVal": "10",
+          "queryInterval": "2023-12-01/2024-01-01"
+        }
+      ],
+      "capture": {
+        "notification": "/0/$uri"
+      }
+    },
+    {
+      "id": "alert_notification.list.by_definition",
+      "route": "GET /api2/alert_notifications",
+      "query": {
+        "where": {
+          "alertDefinition": {
+            "$ref": "{alert}"
+          }
+        }
+      }
+    },
+    {
+      "id": "client.alert_notification.list",
+      "route": "GET /api2/alert_notifications",
+      "query": {
+        "page": "1",
+        "per_page": "100"
+      },
+      "session": "client"
+    },
+    {
+      "id": "alert_notification.get",
+      "route": "GET /api2/alert_notifications/<id>",
+      "path": "{notification}"
+    },
+    {
+      "id": "alert_notification.all_filtered",
+      "route": "GET /api2/alert_notifications/all_filtered",
+      "query": {
+        "per_page": "1000"
+      },
+      "note": "AlertsService.js:136 calls this, but no route exists; 404 today (WP-2c finding F2)."
+    },
+    {
+      "id": "alert_definition.latest_notifications",
+      "route": "GET /api2/alert_definitions/latest_notifications"
+    },
+    {
+      "id": "client.alert_notification.update",
+      "route": "PATCH /api2/alert_notifications/<id>",
+      "path": "{notification}",
+      "session": "client",
+      "body": {
+        "reportedVal": "13"
+      }
+    },
+    {
+      "id": "client.alert_notification.update_bulk",
+      "route": "PATCH /api2/alert_notifications/bulk",
+      "session": "client",
+      "body": [
+        {
+          "$uri": "{notification}",
+          "reportedVal": "14"
+        }
+      ]
+    },
+    {
+      "id": "alert_definition.transfer_all",
+      "route": "POST /api2/alert_definitions/transfer/username",
+      "body": {
+        "sourceUser": "{env:CONTRACT_USERNAME}",
+        "targetUser": "{env:CONTRACT_USERNAME}"
+      }
+    },
+    {
+      "id": "alert_definition.delete",
+      "route": "DELETE /api2/alert_definitions/<id>",
+      "path": "{alert}"
+    }
+  ]
+}

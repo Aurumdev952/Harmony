@@ -23,6 +23,9 @@ instances:
       - docs/modernisation/work/WP-0i.md
       - docs/modernisation/work/WP-0i-evidence/**
       - .claude/agent-memory/harmony-backend-engineer/**
+  - name: "qa-0i-flip"
+    files:
+      - tests/authz/test_render_routes.py
 branch: "mig/WP-0i-render-route-guards"
 requirements: [SEC-7]
 contracts_consumed: []
@@ -258,7 +261,7 @@ These are WP-2c API contract recordings (`tests/contract`, owned by qa), not one
 
 ## Requests
 
-- [ ] **qa (qa-2b): flip the N1, N2 and N7 pins** in `tests/authz/test_render_routes.py` on this branch.
+- [x] **qa (qa-2b): flip the N1, N2 and N7 pins** in `tests/authz/test_render_routes.py` on this branch. Done on 2026-10-06 by backend-7 on the lead's instruction, with the `mig/integration` `2ddc30c` merge (instance `qa-0i-flip`, see the Log).
   - The front matter will need a qa instance (for example `qa-2b`) with `files: [tests/authz/test_render_routes.py]`, so that `task_gate` attributes that file to qa.
   - The overlay is 3.8-safe: it uses `contextlib.ExitStack`, not a parenthesised `with`, and passes `ci/check_py38_syntax.py`.
   - A verified flipped version is at `docs/modernisation/work/WP-0i-evidence/test_render_routes.flipped.py`. It passes 18 of 18. The full pure layer gives 4681 passed against 4675 on base, and the non-render outcomes are identical (Evidence).
@@ -282,6 +285,7 @@ These are WP-2c API contract recordings (`tests/contract`, owned by qa), not one
 - [ ] **infra:** when WP-2b merges, add `tests/authz` to the path list of the 3.8 syntax guard (`ci/check_py38_syntax.py` in `.github/workflows/integration.yml`). The flipped overlay that qa-2b copies there is 3.8-safe today, but nothing would catch a regression.
 - [ ] **infra (WP-3b):** upgrade gunicorn from 20.0.4 (`uv.lock`), so that a `SCRIPT_NAME` request header no longer reaches the WSGI environ (carried risk 11). Not blocking: the render paths no longer read it.
 - [x] **qa (qa-2c):** acknowledge the two contract changes above (done at `bf08a36`). The `seed_cache.py` rework belongs to whichever of WP-0i and WP-2c merges second.
+- [ ] **qa (qa-2c): re-record `storage.retrieve.cached` and `storage.retrieve.unknown_slug`, and seed a v2 thumbnail key in `tests/contract/stack/seed_cache.py`.** WP-2c is now in this branch, so per the acknowledgement above this WP owes the re-record. `seed_cache.py` still seeds the v1 key `thumbnail_contract-dashboard`. The offline contract suite passes; the live replay needs the stack.
 - [ ] **human:** remove `RENDERBOT_EMAIL` from `.env.example` (a human item; agents do not read `.env*`).
 - [ ] **human:** accept the INV-3 table, including the public-PDF row, and answer the questions above.
 
@@ -304,6 +308,7 @@ These are WP-2c API contract recordings (`tests/contract`, owned by qa), not one
 - 2026-10-05 backend-7 round-3 rework: the render fakes are now `render_fakes.py`, imported by basename. A new test checks that a gunicorn `create_app` refuses a hostile `DEPLOYMENT_BASE_URL` before any database access (`d5c3d23`). Check: tests/web gives 238 passed and 1 xfail on 3.9 (CI way) and on 3.8 (requirements*.txt). With a regular `tests` package placed after the repo on the 3.8 path, as a pip develop install of Flask-Potion does, the round-3 head fails collection (`flask_testing`) and this head passes. The startup test fails ("the database was touched") when `validate_deployment_base_url` is removed.
 - 2026-10-05 backend-7 round-3 rework: the overlay now uses `ExitStack` instead of a parenthesised `with`. Stale lead, render-bot and qa-2c items updated, with the evidence refreshed. Check: the old overlay fails the 3.8 guard at line 159 and the new one passes. The lint gate is clean. The WP-2b pure layer (`7933e17`) is 4681 passed with the overlay against 4675 on base, with identical non-render outcomes.
 - 2026-10-05 backend-7: QA, reviewer and security approved at `b5248bf`. The status is set to blocked on the human's acceptance of the INV-3 table (decision 0004). Also corrected the shadowing note (only a pip develop install shadows), requested the 3.8 guard for `tests/authz`, and pushed the branch with a draft PR. Check: `task_gate` reports only the status.
+- 2026-10-06 backend-7: merged `mig/integration` `2ddc30c` (WP-2b, 2c, 2g, 4a, 8a, 0h, decisions 0007 to 0011). Two conflicts resolved. `.claude/agent-memory/harmony-backend-engineer/MEMORY.md` keeps both sides, one index line per memory file (18 files, 18 lines). `tests/web/test_redis_password.py`: both sides fixed the same Flask 1.0 path bug in `test_flask_cache_client_carries_the_password`; this branch's `bare_flask_app` fixture sets the same `root_path` and `instance_path` as integration's inline `Flask(...)`, so the fixture form is kept and no case is dropped (7 test functions on each side and after the merge). `web/server/api/user_api_models.py` merged cleanly as integration's file: WP-0h's `verify_acl_grants` and `replace_user_acls` and WP-2c's `issue_api_token` are all present. On the lead's instruction, backend applied the qa flip of the WP-2b render pins: `tests/authz/test_render_routes.py` is now `WP-0i-evidence/test_render_routes.flipped.py` minus its two copy-header lines (the `tests/**` ruff ignores already cover S101 and S106). The front matter claims the file for instance `qa-0i-flip`, and the qa-2b request is ticked. Check: render pins 18 of 18; the WP-2b pure layer (`tests/authz/run.sh`, no stack env) 4681 passed, 583 skipped, against 12 errors with integration's pins on this code; `ci/pytest_suites.sh` all 13 suites pass (`tests/web` 283 passed plus 1 xfail, `tests/privilege_escalation` 86, `tests/contract` offline 60 with 234 stack cases deselected); `tests/web/render` alone 143 passed plus 1 xfail; `ci/lint_python.sh mig/integration` clean (157 files formatted); `uv run --locked mypy` 519 files, no issues; `ci/check_py38_syntax.py` on CPython 3.8.20 gives 0 problems over the CI paths (865 files) and over `tests/authz` (19 files). Not run: the live contract replay and the `tests/authz` stack layer (no stack). The `storage.retrieve` re-record that this WP owes WP-2c is requested from qa-2c.
 
 ## Evidence
 

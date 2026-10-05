@@ -1,0 +1,5 @@
+{
+  "description": "StateName = '' as a stored filter value (qa's shape for N1c): rows with no state, grouped by municipality.",
+  "endpoint": "table",
+  "policy": null
+}

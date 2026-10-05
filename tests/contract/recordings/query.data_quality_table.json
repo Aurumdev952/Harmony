@@ -1,0 +1,46 @@
+{
+  "content_type": "application/json",
+  "headers": [],
+  "id": "query.data_quality_table",
+  "pinned": {},
+  "response_schema": {
+    "items": {
+      "properties": {
+        "geographyHierarchy": {
+          "properties": {
+            "StateName": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "StateName"
+          ],
+          "type": "object"
+        },
+        "lastReport": {
+          "type": "number"
+        },
+        "numPeriods": {
+          "type": "number"
+        },
+        "numPeriodsWithReport": {
+          "type": "number"
+        },
+        "silentDays": {
+          "type": "number"
+        }
+      },
+      "required": [
+        "geographyHierarchy",
+        "lastReport",
+        "numPeriods",
+        "numPeriodsWithReport",
+        "silentDays"
+      ],
+      "type": "object"
+    },
+    "type": "array"
+  },
+  "route": "POST /api2/query/data_quality_table",
+  "status": 200
+}

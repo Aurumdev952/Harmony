@@ -1,0 +1,15 @@
+{
+  "content_type": "text/html",
+  "cookies": [
+    "accessKey; cleared; path=/"
+  ],
+  "headers": [
+    "location"
+  ],
+  "id": "auth.sign_out",
+  "non_empty": true,
+  "pinned": {},
+  "response_schema": null,
+  "route": "GET /user/sign-out",
+  "status": 302
+}

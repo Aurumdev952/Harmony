@@ -176,6 +176,25 @@ Seeded roles with no difference, because they pass none of these route gates: `d
 
 The admin UI's group and role editors sit behind `view_admin_page`, which none of the affected roles holds. Those roles reach these routes only through the API. The admin UI itself runs as admin, so no screen changes.
 
+### WP-2b pins flipped by this WP
+
+WP-2b pinned these ten live cases in `tests/authz/http/test_escalation.py` as they behaved before this WP. qa flipped them on this branch after the `mig/integration` `6935714` merge. Each was renamed to say what it now asserts, and each docstring gives the before and after.
+
+| Finding (row) | Pin before (asserted the escalation) | Pin after | After WP-0h |
+|---|---|---|---|
+| H1 (1) | `test_group_admin_becomes_site_admin_by_creating_a_group_with_the_admin_role` | `test_group_admin_cannot_create_a_group_with_the_admin_role` | 403; no group written; `/admin` stays unauthorized |
+| H2 (2) | `test_group_moderator_becomes_site_admin_through_a_group_it_belongs_to` | `test_group_moderator_cannot_attach_the_admin_role_to_a_group_it_belongs_to` | 403; group roles stay `[]`; `/admin` stays unauthorized |
+| N5 (2) | `test_group_moderator_gains_all_values_policies_by_attaching_a_role` | `test_group_moderator_cannot_gain_all_values_policies_by_attaching_a_role` | 403; group roles stay `[]`; own policies stay `[]` |
+| N3 (9) | `test_role_moderator_adds_a_permission_to_a_role_it_holds` | `test_role_moderator_cannot_add_a_permission_to_a_role_it_holds` | 403; role permissions stay `[]`; `/admin` stays unauthorized |
+| N4 create (8) | `test_role_administrator_attaches_all_values_policies_and_data_export` | `test_role_administrator_cannot_create_a_role_with_all_values_policies_and_export` | 403; no role written; own policies stay `[]` |
+| N4 update (10) | `test_role_editor_attaches_all_values_policies_and_data_export_to_a_held_role[role_moderator]` | `test_role_editor_cannot_add_all_values_policies_and_export_to_a_held_role[role_moderator]` | 403; role keeps no policies and `dataExport` false; own policies stay `[]` |
+| N4 update (10) | `...[role_administrator]` (same test) | `...[role_administrator]` (same test) | as above |
+| `/roles` empty map (6) | `test_group_moderator_empty_role_map_deletes_the_group_roles_for_everyone` | `test_group_moderator_empty_role_map_unlinks_the_group_roles_and_keeps_them` | 200; group roles `[]`; the `Role` row stays (admin GET 200); the bystander keeps it |
+| `/roles` empty map (6) | `test_user_admin_empty_role_map_deletes_the_user_roles_for_everyone` | `test_user_admin_empty_role_map_unlinks_the_user_roles_and_keeps_them` | 200; target roles `[]`; the `Role` row stays; the bystander keeps it |
+| H3 (7) | `test_role_administrator_grants_itself_any_permission_through_a_new_role` | `test_role_administrator_cannot_grant_itself_a_permission_through_a_new_role` | 403; no role written; `/admin` stays unauthorized |
+
+The pins that keep their behaviour and their names are N6 (`test_role_moderator_grants_a_role_it_holds_to_another_user`, by lead ruling), the `/users` self-add 404 (`test_group_moderator_cannot_reach_a_group_it_is_not_a_member_of`), `test_user_admin_cannot_change_roles_through_the_user_form` (401) and `test_admin_cannot_delete_their_own_account` (400). The findings list in `WP-2b.md` still names the old tests.
+
 ## Interrogate (unit 5)
 
 Three reviewers ran: opus (A), fable (B), and sonnet (C; it reported to the lead, who forwarded its findings with scope decisions). The sonnet run was first refused by the concurrent-subagent limit and relaunched once slots freed.
@@ -300,7 +319,7 @@ None.
 
 ## Requests
 
-- [ ] qa: on `mig/WP-2b-authz-suite`, flip the pinned escalation cases from today's outcome to refused, in the same stack as this fix (decisions 0003, 0004). It blocks merge, not review. The expected outcomes on this branch:
+- [x] qa (done 2026-10-06 on this branch after WP-2b reached integration; see "WP-2b pins flipped by this WP" and the Log): flip the pinned escalation cases from today's outcome to refused, in the same stack as this fix (decisions 0003, 0004). It blocks merge, not review. The expected outcomes on this branch:
   - `test_group_admin_becomes_site_admin_by_creating_a_group_with_the_admin_role`: 403, `/admin` stays `page:unauthorizedPage`, no group written.
   - `test_group_moderator_becomes_site_admin_through_a_group_it_belongs_to`: 403, group roles unchanged.
   - `test_role_administrator_grants_itself_any_permission_through_a_new_role`: 403, no role written.
@@ -330,8 +349,29 @@ None.
 - 2026-10-05 backend-8 unit 10: merged `mig/integration` (`1697a7a`), suite moved to `tests/privilege_escalation`, mypy and ruff fixes, two guards pinned, dead `QueryNeed` filter removed, evidence corrected; commits `df01179`, `98e77fc`, `044a457`. Check: `ci/lint_python.sh mig/integration` and `uv run --locked mypy` pass; `ci/pytest_suites.sh` all 9 suites pass (86 here); the file on integration `1697a7a` gives `50 failed, 36 passed`; the new pins kill their guards; WP-2b pure layer byte-identical.
 - 2026-10-05 backend-8 unit 11: merged `mig/integration` `e86d91a` (`741fc11`), restored the 3.8-compatible `with` in `RoleResource.update_users`, corrected the 3.8 memory note. Check: `ci/lint_python.sh`, mypy and `ci/pytest_suites.sh` pass on the merge; `py_compile` on CPython 3.8 of the 11 changed files passes; WP suite on CPython 3.8.20 `86 passed`.
 - 2026-10-05 backend-8: QA, reviewer and security approved `488e482`; QA's round-3 evidence and security's two lows recorded; `status: ready`.
+- 2026-10-06 qa-0h-flip (supporting role, on this branch at the lead's request): merged `mig/integration` `6935714` (WP-2b, WP-4a, WP-8a; no conflicts) and flipped the ten WP-2b pins to WP-0h's behaviour. Check: WP-2b pure layer `4675 passed, 583 skipped` on both the merge and integration, with identical per-test outcomes apart from the ten renamed (skipped) pins. Live layer on one fresh stack of the merged tree: `580 passed`, plus the 3 F12 token pins, which fail the same way on integration's own code (WP-2c fix). The flipped pins fail on integration's code (10 failed, 4 passed). `tests/privilege_escalation` 86 passed, `ci/lint_python.sh mig/integration`, the 3.8 guard on CPython 3.8.20 (848 files, 0 problems), mypy (519 files) and `task_gate.py WP-0h` pass. Evidence below.
 
 ## Evidence
+
+**qa: WP-2b pins flipped, after merging integration `6935714` (merge commit `42d6f0b`):**
+- **Pure layer** (`tests/authz/run.sh`, no stack env): the merge and a `git archive` copy of integration `6935714` both give `4675 passed, 583 skipped`. A per-test junit comparison finds only the ten pin renames, all skipped on both sides without a stack.
+- **Live layer, merged tree.** One fresh stack, project `qa0h-live` on 58694, WP-2c stack files from `f909234`, the worktree mounted read-only:
+  - whole suite with the stack env set: `3 failed, 5255 passed`;
+  - `-m authz_http` run 2: `3 failed, 580 passed`;
+  - leftovers afterwards: `users=0 groups=0 authz_roles=0 saved_queries=0 api_tokens=0`.
+  - All ten flipped pins pass.
+  - The 3 failures are WP-2b's F12/T1/T2 API-token pins (`test_api_token_authenticates_from_issue_until_revoked`, `test_api_token_without_a_row_is_refused_for_a_recreated_username`, `test_used_api_token_of_a_deleted_user_signs_in_as_the_recreated_username`). They expect WP-2c's production fix that stores a token at issue, and neither integration nor this branch has it yet.
+- **Live layer, integration's code** (fresh stack `qa0h-int` on the integration copy): `3 failed, 580 passed`, the same three token pins. Per-test comparison against the merged run 2: the only differences are the ten renamed pins, which pass on both sides. Nothing else changed.
+- **Flip check, both directions:**
+  - Integration's suite, with the old pins, against the merged stack: `13 failed, 570 passed`. The 13 are exactly the ten old escalation pins plus the three token pins.
+  - The flipped pins against integration's code: `10 failed, 4 passed`. Eight fail on `assert 200 == 403`. The two empty-map pins fail on `assert 404 == 200`, because the `Role` row was deleted.
+- **Stack image.** The WP-2c image `harmony-contract-web-server:f46617f35db7` has no pydantic, which WP-4a's `config/settings.py` needs, so it cannot run the merged tree. The build has no network. The stacks therefore ran on `local/wp4a-infra/harmony-web-server:test`, tagged under the merged tree's hash `b5eee49d3f44`. Its `pip freeze` differs from `f46617f35db7` exactly by the requirements diff: `pydantic` 2.10.6, `pydantic-settings` 2.8.1, `pydantic_core`, `annotated-types`, `python-dotenv` and `typing_extensions` 4.12.2. `stack.sh` was run from an untracked copy that skips the build when that tag exists. Both stacks were torn down with their volumes.
+- **Other gates on the merge:**
+  - `tests/privilege_escalation`: `86 passed`.
+  - `ci/lint_python.sh mig/integration`: `All checks passed!`, `12 files already formatted`.
+  - `uv run --no-project -p cpython-3.8.20 python ci/check_py38_syntax.py config data db log models graphql util web scripts tests/web`: `848 files checked, 0 problems`.
+  - `uv run --locked mypy`: `Success: no issues found in 519 source files`.
+  - `uv run python scripts/agents/task_gate.py WP-0h`: `WP-0h meets the definition of done gates`.
 
 **Unit 11 (merge with integration `e86d91a`):**
 - `ci/lint_python.sh mig/integration` (ruff now targets py38): `All checks passed!`, `11 files already formatted`.

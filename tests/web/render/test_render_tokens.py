@@ -25,8 +25,10 @@ from web.server.security.render_tokens import (
     RENDER_CLAIM,
     RENDER_POLICY_CLAIM,
     is_render_request,
+    is_spent_render_token,
     render_token,
 )
+from web.server.util.authentication import USER_ID_CLAIM
 from web.server.security.signal_handlers import (
     _install_token_needs,
     install_login_manager_signal_handlers,
@@ -34,13 +36,15 @@ from web.server.security.signal_handlers import (
 )
 
 USERNAME = 'north@tests.invalid'
+ACCOUNT_ID = 42
+ACCOUNT = SimpleNamespace(id=ACCOUNT_ID, username=USERNAME)
 RESOURCE_ID = 7
 STATE = 'StateName'  # an AUTHORIZABLE_DIMENSIONS entry in harmony_demo
 NOT_SUPERUSER = SimpleNamespace(can=lambda: False)
 
 
 class _User(UserMixin):
-    id = USERNAME
+    id = ACCOUNT_ID
     username = USERNAME
 
 
@@ -95,7 +99,7 @@ def _whoami(app: Flask, token: str) -> dict:
 def _minted(app: Flask, ttl_seconds: int = 60, policy=None):
     with app.test_request_context('/'):
         with render_token(
-            USERNAME, RESOURCE_ID, policy=policy, ttl_seconds=ttl_seconds
+            ACCOUNT, RESOURCE_ID, policy=policy, ttl_seconds=ttl_seconds
         ) as token:
             yield token
 
@@ -116,6 +120,39 @@ def test_token_signs_in_as_the_requesting_user_for_one_dashboard(app):
     assert claims['user_claims']['query_needs'] == ['*']
     assert claims['user_claims'][RENDER_CLAIM]
     assert RENDER_POLICY_CLAIM not in claims['user_claims']
+
+
+def test_token_names_its_account_by_id(app):
+    # WP-0k binds every session to its account by id (rows T-1, T-3, D-3);
+    # a render token is bound the same way.
+    with _minted(app) as token:
+        claims = _claims(app, token)
+
+    assert claims['identity'] == USERNAME
+    assert claims['user_claims'][USER_ID_CLAIM] == ACCOUNT_ID
+
+
+@pytest.mark.parametrize(
+    'claims, live, spent',
+    [
+        ({RENDER_CLAIM: 'abc'}, False, True),
+        ({RENDER_CLAIM: 'abc'}, True, False),
+        ({RENDER_CLAIM: ['abc']}, False, True),
+        ({'needs': ['*'], 'query_needs': ['*']}, False, False),
+        ({'id': 'api-token-id'}, False, False),
+    ],
+    ids=['returned', 'running', 'not-a-string', 'session', 'api-token'],
+)
+def test_only_a_render_token_whose_render_returned_is_spent(app, claims, live, spent):
+    # WP-0k's account_for_token refuses a token for which this is true, so a
+    # render token stays single-use once the two land together (SEC-7).
+    with app.app_context():
+        if live:
+            app.cache.set('render-token:abc', True)
+        try:
+            assert is_spent_render_token(claims) is spent
+        finally:
+            app.cache.delete('render-token:abc')
 
 
 def test_token_is_short_lived(app):

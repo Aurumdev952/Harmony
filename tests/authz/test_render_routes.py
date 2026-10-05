@@ -22,6 +22,7 @@ from flask_login import LoginManager
 from flask_potion import Api
 
 from tests.authz.principals import (
+    SIGNED_IN_USER_ID,
     StandInUser,
     configuration,
     load_identity,
@@ -224,7 +225,14 @@ def test_render_route(principal, route, status, rendered_as, render_app, renders
     claims = _token_claims(render_app, call)
     assert claims['identity'] == rendered_as
     user_claims = dict(claims['user_claims'])
-    assert set(user_claims) - {'needs', 'query_needs'} <= {'render', 'policy'}
+    # C-5 (WP-1h): render tokens add `render`, `policy` and the account's
+    # `user_id`, the claim WP-0k binds every session with.
+    assert set(user_claims) - {'needs', 'query_needs'} <= {
+        'render',
+        'policy',
+        'user_id',
+    }
+    assert user_claims['user_id'] == SIGNED_IN_USER_ID
     assert {k: user_claims[k] for k in ('needs', 'query_needs')} == {
         'needs': [['view_resource', RESOURCE_ID, 'dashboard']],
         'query_needs': ['*'],

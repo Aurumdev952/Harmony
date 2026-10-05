@@ -21,6 +21,7 @@ from werkzeug.exceptions import HTTPException, ServiceUnavailable, Unauthorized
 from config import settings
 from log import LOG
 from models.alchemy.dashboard import Dashboard
+from models.alchemy.user import User
 from web.server.data.data_access import Transaction
 from web.server.security.render_tokens import render_token
 from web.server.security.signal_handlers import query_policy_fingerprint
@@ -333,6 +334,18 @@ def render_dashboard(
         resource_id = (
             transaction.find_all_by_fields(Dashboard, {'slug': name}).one().resource_id
         )
+        # The token names its account by id (WP-0k). An emailed render is made
+        # as a recipient found by their stored, exact username.
+        account = (
+            current_user
+            if _is_signed_in_as(auth_user_email)
+            else transaction.find_one_by_fields(
+                User, True, {'username': auth_user_email}
+            )
+        )
+    if account is None:
+        LOG.error('No account to render dashboard %s as', name)
+        return None
     body = {
         'url': _page_url(locale, name, output_format, session_hash, is_thumbnail),
         'format': output_format,
@@ -342,7 +355,7 @@ def render_dashboard(
     policy = query_policy_fingerprint() if _is_signed_in_as(auth_user_email) else None
     ttl_seconds = RENDER_TIMEOUT_SECONDS + RESPONSE_MARGIN_SECONDS
     with _render_slot(ttl_seconds, slot_wait_seconds), render_token(
-        auth_user_email, resource_id, policy=policy, ttl_seconds=ttl_seconds
+        account, resource_id, policy=policy, ttl_seconds=ttl_seconds
     ) as token:
         try:
             response = requests.post(

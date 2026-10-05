@@ -13,6 +13,7 @@ instances:
       - web/server/routes/views/page_renderer.py
       - web/server/routes/page_renderer.py
       - web/server/security/render_tokens.py
+      - web/server/util/authentication.py
       - web/server/security/signal_handlers.py
       - web/server/redis/thumbnail_storage_service.py
       - web/server/routes/views/dashboard.py
@@ -184,6 +185,14 @@ The phase-1 1h verification asks for PDF and PNG exports of three reference dash
 
 C-5 (session and JWT format, owned by backend). Old: a render token was a plain `accessKey` JWT (`needs`, `query_needs: ['*']`) valid for 120 s. New: two optional `user_claims`, `render` (a random id that must be live in `app.cache`) and `policy` (a sha256 hex digest). Consumers: Flask `login_from_request` and `_install_token_needs` (this WP), and the FastAPI `PrincipalDep` (WP-5a/5f, backend). Ordinary session and API tokens carry neither claim and are unchanged. The `PrincipalDep` must refuse a token with a `render` claim whose id is not live, and apply the `policy` check, until the renderer signs in through FastAPI.
 
+Round 3 (the WP-0k security gate, on the lead's instruction): a render token also carries WP-0k's `user_id` claim (`USER_ID_CLAIM`, `web/server/util/authentication.py`, the same constant and comment as WP-0k at 299c632), naming the account it renders as by id. `render_token(account, resource_id, *, policy, ttl_seconds)` takes the account: the signed-in caller, or for an emailed render the recipient found by exact username, and no token is minted when there is none. Single use is the separate predicate `render_tokens.is_spent_render_token(claims)`: a `render` claim whose id is not live.
+
+**Merge rule for WP-0k and WP-1h, for whichever lands second** (0k merges into integration first):
+- WP-0k's `account_for_token` returns None when `is_spent_render_token(claims)` is true, before any account lookup. This keeps render tokens single-use (SEC-7), and it replaces WP-1h's `elif is_spent_render_token(claims)` branch in `login_from_request`. WP-0k removes the token-validity cache, so the branch has nowhere else to go.
+- Render tokens are minted by WP-1h's `render_token(account, …)` with `USER_ID_CLAIM`, never by WP-0k's urlbox `grid_dashboard_urlbox_renderer`, which WP-1h deletes. WP-0k's rows T-1, T-2, U-1 and D-3 then hold for render tokens: they are bound by id, exact username, active status and `iat`.
+- Tests for both: WP-1h's `test_token_names_its_account_by_id`, `test_only_a_render_token_whose_render_returned_is_spent`, `test_a_render_token_names_the_callers_account_by_id` and `test_an_emailed_render_token_names_the_recipients_account_by_id` stay. The merge adds a test through `account_for_token` that a spent render token for an active account is None, and one that a render token for a deactivated or renamed account is None.
+- `render_fakes.FakeTransaction.find_one_by_fields` has WP-0k's exact username lookup, so that file merges without conflict. Expect conflicts in `signal_handlers.login_from_request` (take WP-0k's body plus the rule above), `page_renderer.py` (take WP-1h's) and `dashboard.py` (WP-0k's `page_args` and `shared_page_url`, plus WP-1h's `_render_for_email`).
+
 ## Requests
 
 - [x] infra: add `docker/renderer/Dockerfile` (from `WP-1h-evidence/infra-request/Dockerfile`) and `docker/renderer/seccomp_profile.json` (from `infra-request/seccomp_profile.json`, Playwright v1.63.0, sha256 `cc3e61ca…7849`). Add the `renderer` service and the `render` network with `internal: true`, and on `web` set `RENDERER_URL`/`RENDER_WEB_ORIGIN` and `networks: [default, render]` (from `infra-request/compose.renderer.yaml`). Build and push the renderer image in CI next to web. Remove `URLBOX_API_KEY` from `docker-compose.yaml` (web and worker) and from `.env.example`. Verified locally in `WP-1h-evidence/unit-5-container-check.md`. This blocks deployments from using the renderer, but no WP-1h unit.
@@ -340,6 +349,18 @@ C-5 (session and JWT format, owned by backend). Old: a render token was a plain 
 - 2026-10-06 backend-8 R3-5 (reviewer round 2): emailed renders now wait up to `EMAIL_SLOT_WAIT_SECONDS` (30) for the sender's slot. Before, with no wait, a share with an attached PDF or embedded image silently mailed without it whenever the sender had any render running, for example their Overview thumbnails. `grid_dashboard_to_pdf` and `grid_dashboard_to_image` take `slot_wait_seconds`, and the routes keep 0, so an export is still a 503 at once. A sender whose slot stays busy for the whole wait still gets the failed-render path, with no 503 after the notifications. check: `test_an_emailed_render_waits_for_the_senders_slot` (pdf and image) and the updated `test_an_emailed_render_counts_against_the_sender_not_the_recipient` (it gives up only after the wait, on a fake clock) failed, then passed; `tests/web` 383 passed, 1 xfailed; ruff clean.
 - 2026-10-06 backend-8 R3-6 (reviewer round 2, info): added a case to `test_a_renderer_failure_is_logged_with_its_error_code` for a JSON error body that carries a valid `egress_blocked` code but is padded past 1 KiB. It must log `no error code`, which pins the 1 KiB read cap; the old oversized case used an invalid code, so it never tested the cap. check: it passed on the head. With `ERROR_BODY_MAX_BYTES` raised to 10**9 as a mutant, only that case failed (it logged `egress_blocked`).
 - 2026-10-06 backend-8 R3-7 (reviewer round 2, info): added `test_the_renderer_answers_before_the_web_app_stops_reading` to `tests/worker/test_renderer_web_drift.py`. It asserts that 120 s plus the renderer's clean-up grace (10 s), the latest a killed render answers 504, stays under the web read timeout of 135 s, which is also the token's and the slot's lifetime. check: it passed on the head; with the default grace raised to 20 s as a mutant, it failed.
+- 2026-10-06 backend-8 R3-8 (the WP-0k security gate, on the lead's instruction): render tokens are now bound to their account by id.
+  - `render_token` takes the account and mints WP-0k's `user_id` claim. `USER_ID_CLAIM` is added to `web/server/util/authentication.py` with WP-0k's exact name and comment.
+  - `render_dashboard` passes the signed-in caller, or, for an emailed render, the recipient found by exact username. With no account it mints nothing and fails the render.
+  - Single use is now the predicate `is_spent_render_token(claims)`, which `login_from_request` calls and WP-0k's `account_for_token` will call.
+  - `render_fakes.FakeTransaction` gets WP-0k's exact username lookup, line for line.
+  - The merge rule for whichever of WP-0k and WP-1h lands second is recorded under Contract changes.
+  - The authz render overlay (and its evidence copy) now accepts `user_id` among the render token's claims and asserts it equals the signed-in id, because C-5 adds it deliberately.
+
+  check:
+  - 8 failed or errored, then passed: the 2 token tests (id binding, and the spent-token predicate over 5 cases), the 5 route cases, the emailed-recipient test, the no-account test, and the render-views test;
+  - `tests/web` 397 passed, 1 xfailed; `tests/authz` 4681 passed, 583 skipped (4 render cases failed on the `user_id` claim before the overlay change);
+  - ruff: clean on the touched files.
 
 ## Evidence
 

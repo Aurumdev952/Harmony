@@ -36,10 +36,9 @@ from web.server.routes.views.authorization import (
 from web.server.routes.views.query_policy import canonical_policy
 from web.server.security.permissions import SuperUserPermission
 from web.server.security.render_tokens import (
-    RENDER_CLAIM,
     RENDER_POLICY_CLAIM,
     RENDER_TOKEN_QUERY_NEEDS,
-    is_render_token_live,
+    is_spent_render_token,
 )
 from web.server.util.util import get_user_string, get_remote_ip_address
 
@@ -339,8 +338,8 @@ def install_login_manager_signal_handlers(app, login_manager):
             claims = get_jwt_claims()
             if 'id' in claims:
                 is_token_valid = memoized_check_token_validity(claims['id'])
-            elif RENDER_CLAIM in claims:
-                is_token_valid = is_render_token_live(claims[RENDER_CLAIM])
+            elif is_spent_render_token(claims):
+                is_token_valid = False
 
         if auth_email and is_token_valid:
             # NOTE: if we found JWT then we don't need the session

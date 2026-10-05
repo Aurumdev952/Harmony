@@ -58,7 +58,7 @@ def test_a_render_page_load_does_not_count_as_a_view(app, tracked):
     dashboard = SimpleNamespace(id=3, total_views=5)
 
     with app.test_request_context('/'), render_token(
-        USERNAME, 7, policy=None, ttl_seconds=60
+        SimpleNamespace(id=1, username=USERNAME), 7, policy=None, ttl_seconds=60
     ) as token:
         _page_load(app, token, dashboard)
 

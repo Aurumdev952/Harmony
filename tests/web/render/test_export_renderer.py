@@ -317,6 +317,33 @@ def test_emailed_render_resolves_the_recipients_own_policy(app, renderer):
     assert 'policy' not in call.claims
 
 
+@pytest.mark.parametrize('route', ROUTE_PATHS)
+def test_a_render_token_names_the_callers_account_by_id(client, renderer, route):
+    _, call = render(client, renderer, route)
+
+    assert call.identity == VIEWER
+    assert call.claims['user_id'] == USERS[VIEWER].id
+
+
+def test_an_emailed_render_token_names_the_recipients_account_by_id(app, renderer):
+    with app.test_request_context('/', headers=SENDER):
+        get_email_attachments(NORTH, SLUG, should_attach_pdf=True)
+
+    [call] = renderer.calls
+    assert call.identity == NORTH
+    assert call.claims['user_id'] == USERS[NORTH].id
+
+
+def test_an_emailed_render_for_no_account_fails_without_a_token(app, renderer):
+    with app.test_request_context('/', headers=SENDER):
+        attachments = get_email_attachments(
+            'nobody@tests.invalid', SLUG, should_attach_pdf=True
+        )
+
+    assert attachments == (None, None)
+    assert renderer.calls == []
+
+
 def test_emailed_render_with_a_failed_renderer_attaches_nothing(
     app, renderer, monkeypatch
 ):

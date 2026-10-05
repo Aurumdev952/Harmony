@@ -9,6 +9,7 @@ from pydruid.utils.postaggregator import Postaggregator
 
 from config.druid_base import DEFAULT_DRUID_INTERVAL
 from data.calculated_indicator.util import get_constituent_fields
+from db.druid.aggregations.last_value_aggregation import build_last_value
 
 DRUID_DATE_FORMAT = '%Y-%m-%d'  # TODO: Add time portion
 
@@ -72,6 +73,8 @@ def _build_aggregator_workaround(name, kwargs):
         aggregator["aggregator"] = _build_aggregator_workaround(
             name, aggregator["aggregator"]
         )
+    elif aggregator["type"] == "aggregateLast":
+        aggregator = build_last_value(name, aggregator)
     else:
         aggregator.update({"name": name})
     return aggregator

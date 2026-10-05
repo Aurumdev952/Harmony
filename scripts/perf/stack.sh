@@ -339,10 +339,24 @@ for name, path in json.load(open(os.path.join(staged, 'min', 'sourcemap.json')))
 PY
 }
 
+# The staged client is rebuilt only when a client input changed since the
+# commit it was built from (client.sha), or with PERF_REBUILD=1: a build
+# installs about 840 MB of node_modules into the checkout.
 ui() {
+  local built="${PERF_SCRATCH}/client.sha"
   load_secrets
   use_built_image
-  client "${ROOT}" "${PERF_SCRATCH}/client"
+  if [[ -z "${PERF_REBUILD:-}" && -d "${PERF_SCRATCH}/client/min" && -f "${built}" ]] &&
+    client_unchanged_since "$(cat "${built}")"; then
+    echo "perf stack: the client is unchanged since $(cat "${built}"); serving the staged build"
+  else
+    rm -f "${built}"
+    client "${ROOT}" "${PERF_SCRATCH}/client"
+    # A build from uncommitted client edits matches no commit.
+    if client_unchanged_since HEAD; then
+      git -C "${ROOT}" rev-parse HEAD > "${built}"
+    fi
+  fi
   web_compose --profile ui up -d ui
   wait_for "the client is served at http://127.0.0.1:${PERF_UI_PORT}" 24 ui_answers
 }

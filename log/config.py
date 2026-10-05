@@ -38,20 +38,29 @@ TEXT_DATE_FORMAT = '%Y%m%d.%H%M%S'
 
 REDACTED = '[REDACTED]'
 
-_SECRET_KEY = (
-    r'[\w-]*?(?:password|passwd|secret|token|api[_-]?key|access[_-]?key'
-    r'|private[_-]?key|authorization)[\w-]*'
+# Log lines carry client-controlled text, so every pattern must run in linear time.
+# A pattern that may start anywhere inside a long run and scan to its end is
+# quadratic. So each pattern starts only at the start of a run (a lookbehind), and
+# the key pattern scans its run once: Python never backtracks into a lookahead, and
+# the backreference re-matches what the lookahead captured.
+_SECRET_WORD = (
+    r'(?:password|passwd|secret|token|api[_-]?key|access[_-]?key|private[_-]?key'
+    r'|authorization)'
 )
+# A whole run of word characters and hyphens that names a secret.
+_SECRET_KEY = r'(?<![\w-])(?=[\w-]*?' + _SECRET_WORD + r')(?=([\w-]+))\2'
 _REDACTIONS = (
     # scheme://user:password@host
     (
-        re.compile(r'([a-zA-Z][a-zA-Z0-9+.-]*://[^\s/:@]*:)[^\s/@]+@'),
+        re.compile(
+            r'(?<![a-zA-Z0-9+.-])([a-zA-Z][a-zA-Z0-9+.-]*://[^\s/:@]*:)[^\s/@]+@'
+        ),
         r'\1' + REDACTED + '@',
     ),
     # key=value, key: value, 'key': 'value' and "key": "Basic value"
     (
         re.compile(
-            r'(?i)(["\']?\b' + _SECRET_KEY + r'["\']?\s*[:=]\s*["\']?)'
+            r'(?i)(["\']?' + _SECRET_KEY + r'["\']?\s*[:=]\s*["\']?)'
             r'(?:(?:bearer|basic|digest|token)\s+)?(?!\[REDACTED\])[^\s"\',;&)}\]]+'
         ),
         r'\1' + REDACTED,
@@ -70,7 +79,12 @@ _REDACTIONS = (
         re.compile(r'(?i)\b(bearer\s+)(?!\[REDACTED\])[A-Za-z0-9._~+/=-]+'),
         r'\1' + REDACTED,
     ),
-    (re.compile(r'\beyJ[A-Za-z0-9_-]+\.eyJ[A-Za-z0-9_-]+\.[A-Za-z0-9_-]*'), REDACTED),
+    (
+        re.compile(
+            r'(?<![A-Za-z0-9_-])eyJ[A-Za-z0-9_-]+\.eyJ[A-Za-z0-9_-]+\.[A-Za-z0-9_-]*'
+        ),
+        REDACTED,
+    ),
     # Flask-User's reset and confirmation links carry the token in the path.
     (
         re.compile(r'(?i)(/(?:reset[-_]password|confirm[-_]email)/)[^\s/?"\']+'),
@@ -88,8 +102,9 @@ _REDACTIONS = (
 )
 
 # gunicorn logs client-supplied URIs ("Error handling request /path?query"), and a
-# query string can carry any secret, not only the named ones above.
-_QUERY_STRING = re.compile(r'(/[^\s?\'"]*)\?[^\s\'"]+')
+# query string can carry any secret, not only the named ones above. A match starts
+# only at the start of a token, and the token holds a path before the `?`.
+_QUERY_STRING = re.compile(r'(?<![^\s\'"])([^\s?\'"/]*/[^\s?\'"]*)\?[^\s\'"]+')
 
 _FORMATS = ('json', 'text')
 _STREAMS = ('stdout', 'stderr')

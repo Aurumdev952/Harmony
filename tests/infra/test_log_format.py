@@ -6,6 +6,7 @@ import logging
 import logging.handlers
 import re
 import sys
+import time
 from datetime import datetime, timezone
 
 import pytest
@@ -295,3 +296,39 @@ def test_uncaught_exception_is_one_error_line_without_the_value(configured):
         'refusing to start.'
     )
     assert 'Traceback' in entry['exc_info']
+
+
+# Client-controlled text (paths, headers, bodies) reaches these patterns on access
+# and error lines inside a gevent worker, so formatting must stay linear in it.
+# 8000 bytes is gunicorn's header field limit. Before the patterns were anchored to
+# the start of a run, these took from a tenth of a second to over a minute.
+_HOSTILE = {
+    'a-a-a': 'a-' * 4000,
+    'path': '/' + 'a-' * 4000,
+    'header': 'X-Username: ' + 'a-' * 4000,
+    'keys': 'token-' * 1333,
+    'scheme': 'a+' * 4000,
+    'jwt': 'eyJ-' * 2000,
+    'slashes': '/' * 8000,
+    'segments': 'a/' * 4000,
+}
+
+
+@pytest.mark.parametrize('formatter', [JsonFormatter, TextFormatter])
+@pytest.mark.parametrize('name', ['ZenysisLogger', 'gunicorn.error'])
+@pytest.mark.parametrize('text', _HOSTILE.values(), ids=_HOSTILE.keys())
+def test_formatting_is_linear_in_hostile_messages(formatter, name, text):
+    record = _record('Error handling request %s', (text,), logging.WARNING, name)
+    start = time.perf_counter()
+    formatter().format(record)
+    assert time.perf_counter() - start < 0.2
+
+
+@pytest.mark.parametrize('formatter', [JsonFormatter, TextFormatter])
+@pytest.mark.parametrize('text', _HOSTILE.values(), ids=_HOSTILE.keys())
+def test_formatting_is_linear_in_hostile_access_paths(formatter, text):
+    record = _record('%(U)s', (), logging.INFO, 'gunicorn.access')
+    record.args = {'m': 'GET', 'U': '/' + text, 's': '404', 'B': '0', 'D': '1'}
+    start = time.perf_counter()
+    formatter().format(record)
+    assert time.perf_counter() - start < 0.2

@@ -1,5 +1,5 @@
 from abc import ABCMeta, abstractmethod
-import collections
+from collections.abc import Mapping
 
 from flask import current_app
 from flask_login import current_user
@@ -125,7 +125,7 @@ class AuthorizationResourceManager(SQLAlchemyManager, metaclass=ABCMeta):
                 for key, value in list(changes.items()):
                     # Done for the reasons described here
                     # https://stackoverflow.com/questions/42559434/updates-to-json-field-dont-persist-to-db
-                    if isinstance(value, collections.Mapping):
+                    if isinstance(value, Mapping):
                         flag_modified(item, key)
 
                 authorization_id = getattr(

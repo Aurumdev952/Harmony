@@ -151,9 +151,10 @@ def bound(variable, ports):
 MIDDLEMANAGER_PORTS = [('middlemanager', p) for p in (8091, *range(8100, 8106))]
 
 # Druid has no authenticator configured (JavaScript is disabled since WP-8a,
-# see test_every_druid_service_disables_javascript). Single mode publishes only what web and the pipeline call (coordinator
-# for indexing, broker and router for queries). Cluster mode binds each host's
-# ports to that host's private address, because the other hosts call them.
+# see test_every_druid_service_disables_javascript). Single mode publishes only
+# what web and the pipeline call (coordinator for indexing, broker and router
+# for queries). Cluster mode binds each host's ports to that host's private
+# address, because the other hosts call them.
 EXPECTED_PORTS = {
     'single/docker-compose.yml': bound(
         'DRUID_BIND_ADDRESS',

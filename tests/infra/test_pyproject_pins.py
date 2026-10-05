@@ -1,6 +1,9 @@
 """pyproject.toml pins every dependency (SEC-9), and the pins work together."""
 
 import re
+import shutil
+import subprocess
+import sys
 import tomllib
 from pathlib import Path
 
@@ -36,7 +39,6 @@ UNPINNED_AT_ADOPTION = {
     "isoweek",
     "scikit-learn>=0.21.3",
     "netCDF4",
-    "dataclasses",
     "pytest>=7.4.3",
     "pytest-flask>=0.15.0",
     "pytest-xdist>=1.29.0",
@@ -92,3 +94,16 @@ def test_passlib_can_hash_with_the_locked_bcrypt():
 
     context = CryptContext(schemes=["bcrypt"])
     assert context.verify("password", context.hash("password"))
+
+
+def test_the_locked_environment_satisfies_every_installed_requirement(tmp_path):
+    # The images install groups of this lock, so a requirement no installed
+    # version satisfies (a backport for an older Python, a too-low floor) shows
+    # here first. Run outside the repo so uv reads no project settings.
+    uv = shutil.which("uv")
+    assert uv, "uv is on PATH wherever this suite runs (CI: setup-uv)"
+    result = subprocess.run(
+        [uv, "pip", "check", "--python", sys.executable],
+        capture_output=True, text=True, cwd=tmp_path, check=False,
+    )  # fmt: skip
+    assert result.returncode == 0, result.stdout + result.stderr

@@ -133,6 +133,7 @@ None.
   - `ci/pytest_suites.sh`: all 9 suites passed (core 25, druid 1, druid_setup 79, golden 269, graphql 22, pipeline 129 + 1 skipped, privilege_escalation 122, toolchain 12, web 95);
   - CPython 3.8.20 (`/tmp/wp2g-be3-py38`, the web image's version): `python -m pytest tests/privilege_escalation` 122 passed; `py_compile` of the three changed Python files passes.
 - 2026-10-05 backend-0j round 2 unit 1 (reviewer finding 1): two higher targets pin the `all` in `_holds_acl` and the resource id: the caller holds `dashboard_viewer` on the target's `dashboard_admin` dashboard, and `dashboard_admin` on another dashboard. Check: `test_rename_and_reset.py` 44 passed; mutants `all` to `any` and resource id ignored pass the round-1 file (36 passed each) and fail 4 tests each on the new one (`/tmp/wp0j-r2/mutate.py`); ruff clean.
+- 2026-10-05 backend-0j round 2 unit 2 (reviewer finding 2, QA low): `test_a_rename_is_judged_on_the_user_before_the_request`, for a target in a group carrying `admin` and one carrying `exporter`, renames while dropping that group and changing `lastName`: 403, username, last name, roles, groups and ACLs unchanged, one refusal line. Every higher-target rename case now also changes `lastName` and asserts the same five unchanged. Check: 46 passed; the mutant that judges the body's groups passes the round-1 file (36 passed) and fails both new cases; ruff clean.
 
 ## Interrogate (unit 6)
 
@@ -166,6 +167,8 @@ The three-model panel did not run (concurrent subagent limit). The reviewer prom
   | no exact cover for ACLs | 1 failed (`acl_the_caller_holds_too`) |
   | any need of an ACL covers it (`all` to `any`) | round 1 tests: 36 passed; round 2: 4 failed (`dashboard_acl_the_caller_only_views`, rename and the three reset callers) |
   | resource id ignored (an ACL on one dashboard covers another) | round 1 tests: 36 passed; round 2: 4 failed (`dashboard_acl_on_another_dashboard`) |
+  | rename judged on the request body (groups resolved from the body, then the guard) | round 1 tests: 36 passed; round 2: 2 failed (`a_rename_is_judged_on_the_user_before_the_request[admin]`, `[exporter]`) |
+  | rename judged on the written user (guard after the writes) | round 1 tests: 8 failed; round 2: 11 failed |
 
 ## Verdicts
 

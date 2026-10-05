@@ -175,6 +175,17 @@ def _rename(db, caller, user_id: int, username: str):
     )
 
 
+def _holdings(db, user_id: int) -> tuple:
+    user = _user(db, user_id)
+    return (
+        user.username,
+        user.last_name,
+        sorted(role.id for role in user.roles),
+        sorted(group.id for group in user.groups),
+        sorted((acl.resource_role_id, acl.resource_id) for acl in user.acls),
+    )
+
+
 def _reset(caller, user_id: int):
     return caller.request('POST', f'/api2/user/{user_id}/reset_password')
 
@@ -267,18 +278,42 @@ def test_user_editor_cannot_rename_a_user_holding_more(
 ):
     actor = make_user(_USER_EDITOR)
     target = make_target(db, make_user, actor)
-    groups = [group.id for group in _user(db, target.id).groups]
+    before = _holdings(db, target.id)
+    body = _resent_body(db, target.id, _attacker_address())
+    body['lastName'] = 'Renamed'
 
-    response = _rename(db, actor, target.id, _attacker_address())
+    response = actor.request('PATCH', f'/api2/user/{target.id}', body)
 
     assert response.status_code == 403
-    assert _user(db, target.id).username == target.username
-    assert [group.id for group in _user(db, target.id).groups] == groups
+    assert _holdings(db, target.id) == before
     assert mailer == []
     assert len(refusals()) == 1
     # The body names nothing the caller might not be able to list.
     body = response.get_data(as_text=True)
     assert 'admin' not in body and '/api2/' not in body
+
+
+@pytest.mark.parametrize('role_name', ['admin', 'exporter'])
+def test_a_rename_is_judged_on_the_user_before_the_request(
+    db, make_user, refusals, role_name
+):
+    '''Dropping, in the same body, the group that makes the target hold more
+    does not make it lesser: the caller must remove the group first, then
+    rename.
+    '''
+    actor = make_user(_USER_EDITOR)
+    target = make_user()
+    _make_group(db, roles=[role_name], users=[target])
+    before = _holdings(db, target.id)
+    body = _resent_body(db, target.id, _attacker_address())
+    body['groups'] = []
+    body['lastName'] = 'Renamed'
+
+    response = actor.request('PATCH', f'/api2/user/{target.id}', body)
+
+    assert response.status_code == 403
+    assert _holdings(db, target.id) == before
+    assert len(refusals()) == 1
 
 
 @pytest.mark.parametrize(

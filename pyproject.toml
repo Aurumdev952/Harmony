@@ -282,7 +282,7 @@ ignore_missing_imports = true
 [tool.importlinter]
 # The legacy packages are in the graph so an import that reaches a web framework
 # through them breaks the contract too.
-root_packages = ["harmony.core", "config", "data", "db", "log", "models", "util", "web"]
+root_packages = ["harmony", "config", "data", "db", "log", "models", "util", "web"]
 include_external_packages = true
 
 [[tool.importlinter.contracts]]

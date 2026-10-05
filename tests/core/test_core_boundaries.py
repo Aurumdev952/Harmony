@@ -39,11 +39,13 @@ def test_core_imports_no_web_framework():
 
 
 def _core_with(tmp_path: Path, source: str) -> Path:
-    core = tmp_path / 'harmony' / 'core'
+    '''A copy of the whole harmony tree whose core gains `leak.py`.'''
     shutil.copytree(
-        REPO / 'harmony' / 'core', core, ignore=shutil.ignore_patterns('__pycache__')
+        REPO / 'harmony',
+        tmp_path / 'harmony',
+        ignore=shutil.ignore_patterns('__pycache__'),
     )
-    (core / 'leak.py').write_text(f'{source}\n')
+    (tmp_path / 'harmony' / 'core' / 'leak.py').write_text(f'{source}\n')
     return tmp_path
 
 
@@ -73,3 +75,17 @@ def test_contract_breaks_on_an_import_through_legacy_code(tmp_path):
 
     assert returncode != 0, output
     assert 'harmony.core.leak -> web.server.app_base' in output
+
+
+def test_contract_breaks_on_an_import_through_a_sibling_harmony_package(tmp_path):
+    # harmony.api (phase 5) imports fastapi; core must not reach it either.
+    root = _core_with(tmp_path, 'from harmony.api import router')
+    api = root / 'harmony' / 'api'
+    api.mkdir()
+    (api / '__init__.py').write_text('')
+    (api / 'router.py').write_text('import fastapi\n')
+
+    returncode, output = _lint_imports(root)
+
+    assert returncode != 0, output
+    assert 'harmony.core.leak -> harmony.api.router' in output

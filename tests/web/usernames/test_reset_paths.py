@@ -149,3 +149,12 @@ def test_the_api_reset_activates_a_pending_account_and_keeps_its_names(app):
     after = _row(app, 4)
     assert after.status_id == UserStatusEnum.ACTIVE.value
     assert after.password != before.password
+
+
+@pytest.mark.parametrize(
+    'path', ['/user/confirm-email/any-token', '/user/resend-confirm-email']
+)
+def test_flask_user_confirm_views_are_not_registered(app, path):
+    '''Production turns off `USER_ENABLE_CONFIRM_EMAIL`, so no other flask-user
+    view turns a token into an account.'''
+    assert app.test_client().get(path).status_code == 404

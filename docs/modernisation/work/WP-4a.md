@@ -146,6 +146,7 @@ None. C-1 (`AppContext`) arrives in WP-4f and will hold `Settings` and `Deployme
   - check: both mutations fail as intended. Removing the venv but keeping the stages fails with `dead PyPy wheel stages: ['pypy-wheels', 'rust']`. Removing `AS pypy-wheels` but keeping the venv fails with `{'rust'} == {'pypy-wheels', 'rust'}`.
   - check: `tests/infra` 167 passed on the 3.13 tools lane; ruff check and format clean.
   - check: `docker build --check` shows the same 6 LegacyKeyValueFormat warnings as the base. They come from existing `ENV key value` lines and are out of scope.
+- 2026-10-05 core-4a: fast-forwarded to infra's `599665e` (infra-2 branch, memory commit kept). `task_gate.py WP-4a` reports only the status and the qa and reviewer verdicts. check: infra lane 167; 8 CI suites passed (core 104, druid 1, druid_setup 79, golden 269, graphql 22, pipeline 129 + 1 skipped, toolchain 12, web 95); `record.py --check` 0 drift; mypy clean (520); `lint-imports` 1 kept; `uv lock --check` clean; py38 syntax guard 857 files, 0 problems. No code under review changed since `2c78806`; only the pipeline Dockerfile comment, the infra test and docs did.
 
 ### Recorded differences (INV-1, for reviewer acceptance)
 

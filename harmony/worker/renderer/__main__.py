@@ -3,6 +3,7 @@
 import json
 import logging
 import os
+from urllib.parse import urlsplit
 
 from harmony.worker.renderer.egress import parse_origins
 from harmony.worker.renderer.server import RendererSettings, build_server
@@ -22,8 +23,16 @@ def settings_from_env() -> RendererSettings:
             json.dumps({'event': 'no_egress_proxy', 'map_origins': list(map_origins)})
         )
         map_origins = ()
+    allowed_origin = os.environ.get('RENDERER_ALLOWED_ORIGIN', 'http://web:5000')
+    dashboard_host = urlsplit(allowed_origin).hostname
+    for map_origin in map_origins:
+        if urlsplit(map_origin).hostname == dashboard_host:
+            # The render token's cookie is scoped to the dashboard's host, not
+            # its port, so Chromium would send it here; over https the egress
+            # proxy cannot strip it from inside the tunnel.
+            raise ValueError(f'map origin {map_origin} is on the dashboard host')
     return RendererSettings(
-        allowed_origin=os.environ.get('RENDERER_ALLOWED_ORIGIN', 'http://web:5000'),
+        allowed_origin=allowed_origin,
         port=int(os.environ.get('RENDERER_PORT', '8080')),
         max_timeout_seconds=float(
             os.environ.get('RENDERER_MAX_TIMEOUT_SECONDS', '120')

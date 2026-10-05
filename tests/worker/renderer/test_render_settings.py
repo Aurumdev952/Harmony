@@ -8,6 +8,7 @@ from harmony.worker.renderer.__main__ import settings_from_env
 @pytest.fixture(autouse=True)
 def fixture_clean_env(monkeypatch):
     for name in (
+        'RENDERER_ALLOWED_ORIGIN',
         'RENDERER_EGRESS_PROXY',
         'RENDERER_MAP_ORIGINS',
         'RENDERER_BLOCKED_GRACE_SECONDS',
@@ -52,4 +53,19 @@ def test_a_map_origin_that_is_not_a_bare_origin_stops_the_service(monkeypatch):
     monkeypatch.setenv('RENDERER_MAP_ORIGINS', 'https://api.mapbox.com/styles')
 
     with pytest.raises(ValueError):
+        settings_from_env()
+
+
+@pytest.mark.parametrize(
+    'map_origin', ['http://web:8000', 'https://web', 'https://WEB:5443']
+)
+def test_a_map_origin_on_the_dashboards_host_stops_the_service(monkeypatch, map_origin):
+    # Cookies are scoped to a host, not a port, so Chromium sends the render
+    # token to any origin on the dashboard's host. Over https the proxy cannot
+    # strip it from inside the tunnel.
+    monkeypatch.setenv('RENDERER_EGRESS_PROXY', 'http://render-egress:3128')
+    monkeypatch.setenv('RENDERER_ALLOWED_ORIGIN', 'http://web:5000')
+    monkeypatch.setenv('RENDERER_MAP_ORIGINS', f'https://api.mapbox.com,{map_origin}')
+
+    with pytest.raises(ValueError, match='dashboard'):
         settings_from_env()

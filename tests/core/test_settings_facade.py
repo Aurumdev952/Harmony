@@ -29,9 +29,10 @@ ATTRIBUTES = (
     'REDIS_HOST',
     'HASURA_HOST',
     'DRUID_HOST',
-    'RENDERBOT_EMAIL',
-    'URLBOX_API_KEY',
 )
+# WP-1h deletes these from config.settings; they are outside the facade's
+# contract, so the comparison ignores them on both sides.
+URLBOX_ERA = ('RENDERBOT_EMAIL', 'URLBOX_API_KEY')
 SETTINGS = (
     'DEFAULT_SECRET_KEY',
     'DRUID_HOST',
@@ -116,7 +117,13 @@ def _run(kind: str, environment: dict[str, str]) -> dict:
         check=False,
     )
     assert proc.returncode == 0, proc.stderr
-    return json.loads(proc.stdout.strip().splitlines()[-1])
+    result = json.loads(proc.stdout.strip().splitlines()[-1])
+    result['warnings'] = [
+        warning
+        for warning in result['warnings']
+        if not any(name in warning[1] for name in URLBOX_ERA)
+    ]
+    return result
 
 
 REQUIRED = {'DEFAULT_SECRET_KEY': KEY, 'DRUID_HOST': 'http://druid.invalid'}

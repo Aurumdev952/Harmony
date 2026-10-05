@@ -11,7 +11,12 @@ from typing import Callable
 
 import pytest
 
-from harmony.worker.renderer.errors import OutputTooLarge, PageFailed, RenderTimeout
+from harmony.worker.renderer.errors import (
+    EgressBlocked,
+    OutputTooLarge,
+    PageFailed,
+    RenderTimeout,
+)
 from harmony.worker.renderer.server import RendererSettings, RenderOutput, build_server
 from harmony.worker.renderer.spec import RenderSpec
 
@@ -129,6 +134,7 @@ def test_render_is_logged_as_one_json_line_without_the_token(caplog):
         (RenderTimeout('deadline passed'), 504, 'render_timeout'),
         (PageFailed('dashboard page answered 500'), 502, 'page_failed'),
         (OutputTooLarge('30000000 bytes'), 502, 'output_too_large'),
+        (EgressBlocked('the page needed styles.invalid'), 502, 'egress_blocked'),
     ],
 )
 def test_render_failures_map_to_statuses(error, status, code):

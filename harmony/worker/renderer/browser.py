@@ -6,13 +6,20 @@ cache or storage outlives one user's render.
 The page runs with the user's token and loads content the renderer does not
 control, so it is fenced three times (threat model in
 docs/modernisation/work/WP-1h.md):
-- a request route aborts every HTTP request, navigation and redirect hop off the
-  allowed origin, and every WebSocket is refused;
+- a request route aborts every request off the allowed origin, except fetches
+  (never navigations) from the configured map origins, and every WebSocket is
+  refused. Playwright does not route redirect hops; the next two layers hold
+  those;
 - Chromium may only connect directly to the allowed scheme, host and port; every
-  other connection, preconnects and WebRTC included, goes to a proxy that does
+  other connection, preconnects and WebRTC included, goes to the egress proxy,
+  which relays only to the map origins, or, without one, to a proxy that does
   not exist;
-- the Compose network has no route out.
+- the Compose network has no route out except through the egress proxy.
 Chromium keeps its sandbox.
+
+A dashboard whose map needs a host it cannot reach would wait out the whole
+deadline, so once the page needed something it could not get, it has
+`blocked_grace_seconds` left to signal ready.
 '''
 
 import asyncio
@@ -28,15 +35,21 @@ from playwright.async_api import (
 )
 
 from harmony.worker.renderer.egress import is_allowed, origin_of
-from harmony.worker.renderer.errors import OutputTooLarge, PageFailed, RenderTimeout
+from harmony.worker.renderer.errors import (
+    EgressBlocked,
+    OutputTooLarge,
+    PageFailed,
+    RenderTimeout,
+)
 from harmony.worker.renderer.server import RendererSettings, RenderOutput
 from harmony.worker.renderer.spec import RenderSpec
 
 # The screenshot app adds this element once every tile has loaded.
 READY_SELECTOR = '#dashboard-load-success'
 
-# Every connection Chromium does not make directly to the allowed origin goes
-# here. `.invalid` never resolves, so those connections fail.
+# Without an egress proxy, every connection Chromium does not make directly to
+# the allowed origin goes here. `.invalid` never resolves, so those connections
+# fail.
 BLACKHOLE_PROXY = 'http://egress-blocked.invalid:3128'
 CHROMIUM_ARGS = [
     # WebRTC would otherwise send UDP around the proxy.
@@ -44,6 +57,8 @@ CHROMIUM_ARGS = [
     '--dns-prefetch-disable',
 ]
 NET_ERROR = re.compile(r'net::ERR_[A-Z_]+')
+# The page cancelled the request itself (a replaced image, a superseded fetch).
+CANCELLED = 'net::ERR_ABORTED'
 
 # Carried over from the urlbox PDF options: charts whose SVG overflows its box
 # would otherwise be clipped in print.
@@ -93,37 +108,89 @@ def _is_requested_page(current: str, requested: str, origin: str) -> bool:
     )
 
 
-def _proxy(origin: str) -> ProxySettings:
-    scheme, host, port = origin_of(origin)  # type: ignore[misc]
+def _proxy(settings: RendererSettings) -> ProxySettings:
+    scheme, host, port = origin_of(settings.allowed_origin)  # type: ignore[misc]
     bracketed = f'[{host}]' if ':' in host else host
     # Chromium applies the last matching rule. `<-loopback>` first sends loopback
     # addresses through the proxy too; the origin rule after it still wins for
     # the origin itself, even when that is a loopback address.
     return {
-        'server': BLACKHOLE_PROXY,
+        'server': settings.egress_proxy or BLACKHOLE_PROXY,
         'bypass': f'<-loopback>,{scheme}://{bracketed}:{port}',
     }
 
 
+def _is_map_url(url: str, settings: RendererSettings) -> bool:
+    origin = origin_of(url)
+    return origin is not None and origin in {origin_of(m) for m in settings.map_origins}
+
+
+async def _wait_until_ready(page, egress_failed: asyncio.Event, needed, grace) -> None:
+    '''Waits for the ready signal. Once the page needed something it could not
+    get, it has `grace` seconds left, then the render fails.
+    '''
+    ready = asyncio.ensure_future(
+        page.wait_for_selector(READY_SELECTOR, state='attached')
+    )
+    failed = asyncio.ensure_future(egress_failed.wait())
+    try:
+        await asyncio.wait({ready, failed}, return_when=asyncio.FIRST_COMPLETED)
+        if not ready.done():
+            # The page may still finish without what it was refused.
+            await asyncio.wait({ready}, timeout=grace)
+        if not ready.done():
+            raise EgressBlocked(f'the page needed {", ".join(sorted(needed))}')
+        ready.result()
+    finally:
+        for task in (ready, failed):
+            task.cancel()
+
+
 async def _render(spec: RenderSpec, settings: RendererSettings, blocked: set[str]):
     origin = settings.allowed_origin
+    needed: set[str] = set()
+    egress_failed = asyncio.Event()
+
+    def refused(host: str) -> None:
+        if host not in settings.ignored_blocked_hosts:
+            needed.add(host)
+            egress_failed.set()
 
     async def guard(route: Route) -> None:
-        url = route.request.url
-        if is_allowed(url, origin):
+        request = route.request
+        if is_allowed(
+            request.url,
+            origin,
+            settings.map_origins,
+            is_navigation=request.is_navigation_request(),
+        ):
             await route.continue_()
         else:
-            blocked.add(_host(url))
+            blocked.add(_host(request.url))
+            refused(_host(request.url))
             await route.abort('blockedbyclient')
 
     async def refuse_web_socket(web_socket: WebSocketRoute) -> None:
         # Never connected to a server: the page's socket just closes.
         blocked.add(_host(web_socket.url))
+        refused(_host(web_socket.url))
         await web_socket.close()
+
+    def map_request_failed(request) -> None:
+        # The egress proxy refused or could not reach a map origin.
+        if _is_map_url(request.url, settings) and request.failure != CANCELLED:
+            refused(_host(request.url))
+
+    def map_response(response) -> None:
+        # A map style or tile that answers with an error never loads; a 404 is a
+        # tile outside the map's coverage, which the map draws without.
+        if _is_map_url(response.url, settings) and response.status >= 400:
+            if response.status != 404:
+                refused(_host(response.url))
 
     async with async_playwright() as playwright:
         browser = await playwright.chromium.launch(
-            chromium_sandbox=True, args=CHROMIUM_ARGS, proxy=_proxy(origin)
+            chromium_sandbox=True, args=CHROMIUM_ARGS, proxy=_proxy(settings)
         )
         try:
             context = await browser.new_context(
@@ -152,6 +219,8 @@ async def _render(spec: RenderSpec, settings: RendererSettings, blocked: set[str
             if spec.format == 'pdf':
                 await context.add_init_script(PDF_INIT_SCRIPT)
             page = await context.new_page()
+            page.on('requestfailed', map_request_failed)
+            page.on('response', map_response)
             try:
                 response = await page.goto(spec.url, wait_until='domcontentloaded')
             except PlaywrightError as error:
@@ -165,7 +234,9 @@ async def _render(spec: RenderSpec, settings: RendererSettings, blocked: set[str
                 # Usually the token was refused and the app sent the browser to
                 # log in. A redirect off the origin was aborted before this.
                 raise PageFailed('dashboard page redirected elsewhere')
-            await page.wait_for_selector(READY_SELECTOR, state='attached')
+            await _wait_until_ready(
+                page, egress_failed, needed, settings.blocked_grace_seconds
+            )
             if not _is_requested_page(page.url, spec.url, origin):
                 raise PageFailed('dashboard page navigated elsewhere')
             return await _capture(page, spec, settings)

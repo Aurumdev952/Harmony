@@ -5,6 +5,7 @@ evidence for the command); elsewhere it is skipped. Nothing leaves the container
 the origins are local servers and every other destination is `.invalid`.
 """
 
+import socket
 import struct
 import threading
 import time
@@ -20,7 +21,13 @@ pytest.importorskip('playwright')
 # pylint: disable=wrong-import-position
 from harmony.worker.renderer import browser
 from harmony.worker.renderer.browser import render
-from harmony.worker.renderer.errors import OutputTooLarge, PageFailed, RenderTimeout
+from harmony.worker.renderer.egress_proxy import EgressProxySettings, build_proxy
+from harmony.worker.renderer.errors import (
+    EgressBlocked,
+    OutputTooLarge,
+    PageFailed,
+    RenderTimeout,
+)
 from harmony.worker.renderer.server import RendererSettings
 from harmony.worker.renderer.spec import RenderSpec, Viewport
 
@@ -65,6 +72,26 @@ PAGES = {
         "window.location.href = '{other}/dashboard/navigate-away';"
         f"setTimeout(() => {{ {SIGNAL_READY} }}, 1000);",
     ),
+    # Map styles and tiles come from a map origin, through the egress proxy.
+    '/dashboard/map': _page(
+        '<img src="{map}/tiles/0/0/0.png">',
+        f"fetch('{{map}}/styles/light.json').then((r) => {{ if (r.ok) {{ {SIGNAL_READY} }} }});",
+    ),
+    '/dashboard/map-off-the-list': _page(
+        '',
+        "fetch('http://styles.invalid/light.json')"
+        f".then(() => {{ {SIGNAL_READY} }}).catch(() => {{}});",
+    ),
+    '/dashboard/map-with-telemetry': _page(
+        '',
+        "fetch('http://events.mapbox.com/events/v2').catch(() => {});"
+        f'setTimeout(() => {{ {SIGNAL_READY} }}, 2500);',
+    ),
+    '/dashboard/navigate-to-map': _page(
+        '',
+        "window.location.href = '{map}/dashboard/navigate-to-map';"
+        f'setTimeout(() => {{ {SIGNAL_READY} }}, 1000);',
+    ),
     '/dashboard/storage': _page(
         '',
         "fetch('/seen?value=' + (localStorage.getItem('seen') || 'none'))"
@@ -90,6 +117,7 @@ class Origin:
     def __init__(self) -> None:
         self.requests: list[dict] = []
         self.other_port = 0
+        self.map = 'http://map.invalid'
         self.chromium_flags: list[set[str]] = []
         self.connections = 0
 
@@ -128,6 +156,7 @@ class Origin:
                             f'http://127.0.0.1:{origin.other_port}'.encode(),
                         )
                         .replace(b'{other_port}', str(origin.other_port).encode())
+                        .replace(b'{map}', origin.map.encode())
                     )
                     self._send(200, body)
                 else:
@@ -136,6 +165,8 @@ class Origin:
             def _send(self, status: int, body: bytes) -> None:
                 self.send_response(status)
                 self.send_header('Content-Type', 'text/html')
+                # As map servers do, so the page may read a cross-origin style.
+                self.send_header('Access-Control-Allow-Origin', '*')
                 self.send_header('Content-Length', str(len(body)))
                 self.end_headers()
                 self.wfile.write(body)
@@ -259,7 +290,7 @@ def test_the_proxy_fence_holds_even_if_the_request_guard_lets_everything_through
     origins, monkeypatch
 ):
     origin, _, other = origins
-    monkeypatch.setattr(browser, 'is_allowed', lambda url, allowed_origin: True)
+    monkeypatch.setattr(browser, 'is_allowed', lambda *args, **kwargs: True)
 
     render(_spec(origin, '/dashboard/egress'), _settings(origin))
 
@@ -383,3 +414,127 @@ def test_nothing_from_one_render_survives_into_the_next(origins):
     seen = [r for r in dashboard.requests if r['path'].startswith('/seen')]
     assert [r['path'] for r in seen] == ['/seen?value=none', '/seen?value=none']
     assert seen[1]['cookie'] == f'accessKey={OTHER_TOKEN}'
+
+
+# Maps: the page fetches styles and tiles from the configured map origins through
+# the egress proxy, without the cookie. The map origin here is a local server
+# named `localhost`, so it is another host than the dashboard's `127.0.0.1`.
+
+
+@contextmanager
+def _egress_proxy(*allowed: str) -> Iterator[str]:
+    server = build_proxy(EgressProxySettings(allowed_origins=allowed, port=0))
+    thread = threading.Thread(target=server.serve_forever, daemon=True)
+    thread.start()
+    try:
+        yield f'http://127.0.0.1:{server.server_address[1]}'
+    finally:
+        server.shutdown()
+        server.server_close()
+
+
+@pytest.fixture(name='mapped')
+def fixture_mapped(origins):
+    """The dashboard origin, a map origin, and an egress proxy that allows it."""
+    origin, dashboard, other = origins
+    maps = Origin()
+    with _serving(maps) as map_port:
+        dashboard.map = f'http://localhost:{map_port}'
+        with _egress_proxy(dashboard.map) as proxy:
+            settings = _settings(
+                origin,
+                map_origins=(dashboard.map,),
+                egress_proxy=proxy,
+                blocked_grace_seconds=1.0,
+            )
+            yield origin, settings, maps, other
+
+
+def test_a_map_loads_its_style_and_tiles_through_the_egress_proxy(mapped):
+    origin, settings, maps, _ = mapped
+
+    output = render(_spec(origin, '/dashboard/map'), settings)
+
+    assert _png_size(output.content) == (1280, 800)
+    assert sorted(r['path'] for r in maps.requests) == [
+        '/styles/light.json',
+        '/tiles/0/0/0.png',
+    ]
+    assert [r['cookie'] for r in maps.requests] == ['', '']
+
+
+def test_a_map_needing_a_host_off_the_list_fails_fast_not_at_the_deadline(mapped):
+    origin, settings, _, _ = mapped
+    started = time.monotonic()
+
+    with pytest.raises(EgressBlocked, match='styles.invalid'):
+        render(_spec(origin, '/dashboard/map-off-the-list'), settings)
+
+    assert time.monotonic() - started < 10
+
+
+def test_an_unreachable_map_origin_fails_fast(origins):
+    origin, dashboard, _ = origins
+    with socket.socket() as probe:
+        probe.bind(('127.0.0.1', 0))
+        closed_port = probe.getsockname()[1]
+    dashboard.map = f'http://localhost:{closed_port}'
+    started = time.monotonic()
+
+    with _egress_proxy(dashboard.map) as proxy, pytest.raises(EgressBlocked):
+        render(
+            _spec(origin, '/dashboard/map'),
+            _settings(
+                origin,
+                map_origins=(dashboard.map,),
+                egress_proxy=proxy,
+                blocked_grace_seconds=1.0,
+            ),
+        )
+
+    assert time.monotonic() - started < 10
+
+
+def test_without_an_egress_proxy_a_map_fails_fast(origins):
+    origin, dashboard, _ = origins
+    dashboard.map = 'http://localhost:9'
+    started = time.monotonic()
+
+    with pytest.raises(EgressBlocked):
+        render(
+            _spec(origin, '/dashboard/map'),
+            _settings(origin, blocked_grace_seconds=1.0),
+        )
+
+    assert time.monotonic() - started < 10
+
+
+def test_refused_telemetry_does_not_fail_a_page_that_loads(mapped):
+    origin, settings, _, _ = mapped
+
+    output = render(_spec(origin, '/dashboard/map-with-telemetry'), settings)
+
+    assert 'events.mapbox.com' in output.blocked_hosts
+
+
+def test_the_page_cannot_navigate_to_a_map_origin(mapped):
+    origin, settings, maps, _ = mapped
+
+    try:
+        render(_spec(origin, '/dashboard/navigate-to-map'), settings)
+    except PageFailed:
+        pass
+
+    assert maps.requests == []
+
+
+def test_the_egress_proxy_holds_even_if_the_request_guard_lets_everything_through(
+    mapped, monkeypatch
+):
+    origin, settings, _, other = mapped
+    monkeypatch.setattr(browser, 'is_allowed', lambda *args, **kwargs: True)
+
+    render(_spec(origin, '/dashboard/egress'), settings)
+
+    assert other.requests == []
+    assert other.connections == 0

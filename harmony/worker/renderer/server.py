@@ -11,7 +11,7 @@ import threading
 import time
 from dataclasses import dataclass
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
-from typing import Any, Callable
+from typing import Any, Callable, Optional
 
 from harmony.worker.renderer.errors import OutputTooLarge, RenderError
 from harmony.worker.renderer.spec import RenderSpec, parse_render_request
@@ -30,6 +30,17 @@ class RendererSettings:
     max_bytes: int
     concurrency: int
     max_page_height: int
+    # Map style and tile origins the page may fetch (never navigate to), only
+    # through `egress_proxy`. Without a proxy nothing but the dashboard origin
+    # is reachable.
+    map_origins: tuple[str, ...] = ()
+    egress_proxy: Optional[str] = None
+    # Once the page needed something it could not get, how long it still has
+    # to signal ready before the render fails instead of waiting out its
+    # deadline. Refusing a host listed in `ignored_blocked_hosts` (telemetry)
+    # does not start this.
+    blocked_grace_seconds: float = 10.0
+    ignored_blocked_hosts: tuple[str, ...] = ('events.mapbox.com',)
 
 
 @dataclass(frozen=True)

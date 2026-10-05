@@ -25,3 +25,10 @@ class PageFailed(RenderError):
 class OutputTooLarge(RenderError):
     status = 502
     code = 'output_too_large'
+
+
+class EgressBlocked(RenderError):
+    '''The page needed a host it may not reach and did not signal ready.'''
+
+    status = 502
+    code = 'egress_blocked'

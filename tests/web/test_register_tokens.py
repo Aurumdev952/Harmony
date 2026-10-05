@@ -39,6 +39,7 @@ def fixture_app():
         SQLALCHEMY_DATABASE_URI='sqlite://',
         SQLALCHEMY_TRACK_MODIFICATIONS=False,
         JWT_SECRET_KEY='tests-web-placeholder-key',
+        JWT_ACCESS_COOKIE_NAME='accessKey',
         JWT_TOKEN_WEB_COOKIE_EXPIRATION=timedelta(hours=1),
     )
     db = create_db()

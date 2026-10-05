@@ -1,5 +1,5 @@
-'''Entry point for business logic dealing with alerts.
-'''
+'''Entry point for business logic dealing with alerts.'''
+
 from datetime import datetime, timedelta
 from typing import Dict, List, NamedTuple, Optional
 
@@ -195,7 +195,7 @@ def get_interval_bounds(latest_date: AlertLatestDate, time_granularity) -> str:
     }
 
     if time_granularity not in get_time_bound_map:
-        assert False, f'Time granularity: {time_granularity} is not supported'
+        raise ValueError(f'Time granularity: {time_granularity} is not supported')
     return get_time_bound_map[time_granularity](latest_date)
 
 

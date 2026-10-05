@@ -1,1 +1,1 @@
-- [Test and filter traps](test-and-filter-traps.md) — run tests/pipeline via run.sh; SelectorFilter rejects None (use RawFilter); lint baselines
+- [Test and filter traps](test-and-filter-traps.md) — run tests/pipeline via run.sh from /tmp; SelectorFilter rejects None (use RawFilter); lint

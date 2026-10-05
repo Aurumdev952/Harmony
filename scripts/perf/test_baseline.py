@@ -569,3 +569,18 @@ def test_the_report_says_whether_the_reference_is_the_wps_base():
     text = '\n'.join(baseline.method_lines(meta))
     assert f'not the merge base with mig/integration (`{"c" * 40}`)' in text
 
+
+
+def test_the_reference_web_has_its_own_redis():
+    # Decision 0011: from WP-1b the result cache lives in Redis, so a shared
+    # Redis would let one side answer from bytes the other side cached.
+    import yaml
+
+    compose = yaml.safe_load((baseline.HERE / 'stack/web.yaml').read_text())
+    services = compose['services']
+    candidate_redis = services['web']['environment']['REDIS_HOST']
+    reference_redis = services['web-reference']['environment']['REDIS_HOST']
+    assert candidate_redis == 'redis'
+    assert reference_redis != candidate_redis
+    assert services[reference_redis]['profiles'] == ['reference']
+    assert reference_redis in services['web-reference']['depends_on']

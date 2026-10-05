@@ -206,7 +206,7 @@ ui_answers() {
 # later, and nothing on the host shows when, so starting is retried. A failed
 # start leaves a container without its port, so every try recreates them.
 start_reference() {
-  web_compose --profile reference up -d --no-deps --force-recreate web-reference ui-reference &&
+  web_compose --profile reference up -d --no-deps --force-recreate redis-reference web-reference ui-reference &&
     [[ -n "$(web_compose --profile reference port web-reference 5000)" ]] &&
     [[ -n "$(web_compose --profile reference port ui-reference 8080)" ]]
 }
@@ -371,8 +371,8 @@ client_unchanged_since() {
     [[ -z "$(git -C "${ROOT}" ls-files --others --exclude-standard -- "${excludes[@]}")" ]]
 }
 
-# Start <git ref> beside this checkout, against the same Druid, Postgres and
-# Redis, for baseline.py's paired mode: web-reference on PERF_REFERENCE_WEB_PORT
+# Start <git ref> beside this checkout, against the same Druid and Postgres
+# and its own Redis, for baseline.py's paired mode: web-reference on PERF_REFERENCE_WEB_PORT
 # and ui-reference on PERF_REFERENCE_UI_PORT. The migrations are this
 # checkout's (web-init), so a reference must run on the schema they leave.
 # The default is the WP's base on mig/integration (decision 0011), never main:
@@ -386,7 +386,7 @@ reference() {
   sha="$(git -C "${ROOT}" rev-parse --verify "${ref}^{commit}")"
   load_secrets
   use_built_image
-  web_compose --profile reference rm -fs web-reference ui-reference
+  web_compose --profile reference rm -fs redis-reference web-reference ui-reference
   rm -rf "${PERF_REFERENCE_DIR}"
   mkdir -p "${src}"
   git -C "${ROOT}" archive --format=tar "${sha}" | tar -x -C "${src}"

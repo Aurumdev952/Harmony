@@ -13,8 +13,10 @@
 # - no mail sink: nothing in the baseline sends mail.
 # - a `ui` nginx in front of web for the browser measurements.
 # - with the `reference` profile, a second copy of web and ui running another
-#   commit (stack.sh reference) on the same database, Redis and Druid, for
-#   baseline.py's paired runs.
+#   commit (stack.sh reference) on the same database and Druid, for
+#   baseline.py's paired runs. The reference has its own Redis: from WP-1b the
+#   result cache lives there, and a shared one would let either side answer
+#   from bytes the other cached (decision 0011).
 name: ${PERF_PROJECT:?run scripts/perf/stack.sh}-web
 
 x-web-env: &web-env
@@ -69,10 +71,14 @@ services:
     tmpfs:
       - /var/lib/postgresql/data
 
-  redis:
+  redis: &redis
     image: redis:7-alpine@sha256:520775a41a63e77e06c73e35d2fd9cc15921a609516818796b4ecbb813078bc7
     networks: [internal]
     command: redis-server ${PERF_REDIS_ARGS:-}
+
+  redis-reference:
+    <<: *redis
+    profiles: [reference]
 
   web-init:
     image: ${PERF_WEB_IMAGE:?}
@@ -147,10 +153,12 @@ services:
       - ${PERF_REFERENCE_DIR:?}/src:/zenysis:ro
     environment:
       <<: *web-env
+      REDIS_HOST: redis-reference
       ZEN_GUNICORN_WORKER_THREADS: "4"
     command: ["python", "web/gunicorn_server.py", "--timeout=600"]
     ports:
       - 127.0.0.1:${PERF_REFERENCE_WEB_PORT:?}:5000
+    depends_on: [redis-reference]
 
   ui-reference:
     image: nginx:1.27-alpine@sha256:65645c7bb6a0661892a8b03b89d0743208a18dd2f3f17a54ef4b76fb8e2f2a10

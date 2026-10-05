@@ -174,3 +174,25 @@ def test_flask_user_finds_accounts_of_every_status(app, request_ctx):
 
     assert app.user_manager.get_user_by_id(8).id == 8
     assert app.user_manager.get_user_by_id(4).id == 4
+
+
+def test_a_deactivated_account_is_refused_after_the_password_check(
+    app, request_ctx, monkeypatch
+):
+    '''Checking the status first answered in a few milliseconds instead of a
+    bcrypt verification's time, telling an attacker the account is
+    deactivated.'''
+    # pylint: disable=import-outside-toplevel
+    from web.server.routes.views.authentication import try_authenticate_user
+
+    checked = []
+    verify = app.user_manager.verify_password
+    monkeypatch.setattr(
+        app.user_manager,
+        'verify_password',
+        lambda password, user: checked.append(user.id) or verify(password, user),
+    )
+    _deactivate(app)
+
+    assert try_authenticate_user(JANE, PASSWORD) is None
+    assert checked == [8]

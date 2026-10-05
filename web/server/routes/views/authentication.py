@@ -116,12 +116,13 @@ def try_authenticate_user(username, password):
     user = user_manager.find_user_by_username(username)
 
     # Handle successful authentication. A deactivated account is refused like
-    # a wrong password, so the answer does not say which.
+    # a wrong password, and only after the password is checked, so neither the
+    # answer nor its timing says which.
     if (
         user
-        and user.is_active
         and user_manager.get_password(user)
         and user_manager.verify_password(password, user)
+        and user.is_active
     ):
         return user
 

@@ -1,7 +1,7 @@
 ---
 wp: "2g"
 title: "Structured logging"
-status: review
+status: ready
 owner_role: "infra"
 instances:
   - name: "infra-6"
@@ -27,8 +27,8 @@ instances:
       - "docs/modernisation/work/WP-2g-evidence/rework_hostile_paths_before.txt"
       - "docs/modernisation/work/WP-2g-evidence/rework_hostile_paths_after.txt"
       - "docs/modernisation/work/WP-2g.md"
-  # Resumed by infra-7 after the host reboot, and by infra-8 for the rework after
-  # review; same branch, same files.
+  # Resumed by infra-7 after the host reboot, by infra-8 for the rework after
+  # review, and by infra-9 for the close-out; same branch, same files.
   - name: "backend-1"
     files:
       - "web/gunicorn_server.py"
@@ -98,6 +98,7 @@ Units:
 5. Compose `LOG_FORMAT` for web, worker and pipeline (`text` in the dev overlay), the nginx `LOG_FORMAT`, and the browser-share JSON reader. Check: `docker compose config` diff shows only the logging variables, a throwaway nginx proxies to a stub and writes a JSON line carrying the upstream's id, and the browser-share tests pass.
 6. Requests for the backend and core wiring, then review.
 7. Rework after the reviewer's and QA's verdicts (2026-10-05), one commit each: redaction linear in hostile input, with timed tests in both formats; `mig/integration` merged and infra's files pass the CI gates; the redaction gaps (quoted values, header tuples, bare Basic, the chained chunk-size `ValueError`, cookies, `stack_info`); the worker's plain-text banner; stale text; deferrals routed as Requests. Check: the full CI gate set on the merged tree.
+8. Close-out after every verdict was `approved`: merge `mig/integration` (e31294c), then security's optional low items where each is cheap: the session cookie as a quoted dict, JSON or tuple key, and a `LOG_LEVEL` docstring sentence on DEBUG. Check: tests first, the CI gates, and `task_gate.py WP-2g`.
 
 ## Contract changes
 
@@ -120,6 +121,8 @@ Follow-ups from core's Alembic work (core-1 observations). None blocks WP-2g:
 - [ ] infra, route to WP-5a (nginx side): nginx chooses the request id, with `proxy_set_header X-Request-ID $request_id`, so a client cannot pick it. Interim decision (2026-10-05): the app keeps a well-formed client `X-Request-ID` (1 to 128 of `A-Za-z0-9._:-`) and replaces a malformed one. The id only correlates log lines; it grants nothing and authorises nothing. A client that reuses an id can only make its own lines share it, which can confuse a log search. That is accepted until nginx sets the id.
 - [ ] infra, route to WP-3b: replace the three copies of the `log_json` shell function (`docker/entrypoint_web.sh`, `docker/web/scripts/initialize_new_container.sh`, `docker/web/scripts/run_web_gunicorn.sh`) with one sourced file. The scripts land in two image directories (`/zenysis/docker/` and `/zenysis/`), so the shared file needs its own `COPY` in the web image, which WP-3b rewrites. Until then `tests/infra/test_web_scripts_log_json.py` checks every copy. Proof: one definition in the tree, and the web image's startup lines still parse with `jq`.
 - [ ] backend (pre-existing, does not block WP-2g): `web/server/routes/views/authentication.py:61` logs `request.full_path` on the "Unauthenticated user ... attempted to access" line, so any query string a signed-out visitor sends lands in the log. The redaction pass catches named secrets only. Log `request.path` instead. Proof: a test request to a protected page with `?anything=s3cr3t` logs the path without `s3cr3t`.
+- [ ] infra, route to WP-5a (security low, optional): the `text` format does not escape newlines in messages, so a client-controlled value can start what looks like a new line. Production and the Compose services use `json`, which escapes them; `text` is the format for people in development, where tracebacks need their line breaks. If it is wanted, escape newlines in the message part of text lines only, with a test that a forged line stays on the record's own line.
+- [ ] backend, route to WP-1h (security, pre-existing medium): `web/server/routes/views/page_renderer.py:143-148` logs `res.url`, which carries the urlbox API key, when urlbox returns an error. WP-1h deletes the urlbox client, so the line goes with it.
 
 ## Log
 
@@ -152,6 +155,8 @@ Follow-ups from core's Alembic work (core-1 observations). None blocks WP-2g:
 - 2026-10-05 infra-8 unit 7f (reviewer round 2): the URL pattern starts at the literal `://` and the JWT pattern at the payload's `.eyJ`, instead of a lookbehind that a digit, dot, plus, minus or underscore at the start of the run defeated (`1redis://:pw@h`, `id=3-redis://:pw@h`, `.postgres://u:pw@h`, `id-eyJ...`, `id_eyJ...` leaked; fc45dc8 redacted the URLs). Neither literal can recur inside the span it scans, so both stay linear. `Invalid chunk terminator[^:\n]*` became `{0,32}` (gunicorn's text between the two is 14 characters). Tests first, seen failing (21): the five inputs in `_SECRETS` (through `redact` and both formatters) and a 64 KB `chunk terminators` case in `_HOSTILE` (both formats, both timing tests). Check: `tests/infra/test_log_format.py` 215 passed in 0.25 s; a probe of every pattern against 37 repeated units at 64 KB: slowest 8 ms. The `log_json` deduplication is now a Request to WP-3b.
 - 2026-10-05 infra-8 unit 7g (reviewer round 3, optional nit): a JWT right after a dot (`x.<jwt>`) kept its signature, because the match started at the header. The JWT pattern takes an optional third segment. Test first, seen failing (3): `x.<jwt>` in `_SECRETS`, asserting the signature is gone, through `redact` and both formatters. Check: `tests/infra` 409 passed on 3.13; the log-format and gunicorn tests 237 passed on 3.8; the 64 KB probe of every pattern, slowest 11 ms; lint and mypy gates clean.
 - 2026-10-05 infra-8 unit 7h (QA round 2, doc items): Deferrals record the worker's one plain shutdown line with `jq -R 'fromjson?'` as the substitute, and the phase command as `docker compose logs --no-log-prefix web | jq`; a backend Request covers the query string on the unauthenticated-access line in `authentication.py:61`. The session cookie pattern loses its dead `accessKey`, `remember_token` and `csrf_access_token` alternatives, which the key pattern already redacts; the last two are now `_SECRETS` cases, so a test fails if that stops being true. Check: `tests/infra` 415 passed on 3.13, `test_log_format.py` 224 passed on 3.8; lint and mypy gates clean.
+- 2026-10-05 infra-9: merged `mig/integration` (e31294c: the 3.8 syntax guard, ruff targeting py38, the lead role in the gate tooling, decisions 0006 to 0009) into the branch; no conflicts.
+- 2026-10-05 infra-9 unit 8 (security's optional low items, after all three approvals): the session cookie is redacted as a quoted dict or JSON key and as a `('session', value)` tuple, not only as `session=` or in a Cookie header. An unquoted `session:` stays, since it is prose ("Database session: rolled back" is a keep case). `_redact_value` reads a named `value` group, which the key pattern and the session pattern share as `_VALUE`. The `LOG_LEVEL` docstring now says DEBUG raises every library that leaves its level unset, whose debug lines can carry URLs and payloads that redaction does not catch; the level is not scoped to `ZenysisLogger`, so DEBUG still serves library debugging. The text format's unescaped newlines are a follow-up under Requests (dev-only format, where tracebacks need their line breaks). Tests first, seen failing (12): four session forms in `_SECRETS` through `redact` and both formatters; plus a keep case and an 8 KB `'session', ` hostile case for both timing tests. Check: `test_log_format.py` 243 passed on 3.9 and on CPython 3.8.20; `tests/infra` 437 passed on the 3.13 lane, whose mypy is clean; `ci/lint_python.sh mig/integration` clean (33 files checked and formatted); `uv run --locked mypy` no issues in 517 files; `ci/check_py38_syntax.py` on CPython 3.8.20, 854 files, 0 problems; `CI=true ci/pytest_suites.sh` all 8 suites passed (web 137, golden 269, pipeline 130, druid_setup 79, core 25, graphql 22, toolchain 12, druid 1).
 
 ## Evidence
 
@@ -166,9 +171,35 @@ Each link below is cited with its check in the Log above.
 
 Environments: the host env is `uv sync` on 3.9, run with `--with 'gunicorn[gevent]==20.0.4' --with 'setuptools<70'` for gunicorn. The 3.8 web env is `uv venv --seed --python 3.8`, then the venv's own `pip install -r requirements.txt -r requirements-web.txt 'pytest<8.4' freezegun`. `requirements-dev.txt` does not install on 3.8, and a hook blocks `uv pip`. The browser-share tests run on `uvx --python 3.13 --with pytest==8.4.2`.
 
-Deferrals: OpenTelemetry traces and `/metrics` go with FastAPI in WP-5a (BE-8's other half), and the liveness and readiness endpoints too, since they live under `/api/v3`. Flask-User tokens in nginx `$uri` and nginx setting `X-Request-ID` go to the nginx side of WP-5a, under Requests. The `log_json` deduplication goes to WP-3b, under Requests. After `docker compose stop worker`, the worker's output holds one plain `worker: Warm shutdown (MainProcess)` line, which Celery's SIGTERM handler prints to stdout whatever the options; use `docker compose logs --no-log-prefix worker | jq -R 'fromjson?'` to skip it.
+Deferrals: OpenTelemetry traces and `/metrics` go with FastAPI in WP-5a (BE-8's other half), and the liveness and readiness endpoints too, since they live under `/api/v3`. Flask-User tokens in nginx `$uri` and nginx setting `X-Request-ID` go to the nginx side of WP-5a, under Requests. The `log_json` deduplication goes to WP-3b, under Requests. After `docker compose stop worker`, the worker's output holds one plain `worker: Warm shutdown (MainProcess)` line, which Celery's SIGTERM handler prints to stdout whatever the options; use `docker compose logs --no-log-prefix worker | jq -R 'fromjson?'` to skip it. Unescaped newlines in the `text` format go to WP-5a as an optional infra item, under Requests.
 
 Phase check: run it as `docker compose logs --no-log-prefix web | jq`. Without `--no-log-prefix`, Compose puts `web-1  | ` before every line and `jq` reads none of them.
+
+## PR summary
+
+**Requirements.** BE-8, first half: logs are JSON lines on stdout, each with a request id. The OpenTelemetry half goes with FastAPI in WP-5a. The WP also holds INV-1 (every deployment keeps working), INV-6 (no secret in logs) and INV-8 (CI stays green; every gate passes on the tree merged with `mig/integration`).
+
+**What changes.**
+- `log/` is one standard-library configuration, compatible with Python 3.8: one stream handler on the root logger, so the app, Celery, gunicorn, werkzeug, Alembic and libraries share it. `LOG_FORMAT` is `json` or `text`, `LOG_STREAM` is `stdout` or `stderr`, and `LOG_LEVEL` sets the level. The 512 KB rotating files under `/data/output` are gone, and `log` no longer imports `web`.
+- Request ids: a WSGI middleware keeps a well-formed `X-Request-ID` or makes a new one, binds it for the request and echoes it in the response. Celery carries it in the task headers into the worker. gunicorn access lines are JSON with `http.method`, `path`, `status`, `bytes`, `duration_s` and the response's request id.
+- Wiring by the owning roles: backend wires `create_app()`, `create_celery()`, `signal_handlers.py` and `gunicorn_server.py`, and imports `log` first in `app.py` and `app_base.py`. Core drops Alembic's `fileConfig` and moves the seed scripts' `print()` calls to logging.
+- Compose sets `LOG_FORMAT=json` and `LOG_STREAM=stdout` for web and worker, `json` on stderr for the pipeline, and `text` in the dev overlay. The worker runs with `celery -q`, so it prints no banner. nginx writes JSON access lines with `$uri` and the upstream's request id. `prod/browser_share` reads both the new lines and the old `vhost` lines. The web container's startup scripts print JSON lines.
+
+**INV-6 evidence.**
+- Every formatted line, including tracebacks and `stack_info`, passes a redaction pass. The pass covers bearer and Basic credentials, JWTs, URL passwords, cookies and the session cookie, values whose key names a password, secret, token or key (in `key=value`, quoted-key and header-tuple forms), Flask-User token paths, and gunicorn's body echoes. gunicorn lines also lose their query strings.
+- The cases are in `_SECRETS` in `tests/infra/test_log_format.py`, run through `redact` and through both formatters. The gunicorn leak tests are in `tests/web/test_gunicorn_logging.py`.
+- Every pattern runs in linear time on client-controlled text. Timed hostile cases cover both formats, app records and `gunicorn.error`, and the slowest pattern takes 11 ms at 64 KB.
+- A startup refusal is one ERROR line that names the variable, never its value.
+- QA ran the production image from a fresh database. In web (498 lines) and worker (110 lines), every line parsed as JSON, a reset task's line carried the web request id, and the reset token appeared in neither log. Of 27 canaries, the only leak was a non-secret query value on a pre-existing backend line, which is routed under Requests.
+- Security checked: 58 of 69 secret forms are redacted, including every form in scope. The redaction stays linear on 3.8 and PyPy, and under live gunicorn gevent. A malformed `X-Request-ID` is always replaced.
+
+**Deferrals.**
+- **Flask-User token paths in nginx lines (WP-5a, nginx side).** Reset and confirm links carry the token in the path, so nginx's JSON lines log it through `$uri`. Redacting it needs an http-level `map`. nginx-proxy takes one only from a `conf.d` file on the host or from a custom image, and deployments run Compose against a remote `DOCKER_HOST`, so a repo bind mount would not exist there. The app's own lines and gunicorn's lines redact these paths. The old `vhost` format logged these paths too, and every query string as well.
+- WP-5a: nginx sets `X-Request-ID`. Until then the app keeps a well-formed client id, which only correlates lines. Also WP-5a: OpenTelemetry, `/metrics`, and the liveness and readiness endpoints.
+- WP-3b: one `log_json` shell function in place of three copies, and `UV_COMPILE_BYTECODE=1`.
+- Pre-existing items for other roles, under Requests: the unauthenticated-access line's query string (backend), the urlbox key in `page_renderer.py` (removed by WP-1h), the golden harness's `ZEN_PROD` refusal (qa), and the Flask-Migrate and alembic mismatch (WP-3c/3d).
+
+**Verdicts.** QA, the reviewer and security approved. Unit 8 came after those verdicts. It is test-first, and it only adds a redaction pattern and a docstring sentence.
 
 ## Verdicts
 

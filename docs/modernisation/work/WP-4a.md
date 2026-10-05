@@ -97,7 +97,7 @@ None. C-1 (`AppContext`) arrives in WP-4f and will hold `Settings` and `Deployme
 - [x] infra: add `COPY harmony harmony` to `docker/web/Dockerfile_web-server` (next to `COPY config config`) and `COPY harmony ./harmony` to `docker/pipeline/Dockerfile` (next to `COPY config ./config`). Both images copy an explicit list of top-level directories, and `config/__init__.py` and `config/settings.py` now import `harmony.core`. Without this, the web server, the worker and every pipeline step fail at `import config` with `ModuleNotFoundError: harmony`. The dev image mounts the repo (`.:/app`) and needs nothing. Blocks merge (INV-1).
 - [ ] lead: merging with WP-1h conflicts on the last lines of `config/settings.py`. WP-1h deletes `RENDERBOT_EMAIL` and `URLBOX_API_KEY`, and this WP changed the `DRUID_HOST` line above them. Resolve by keeping this branch's file without those two lines. `tests/core/test_settings_facade.py` passes either way, and WP-1h's `tests/core/test_settings_render.py` passes on the result (simulated, see Evidence).
 
-- [ ] infra: in `docker/pipeline/Dockerfile`, put the removal note on the `pypy-wheels` stage's own comment: delete the stage, its `--find-links` use and the drift test when PyPy leaves the image (WP-3b, or WP-8d if first). In `tests/infra/test_dockerfiles.py`, make the drift test assert that the stage exists exactly while the Dockerfile creates `venv_pypy3`, so removing PyPy without removing the stage, or the reverse, fails. Reviewer finding (low); does not block review.
+- [x] infra: in `docker/pipeline/Dockerfile`, put the removal note on the `pypy-wheels` stage's own comment: delete the stage, its `--find-links` use and the drift test when PyPy leaves the image (WP-3b, or WP-8d if first). In `tests/infra/test_dockerfiles.py`, make the drift test assert that the stage exists exactly while the Dockerfile creates `venv_pypy3`, so removing PyPy without removing the stage, or the reverse, fails. Reviewer finding (low); does not block review.
 - [x] lead: `task_gate.py` reported `harmony/__init__.py (owner: lead)` as outside the owner role. This was resolved by integration `e86d91a` (the gate counts the lead role), merged here in `da48905`.
 
 ## Log
@@ -140,6 +140,12 @@ None. C-1 (`AppContext`) arrives in WP-4f and will hold `Settings` and `Deployme
 - 2026-10-05 core-4a: merged `mig/integration` at `61db9f8` (merge `da48905`), which brings the lead role in `task_gate.py`/`ownership.py`, the CI py38 syntax guard and decision 0007. No conflicts.
   - `task_gate.py WP-4a` now reports only the status and the qa and reviewer verdicts.
   - check: 8 CI suites passed (core 104, druid 1, druid_setup 79, golden 269, graphql 22, pipeline 129 + 1 skipped, toolchain 12, web 95); infra lane 164 + 3 = 167 passed; `record.py --check` 0 drift; `ci/check_py38_syntax.py` over CI's paths plus `harmony` and `tests/core` checked 857 files with 0 problems; mypy clean (520); `lint-imports` 1 kept; `uv lock --check` clean.
+- 2026-10-05 infra-4a (branch `mig/WP-4a-settings-loading-infra-2`) `86c8aee`: reviewer finding (7) done.
+  - The comment on the `rust` and `pypy-wheels` stages in `docker/pipeline/Dockerfile` says to delete both stages, the `--find-links` install and the drift test together with the PyPy venv (WP-3b, or WP-8d if PyPy goes first).
+  - `tests/infra/test_dockerfiles.py::test_pipeline_pypy_wheel_stages_live_exactly_as_long_as_the_pypy_venv` asserts that both stages exist exactly while the Dockerfile creates `venv_pypy3`. It checks the `PYDANTIC_CORE_VERSION` pin against `uv.lock` only while they exist.
+  - check: both mutations fail as intended. Removing the venv but keeping the stages fails with `dead PyPy wheel stages: ['pypy-wheels', 'rust']`. Removing `AS pypy-wheels` but keeping the venv fails with `{'rust'} == {'pypy-wheels', 'rust'}`.
+  - check: `tests/infra` 167 passed on the 3.13 tools lane; ruff check and format clean.
+  - check: `docker build --check` shows the same 6 LegacyKeyValueFormat warnings as the base. They come from existing `ENV key value` lines and are out of scope.
 
 ### Recorded differences (INV-1, for reviewer acceptance)
 

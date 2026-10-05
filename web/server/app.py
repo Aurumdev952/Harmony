@@ -1,5 +1,5 @@
-''' Handle initialization and setup of the flask app and all its dependencies.
-'''
+'''Handle initialization and setup of the flask app and all its dependencies.'''
+
 from datetime import datetime
 import queue
 from typing import Optional

@@ -105,3 +105,15 @@ Added by decision 0004 after the WP-2b security review.
   - Anonymous and unauthorised requests to every render route get 401 or 403 and no outbound render call is made (mock the renderer; never call urlbox from tests).
   - A policy-restricted viewer never receives a thumbnail rendered with a wider policy.
   - The WP-2b pins for these routes flip from today's behaviour to the new one in the same stack.
+
+## 0j. Refuse username changes and password resets that reach a higher-privileged account
+
+Added by decision 0005 after the WP-0h security re-review confirmed H5 live.
+
+- **Changes.**
+  - `PATCH /api2/user/<id>` refuses a `username` change, and `POST /api2/user/<id>/reset_password` refuses the reset, when the caller is not a superuser and the target holds any grant the caller does not (roles direct or through a group, group memberships, ACLs, query policies, data export; administrator by any path). Refusals are 403, write nothing and leave an audit line.
+  - Optional, with security: `UserResourceManager` hides users who are administrators through a group from non-superusers, as it already hides direct administrators.
+- **Verification.**
+  - A failing test first: `manager` + `user_admin` renaming an admin-through-group user gets 200 on the base and 403 on the branch with no row changed and no reset mail; the stubbed mailer receives nothing.
+  - Equal-or-lesser targets still rename and reset as before.
+  - The WP-2b pins for these routes flip in the same stack; the INV-3 row in decision 0005 is accepted by security and the human.

@@ -5,6 +5,7 @@ Checks: every agent's frontmatter parses; every skill an agent preloads resolves
 skill, an installed plugin skill, or a known built-in; every agent maps to an ownership role in
 SPEC section 6 (reviewer and security are read-only roles); every project skill's internal links exist.
 """
+
 from __future__ import annotations
 
 import re

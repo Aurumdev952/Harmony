@@ -103,7 +103,9 @@ def fixture_app() -> Flask:
         class Meta:
             name = 'storage'
 
-    api = Api(app, decorators=[authentication_required(is_api_request=True)], prefix='/api2')
+    api = Api(
+        app, decorators=[authentication_required(is_api_request=True)], prefix='/api2'
+    )
     api.add_resource(Storage)
     return app
 

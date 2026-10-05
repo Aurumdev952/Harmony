@@ -17,7 +17,7 @@ class Handler(BaseHTTPRequestHandler):
             UPSTREAM, data=body, headers={'Content-Type': 'application/json'}
         )
         try:
-            response = urllib.request.urlopen(request, timeout=200)
+            response = urllib.request.urlopen(request, timeout=200)  # noqa: S310
             status, headers, data = response.status, response.headers, response.read()
         except urllib.error.HTTPError as error:
             status, headers, data = error.code, error.headers, error.read()
@@ -30,4 +30,4 @@ class Handler(BaseHTTPRequestHandler):
         self.wfile.write(data)
 
 
-ThreadingHTTPServer(('0.0.0.0', 8080), Handler).serve_forever()
+ThreadingHTTPServer(('0.0.0.0', 8080), Handler).serve_forever()  # noqa: S104

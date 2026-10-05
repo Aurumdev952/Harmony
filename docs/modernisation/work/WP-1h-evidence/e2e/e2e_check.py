@@ -16,10 +16,10 @@ import requests
 
 BASE = 'http://127.0.0.1:58761'
 PROJECT = 'wp1h-e2e'
-STACK = '/tmp/wp1h-e2e/tests/contract/stack'
+STACK = '/tmp/wp1h-e2e/tests/contract/stack'  # noqa: S108
 SLUG = 'wp1h-render-check-3'
-OUT = Path('/tmp/wp1h-e2e-out')
-TAP = Path('/tmp/wp1h-tap/calls.jsonl')
+OUT = Path('/tmp/wp1h-e2e-out')  # noqa: S108
+TAP = Path('/tmp/wp1h-tap/calls.jsonl')  # noqa: S108
 OUTSIDER = 'outsider@harmony.invalid'
 
 
@@ -41,7 +41,7 @@ def admin_headers() -> dict:
 
 
 # Output of wp1h_spec.py run inside the web container.
-SPEC = json.loads(Path('/tmp/wp1h-spec.json').read_text())
+SPEC = json.loads(Path('/tmp/wp1h-spec.json').read_text())  # noqa: S108
 
 
 def png_size(data):

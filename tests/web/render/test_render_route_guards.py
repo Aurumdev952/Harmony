@@ -8,7 +8,12 @@ import json
 
 import pytest
 
-from tests.web.render.fakes import DASHBOARDS, DASHBOARD_SLUG, FakeDashboard, FakeRenderResponse
+from tests.web.render.fakes import (
+    DASHBOARDS,
+    DASHBOARD_SLUG,
+    FakeDashboard,
+    FakeRenderResponse,
+)
 from web.server.routes.views.dashboard import get_email_attachments
 
 SLUG = DASHBOARD_SLUG
@@ -96,7 +101,13 @@ def test_request_args_cannot_redirect_the_minted_token(client, renderer, route):
     assert response.status_code == 200
     [call] = renderer.calls
     assert set(call.params) == {
-        'url', 'token', 'format', 'viewport', 'full_page', 'pdf', 'timeout_seconds'
+        'url',
+        'token',
+        'format',
+        'viewport',
+        'full_page',
+        'pdf',
+        'timeout_seconds',
     }
     assert call.params['url'].startswith('http://web:5000/')
     assert call.params['url'].split('?')[0].endswith(f'/dashboard/{SLUG}')

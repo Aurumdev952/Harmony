@@ -144,6 +144,7 @@ def build_server(settings: RendererSettings, render: Render) -> ThreadingHTTPSer
             # One JSON line per render is logged instead of the access log.
             return
 
-    server = ThreadingHTTPServer(('0.0.0.0', settings.port), Handler)
+    # Only reachable on the internal render network (Compose).
+    server = ThreadingHTTPServer(('0.0.0.0', settings.port), Handler)  # noqa: S104
     server.daemon_threads = True
     return server

@@ -1,7 +1,7 @@
 from collections import defaultdict, namedtuple
 from typing import Any, Dict, List, Optional, Tuple, TYPE_CHECKING, TypedDict, Union
 
-from flask import g, current_app
+from flask import g
 from flask_user import current_user
 from sqlalchemy import func
 from sqlalchemy.dialects.postgresql import insert
@@ -384,9 +384,6 @@ def update_user_groups(user: User, new_groups: List[str]) -> None:
 
 
 def update_user_api_tokens(user: User, tokens: List[APITokenType]):
-    # pylint: disable=import-outside-toplevel
-    from web.server.security.signal_handlers import api_token_user_id
-
     if not tokens:
         # nothing to do here
         return
@@ -416,11 +413,6 @@ def update_user_api_tokens(user: User, tokens: List[APITokenType]):
             APIToken.is_revoked == False,  # noqa: E712 (a SQL expression)
             APIToken.id.in_(to_revoke),
         ).update({'is_revoked': True}, synchronize_session=False)
-
-        # invalidate validity caches because the state of the tokens has changed
-        memoized = current_app.cache.memoize()(api_token_user_id)
-        for token in tokens:
-            current_app.cache.delete_memoized(memoized, token['id'])
 
 
 def build_user_updates(user_obj: UserObject) -> Dict[str, Any]:

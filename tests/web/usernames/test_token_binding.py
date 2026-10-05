@@ -4,7 +4,7 @@ Browser sessions last up to 365 days and API tokens up to 20 years, and both
 named their account only by username. Once an account was deleted (or renamed)
 and another took its username, the old token signed in the new account. A
 session now carries the account id, and an API token is tied to its row's
-`user_id`, even while the app's cache still remembers the deleted token.
+`user_id`, read on every request.
 A session minted before WP-0k carries no id, so it signs in only an account
 created no later than the second it was issued.
 """
@@ -88,10 +88,27 @@ def test_api_token_does_not_sign_in_an_account_that_reuses_the_username(app):
         id=TOKEN_ID,
     )
     token = api_token(app, JOHN_DOE, TOKEN_ID)
-    # Signing in once leaves the token's owner in the app's cache.
+    # Used once before the delete, as WP-2b's T1 pin does.
     assert signed_in_id(app, token) == 2
 
     _delete_and_recreate(app, JOHN_DOE, old_id=2, new_id=12)
+
+    assert signed_in_id(app, token) is None
+
+
+def test_api_token_is_refused_once_its_account_is_deleted_even_if_the_id_returns(app):
+    """Before WP-0k the app cached the token's validity for 10 minutes. SQLite,
+    like a restored or re-seeded database, can hand the deleted account's id
+    to the next account."""
+    _run(
+        app,
+        'INSERT INTO api_token (id, user_id, is_revoked) VALUES (:id, 2, 0)',
+        id=TOKEN_ID,
+    )
+    token = api_token(app, JOHN_DOE, TOKEN_ID)
+    assert signed_in_id(app, token) == 2
+
+    _delete_and_recreate(app, JOHN_DOE, old_id=2, new_id=2)
 
     assert signed_in_id(app, token) is None
 

@@ -45,26 +45,6 @@ for _module in (
     importlib.import_module(f'models.alchemy.{_module}')
 
 
-class _MemoizeCache:
-    """Remembers results like the app's cache, which keeps API token lookups
-    for minutes after the token or its account is deleted."""
-
-    def __init__(self):
-        self.results = {}
-
-    def memoize(self, *_args, **_kwargs):
-        def decorate(function):
-            def memoized(*args):
-                key = (function.__name__, args)
-                if key not in self.results:
-                    self.results[key] = function(*args)
-                return self.results[key]
-
-            return memoized
-
-        return decorate
-
-
 @pytest.fixture(name='app')
 def fixture_app(tmp_path):
     here = os.path.dirname(__file__)
@@ -87,7 +67,6 @@ def fixture_app(tmp_path):
     db = create_db()
     db.init_app(app)
     JWTManager(app)
-    app.cache = _MemoizeCache()
     app.zen_config = import_configuration_module('harmony_demo')
     app.user_authentication_router = SimpleNamespace(unauthorized=lambda: '')
     with app.app_context():

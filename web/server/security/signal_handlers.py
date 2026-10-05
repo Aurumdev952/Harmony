@@ -314,15 +314,14 @@ def issued_before_account(user, issued_at: Optional[int]) -> bool:
 
 
 def install_login_manager_signal_handlers(app, login_manager):
-    memoized_api_token_user_id = app.cache.memoize()(api_token_user_id)
-
     def user_for_token(username, claims, issued_at):
         # The account the token was issued to: an API token's through its row,
+        # read on every request so no cache outlives a revoke or a user delete;
         # a session's through its user_id claim since WP-0k. A token with
         # neither (an older session, a render token) has only its username and
         # the time it was issued.
         if 'id' in claims:
-            issued_to = memoized_api_token_user_id(claims['id'])
+            issued_to = api_token_user_id(claims['id'])
             if issued_to is None:
                 return None
         else:

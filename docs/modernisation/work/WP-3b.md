@@ -1,7 +1,7 @@
 ---
 wp: "3b"
 title: "One CPython 3.13 interpreter everywhere"
-status: building
+status: review
 owner_role: "infra"
 instances:
   - name: "infra-3"
@@ -93,6 +93,8 @@ Each item names the owner, the change, and what it blocks. Reproduce on this bra
 - 2026-10-05 infra-3 unit 6: image workflows tag with a sanitised branch name. Check: `tests/infra/test_image_workflows.py` (10 failed before, 10 pass after); actionlint 0, zizmor 0, policy OK.
 - 2026-10-05 infra-3 unit 7: `requirements*.txt`, `docker/export_requirements.py`, its tests and `make requirements` deleted; the pin policy and passlib/bcrypt check moved to `tests/infra/test_pyproject_pins.py`. Check: grep finds no reader outside history docs; pin test fails on an unpinned `toposort`; `tests/infra` passes.
 - 2026-10-05 infra-3 unit 8: the Python 3.8 scaffolding retired (above). Check: suites as unit 2 (golden 38 failed / 231 passed, the core request; the rest pass); mypy 518 files; lint gate, actionlint, zizmor, policy.
+- 2026-10-05 infra-3: status review. Every infra unit is done and the three images build at the head. The pull request still waits on core's two blocking requests: golden on pandas 2 (unit 1b) and the ijson parse speed (PERF-7). It also waits on backend's `collections` fix, the lead's uv update, and the qa and reviewer verdicts. `task_gate.py WP-3b`: status and the two verdicts outstanding.
+
 
 ## Evidence
 

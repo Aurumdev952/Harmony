@@ -9,3 +9,4 @@
 - [Potion route test harness](potion_route_test_harness.md) — test /api2 routes through the real app on a throwaway Postgres; WP-0h authz traps
 - [Flask route tests in-process](flask-route-tests-in-process.md) — conftest double import, subclass Potion resources, AUTHORIZABLE_DIMENSIONS, urlbox recorder
 - [Post-WP-2f tooling](post_wp2f_tooling.md) — tests/web on plain uv py3.9, lint-gate and noqa traps, guard workarounds, graphql stub
+- [ruff format vs py3.8](ruff_format_py38_trap.md) — ruff format writes parenthesized `with` that the 3.8 web image rejects; nest them, parse under 3.8

@@ -4,7 +4,7 @@ WP-0k matches typed usernames for equality ignoring case instead of with ILIKE,
 where `_` and `%` are wildcards, and refuses any new username equal ignoring
 case to another account's. It also signs in no deactivated account on any path
 (decision 0010). Each pin names its WP-0k INV-3 row and states the answer
-before WP-0k (integration f5d5993) and after.
+before WP-0k (integration bc5cb2d) and after.
 
 Look-alikes are pairs such as `look.alike@` and `look_alike@`: before WP-0k
 `look_alike@` pattern-matched both, and `first()` returned the older account.
@@ -404,7 +404,7 @@ def test_admin_reset_mails_the_account_it_authorised(stack):
     '''WP-0k INV-3 row U-6. The admin resets the password of a pending
     `reset.twin@` beside an active `Reset.Twin@`.
     The reset link is stored on, and mailed to, the account the route
-    authorised, by id. Integration f5d5993 looked it up again by exact
+    authorised, by id. Integration bc5cb2d looked it up again by exact
     username, which found the same account, so this holds there too; WP-0k's
     unit 4 to 11 code (e3a7064) looked it up ignoring case and mailed the
     active twin, and unit 12 fixed that.'''

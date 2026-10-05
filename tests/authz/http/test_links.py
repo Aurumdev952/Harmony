@@ -12,10 +12,12 @@ and a `SCRIPT_NAME` header with the request path prefixed by it (gunicorn takes
 the script root from that header). The stack's forwarder passes requests to
 gunicorn unchanged, as when gunicorn is reachable without the stock
 nginx-proxy (WP-0k unit 1).
-Before WP-0k (integration f5d5993) the links took the request's scheme, host
-and script root: `http://attacker.invalid/...`, or the stack's own
-`http://127.0.0.1:<port>/@attacker.invalid/...`. After: every link is on
-`https://harmony_demo.zenysis.com`.
+Before WP-0k (integration bc5cb2d) the links took the request's scheme, host
+and script root: `http://attacker.invalid/...` under the forged Host, and
+`http://127.0.0.1:<port>@attacker.invalid/...` (host `attacker.invalid`) under
+the script root. No proxy middleware reads `X-Forwarded-*`, before or after, so
+those links named the request's own `http://127.0.0.1:<port>`. After: every
+link is on `https://harmony_demo.zenysis.com`.
 '''
 
 from __future__ import annotations
@@ -271,8 +273,8 @@ def test_flask_user_reset_page_sends_the_browser_to_the_configured_origin(
 ):
     '''Row L-1, flask-user's own `/user/reset-password/<token>` (WP-0k
     0e49324 onwards: `open_reset_page`).
-    Before WP-0k: flask-user's view served its own reset form on the request's
-    host.
+    Before WP-0k: flask-user's view answered on the request's host (for this
+    token, a redirect to `<request host>/login`).
     After: a redirect to Harmony's reset page on the configured origin, the
     one place a reset token sets a password.'''
     headers, prefix = FORGERIES[forgery]

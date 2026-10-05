@@ -9,7 +9,7 @@ its username can mean that is not a pending invitation. The account must be
 active, have exactly the username the token names, and not have been created
 in a later second than the token was issued.
 
-Before WP-0k (integration f5d5993) every token named its account by username
+Before WP-0k (integration bc5cb2d) every token named its account by username
 alone, looked up with ILIKE and `first()`, and an API token's validity was
 memoised in Redis for 10 minutes. `generate_api_token` stores the row as it
 issues the token (WP-2c F12), so the token authenticates at once. Only admin

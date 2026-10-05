@@ -5,4 +5,4 @@
 - [Worktree shell guard](feedback_worktree_shell_guard.md) — command forms the isolation guard refuses and the workarounds that pass
 - [Tooling traps](tooling_traps.md) — multi-Python runs, black vs ruff, 3.8 syntax proof (web image), ruff with-parens, E712 on SQLA, mypy flags, 3.13 wheels
 - [Config import hook](config_import_hook.md) — alias semantics, PathFinder precedence, __spec__ restore, lazy DATASOURCE
-- [Postgres bulk-replace traps](postgres-bulk-replace-traps.md) — upsert before delete; setval survives rollback; last_modified trigger; create_all lacks triggers
+- [Postgres bulk-replace traps](postgres-bulk-replace-traps.md) — upsert before delete; setval survives rollback; last_modified trigger; OID not ::integer; create_all lacks triggers

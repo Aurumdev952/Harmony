@@ -8,6 +8,10 @@ data export. Permissions and resource roles on a role pass the
 `update_users` there. Roles, groups and ACLs the target group or user already
 has may be sent again unchanged.
 
+A username change or a password reset is not a grant, but it can hand the
+caller the user's account: the reset link goes to the username. A non-superuser
+may do either only to a user whose grants are among its own.
+
 "Superuser" is the identity (`current_user_is_superuser`), never the account,
 so a token narrowed on an admin account grants like a non-superuser. What a
 non-superuser holds comes from its account.
@@ -20,12 +24,12 @@ from typing import TYPE_CHECKING, Any, NoReturn
 
 from flask import g
 from flask_login import current_user
-from flask_principal import Need
+from flask_principal import ItemNeed, Need
 from werkzeug.exceptions import BadRequest, Forbidden
 
 from models.alchemy.permission import Resource, ResourceRole, Role
 from models.alchemy.security_group import Group, GroupAcl
-from models.alchemy.user import UserAcl
+from models.alchemy.user import User, UserAcl
 from models.alchemy.user.web_base_user import BaseWebUserMixin
 from models.python.permissions import QueryNeed
 from web.server.data.data_access import get_db_adapter
@@ -44,13 +48,18 @@ if TYPE_CHECKING:
 
 
 def refuse_grant(description: str, detail: str) -> NoReturn:
+    _refuse('grant', description, detail)
+
+
+def _refuse(action: str, description: str, detail: str) -> NoReturn:
     '''The 403 body is `description` alone. `detail`, which names what was
     refused, goes only to the audit line: naming a role, group or policy would
     tell the caller that an id it cannot list exists.
     '''
     # The log formatter drops LoggerAdapter extras, so the caller goes in the text.
     g.request_logger.warning(
-        'Refused grant by \'%s\': %s %s',
+        'Refused %s by \'%s\': %s %s',
+        action,
         get_user_string(current_user),
         description,
         detail,
@@ -235,4 +244,71 @@ def holds_everything_in(role: Role) -> bool:
         need in account_needs
         for need in BaseWebUserMixin._build_role_needs([role])
         if not isinstance(need, QueryNeed)
+    )
+
+
+def verify_may_rename(user: User) -> None:
+    _verify_holds_all_grants_of(
+        user,
+        'username change',
+        'You may only change the username of users whose access you hold yourself.',
+    )
+
+
+def verify_may_reset_password(user: User) -> None:
+    _verify_holds_all_grants_of(
+        user,
+        'password reset',
+        'You may only reset the password of users whose access you hold yourself.',
+    )
+
+
+def _verify_holds_all_grants_of(user: User, action: str, description: str) -> None:
+    '''Refuses a non-superuser unless it holds every grant of `user`: each
+    role, direct or through a group (so the admin role by any path, and each
+    role's query policies and data export), each group membership, and what
+    each of the user's ACLs allows.
+    '''
+    if current_user_is_superuser():
+        return
+    held_role_ids = {
+        role.id
+        for role in current_user.get_all_roles()
+        if role.name != SUPERUSER_ROLENAME
+    }
+    member_group_ids = {group.id for group in current_user.groups}
+    account_needs = _account_needs()
+    roles = sorted(
+        {
+            (role.id, role.name)
+            for role in user.get_all_roles()
+            if role.id not in held_role_ids
+        }
+    )
+    groups = [
+        (group.id, group.name)
+        for group in user.groups
+        if group.id not in member_group_ids
+    ]
+    acls = [
+        (acl.resource_role.name, acl.resource_id)
+        for acl in user.acls
+        if not _holds_acl(user, acl, account_needs)
+    ]
+    if roles or groups or acls:
+        _refuse(
+            action,
+            description,
+            f'User {user.id} holds roles {roles}, groups {groups}, ACLs {acls}.',
+        )
+
+
+def _holds_acl(user: User, acl: UserAcl, account_needs: set[Need]) -> bool:
+    '''Whether the caller's account holds what `acl` allows, on that resource
+    or on every resource of its type.
+    '''
+    # pylint: disable=protected-access
+    return all(
+        need in account_needs or ItemNeed(need.method, None, need.type) in account_needs
+        for need in user._build_acl_needs(acl.resource_role.permissions, acl.resource)
     )

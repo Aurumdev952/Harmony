@@ -59,6 +59,8 @@ from web.server.security.grants import (
     held_roles_from_uris,
     member_groups_from_uris,
     verify_acl_grants,
+    verify_may_rename,
+    verify_may_reset_password,
 )
 from web.server.security.permissions import (
     SuperUserPermission,
@@ -148,6 +150,8 @@ class UserResource(PrincipalResource):
             # addressed seaparately of why I'm here and requires quite a big refactoring
             if not self.manager.can_update_item(db_user):
                 raise Forbidden()
+            if obj['username'] != db_user.username:
+                verify_may_rename(db_user)
             roles = held_roles_from_uris(obj['roles'], existing=db_user.roles)
             groups = member_groups_from_uris(
                 obj.get('groups', []), existing=db_user.groups
@@ -213,6 +217,7 @@ class UserResource(PrincipalResource):
     )
     def reset_password(self, user):
         with AuthorizedOperation('reset_password', 'user', user.id):
+            verify_may_reset_password(user)
             # TODO - Change the return value of `reset_password` to convey a value
             # with more resolution than True/False
             username = user.username

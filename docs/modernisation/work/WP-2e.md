@@ -59,10 +59,15 @@ None of these block WP-2e.
 - [ ] visualization (WP-7g): every map load sends Mapbox GL telemetry (`events.mapbox.com/events/v2`) and a billing session (`api.mapbox.com/map-sessions/v1`). The suite blocks both and allows them by name in `e2e/support/map.ts`; remove the allowance with the MapLibre move.
 - [ ] visualization (WP-7g), not blocking: the line chart's first draw is not deterministic. The same LINE query (Cases by Month), drawn twice at 1440 px on the same stack, showed bimonthly month ticks once and quarterly ticks once. A window resize settles it, so `tests/visual.spec.ts` captures charts only after a resize. Repro: `e2e/run.sh visual --grep LINE` with the resize loop changed to capture before the first resize.
 - [ ] infra (WP-2f): run `yarn test` on every PR (Node 18.17 today, about 7 s), and run `e2e/run.sh` with no arguments in the job that can start Docker, publishing `e2e/report/` (one folder per project) and, on failure, `e2e/test-results/` as artifacts. The job needs the following:
-  - the client build (`yarn build`, or the build artifact);
-  - pulls of `python:3.8.20-bookworm`, `python:3.12-slim` and the digest-pinned `mcr.microsoft.com/playwright:v1.56.1-noble` (3.7 GB);
-  - about 12 minutes.
+  - pulls of `python:3.8.20-bookworm`, `python:3.12-slim`, `node:18.17.1-bookworm` (the client builds in it; `run.sh` rebuilds only when the client's sources change) and the digest-pinned `mcr.microsoft.com/playwright:v1.56.1-noble` (3.7 GB);
+  - `e2e/node_modules/.bin/playwright install-deps chromium` once on the runner, for the a11y and e2e projects that run on the host;
+  - about 12 minutes, plus about 3 for a client build.
   `run.sh` already handles rootful Docker: it runs the image as the caller's uid. Compare the first CI run's visual results against `e2e/visual/` before making the job required, and report any drift to qa rather than adding tolerance.
+- [ ] frontend-platform (WP-6e, FE-11): bring the TypeScript under `e2e/` into the ESLint 10 flat config with typescript-eslint, including `@typescript-eslint/no-floating-promises`. Without that rule, a missing `await` before an `expect(...)` or a locator action passes silently. The repository's ESLint today is babel-eslint and Flow over `.js` and `.jsx` only, so strict `tsc` (TypeScript 6) is the only gate on `e2e/`.
+
+## Deferrals
+
+- QA-4, CI half: the phase-2 exit check ("CI runs every suite above that exists by then, and a deliberately broken case turns CI red") and 2e's own check ("`yarn test` and `yarn e2e` pass ... in CI") need the CI job in the infra (WP-2f) request above. This WP proves both locally. `yarn e2e` passes from a clean archive of the head, and a deliberately broken view turns it red. The CI half closes when infra lands the job and its first run is compared against `e2e/visual/`.
 
 ## Log
 
@@ -98,6 +103,7 @@ None of these block WP-2e.
 - 2026-10-06 qa-5t round 2, unit 7 (reviewer finding 7): the visual loop skips the three alias rows of the page table. Each row now names the page it renders in a new `aliasOf` field: home is overview, simple-query is advanced-query, alerts is not-found. Their 9 snapshots are deleted. `pages.spec.ts` and the a11y baseline still open every alias URL. Check:
   - home and overview, and alerts and not-found, are byte-identical (`sha256sum`) at all three widths. simple-query and advanced-query differ in 24-36 pixels by at most 2 levels per channel, which is re-render noise.
   - `run.sh visual`: 71 passed (17 pages x 3 widths, plus 20 chart types); `--grep @pages`: 42 passed.
+- 2026-10-06 qa-5t round 2, unit 8 (reviewer finding 8): added a Deferrals section stating that QA-4's CI half waits on the infra (WP-2f) job. Added the frontend-platform request (WP-6e, FE-11) for ESLint flat-config coverage of the `e2e/` TypeScript, with `no-floating-promises`. Brought the infra request up to date with this round's runner (client build in Node 18.17, host Chromium deps). Corrected unit 3's `pages.spec.ts` count from 46 to 42.
 
 ## Evidence
 
@@ -115,7 +121,7 @@ None of these block WP-2e.
 - Unit 2: `e2e/run.sh --grep @login --reporter=line` was run from `down`, so the stack was rebuilt from scratch. Every secret was regenerated, and the catalog and sidecar came up. The 4 login tests passed in 8.1 s. Afterwards `docker ps -a --filter label=com.docker.compose.project=harmony-wp2e-e2e` lists 0 containers and the credentials file is gone. The tests check four things: a signed-out redirect to `/login`, a UI sign-in that lands on `/overview` with an `HttpOnly` `accessKey` cookie, a wrong password that shows "Incorrect username and/or password." and sets no cookie, and a sign-out after which `/overview` redirects to `/login` again.
 
 - Unit 3: `e2e/run.sh --grep @smoke --reporter=line` from `down`, run twice. Both runs: 75 passed in 2.7 min, exit 0. Afterwards 0 containers carry the project label and no credentials file is left (logs `/tmp/wp2e-smoke-run1.log`, `/tmp/wp2e-smoke-run2.log` on the build host). The suite covers:
-  - `pages.spec.ts` (46): every page in the URL table under its legacy URL, the same pages under `/en/`, `/fr`, `/pt` and `/am` overviews rendered in that language, and a Data Catalog field URL loaded directly (FE-9, INV-5).
+  - `pages.spec.ts` (42; the original count of 46 was wrong, since the six spec files add up to 75 only with 42): every page in the URL table under its legacy URL, the same pages under `/en/`, `/fr`, `/pt` and `/am` overviews rendered in that language, and a Data Catalog field URL loaded directly (FE-9, INV-5).
   - `visualizations.spec.ts` (20): every type the picker offers. Each test asserts a 200 from that type's query endpoint and a drawn element (a broker state or month label, data marks, or the primary number), and that no "No data" appears.
   - `dashboard.spec.ts` (6): a query from Analyze onto a new dashboard, then opened from the overview; a text tile saved and still there after reload; the share link; share by e-mail, checked in mailpit; and PDF and JPEG downloads, checked by magic bytes. The renderer refuses unless the minted cookie opens the dashboard.
   - `account.spec.ts` (2): an admin invite, then registration from the e-mailed link; forgot password, then reset from the e-mailed link, after which the old password fails and the new one works.

@@ -47,3 +47,5 @@ openpyxl>=3.0.9
 ijson-bigint==3.2.0.post1
 types-jsonschema==4.17.0.8
 future==0.18.3
+pydantic==2.10.6
+pydantic-settings==2.8.1

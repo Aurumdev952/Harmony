@@ -37,6 +37,25 @@ RUN case $(uname -m) in \
     wget "https://github.com/minio/mc/releases/download/${MC_RELEASE}/mc.linux-${arch}.${MC_RELEASE}" -O /usr/local/bin/mc \
     && echo "${sha256}  /usr/local/bin/mc" | sha256sum -c -
 
+# pydantic-core publishes no wheel for jammy's PyPy 3.8 (7.3.9), and its sdist
+# needs Rust. Build the wheel here so the runtime image gets no Rust toolchain.
+# PYDANTIC_CORE_VERSION must match uv.lock (tests/infra/test_dockerfiles.py).
+FROM rust:1.83.0-slim-bookworm@sha256:540c902e99c384163b688bbd8b5b8520e94e7731b27f7bd0eaa56ae1960627ab AS rust
+
+FROM ubuntu:jammy-20260924.1@sha256:5ec03bb3441e8b0bf3b4f9cd4629a1ae763010dc3035bb8da3ae6cf026486401 AS pypy-wheels
+ENV DEBIAN_FRONTEND=noninteractive
+RUN apt-get update \
+    && apt-get -y install --no-install-recommends build-essential ca-certificates pypy3 pypy3-dev pypy3-venv \
+    && apt-get clean \
+    && rm -rf /var/lib/apt/lists/*
+COPY --from=rust /usr/local/rustup /usr/local/rustup
+COPY --from=rust /usr/local/cargo /usr/local/cargo
+ENV RUSTUP_HOME=/usr/local/rustup CARGO_HOME=/usr/local/cargo PATH=/build/bin:/usr/local/cargo/bin:$PATH
+ARG PYDANTIC_CORE_VERSION=2.27.2
+RUN pypy3 -m venv /build \
+    && pip install maturin==1.8.1 typing_extensions==4.12.2 \
+    && pip wheel --no-deps --no-build-isolation --wheel-dir /wheels "pydantic-core==${PYDANTIC_CORE_VERSION}"
+
 FROM ubuntu:jammy-20260924.1@sha256:5ec03bb3441e8b0bf3b4f9cd4629a1ae763010dc3035bb8da3ae6cf026486401
 ENV DEBIAN_FRONTEND noninteractive
 
@@ -152,12 +171,13 @@ RUN . venv/bin/activate \
 #       build stage and copy it here. It would result in a leaner, cleaner
 #       image.
 RUN pypy3 -m venv venv_pypy3
+COPY --from=pypy-wheels /wheels /tmp/pypy-wheels
 # Install pypy dependencies.
 # wheel 0.43.0 HAS to be installed prior to installing requirments. If changing version here, also
 # change in requirements.txt.
 RUN . venv_pypy3/bin/activate \
     && python -m pip install wheel==0.43.0 \
-    && pypy -m pip install --no-build-isolation --verbose -r requirements.txt -r requirements-pipeline.txt
+    && pypy -m pip install --no-build-isolation --verbose --find-links /tmp/pypy-wheels -r requirements.txt -r requirements-pipeline.txt
 
 # Copy only what the pipeline needs.
 COPY pipeline ./pipeline
@@ -165,6 +185,7 @@ COPY util ./util
 COPY data ./data
 COPY docker/entrypoint_pipeline.sh ./docker/entrypoint_pipeline.sh
 COPY config ./config
+COPY harmony ./harmony
 COPY models ./models
 COPY log ./log
 # TODO: Why does pipeline need web?

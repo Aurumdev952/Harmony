@@ -2,10 +2,15 @@
 the password of, only a user whose grants are among its own. Otherwise renaming
 the user to an address the caller reads, then resetting the password, hands
 the caller the user's account (H5).
+
+Decision 0010: administrators, direct or through a group, are hidden from every
+non-superuser identity, so every user route answers 404 for them before any
+other check.
 '''
 
 from __future__ import annotations
 
+import json
 import logging
 import uuid
 from types import SimpleNamespace
@@ -183,6 +188,7 @@ def _holdings(db, user_id: int) -> tuple:
         sorted(role.id for role in user.roles),
         sorted(group.id for group in user.groups),
         sorted((acl.resource_role_id, acl.resource_id) for acl in user.acls),
+        user.status_id,
     )
 
 
@@ -190,13 +196,19 @@ def _reset(caller, user_id: int):
     return caller.request('POST', f'/api2/user/{user_id}/reset_password')
 
 
-# Targets holding a grant the caller does not hold.
-
-
-def _admin_through_group(db, make_user, _actor=None):
-    target = make_user()
+def _admin_through_group(db, make_user, roles=()):
+    target = make_user(roles)
     _make_group(db, roles=['admin'], users=[target])
     return target
+
+
+def _in_a_group_carrying(db, make_user, role_name: str):
+    target = make_user()
+    _make_group(db, roles=[role_name], users=[target])
+    return target
+
+
+# Targets holding a grant the caller does not hold, other than the admin role.
 
 
 def _role_not_held(role_name):
@@ -240,7 +252,6 @@ def _dashboard_acl_on_another_dashboard(db, make_user, actor):
 _HIGHER_TARGETS = pytest.mark.parametrize(
     'make_target',
     [
-        _admin_through_group,
         _role_not_held('all_sources_reader'),
         _role_not_held('exporter'),
         _role_not_held('group_admin'),
@@ -256,9 +267,29 @@ _HIGHER_TARGETS = pytest.mark.parametrize(
 def test_user_editor_cannot_take_over_an_admin_through_a_group(
     db, make_user, mailer, refusals
 ):
-    '''H5 end to end: rename to the caller's address, then reset the password.'''
+    '''H5 end to end: rename to the caller's address, then reset the password.
+    The target is hidden (decision 0010), so neither request reaches the guard.
+    '''
     actor = make_user(_USER_EDITOR)
     target = _admin_through_group(db, make_user)
+    address = _attacker_address()
+
+    renamed = _rename(db, actor, target.id, address)
+    reset = _reset(actor, target.id)
+
+    assert (renamed.status_code, reset.status_code) == (404, 404)
+    assert _user(db, target.id).username == target.username
+    assert not _user(db, target.id).reset_password_token
+    assert mailer == []
+    assert refusals() == []
+
+
+@_HIGHER_TARGETS
+def test_user_editor_cannot_take_over_a_user_holding_more(
+    db, make_user, mailer, refusals, make_target
+):
+    actor = make_user(_USER_EDITOR)
+    target = make_target(db, make_user, actor)
     address = _attacker_address()
 
     renamed = _rename(db, actor, target.id, address)
@@ -293,7 +324,7 @@ def test_user_editor_cannot_rename_a_user_holding_more(
     assert 'admin' not in body and '/api2/' not in body
 
 
-@pytest.mark.parametrize('role_name', ['admin', 'exporter'])
+@pytest.mark.parametrize('role_name', ['exporter', 'group_admin'])
 def test_a_rename_is_judged_on_the_user_before_the_request(
     db, make_user, refusals, role_name
 ):
@@ -302,8 +333,7 @@ def test_a_rename_is_judged_on_the_user_before_the_request(
     rename.
     '''
     actor = make_user(_USER_EDITOR)
-    target = make_user()
-    _make_group(db, roles=[role_name], users=[target])
+    target = _in_a_group_carrying(db, make_user, role_name)
     before = _holdings(db, target.id)
     body = _resent_body(db, target.id, _attacker_address())
     body['groups'] = []
@@ -416,7 +446,8 @@ def test_user_editor_still_edits_the_profile_of_a_user_holding_more(
     db, make_user, refusals
 ):
     actor = make_user(_USER_EDITOR)
-    target = _admin_through_group(db, make_user)
+    target = _in_a_group_carrying(db, make_user, 'exporter')
+    groups = sorted(group.id for group in _user(db, target.id).groups)
     body = _resent_body(db, target.id, target.username)
     body['lastName'] = 'Renamed'
 
@@ -425,7 +456,7 @@ def test_user_editor_still_edits_the_profile_of_a_user_holding_more(
     assert response.status_code == 200
     edited = _user(db, target.id)
     assert (edited.username, edited.last_name) == (target.username, 'Renamed')
-    assert edited.is_superuser()
+    assert sorted(group.id for group in edited.groups) == groups
     assert refusals() == []
 
 
@@ -445,7 +476,7 @@ def test_a_reset_without_reset_password_is_refused_before_the_target_is_judged(
     db, make_user, mailer, refusals
 ):
     actor = make_user(['manager'])
-    target = _admin_through_group(db, make_user)
+    target = _in_a_group_carrying(db, make_user, 'exporter')
 
     response = _reset(actor, target.id)
 
@@ -503,9 +534,131 @@ def test_a_narrowed_admin_token_cannot_take_over_an_admin_through_a_group(
     reset = _reset(caller, target.id)
 
     if narrowed:
-        assert (renamed.status_code, reset.status_code) == (403, 403)
+        assert (renamed.status_code, reset.status_code) == (404, 404)
         assert _user(db, target.id).username == target.username
         assert mailer == []
     else:
         assert (renamed.status_code, reset.status_code) == (200, 204)
         assert mailer == [address]
+
+
+# Decision 0010: administrators through a group are hidden from every
+# non-superuser identity, like direct administrators. Each case below passes the
+# route's permission; before, each was 200 or 204 and wrote.
+
+_DIRECT_ADMIN = 'direct_admin'
+_GROUP_ADMIN = 'admin_through_group'
+
+
+def _admin_target(db, make_user, kind: str, roles=()):
+    if kind == _DIRECT_ADMIN:
+        return make_user(['admin', *roles])
+    return _admin_through_group(db, make_user, roles)
+
+
+def _listed(caller, username: str) -> bool:
+    response = caller.request(
+        'GET', f'/api2/user?where={json.dumps({"username": username})}'
+    )
+    assert response.status_code == 200
+    return [user['username'] for user in response.get_json()] == [username]
+
+
+def _deactivate(db, user_id: int) -> dict:
+    body = _resent_body(db, user_id, _user(db, user_id).username)
+    body['status'] = 'inactive'
+    return body
+
+
+def _drop_groups(db, user_id: int) -> dict:
+    body = _resent_body(db, user_id, _user(db, user_id).username)
+    body['groups'] = []
+    return body
+
+
+@pytest.mark.parametrize(
+    ('caller', 'method', 'suffix', 'make_body'),
+    [
+        (['user_admin'], 'DELETE', '', None),
+        (['manager'], 'DELETE', '/force', None),
+        (_USER_EDITOR, 'PATCH', '', _deactivate),
+        (_USER_EDITOR, 'PATCH', '', _drop_groups),
+        (['user_admin'], 'PATCH', '/roles', lambda _db, _id: {}),
+    ],
+    ids=['delete', 'force_delete', 'deactivate', 'demote', 'clear_roles'],
+)
+def test_user_routes_cannot_reach_an_admin_through_a_group(
+    db, make_user, refusals, caller, method, suffix, make_body
+):
+    actor = make_user(caller)
+    # A direct role the caller holds, so clearing roles would write.
+    target = _admin_through_group(db, make_user, ['user_admin'])
+    before = _holdings(db, target.id)
+    body = make_body(db, target.id) if make_body else None
+
+    response = actor.request(method, f'/api2/user/{target.id}{suffix}', body)
+
+    assert response.status_code == 404
+    assert _holdings(db, target.id) == before
+    assert _user(db, target.id).is_superuser()
+    assert refusals() == []
+
+
+@pytest.mark.parametrize('kind', [_DIRECT_ADMIN, _GROUP_ADMIN])
+@pytest.mark.parametrize(
+    'caller',
+    [[], _USER_EDITOR, ['user_moderator']],
+    ids=lambda c: '+'.join(c) or 'none',
+)
+def test_admins_are_hidden_from_non_superusers(db, make_user, caller, kind):
+    _ensure_role(db, 'user_moderator', ['invite_user', 'reset_password'])
+    actor = make_user(caller)
+    target = _admin_target(db, make_user, kind)
+
+    assert not _listed(actor, target.username)
+    assert actor.request('GET', f'/api2/user/{target.id}').status_code == 404
+    assert _reset(actor, target.id).status_code == 404
+
+
+@pytest.mark.parametrize('kind', [_DIRECT_ADMIN, _GROUP_ADMIN])
+@pytest.mark.parametrize('superuser', [_DIRECT_ADMIN, _GROUP_ADMIN])
+def test_superusers_still_list_and_reach_admins(db, make_user, superuser, kind):
+    actor = _admin_target(db, make_user, superuser)
+    target = _admin_target(db, make_user, kind)
+
+    assert _listed(actor, target.username)
+    assert actor.request('GET', f'/api2/user/{target.id}').status_code == 200
+    status = _user(db, target.id).status_id
+    response = actor.request(
+        'PATCH', f'/api2/user/{target.id}', _deactivate(db, target.id)
+    )
+    assert response.status_code == 200
+    assert _user(db, target.id).status_id != status
+
+
+@pytest.mark.parametrize(
+    'caller', [[], _USER_EDITOR], ids=lambda c: '+'.join(c) or 'none'
+)
+def test_users_holding_more_but_not_admin_stay_listed_and_reachable(
+    db, make_user, caller
+):
+    actor = make_user(caller)
+    target = _in_a_group_carrying(db, make_user, 'group_admin')
+
+    assert _listed(actor, target.username)
+    assert actor.request('GET', f'/api2/user/{target.id}').status_code == 200
+
+
+@pytest.mark.parametrize('kind', [_DIRECT_ADMIN, _GROUP_ADMIN])
+@pytest.mark.parametrize('narrowed', [False, True], ids=['full_session', 'narrowed'])
+def test_a_narrowed_admin_token_does_not_see_admins(app, db, make_user, kind, narrowed):
+    '''"Superuser" is the identity: a token narrowed on an admin account lists
+    and reaches administrators no more than any other non-superuser.
+    '''
+    admin = make_user(['admin'])
+    target = _admin_target(db, make_user, kind)
+    caller = _token_caller(app, admin.username, _NARROWED_NEEDS if narrowed else None)
+
+    assert _listed(caller, target.username) is not narrowed
+    status = caller.request('GET', f'/api2/user/{target.id}').status_code
+    assert status == (404 if narrowed else 200)

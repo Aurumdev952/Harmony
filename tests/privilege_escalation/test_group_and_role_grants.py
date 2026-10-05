@@ -1187,7 +1187,9 @@ def test_admin_makes_a_user_admin(db, make_user):
 def test_user_editor_removes_grants_it_does_not_hold(db, make_user):
     actor = make_user(_USER_EDITOR)
     target = make_user(['all_sources_reader'])
-    _make_group(db, roles=['admin'], users=[target])
+    # Not the admin role: administrators through a group are hidden from
+    # non-superusers (decision 0010).
+    _make_group(db, roles=['exporter'], users=[target])
 
     response = actor.request(
         'PATCH', f'/api2/user/{target.id}', _user_body(db, target.id)

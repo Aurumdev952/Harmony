@@ -8,7 +8,9 @@ instances:
     files:
       - "web/server/api/user_api_models.py"
       - "web/server/security/grants.py"
+      - "web/server/potion/managers.py"
       - "tests/privilege_escalation/test_rename_and_reset.py"
+      - "tests/privilege_escalation/test_group_and_role_grants.py"
       - "docs/modernisation/work/WP-0j.md"
 branch: "mig/WP-0j-rename-reset-guard"
 requirements: [INV-3, QA-1, QA-4]
@@ -32,11 +34,23 @@ Units, in order. Each line names the change and the check that ends it.
 5. Decide the optional `UserResourceManager` change with a note for security; INV-3 table; human acceptance item; Request to qa for the WP-2b pins. Check: this file.
 6. `pstack:interrogate` on the guard; triage findings. Then `status: review`.
 
+Round 2 (reviewer round 1 findings, then decision 0010), one commit each:
+
+7. Pin the `all` in `_holds_acl` and the resource id with two higher targets; mutants `all` to `any` and resource id ignored. Check: they fail on the new file and pass on the round-1 one.
+8. Pin that a rename is judged on the stored user and writes nothing: drop the group that makes the target hold more and change `lastName` in the same body. Check: the body-judging mutant fails.
+9. Decision 0010: `UserResourceManager` hides administrators through a group from every non-superuser identity. Tests first for the destructive routes, the list, superusers, ordinary users and narrowed tokens; INV-3 rows 3 to 5; human item; residuals. Check: the new tests fail at `b090396` on status codes, pass after; WP-0h harness green; mutants.
+10. Ordering and exact comparison: `manager` alone, a rename plus an unheld role, a case-only rename. Check: three mutants fail.
+11. Breadth note: narrowed admin tokens, alert authors, `user_moderator`, what a bare reset mails. Check: this file.
+12. One held-role-ids and one member-group-ids helper in `grants.py`, used by every caller; ACL needs built from `current_user`. Check: harness green, mypy, the full mutation table.
+13. The over-50-character 500 under Findings (WP-5d), the QA-4 evidence line, then the gates (3.9 and CPython 3.8.20, lint, mypy, 3.8 syntax guard, trial merge with `mig/integration` and `ci/pytest_suites.sh`, `task_gate.py`). Merge qa's pin branch when the lead reports its head.
+
 ### How H5 works
 
-`PATCH /api2/user/<id>` is gated by `edit_user` on site plus Potion's `edit_resource` on user; the seeded holders of both are `manager` + `user_admin`. WP-0h checks what the body grants, and resending the target's current groups is allowed, so a rename keeps a group carrying the admin role. `POST /api2/user/<id>/reset_password` is gated by `reset_password` on user (`user_admin`, `user_moderator`); `send_reset_password(user.username)` stores a reset token and mails the link to the username. Rename to an address the caller reads, then reset: the caller sets the admin's password. `UserResourceManager` hides only users holding the admin role directly, so an admin through a group is reachable.
+`PATCH /api2/user/<id>` is gated by `edit_user` on site plus Potion's `edit_resource` on user; the seeded holders of both are `manager` + `user_admin`. WP-0h checks what the body grants, and resending the target's current groups is allowed, so a rename keeps a group carrying the admin role. `POST /api2/user/<id>/reset_password` is gated by `reset_password` on user (`user_admin`, `user_moderator`); `send_reset_password(user.username)` stores a reset token and mails the link to the username. Rename to an address the caller reads, then reset: the caller sets the admin's password. `UserResourceManager` hid only users holding the admin role directly, so an admin through a group was reachable. Since decision 0010 it hides both (below).
 
 ### The rule
+
+Administrators, direct or through a group, are hidden from every non-superuser identity (below), so both routes, like every user route, answer 404 for them before any check here. The guard decides for every other target.
 
 `web/server/security/grants.py`, `verify_may_rename` and `verify_may_reset_password`:
 
@@ -51,16 +65,25 @@ Units, in order. Each line names the change and the check that ends it.
 
 The target is judged as it is before the request. A request that renames a user and in the same body removes the grants the caller lacks is refused; the caller can remove first, then rename.
 
-### UserResourceManager (optional change): not adopted
+### UserResourceManager: administrators through a group are hidden (decision 0010)
 
-Decision 0005 point 4 lets the builder hide users who are admins through a group from non-superusers. Not adopted in WP-0j, for security to confirm:
+Round 1 did not adopt decision 0005 point 4. Its reasoning, that the takeover was closed at the two writes and hiding would only turn a 403 into a 404, was wrong (reviewer round 1, finding 3). At `0b79419` a non-superuser still reached an administrator through a group on other user routes, each with no audit line:
+- `user_admin` alone: `DELETE /api2/user/<id>`, 204, the account deleted;
+- `manager` alone: `DELETE /api2/user/<id>/force`, 204, the account and every dashboard and alert it wrote deleted;
+- `manager` + `user_admin`: `PATCH` with status inactive, 200 (deactivated), and `PATCH` with groups `[]`, 200 (demoted: the target is no longer a superuser).
 
-- The takeover is closed at the two writes, for every target holding more than the caller, not only admins. Hiding would turn the admin case's 403 into a 404 and close nothing more.
-- Hiding changes reads for every non-superuser. `GET /api2/user` feeds the user pickers (sharing a dashboard, alert recipients, group editors), so admins through a group would disappear from them for every non-admin, an INV-3 change outside decision 0005's rows.
-- It would also stop a non-superuser user editor from editing or demoting such a user (404 on every item route), a second behaviour change.
-- WP-2b's triage already assigns H5's list visibility (admins through a group appear in non-admins' user lists, Low, part of I1) to WP-5d, where the user list is rebuilt on FastAPI with explicit `can()` checks and the direct-admin rule can be decided with it, from the identity rather than the account.
+None raises the caller's own access, but together they let a lesser role remove every administrator of a deployment. Decision 0010 made the hiding a requirement of this WP.
 
-Residual: a non-superuser who lists users still sees admins through a group (Low, information disclosure, unchanged). It can no longer take them over.
+`UserResourceManager._query` (`web/server/potion/managers.py`) leaves out users holding the admin role directly or through a group unless `SuperUserPermission().can()`. Superuser is the identity, as in WP-0h. So a token narrowed on an admin account no longer reaches direct administrators either: the old filter asked the account. One filter covers the list and every user item route (`DELETE`, `/force`, `PATCH`, `/roles`, `/reset_password`, `/password`, `/generate_api_token`, `/ownership`, `/can_export_data`, `/is_user_in_group`). Each answers 404 with nothing written and no audit line.
+
+Residuals, each Low, owner WP-5d (decision 0010 point 4):
+- lesser roles removing peers or higher users who are not administrators (delete, force-delete, deactivate, demote);
+- force-delete destroying dashboards the caller cannot delete directly;
+- removing a user from a group the caller is not in;
+- self force-delete through `/force`;
+- no audit line for successful destructive user operations.
+
+Deactivated accounts keep full access today (sign-in, header login, existing tokens). That High is WP-0k's (decision 0010 point 3), not this WP's.
 
 ### How to run the tests
 
@@ -78,10 +101,13 @@ Only principals that already pass a route's gate reach the new checks. The gates
 
 | # | Principal | Request | Before | After |
 |---|---|---|---|---|
-| 1 | a non-superuser identity passing the `PATCH` gates: `manager` + `user_admin` among seeded roles, or an admin account's token narrowed to them | `PATCH /api2/user/<id>` with a `username` other than the stored one, on a user holding a role (direct or through a group, admin included) the caller's account does not hold, a group the caller is not in, or an ACL whose permissions the caller's account holds neither on that resource nor sitewide | 200; the username and the rest of the body are written | 403; nothing written (profile, roles, groups, ACLs); audit line |
+| 1 | a non-superuser identity passing the `PATCH` gates: `manager` + `user_admin` among seeded roles, or an admin account's token narrowed to them | `PATCH /api2/user/<id>` with a `username` other than the stored one, on a user who is not an administrator and holds a role (direct or through a group) the caller's account does not hold, a group the caller is not in, or an ACL whose permissions the caller's account holds neither on that resource nor sitewide | 200; the username and the rest of the body are written | 403; nothing written (profile, roles, groups, ACLs); audit line |
 | 2 | a non-superuser identity with `reset_password` on user: `user_admin`, `user_moderator`, either with `manager`, or a narrowed admin token | `POST /api2/user/<id>/reset_password` on such a user | 204; a reset token is stored and the link is mailed to the username | 403; no token stored, nothing mailed; audit line |
+| 3 | any non-superuser identity (reading users is open to every signed-in user), a token narrowed on an admin account included | `GET /api2/user` and `GET /api2/user/<id>` on an administrator through a group; for a narrowed admin token, also on a direct administrator | listed; 200 | not listed; 404 |
+| 4 | a non-superuser identity passing a user item route's permission: `user_admin` (`DELETE`, `/roles`, `/reset_password`), `manager` (`/force`), `manager` + `user_admin` (`PATCH`), `user_moderator` (`/reset_password`), or a narrowed admin token | every user item route on an administrator through a group (on a direct administrator too, for a narrowed admin token) | 200 or 204 and written: deleted, force-deleted with its dashboards and alerts, deactivated, demoted, roles cleared; a rename or reset was 200/204 before this WP and 403 under the round-1 guard | 404; nothing written; no audit line |
+| 5 | non-superusers using pickers fed by `GET /api2/user`: dashboard sharing, alert recipients, group editors | choosing an administrator through a group | offered | not offered, as direct administrators already are not |
 
-Rows 1 and 2 are decision 0005's row, spelled out per route. In practice the refused targets include more than administrators:
+Rows 1 and 2 are decision 0005's row, spelled out per route; rows 3 to 5 are decision 0010's. In practice the refused targets include more than administrators:
 - users holding `_default_role` (query policies and data export) when the caller does not;
 - dashboard authors, who get a `dashboard_admin` ACL on each dashboard they create, unless the caller holds dashboard permissions sitewide (for example the `dashboard_admin` role) or the same ACL;
 - members of any group the caller is not in.
@@ -93,7 +119,9 @@ Unchanged:
 - Renames and resets of users whose roles, groups and ACLs are among the caller's, the caller itself included.
 - `PATCH /api2/user/<id>` that keeps the username, on any user the caller reaches, whatever it holds. WP-0h's grant checks still apply.
 - Callers without the gates: 401 from `AuthorizedOperation`, or 403 from Potion's check, with no audit line.
-- Users holding the admin role directly: still 404 to non-superusers (`UserResourceManager`). Admins through a group stay listed and reachable (see the not-adopted change above).
+- Users holding the admin role directly: still 404 to every non-superuser full session.
+- Superusers, direct or through a group: they still list and reach every user, administrators included.
+- Users who hold more than the caller without being administrators: still listed and reachable; only a rename or reset is refused (rows 1 and 2).
 - The anonymous `POST /api/forgot_password` (the user's own mailbox), `/api2/user/<id>/password` and `/generate_api_token` (both gated by `change_password` on user, which only superusers hold in the seed).
 - The 400 for a legacy username that is not an e-mail address is now reached only after the guard: a refused target answers 403 first.
 
@@ -102,13 +130,15 @@ Seeded roles with no difference: `admin` (a superuser), and every other role exc
 ## Findings for the lead
 
 - **Coupling with WP-0k.** WP-0k rebuilds the reset link from `DEPLOYMENT_BASE_URL` and changes username matching at login. This WP's mailer fixture patches `admin.url_for`; whichever lands second updates the fixture. WP-0j still allows renames to look-alike usernames of users the caller holds no less than; the login-side matching that makes look-alikes dangerous is WP-0k's.
+- **Destructive user routes on administrators (reviewer round 1, finding 3).** Delete, force-delete, deactivate and demote reached administrators through a group; decision 0010 closed them here (rows 3 to 5). The Low residuals for WP-5d are listed under the `UserResourceManager` section. The deactivated-accounts High is WP-0k's.
 - **`change_password` paths.** `/api2/user/<id>/password` and `/generate_api_token` hand over an account directly and are gated only by `change_password` on user. No seeded non-superuser role holds it, so nothing changes here. A custom role holding it would be a takeover path this rule does not cover; the WP-5d port should apply the same rule to every account-handover route.
 
 ## Human acceptance
 
 Security asks the human to accept:
 - INV-3 rows 1 and 2, including how broad they are in practice: a non-superuser user editor can no longer rename or reset dashboard authors, `_default_role` holders or members of other groups unless it holds the same access.
-- **The not-adopted `UserResourceManager` change.** Admins through a group stay visible in non-admins' user lists until WP-5d (Low).
+- **INV-3 rows 3 to 5 (decision 0010).** No deployment needs a non-superuser to see, share with, or maintain administrator accounts. Offboarding an administrator (delete, deactivate, demote) becomes a superuser or shell task. If no superuser can sign in, the recovery path is `scripts/create_user.py --site_admin`, documented per deployment.
+- **The Low residuals left to WP-5d:** lesser roles deleting, force-deleting, deactivating or demoting peers and higher users who are not administrators; force-delete destroying dashboards the caller cannot delete directly; removing a user from a group the caller is not in; self force-delete; no audit line for successful destructive user operations.
 
 ## Contract changes
 
@@ -117,6 +147,7 @@ None.
 ## Requests
 
 - [ ] qa: WP-2b has no live pin for the rename-and-reset takeover; its H5 entry covers only the user-list visibility, which does not change here. In this WP's stack, add and flip, in `tests/authz/http`: (a) `manager` + `user_admin` `PATCH /api2/user/<id>` changing the `username` of a user who is admin through a group, 200 with the username changed today, 403 with nothing changed after; (b) `user_admin` `POST /api2/user/<id>/reset_password` on the same user, 204 with a mail today (mailpit on the WP-2c stack), 403 and no mail after; (c) the unchanged controls, a rename and a reset of a user holding no more than the caller (200, 204). The `decisions.yaml` row `[reset_password, user, 43]` stays as it is: that check is still the gate, and the new refusal is a second check after it. `test_user_list_hides_admins_but_shows_everyone_else` is unchanged.
+- [ ] qa (decision 0010, supersedes parts of the request above): (a) and (b) now end in 404, not 403, with nothing written and no mail; add (d) a rename and a reset of a user who holds more without being an administrator (for example in a group carrying `exporter`): 200/204 today, 403 after; (e) flip the WP-2b list-visibility pin (`test_user_list_hides_admins_but_shows_everyone_else`): an administrator through a group is listed today and not after; (f) pin and flip the four destructive paths on an administrator through a group: `user_admin` `DELETE` 204, `manager` `DELETE /force` 204, `manager` + `user_admin` `PATCH` status inactive 200 and groups `[]` 200 today; 404 with nothing changed after; (g) check whether `authorUsername` on dashboards written by an administrator through a group goes null for non-superusers (the field's description says it is null when the author is not visible; whether it reads through `UserResourceManager` is the question), and whether the dashboard sharing, alert recipient and group editor pickers still load.
 
 ## Log
 
@@ -134,6 +165,7 @@ None.
   - CPython 3.8.20 (`/tmp/wp2g-be3-py38`, the web image's version): `python -m pytest tests/privilege_escalation` 122 passed; `py_compile` of the three changed Python files passes.
 - 2026-10-05 backend-0j round 2 unit 1 (reviewer finding 1): two higher targets pin the `all` in `_holds_acl` and the resource id: the caller holds `dashboard_viewer` on the target's `dashboard_admin` dashboard, and `dashboard_admin` on another dashboard. Check: `test_rename_and_reset.py` 44 passed; mutants `all` to `any` and resource id ignored pass the round-1 file (36 passed each) and fail 4 tests each on the new one (`/tmp/wp0j-r2/mutate.py`); ruff clean.
 - 2026-10-05 backend-0j round 2 unit 2 (reviewer finding 2, QA low): `test_a_rename_is_judged_on_the_user_before_the_request`, for a target in a group carrying `admin` and one carrying `exporter`, renames while dropping that group and changing `lastName`: 403, username, last name, roles, groups and ACLs unchanged, one refusal line. Every higher-target rename case now also changes `lastName` and asserts the same five unchanged. Check: 46 passed; the mutant that judges the body's groups passes the round-1 file (36 passed) and fails both new cases; ruff clean.
+- 2026-10-05 backend-0j round 2 unit 3 (decision 0010, replacing reviewer finding 3's correction): `UserResourceManager` hides administrators, direct or through a group, from every non-superuser identity (`SuperUserPermission().can()`). Tests: the five item routes (delete, force-delete, deactivate, demote, clear roles) 404 with nothing changed and no audit line; hidden from `GET /api2/user` and `GET /api2/user/<id>` for no roles, `manager` + `user_admin` and `user_moderator`; superusers direct and through a group still list, get and deactivate; users holding more but not admin still listed; narrowed admin tokens see neither direct nor group administrators. Admin-through-group rename and reset cases moved from 403 to 404; the guard cases keep their non-admin targets; WP-0h's `test_user_editor_removes_grants_it_does_not_hold` moved its target's group from `admin` to `exporter`. Check: at `b090396` with the new tests, 12 failed (200/204 instead of 404, listed) and 58 passed; after, harness 156 passed; mutants (group clause removed, direct clause removed, decided by the account) fail 11, 4 and 3 tests; ruff clean.
 
 ## Interrogate (unit 6)
 

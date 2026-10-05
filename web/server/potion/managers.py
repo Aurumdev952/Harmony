@@ -16,6 +16,7 @@ from flask_potion.utils import get_value
 
 from models.alchemy.permission import Role
 from models.alchemy.query_policy import QueryPolicyRole
+from models.alchemy.security_group import Group
 from web.server.data.data_access import Transaction
 from web.server.security.permissions import SUPERUSER_ROLENAME, SuperUserPermission
 
@@ -338,14 +339,19 @@ class GroupResourceManager(SQLAlchemyManager):
 
 
 class UserResourceManager(SQLAlchemyManager):
+    '''Administrators, direct or through a group, are hidden from every
+    non-superuser identity (decision 0010): no user route reaches them.
+    '''
+
     def _query(self):
         query = super()._query()
-        user = current_user
-        if not user.is_superuser():
-            # pylint: disable=no-member
-            admin_role = Role.query.filter(Role.name == 'admin').first()
-            return query.filter(~self.model.roles.any(Role.id == admin_role.id))
-        return query
+        if SuperUserPermission().can():
+            return query
+        is_admin = Role.name == SUPERUSER_ROLENAME
+        return query.filter(
+            ~self.model.roles.any(is_admin),
+            ~self.model.groups.any(Group.roles.any(is_admin)),
+        )
 
 
 class QueryPolicyResourceManager(SQLAlchemyManager):

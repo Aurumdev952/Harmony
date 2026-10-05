@@ -48,6 +48,7 @@ COPY --link --from=build /zenysis/.venv .venv
 
 # Python code, owned by root and read-only to the app user.
 COPY config config
+COPY harmony harmony
 COPY data data
 COPY db db
 COPY log log

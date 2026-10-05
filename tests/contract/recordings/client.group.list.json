@@ -1,0 +1,131 @@
+{
+  "content_type": "application/json",
+  "headers": [
+    "link",
+    "x-total-count"
+  ],
+  "id": "client.group.list",
+  "pinned": {},
+  "response_schema": {
+    "items": {
+      "properties": {
+        "$uri": {
+          "type": "string",
+          "x-format": "api-uri"
+        },
+        "acls": {
+          "maxItems": 0,
+          "type": "array"
+        },
+        "name": {
+          "type": "string"
+        },
+        "roles": {
+          "items": {
+            "properties": {
+              "$uri": {
+                "type": "string",
+                "x-format": "api-uri"
+              },
+              "alertResourceRoleName": {
+                "type": "string"
+              },
+              "dashboardResourceRoleName": {
+                "type": "string"
+              },
+              "dataExport": {
+                "type": "boolean"
+              },
+              "label": {
+                "type": "string"
+              },
+              "name": {
+                "type": "string"
+              },
+              "permissions": {
+                "items": {
+                  "properties": {
+                    "id": {
+                      "type": "integer"
+                    },
+                    "permission": {
+                      "type": "string"
+                    },
+                    "resource_type_id": {
+                      "type": "integer"
+                    }
+                  },
+                  "required": [
+                    "id",
+                    "permission",
+                    "resource_type_id"
+                  ],
+                  "type": "object"
+                },
+                "type": "array"
+              },
+              "queryPolicies": {
+                "maxItems": 0,
+                "type": "array"
+              },
+              "usernames": {
+                "items": {
+                  "type": "string",
+                  "x-format": "email"
+                },
+                "type": "array"
+              }
+            },
+            "required": [
+              "$uri",
+              "alertResourceRoleName",
+              "dashboardResourceRoleName",
+              "dataExport",
+              "label",
+              "name",
+              "permissions",
+              "queryPolicies",
+              "usernames"
+            ],
+            "type": "object"
+          },
+          "type": "array"
+        },
+        "users": {
+          "items": {
+            "properties": {
+              "firstName": {
+                "type": "string"
+              },
+              "lastName": {
+                "type": "string"
+              },
+              "username": {
+                "type": "string",
+                "x-format": "email"
+              }
+            },
+            "required": [
+              "firstName",
+              "lastName",
+              "username"
+            ],
+            "type": "object"
+          },
+          "type": "array"
+        }
+      },
+      "required": [
+        "$uri",
+        "acls",
+        "name",
+        "roles",
+        "users"
+      ],
+      "type": "object"
+    },
+    "type": "array"
+  },
+  "route": "GET /api2/group",
+  "status": 200
+}

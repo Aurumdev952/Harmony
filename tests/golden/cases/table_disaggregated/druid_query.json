@@ -55,7 +55,7 @@
           "field": {
             "dimension": "Age",
             "type": "selector",
-            "value": ""
+            "value": null
           },
           "type": "not"
         }

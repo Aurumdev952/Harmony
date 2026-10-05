@@ -17,6 +17,7 @@ from flask_potion.utils import get_value
 from models.alchemy.permission import Role
 from models.alchemy.query_policy import QueryPolicyRole
 from web.server.data.data_access import Transaction
+from web.server.security.permissions import SUPERUSER_ROLENAME, SuperUserPermission
 
 from models.alchemy.base import Base, Pagination as SAPagination
 
@@ -304,24 +305,36 @@ class AuthorizationResourceManager(SQLAlchemyManager, metaclass=ABCMeta):
         pass
 
 
+# Item routes on roles and groups confer what they reach (`/users`), so the
+# reach follows web.server.security.grants: superuser is the identity, and a
+# non-superuser identity on an admin account (a narrowed token) does not hold
+# the admin role or a group carrying it.
+
+
 class RoleResourceManager(SQLAlchemyManager):
     def _query(self):
         query = super()._query()
-        user = current_user
-        if not user.is_superuser():
-            role_ids = [role.id for role in user.get_all_roles()]
-            return query.filter(getattr(self.model, 'id').in_(role_ids))
-        return query
+        if SuperUserPermission().can():
+            return query
+        role_ids = [
+            role.id
+            for role in current_user.get_all_roles()
+            if role.name != SUPERUSER_ROLENAME
+        ]
+        return query.filter(getattr(self.model, 'id').in_(role_ids))
 
 
 class GroupResourceManager(SQLAlchemyManager):
     def _query(self):
         query = super()._query()
-        user = current_user
-        if not user.is_superuser():
-            group_ids = [group.id for group in user.groups]
-            return query.filter(getattr(self.model, 'id').in_(group_ids))
-        return query
+        if SuperUserPermission().can():
+            return query
+        group_ids = [
+            group.id
+            for group in current_user.groups
+            if all(role.name != SUPERUSER_ROLENAME for role in group.roles)
+        ]
+        return query.filter(getattr(self.model, 'id').in_(group_ids))
 
 
 class UserResourceManager(SQLAlchemyManager):
@@ -329,6 +342,7 @@ class UserResourceManager(SQLAlchemyManager):
         query = super()._query()
         user = current_user
         if not user.is_superuser():
+            # pylint: disable=no-member
             admin_role = Role.query.filter(Role.name == 'admin').first()
             return query.filter(~self.model.roles.any(Role.id == admin_role.id))
         return query
@@ -340,6 +354,7 @@ class QueryPolicyResourceManager(SQLAlchemyManager):
         user = current_user
         if not user.is_superuser():
             role_ids = [role.id for role in user.get_all_roles()]
+            # pylint: disable=no-member
             qps = [
                 query_policy.query_policy_id
                 for query_policy in QueryPolicyRole.query.filter(

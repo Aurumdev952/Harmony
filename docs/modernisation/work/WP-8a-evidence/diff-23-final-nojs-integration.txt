@@ -1,0 +1,1 @@
+0 cases differ between /tmp/wp8a/out/final/legacy-integration and /tmp/wp8a/out/final/nojs-integration; 0 in Druid rows, body or error, 0 in query text only

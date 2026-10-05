@@ -1,0 +1,10 @@
+{
+  "content_type": "text/html",
+  "headers": [],
+  "id": "graphql.patchFieldServiceQuery.anonymous",
+  "non_empty": true,
+  "pinned": {},
+  "response_schema": null,
+  "route": "POST /api/graphql",
+  "status": 401
+}

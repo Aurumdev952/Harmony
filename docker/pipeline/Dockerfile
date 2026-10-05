@@ -97,6 +97,7 @@ COPY util ./util
 COPY data ./data
 COPY docker/entrypoint_pipeline.sh ./docker/entrypoint_pipeline.sh
 COPY config ./config
+COPY harmony ./harmony
 COPY models ./models
 COPY log ./log
 # TODO: Why does pipeline need web?

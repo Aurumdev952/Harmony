@@ -53,14 +53,27 @@
           "field": {
             "fields": [
               {
-                "dimension": "Death",
-                "type": "selector",
-                "value": "1"
-              },
-              {
                 "dimension": "StateName",
                 "type": "selector",
-                "value": ""
+                "value": null
+              },
+              {
+                "fields": [
+                  {
+                    "dimension": "Death",
+                    "type": "selector",
+                    "value": "1"
+                  },
+                  {
+                    "field": {
+                      "dimension": "Death",
+                      "type": "selector",
+                      "value": null
+                    },
+                    "type": "not"
+                  }
+                ],
+                "type": "and"
               }
             ],
             "type": "or"

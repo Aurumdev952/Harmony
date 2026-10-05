@@ -7,7 +7,7 @@ from pydruid.utils.aggregators import (
     filtered as filtered_aggregator,
     longsum,
 )
-from pydruid.utils.filters import Dimension as DimensionFilter
+from pydruid.utils.filters import Filter
 
 from db.druid.post_aggregations.theta_sketch import bound_sketch_size
 from db.druid.query_client import DruidQueryClient
@@ -112,7 +112,7 @@ def compute_eligible_high_cardinality_dimension_groupings(
     for dimension in dimensions:
         output[dimension] = []
         base_aggregations[dimension] = filtered_aggregator(
-            DimensionFilter(dimension) != '', longsum('count')
+            ~Filter(dimension=dimension, value=None), longsum('count')
         )
 
     for high_cardinality_dimension in high_cardinality_dimensions:
@@ -127,7 +127,7 @@ def compute_eligible_high_cardinality_dimension_groupings(
                     'field': {
                         'type': 'selector',
                         'dimension': high_cardinality_dimension,
-                        'value': '',
+                        'value': None,
                     },
                 },
                 'aggregations': build_aggregators(

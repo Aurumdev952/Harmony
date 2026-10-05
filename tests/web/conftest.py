@@ -6,6 +6,11 @@ from collections.abc import Callable
 import pytest
 from flask import Flask
 
+from tests.throwaway_postgres import (  # noqa: F401
+    fixture_postgres_database,
+    fixture_postgres_server,
+)
+
 # config/settings.py and the config loader read these at import time; the values are
 # test-only placeholders, and harmony_demo is the deployment checked into the repo.
 os.environ.setdefault('DEFAULT_SECRET_KEY', 'tests-web-placeholder-key')

@@ -1,0 +1,187 @@
+--- a/db/postgres/utils.py
++++ b/db/postgres/utils.py
+@@ -8,6 +8,7 @@
+ from typing import List, Optional
+ 
+ import psycopg2
++from psycopg2 import sql
+ from psycopg2.extensions import ISOLATION_LEVEL_AUTOCOMMIT, quote_ident
+ 
+ from log import LOG
+@@ -154,6 +155,86 @@
+             )
+ 
+ 
++def _column_names(cursor, query: str, table_ident: str) -> list[str]:
++    cursor.execute(query, (table_ident,))
++    return [row[0] for row in cursor.fetchall()]
++
++
++def _primary_key(cursor, table_ident: str) -> list[str]:
++    key = _column_names(
++        cursor,
++        'SELECT a.attname FROM pg_index i JOIN pg_attribute a'
++        ' ON a.attrelid = i.indrelid AND a.attnum = ANY(i.indkey)'
++        ' WHERE i.indrelid = %s::regclass AND i.indisprimary ORDER BY a.attnum',
++        table_ident,
++    )
++    if not key:
++        raise ImportTableDataError(f'Table {table_ident} has no primary key.')
++    return key
++
++
++def _delete_rows_missing_from_staging(cursor, table_ident: str, staging_ident: str):
++    '''Deletes the rows the export does not carry. A table that no foreign key
++    references is emptied instead, so that a mapping row whose id holds a different
++    pair in the export cannot collide with the table's other unique constraints.'''
++    cursor.execute(
++        'SELECT EXISTS (SELECT 1 FROM pg_constraint'
++        " WHERE contype = 'f' AND confrelid = %s::regclass)",
++        (table_ident,),
++    )
++    if not cursor.fetchone()[0]:
++        cursor.execute(sql.SQL('DELETE FROM {}').format(sql.SQL(table_ident)))
++        return
++    cursor.execute(
++        sql.SQL(
++            'DELETE FROM {table} AS t WHERE NOT EXISTS'
++            ' (SELECT 1 FROM {staging} AS s WHERE {match})'
++        ).format(
++            table=sql.SQL(table_ident),
++            staging=sql.SQL(staging_ident),
++            match=sql.SQL(' AND ').join(
++                sql.SQL('s.{0} = t.{0}').format(sql.Identifier(column))
++                for column in _primary_key(cursor, table_ident)
++            ),
++        )
++    )
++
++
++def _upsert_rows_from_staging(cursor, table_ident: str, staging_ident: str):
++    '''Inserts the staged rows, updating in place the rows whose primary key the
++    table already holds.'''
++    columns = _column_names(
++        cursor,
++        'SELECT attname FROM pg_attribute WHERE attrelid = %s::regclass'
++        ' AND attnum > 0 AND NOT attisdropped ORDER BY attnum',
++        table_ident,
++    )
++    key = _primary_key(cursor, table_ident)
++    updates = [column for column in columns if column not in key]
++    on_conflict = (
++        sql.SQL('DO UPDATE SET {}').format(
++            sql.SQL(', ').join(
++                sql.SQL('{0} = EXCLUDED.{0}').format(sql.Identifier(column))
++                for column in updates
++            )
++        )
++        if updates
++        else sql.SQL('DO NOTHING')
++    )
++    cursor.execute(
++        sql.SQL(
++            'INSERT INTO {table} ({columns}) SELECT {columns} FROM {staging}'
++            ' ON CONFLICT ({key}) {on_conflict}'
++        ).format(
++            table=sql.SQL(table_ident),
++            staging=sql.SQL(staging_ident),
++            columns=sql.SQL(', ').join(map(sql.Identifier, columns)),
++            key=sql.SQL(', ').join(map(sql.Identifier, key)),
++            on_conflict=on_conflict,
++        )
++    )
++
++
+ def import_data_into_table(
+     sql_connection_string,
+     input_file,
+@@ -161,42 +242,65 @@
+     delimiter: str = ';',
+     disable_migration_check: Optional[bool] = False,
+ ):
+-    '''imports data into the tables from a csv file
++    '''Replaces the rows of `tables` with the rows of an `export_tables_to_zip`
++    archive, in one transaction: a failed import changes nothing.
++
++    Rows in tables the archive does not carry may reference the imported rows
++    (Field Setup's unpublished-field mappings, dimension metadata, source_config), so
++    the import never empties a table that a foreign key references. Such a table keeps
++    the rows whose primary key the archive also carries, updated in place, and loses
++    only the rows the archive does not carry; their foreign keys' ON DELETE rules
++    apply to the rows that reference them. A table nothing references is emptied and
++    reloaded.
++
+     Args:
+-        sql_connection_string: Postgres database connection string,
+-        input_file: Path to the zipped file
+-        csv_data (file): CSV file object descriptor.
+-        delimiter (str): CSV data delimeter
++        sql_connection_string: Postgres database connection string.
++        input_file: Path to the zipped export.
++        tables: The tables to import, each listed after the tables it references.
++        delimiter (str): CSV data delimiter.
+     '''
+     with psycopg_connection(sql_connection_string) as conn, zipfile.ZipFile(
+         input_file
+     ) as zip_file, make_temp_directory() as temp_dir_name:
++        conn.autocommit = False
+         version_file = zip_file.extract('alembic_version.csv.lz4', path=temp_dir_name)
+-        with conn.cursor() as cursor:
++        with conn, conn.cursor() as cursor:
+             if not disable_migration_check:
+                 current_db_version = get_current_db_version(cursor)
+                 check_db_migration_version(version_file, current_db_version, delimiter)
++            idents = {}
+             for table_name in tables:
+-                LOG.info('Beginning import of data into table: %s', table_name)
++                LOG.info('Staging the export of table: %s', table_name)
++                table_ident = quote_ident(table_name, conn)
++                staging_ident = quote_ident(f'import_{table_name}', conn)
++                idents[table_name] = (table_ident, staging_ident)
++                cursor.execute(
++                    sql.SQL(
++                        'CREATE TEMPORARY TABLE {staging} (LIKE {table}) ON COMMIT DROP'
++                    ).format(
++                        staging=sql.SQL(staging_ident), table=sql.SQL(table_ident)
++                    )
++                )
+                 file_name = zip_file.extract(
+                     f'{table_name}.csv.lz4', path=temp_dir_name
+                 )
+-
+-                # Quote the table name to prevent SQL injection.
+-                table_ident = quote_ident(table_name, conn)
+-
+-                # Since we have to execute the COPY statement as raw SQL, we need to safely
+-                # escape all untrusted input.
+-                copy_from_sql = cursor.mogrify(
+-                    f'COPY {table_ident} FROM STDIN WITH CSV DELIMITER %s HEADER',
+-                    (delimiter,),
+-                )
+-
+                 with LZ4Reader(file_name) as reader:
+-                    cursor.execute(
+-                        f'TRUNCATE TABLE {table_ident} RESTART IDENTITY CASCADE;'
++                    cursor.copy_expert(
++                        sql.SQL(
++                            'COPY {staging} FROM STDIN WITH CSV DELIMITER {delimiter}'
++                            ' HEADER'
++                        ).format(
++                            staging=sql.SQL(staging_ident),
++                            delimiter=sql.Literal(delimiter),
++                        ),
++                        reader,
+                     )
+-                    cursor.copy_expert(copy_from_sql, reader)
+-                    # execute sql to reset the sequence if table has sequence
+-                    cursor.execute(SET_SEQUENCE_SQL.format(table_name=table_ident))
+-                LOG.info('Finished import of data into table: %s', table_name)
++            for table_name in reversed(tables):
++                _delete_rows_missing_from_staging(cursor, *idents[table_name])
++            for table_name in tables:
++                LOG.info('Importing data into table: %s', table_name)
++                table_ident, staging_ident = idents[table_name]
++                _upsert_rows_from_staging(cursor, table_ident, staging_ident)
++                # execute sql to reset the sequence if table has sequence
++                cursor.execute(SET_SEQUENCE_SQL.format(table_name=table_ident))
++            LOG.info('Finished import of tables: %s', ', '.join(tables))

@@ -1,9 +1,11 @@
-- [Compose testing traps](compose_testing_traps.md) — dummy env files, worktree Bash guard, host port clashes, anonymous volumes, redis-cli exit codes
+- [Infra test lane](infra-test-lane.md) — tests/infra needs `--project ci/tools313`; test-first via in-place Dockerfile mutation
+- [Compose testing traps](compose_testing_traps.md) — dummy env files, Bash guard, port clashes, volumes, redis-cli, `$$` in config, extends one service
 - [Upstream artifacts gone](upstream_artifacts_gone.md) — MinIO images gone, mc downloads 410; pinned GitHub release; R5 pending
 - [Hasura runtime facts](hasura_runtime_facts.md) — v2.45.8 status codes, image tools, dev-mode scope; required secret couples WP-0a and WP-0b compose fixtures
 - [CI tooling and Bash guards](ci_tooling_and_guards.md): actionlint and shellcheck install, action SHA lookup, worktree guard, Actions default shell
 - [WP-0f open items](wp_0f_open_items.md): Docker Hub path removal awaits the human; slash-tag bug fixed in WP-3b; comma `--cache-from` is fine
 - [Python toolchain](wp_2f_next.md): one 3.13 uv lane after WP-3b, uv >= 0.12.16 required, ruff/pytest/uv traps
-- [Infra tooling traps](infra_tooling_traps.md) — scripts/ vs prod/ vs ci/, old mypy typeshed, worktree Bash/Write guards, side branches
+- [Infra tooling traps](infra_tooling_traps.md) — *.log gitignored, scripts/ vs prod/ ownership, old mypy typeshed, nginx-proxy forego prefix, ZEN_PROD in images, worktree guards, side branches
 - [Image verification recipes](image_verification_recipes.md) — unique compose build names, sweep env/PYTHONPATH, overlays, PyPy: import-test wheels, gspread marker
 - [CPython 3.13 image findings](cpython313_image_findings.md) — ijson C backend lost, non-root upgrade path, Druid stub, NodeSource 14 broken, dev volume
+- [Logging traps](logging_traps.md) — redaction regex cost on client text, Celery stdout banner/shutdown line, worker loglevel ignored, nginx X-Request-ID

@@ -20,6 +20,10 @@ def fixture_tag() -> str:
     return secrets.token_hex(4)
 
 
+# The seeded all-values policies. build_role resolves each entry by its $uri
+# alone; the other keys are labels only, and which seeded policy gets id 1 or 2
+# can differ between fresh stacks. Only the URIs matter, so the tests assert
+# the set of URIs and dimensions, never which dimension an id carries.
 ALL_VALUES_POLICIES = [
     {
         '$uri': '/api2/query_policy/1',
@@ -65,7 +69,8 @@ def _role_body(label, name='', permissions=(), query_policies=(), data_export=Fa
 
 def _delete_if_present(stack, uri) -> None:
     response = stack.request(stack.admin, 'DELETE', uri)
-    assert response.status_code in (204, 404), (uri, response.status_code)
+    # Admin DELETE /api2/role returns 200; other resources return 204.
+    assert response.status_code in (200, 204, 404), (uri, response.status_code)
 
 
 @pytest.fixture(name='empty_group')

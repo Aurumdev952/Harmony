@@ -16,6 +16,7 @@ from db.druid.util import EmptyFilter
 if TYPE_CHECKING:
     from db.druid.query_builder import GroupByQueryBuilder
 
+
 # Strip off any filters around the aggregation and return just
 # the base aggregation
 def extract_aggregation(aggregation):
@@ -67,7 +68,7 @@ class ExactUniqueCountAggregation(QueryModifyingAggregation):
 
         # If requested, prevent empty dimension values from being counted
         if exclude_missing:
-            self.count_filter &= ~Filter(dimension=self.dimension, value='')
+            self.count_filter &= ~Filter(dimension=self.dimension, value=None)
 
         self.calculation = _HelperCalculation(self.name, self.count_filter)
         super().__init__()
@@ -95,16 +96,17 @@ class ExactUniqueCountAggregation(QueryModifyingAggregation):
     # ExactUniqueCountAggregation is encountered during a query, it can be
     # merged into this one to produce a new aggregation to use.
     def merge_compatible_aggregation(self, aggregation):
-        assert isinstance(
-            aggregation, ExactUniqueCountAggregation
-        ), 'Cannot add additional modifying aggregation. Invalid type: %s' % (
-            type(aggregation)
-        )
-        assert aggregation.dimension == self.dimension, (
-            'Cannot add additional modifying aggregations. Uniqueness '
-            'dimension does not match. Original %s\tNew: %s'
-            % (self.dimension, aggregation.dimension)
-        )
+        if not isinstance(aggregation, ExactUniqueCountAggregation):
+            raise TypeError(
+                'Cannot add additional modifying aggregation. Invalid type: '
+                f'{type(aggregation)}'
+            )
+        if aggregation.dimension != self.dimension:
+            raise ValueError(
+                'Cannot add additional modifying aggregations. Uniqueness '
+                f'dimension does not match. Original {self.dimension}\t'
+                f'New: {aggregation.dimension}'
+            )
 
         # NOTE: Aggregations are supposed to be standalone, and the
         # original instance should be reusable. Since additional state needs to
@@ -189,10 +191,11 @@ class _HelperCalculation(BaseCalculation):
     # Merge other calculations supplied by ExactUniqueCountAggregation
     # into this calculation.
     def merge_calculation(self, other_calculation):
-        assert isinstance(other_calculation, _HelperCalculation), (
-            'Cannot merge additional exact unique calculation in. '
-            'Invalid type: %s' % type(other_calculation)
-        )
+        if not isinstance(other_calculation, _HelperCalculation):
+            raise TypeError(
+                'Cannot merge additional exact unique calculation in. '
+                f'Invalid type: {type(other_calculation)}'
+            )
 
         # Merge in the inner aggregations and post aggregations
         self.add_aggregations(other_calculation.aggregations)
@@ -202,7 +205,7 @@ class _HelperCalculation(BaseCalculation):
         for key, value in other_calculation.outer_aggregations.items():
             if key not in self.outer_aggregations:
                 self.outer_aggregations[key] = value
-            else:
-                assert (
-                    value == self.outer_aggregations[key]
-                ), f'Attempting to overwrite existing outer aggregation for key: {key}'
+            elif value != self.outer_aggregations[key]:
+                raise ValueError(
+                    f'Attempting to overwrite existing outer aggregation for key: {key}'
+                )

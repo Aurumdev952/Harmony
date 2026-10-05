@@ -1,0 +1,59 @@
+{
+  "content_type": "text/html",
+  "headers": [],
+  "id": "graphql.DataStatusPageQuery",
+  "pinned": {},
+  "response_schema": {
+    "properties": {
+      "data": {
+        "properties": {
+          "dataprep_flow_connection": {
+            "properties": {
+              "edges": {
+                "items": {
+                  "properties": {
+                    "node": {
+                      "properties": {
+                        "dataprepJobs": {
+                          "maxItems": 0,
+                          "type": "array"
+                        },
+                        "id": {
+                          "type": "string"
+                        }
+                      },
+                      "required": [
+                        "dataprepJobs",
+                        "id"
+                      ],
+                      "type": "object"
+                    }
+                  },
+                  "required": [
+                    "node"
+                  ],
+                  "type": "object"
+                },
+                "type": "array"
+              }
+            },
+            "required": [
+              "edges"
+            ],
+            "type": "object"
+          }
+        },
+        "required": [
+          "dataprep_flow_connection"
+        ],
+        "type": "object"
+      }
+    },
+    "required": [
+      "data"
+    ],
+    "type": "object"
+  },
+  "route": "POST /api/graphql",
+  "status": 200
+}

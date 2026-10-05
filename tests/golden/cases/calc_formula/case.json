@@ -1,0 +1,5 @@
+{
+  "description": "FORMULA case fatality rate: two SUM constituents and an expression post-aggregator.",
+  "endpoint": "table",
+  "policy": null
+}

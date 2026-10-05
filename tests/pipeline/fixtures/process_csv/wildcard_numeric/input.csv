@@ -1,0 +1,4 @@
+StateName,MunicipalityName,Date,*field_Malaria Positive,*field_Malaria Tested,Notes
+Northvale,Ashford,2021-06-01,3,9,first visit
+Northvale,Ashford,2021-06-01,2,,
+Southmere,Cedar Point,2021-06-02,,4,

@@ -1,0 +1,6 @@
+{"timestamp": "2026-10-04T18:37:18.015+00:00", "level": "INFO", "logger": "ZenysisLogger", "message": "Handling demo request", "source": "demo_request.py:demo:22", "deployment": "harmony_demo", "request_id": "demo-0001"}
+{"timestamp": "2026-10-04T18:37:18.016+00:00", "level": "INFO", "logger": "ZenysisLogger", "message": "Response 200 with X-Request-ID=demo-0001", "source": "demo_request.py:<module>:28", "deployment": "harmony_demo"}
+{"timestamp": "2026-10-04T18:37:18.017+00:00", "level": "INFO", "logger": "ZenysisLogger", "message": "Handling demo request", "source": "demo_request.py:demo:22", "deployment": "harmony_demo", "request_id": "68db0557f6844686b03af04e80b3606e"}
+{"timestamp": "2026-10-04T18:37:18.018+00:00", "level": "INFO", "logger": "ZenysisLogger", "message": "Response 200 with X-Request-ID=68db0557f6844686b03af04e80b3606e", "source": "demo_request.py:<module>:28", "deployment": "harmony_demo"}
+{"timestamp": "2026-10-04T18:37:17.729+00:00", "level": "WARNING", "logger": "ZenysisLogger", "message": "Environment variable NOREPLY_EMAIL not set", "source": "settings.py:getenv:11", "deployment": "harmony_demo"}
+{"timestamp": "2026-10-04T18:37:17.729+00:00", "level": "WARNING", "logger": "ZenysisLogger", "message": "Environment variable SUPPORT_EMAIL not set", "source": "settings.py:getenv:11", "deployment": "harmony_demo"}

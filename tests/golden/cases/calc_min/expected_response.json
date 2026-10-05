@@ -1,0 +1,22 @@
+{
+  "data": [
+    {
+      "StateName": "Acre",
+      "yellow_fever_cases": 2.03
+    },
+    {
+      "StateName": "Pará",
+      "yellow_fever_cases": 174.0
+    },
+    {
+      "StateName": "Roraima",
+      "yellow_fever_cases": 70.0
+    }
+  ],
+  "dimensions": [
+    "StateName"
+  ],
+  "fields": [
+    "yellow_fever_cases"
+  ]
+}

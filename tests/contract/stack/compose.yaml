@@ -1,0 +1,132 @@
+# Local-only stack for recording and replaying API contract cases (WP-2c).
+# Start it with stack.sh, which builds the web image, generates every secret
+# below into a mode-600 file outside the repository and adds the overlays
+# that match the checked-out code (compose.redis-auth.yaml after WP-0b,
+# compose.hasura-secret.yaml after WP-0a).
+#
+# Every service sits on an internal network with no route out, so nothing
+# reaches Mailgun, Urlbox or a CDN. Only the forwarder joins a routable
+# network, to publish web on loopback.
+name: ${CONTRACT_PROJECT:?run tests/contract/stack/stack.sh}
+
+x-web-env: &web-env
+  ZEN_ENV: harmony_demo
+  ZEN_OFFLINE: "1"
+  ZEN_HOME: /zenysis
+  PYTHONPATH: /zenysis
+  PYTHONDONTWRITEBYTECODE: "1"
+  DATABASE_URL: postgresql://postgres:${POSTGRES_PASSWORD:?}@postgres:5432/harmony_demo-local
+  SQLALCHEMY_DATABASE_URI: postgresql://postgres:${POSTGRES_PASSWORD:?}@postgres:5432/harmony_demo-local
+  POSTGRES_HOST: postgres
+  POSTGRES_USER: postgres
+  POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?}
+  REDIS_HOST: redis
+  REDIS_PASSWORD: ${REDIS_PASSWORD:?}
+  HASURA_HOST: http://hasura:8080
+  HASURA_ADMIN_SECRET: ${HASURA_ADMIN_SECRET:?}
+  DRUID_HOST: http://druid-stub
+  DEFAULT_SECRET_KEY: ${DEFAULT_SECRET_KEY:?}
+  JWT_SECRET_KEY: ${JWT_SECRET_KEY:?}
+  EMAIL_HOST: mailpit
+  EMAIL_PORT: "1025"
+  EMAIL_HOST_USER: contract-mailer@harmony.invalid
+  EMAIL_HOST_PASSWORD: contract-mail-sink
+  EMAIL_USE_ENCRYPTION: none
+
+networks:
+  internal:
+    internal: true
+  edge: {}
+
+services:
+  postgres:
+    image: postgres:15.2-alpine@sha256:d9c304353c031b21e9a7e33dc4781e272a9fa802a2ab9703fe4199d72ba1422c
+    networks: [internal]
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?}
+      POSTGRES_DB: harmony_demo-local
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres -d harmony_demo-local"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+    tmpfs:
+      - /var/lib/postgresql/data
+
+  redis:
+    image: redis:7-alpine@sha256:520775a41a63e77e06c73e35d2fd9cc15921a609516818796b4ecbb813078bc7
+    networks: [internal]
+
+  mailpit:
+    image: axllent/mailpit:v1.31.0@sha256:c96991d9bef73594c246d89ca81411d4e916f03e76a7d2d72fa2ab5dd3c9ce24
+    networks: [internal]
+    environment:
+      MP_SMTP_AUTH_ACCEPT_ANY: "1"
+      MP_SMTP_AUTH_ALLOW_INSECURE: "1"
+
+  druid-stub:
+    image: python:3.12-slim@sha256:f77ac9e44ae96ef2c90b8053ea08c31f8be030f824196b0ae4db6d462c84e51f
+    networks: [internal]
+    volumes:
+      - ./druid_stub.py:/stub/druid_stub.py:ro
+    command: ["python", "-u", "/stub/druid_stub.py"]
+
+  web-init:
+    image: ${CONTRACT_WEB_IMAGE:?}
+    networks: [internal]
+    working_dir: /zenysis
+    volumes:
+      - ../../..:/zenysis:ro
+    environment:
+      <<: *web-env
+      CONTRACT_USERNAME: ${CONTRACT_USERNAME:?}
+      CONTRACT_PASSWORD: ${CONTRACT_PASSWORD:?}
+    command: ["/bin/bash", "/zenysis/tests/contract/stack/init.sh"]
+    depends_on:
+      postgres:
+        condition: service_healthy
+      druid-stub:
+        condition: service_started
+
+  hasura:
+    image: hasura/graphql-engine:v2.11.3.cli-migrations-v2@sha256:5e75080f938a7f1a59eabae857306eb41c7aff04fd7d2875a942e087716d187f
+    networks: [internal]
+    environment:
+      HASURA_GRAPHQL_ENABLE_TELEMETRY: "false"
+      HASURA_GRAPHQL_DATABASE_URL: postgresql://postgres:${POSTGRES_PASSWORD:?}@postgres:5432/harmony_demo-local
+    depends_on:
+      web-init:
+        condition: service_completed_successfully
+
+  web:
+    image: ${CONTRACT_WEB_IMAGE:?}
+    networks: [internal]
+    working_dir: /zenysis
+    volumes:
+      - ../../..:/zenysis:ro
+    environment:
+      <<: *web-env
+      ZEN_GUNICORN_WORKER_THREADS: "2"
+    command: ["python", "web/gunicorn_server.py", "--timeout=600"]
+    depends_on:
+      web-init:
+        condition: service_completed_successfully
+      redis:
+        condition: service_started
+      mailpit:
+        condition: service_started
+      hasura:
+        condition: service_started
+
+  forward:
+    image: python:3.12-slim@sha256:f77ac9e44ae96ef2c90b8053ea08c31f8be030f824196b0ae4db6d462c84e51f
+    networks: [internal, edge]
+    volumes:
+      - ./port_forward.py:/forward/port_forward.py:ro
+    command: ["python", "-u", "/forward/port_forward.py"]
+    ports:
+      - 127.0.0.1:${CONTRACT_WEB_PORT:?}:5000
+    depends_on:
+      web:
+        condition: service_started

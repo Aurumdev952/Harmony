@@ -1,0 +1,176 @@
+[
+  {
+    "aggregations": [
+      {
+        "aggregator": {
+          "fieldName": "count",
+          "name": "case_fatality_rate__count",
+          "type": "longSum"
+        },
+        "filter": {
+          "fields": [
+            {
+              "dimension": "field",
+              "type": "selector",
+              "value": "yellow_fever_cases"
+            },
+            {
+              "fields": [
+                {
+                  "dimension": "Death",
+                  "type": "selector",
+                  "value": "1"
+                },
+                {
+                  "dimension": "field",
+                  "type": "selector",
+                  "value": "yellow_fever_cases"
+                }
+              ],
+              "type": "and"
+            }
+          ],
+          "type": "or"
+        },
+        "type": "filtered"
+      },
+      {
+        "aggregator": {
+          "fieldName": "sum",
+          "name": "cases__case_fatality_rate",
+          "type": "doubleSum"
+        },
+        "filter": {
+          "dimension": "field",
+          "type": "selector",
+          "value": "yellow_fever_cases"
+        },
+        "type": "filtered"
+      },
+      {
+        "aggregator": {
+          "fieldName": "count",
+          "name": "cases__case_fatality_rate__count",
+          "type": "longSum"
+        },
+        "filter": {
+          "dimension": "field",
+          "type": "selector",
+          "value": "yellow_fever_cases"
+        },
+        "type": "filtered"
+      },
+      {
+        "aggregator": {
+          "fieldName": "sum",
+          "name": "deaths__case_fatality_rate",
+          "type": "doubleSum"
+        },
+        "filter": {
+          "fields": [
+            {
+              "dimension": "Death",
+              "type": "selector",
+              "value": "1"
+            },
+            {
+              "dimension": "field",
+              "type": "selector",
+              "value": "yellow_fever_cases"
+            }
+          ],
+          "type": "and"
+        },
+        "type": "filtered"
+      },
+      {
+        "aggregator": {
+          "fieldName": "count",
+          "name": "deaths__case_fatality_rate__count",
+          "type": "longSum"
+        },
+        "filter": {
+          "fields": [
+            {
+              "dimension": "Death",
+              "type": "selector",
+              "value": "1"
+            },
+            {
+              "dimension": "field",
+              "type": "selector",
+              "value": "yellow_fever_cases"
+            }
+          ],
+          "type": "and"
+        },
+        "type": "filtered"
+      }
+    ],
+    "context": {
+      "resultAsArray": true
+    },
+    "dataSource": "harmony_demo_20260101",
+    "dimensions": [
+      "MunicipalityName"
+    ],
+    "filter": {
+      "fields": [
+        {
+          "dimension": "__time",
+          "intervals": [
+            "2024-01-01/2024-04-01"
+          ],
+          "type": "interval"
+        },
+        {
+          "field": {
+            "dimension": "MunicipalityName",
+            "type": "selector",
+            "value": null
+          },
+          "type": "not"
+        },
+        {
+          "fields": [
+            {
+              "dimension": "field",
+              "type": "selector",
+              "value": "yellow_fever_cases"
+            },
+            {
+              "fields": [
+                {
+                  "dimension": "Death",
+                  "type": "selector",
+                  "value": "1"
+                },
+                {
+                  "dimension": "field",
+                  "type": "selector",
+                  "value": "yellow_fever_cases"
+                }
+              ],
+              "type": "and"
+            }
+          ],
+          "type": "or"
+        }
+      ],
+      "type": "and"
+    },
+    "granularity": "all",
+    "having": null,
+    "intervals": [
+      "2024-01-01/2024-04-01"
+    ],
+    "postAggregations": [
+      {
+        "expression": "deaths__case_fatality_rate / cases__case_fatality_rate * 100",
+        "name": "case_fatality_rate",
+        "type": "expression"
+      }
+    ],
+    "queryType": "groupBy"
+  }
+]

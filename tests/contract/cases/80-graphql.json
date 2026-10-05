@@ -1,0 +1,766 @@
+{
+  "cases": [
+    {
+      "id": "graphql.CreateGroupModalMutation",
+      "route": "POST /api/graphql",
+      "body": {
+        "query": "relay:web/client/components/DataCatalogApp/common/GroupActionModals/__generated__/CreateGroupModalMutation.graphql.js",
+        "variables": {
+          "id": "contract_category",
+          "name": "Contract category",
+          "parentCategoryId": "root"
+        }
+      },
+      "capture": {
+        "category_node": "/data/insert_category/returning/0/id"
+      }
+    },
+    {
+      "id": "graphql.CreateGroupModalMutation.child",
+      "route": "POST /api/graphql",
+      "body": {
+        "query": "relay:web/client/components/DataCatalogApp/common/GroupActionModals/__generated__/CreateGroupModalMutation.graphql.js",
+        "variables": {
+          "id": "contract_category_child",
+          "name": "Contract child",
+          "parentCategoryId": "contract_category"
+        }
+      },
+      "capture": {
+        "child_node": "/data/insert_category/returning/0/id"
+      }
+    },
+    {
+      "id": "graphql.CreateCalculationIndicatorViewMutation",
+      "route": "POST /api/graphql",
+      "body": {
+        "query": "relay:web/client/components/DataCatalogApp/common/CreateCalculationIndicatorView/__generated__/CreateCalculationIndicatorViewMutation.graphql.js",
+        "variables": {
+          "id": "contract_field",
+          "name": "Contract field",
+          "shortName": "Contract",
+          "description": "Created by the WP-2c contract cases",
+          "calculation": {
+            "type": "SUM"
+          },
+          "categoryObj": [
+            {
+              "category_id": "contract_category"
+            }
+          ],
+          "isCopy": false,
+          "isNotCopy": true,
+          "copiedFromFieldId": ""
+        }
+      },
+      "capture": {
+        "field_node": "/data/insert_field/returning/0/id"
+      }
+    },
+    {
+      "id": "graphql.CreateCalculationIndicatorViewMutation.copy",
+      "route": "POST /api/graphql",
+      "body": {
+        "query": "relay:web/client/components/DataCatalogApp/common/CreateCalculationIndicatorView/__generated__/CreateCalculationIndicatorViewMutation.graphql.js",
+        "variables": {
+          "id": "contract_field_copy",
+          "name": "Contract field copy",
+          "shortName": "Contract copy",
+          "description": "Copy",
+          "calculation": {
+            "type": "SUM"
+          },
+          "categoryObj": [
+            {
+              "category_id": "contract_category"
+            }
+          ],
+          "isCopy": true,
+          "isNotCopy": false,
+          "copiedFromFieldId": "contract_field"
+        }
+      }
+    },
+    {
+      "id": "graphql.FieldAboutPanelQuery",
+      "route": "POST /api/graphql",
+      "body": {
+        "query": "relay:web/client/components/AdvancedQueryApp/QueryFormPanel/QueryBuilder/FieldCustomizationModule/FieldAboutPanel/__generated__/FieldAboutPanelQuery.graphql.js",
+        "variables": {
+          "id": "{field_node}"
+        }
+      }
+    },
+    {
+      "id": "graphql.FieldDetailsPageQuery",
+      "route": "POST /api/graphql",
+      "body": {
+        "query": "relay:web/client/components/DataCatalogApp/FieldDetailsPage/__generated__/FieldDetailsPageQuery.graphql.js",
+        "variables": {
+          "id": "{field_node}"
+        }
+      }
+    },
+    {
+      "id": "graphql.FieldAboutPanelQuery.seeded_field",
+      "route": "POST /api/graphql",
+      "body": {
+        "query": "relay:web/client/components/AdvancedQueryApp/QueryFormPanel/QueryBuilder/FieldCustomizationModule/FieldAboutPanel/__generated__/FieldAboutPanelQuery.graphql.js",
+        "variables": {
+          "id": "WzEsICJwdWJsaWMiLCAiZmllbGQiLCAiY29udHJhY3Rfc2VlZGVkX2ZpZWxkIl0="
+        }
+      },
+      "note": "Reads the field stack/seed_catalog.py seeds with a datasource mapping and a dimension mapping, so their item shapes are pinned. The id is Hasura's Relay node id for field contract_seeded_field."
+    },
+    {
+      "id": "graphql.FieldDetailsPageQuery.seeded_field",
+      "route": "POST /api/graphql",
+      "body": {
+        "query": "relay:web/client/components/DataCatalogApp/FieldDetailsPage/__generated__/FieldDetailsPageQuery.graphql.js",
+        "variables": {
+          "id": "WzEsICJwdWJsaWMiLCAiZmllbGQiLCAiY29udHJhY3Rfc2VlZGVkX2ZpZWxkIl0="
+        }
+      },
+      "note": "Reads the field stack/seed_catalog.py seeds with a datasource mapping and a dimension mapping, so their item shapes are pinned. The id is Hasura's Relay node id for field contract_seeded_field."
+    },
+    {
+      "id": "graphql.CopyIndicatorViewWrapperQuery",
+      "route": "POST /api/graphql",
+      "body": {
+        "query": "relay:web/client/components/DataCatalogApp/common/CreateCalculationIndicatorView/__generated__/CopyIndicatorViewWrapperQuery.graphql.js",
+        "variables": {
+          "id": "{field_node}"
+        }
+      }
+    },
+    {
+      "id": "graphql.DirectoryTableContainerQuery",
+      "route": "POST /api/graphql",
+      "body": {
+        "query": "relay:web/client/components/DataCatalogApp/DirectoryPage/DirectoryTableContainer/__generated__/DirectoryTableContainerQuery.graphql.js",
+        "variables": {
+          "id": "{category_node}"
+        }
+      }
+    },
+    {
+      "id": "graphql.DirectoryTableContainerQuery.root",
+      "route": "POST /api/graphql",
+      "body": {
+        "query": "relay:web/client/components/DataCatalogApp/DirectoryPage/DirectoryTableContainer/__generated__/DirectoryTableContainerQuery.graphql.js",
+        "variables": {
+          "id": "WzEsICJwdWJsaWMiLCAiY2F0ZWdvcnkiLCAicm9vdCJd"
+        }
+      },
+      "note": "Opens the root category, which holds contract_category and the seeded field with its datasource mapping. The id is Hasura's Relay node id for category root."
+    },
+    {
+      "id": "graphql.BreadcrumbLeafItemQuery",
+      "route": "POST /api/graphql",
+      "body": {
+        "query": "relay:web/client/components/DataCatalogApp/DirectoryPage/BreadcrumbPath/__generated__/BreadcrumbLeafItemQuery.graphql.js",
+        "variables": {
+          "id": "{child_node}"
+        }
+      }
+    },
+    {
+      "id": "graphql.RecursiveCategoryBreadcrumbQuery",
+      "route": "POST /api/graphql",
+      "body": {
+        "query": "relay:web/client/components/DataCatalogApp/common/CategoryPath/__generated__/RecursiveCategoryBreadcrumbQuery.graphql.js",
+        "variables": {
+          "id": "{child_node}"
+        }
+      }
+    },
+    {
+      "id": "graphql.QueryBuilderQuery",
+      "route": "POST /api/graphql",
+      "body": {
+        "query": "relay:web/client/components/AdvancedQueryApp/QueryFormPanel/QueryBuilder/__generated__/QueryBuilderQuery.graphql.js",
+        "variables": {}
+      }
+    },
+    {
+      "id": "graphql.BreadcrumbPathQuery",
+      "route": "POST /api/graphql",
+      "body": {
+        "query": "relay:web/client/components/DataCatalogApp/DirectoryPage/BreadcrumbPath/__generated__/BreadcrumbPathQuery.graphql.js",
+        "variables": {}
+      }
+    },
+    {
+      "id": "graphql.CreateCalculationIndicatorViewQuery",
+      "route": "POST /api/graphql",
+      "body": {
+        "query": "relay:web/client/components/DataCatalogApp/common/CreateCalculationIndicatorView/__generated__/CreateCalculationIndicatorViewQuery.graphql.js",
+        "variables": {}
+      }
+    },
+    {
+      "id": "graphql.patchDimensionServiceQuery",
+      "route": "POST /api/graphql",
+      "body": {
+        "query": "relay:web/client/components/DataCatalogApp/common/patchLegacyServices/__generated__/patchDimensionServiceQuery.graphql.js",
+        "variables": {}
+      }
+    },
+    {
+      "id": "graphql.patchFieldMetadataServiceQuery",
+      "route": "POST /api/graphql",
+      "body": {
+        "query": "relay:web/client/components/DataCatalogApp/common/patchLegacyServices/__generated__/patchFieldMetadataServiceQuery.graphql.js",
+        "variables": {}
+      }
+    },
+    {
+      "id": "graphql.patchFieldServiceQuery",
+      "route": "POST /api/graphql",
+      "body": {
+        "query": "relay:web/client/components/DataCatalogApp/common/patchLegacyServices/__generated__/patchFieldServiceQuery.graphql.js",
+        "variables": {}
+      }
+    },
+    {
+      "id": "graphql.DataStatusPageQuery",
+      "route": "POST /api/graphql",
+      "body": {
+        "query": "relay:web/client/components/DataUploadApp/__generated__/DataStatusPageQuery.graphql.js",
+        "variables": {}
+      }
+    },
+    {
+      "id": "graphql.DataStatusPageSelfServeQuery",
+      "route": "POST /api/graphql",
+      "body": {
+        "query": "relay:web/client/components/DataUploadApp/__generated__/DataStatusPageSelfServeQuery.graphql.js",
+        "variables": {}
+      }
+    },
+    {
+      "id": "graphql.BatchPublishModalContentsQuery",
+      "route": "POST /api/graphql",
+      "body": {
+        "query": "relay:web/client/components/FieldSetupApp/FieldSetupPageHeaderActions/BatchPublishAction/__generated__/BatchPublishModalContentsQuery.graphql.js",
+        "variables": {}
+      },
+      "note": "A field is publishable only with a datasource mapping. The seeded unpublished field keeps its mapping through self_serve.import.exported_zip (F13 fixed), so this recording pins the unpublished-field datasource-mapping item shape."
+    },
+    {
+      "id": "graphql.EditableCalculationQuery",
+      "route": "POST /api/graphql",
+      "body": {
+        "query": "relay:web/client/components/FieldSetupApp/UnpublishedFieldsTable/UnpublishedFieldTableRows/__generated__/EditableCalculationQuery.graphql.js",
+        "variables": {}
+      }
+    },
+    {
+      "id": "graphql.UnpublishedFieldsTableContainerQuery",
+      "route": "POST /api/graphql",
+      "body": {
+        "query": "relay:web/client/components/FieldSetupApp/UnpublishedFieldsTableContainer/__generated__/UnpublishedFieldsTableContainerQuery.graphql.js",
+        "variables": {}
+      }
+    },
+    {
+      "id": "graphql.useFieldHierarchyRootQuery",
+      "route": "POST /api/graphql",
+      "body": {
+        "query": "relay:web/client/components/common/QueryBuilder/FieldHierarchicalSelector/__generated__/useFieldHierarchyRootQuery.graphql.js",
+        "variables": {}
+      }
+    },
+    {
+      "id": "graphql.useDatasourceLookupQuery",
+      "route": "POST /api/graphql",
+      "body": {
+        "query": "relay:web/client/components/common/__generated__/useDatasourceLookupQuery.graphql.js",
+        "variables": {}
+      }
+    },
+    {
+      "id": "graphql.usePipelineTimesLastPipelineQuery",
+      "route": "POST /api/graphql",
+      "body": {
+        "query": "relay:web/client/components/DataUploadApp/__generated__/usePipelineTimesLastPipelineQuery.graphql.js",
+        "variables": {
+          "allSourcesName": "ALL_SOURCES"
+        }
+      }
+    },
+    {
+      "id": "graphql.usePipelineTimesLastSuccessfulPipelineQuery",
+      "route": "POST /api/graphql",
+      "body": {
+        "query": "relay:web/client/components/DataUploadApp/__generated__/usePipelineTimesLastSuccessfulPipelineQuery.graphql.js",
+        "variables": {
+          "allSourcesName": "ALL_SOURCES",
+          "unsuccessfulFilter": {
+            "failed": true
+          }
+        }
+      }
+    },
+    {
+      "id": "graphql.usePipelineTimesHistoricalPipelinesQuery",
+      "route": "POST /api/graphql",
+      "body": {
+        "query": "relay:web/client/components/DataUploadApp/__generated__/usePipelineTimesHistoricalPipelinesQuery.graphql.js",
+        "variables": {
+          "allSourcesName": "ALL_SOURCES",
+          "timeWindow": "2000-01-01T00:00:00",
+          "unsuccessfulFilter": {
+            "failed": true
+          }
+        }
+      }
+    },
+    {
+      "id": "graphql.NameRowMutation",
+      "route": "POST /api/graphql",
+      "body": {
+        "query": "relay:web/client/components/DataCatalogApp/FieldDetailsPage/FieldDetailsSection/__generated__/NameRowMutation.graphql.js",
+        "variables": {
+          "dbId": "contract_field",
+          "newName": "Contract field renamed"
+        }
+      }
+    },
+    {
+      "id": "graphql.ShortNameRowMutation",
+      "route": "POST /api/graphql",
+      "body": {
+        "query": "relay:web/client/components/DataCatalogApp/FieldDetailsPage/FieldDetailsSection/__generated__/ShortNameRowMutation.graphql.js",
+        "variables": {
+          "dbId": "contract_field",
+          "newShortName": "Contract short"
+        }
+      }
+    },
+    {
+      "id": "graphql.DescriptionRowMutation",
+      "route": "POST /api/graphql",
+      "body": {
+        "query": "relay:web/client/components/DataCatalogApp/FieldDetailsPage/FieldDetailsSection/__generated__/DescriptionRowMutation.graphql.js",
+        "variables": {
+          "dbId": "contract_field",
+          "newDescription": "Changed description"
+        }
+      }
+    },
+    {
+      "id": "graphql.CalculationRowMutation",
+      "route": "POST /api/graphql",
+      "body": {
+        "query": "relay:web/client/components/DataCatalogApp/FieldDetailsPage/FieldDetailsSection/CalculationRow/__generated__/CalculationRowMutation.graphql.js",
+        "variables": {
+          "dbId": "contract_field",
+          "newCalculation": {
+            "type": "SUM"
+          }
+        }
+      }
+    },
+    {
+      "id": "graphql.FieldCalculationSectionMutation",
+      "route": "POST /api/graphql",
+      "body": {
+        "query": "relay:web/client/components/DataCatalogApp/FieldDetailsPage/FieldCalculationSection/__generated__/FieldCalculationSectionMutation.graphql.js",
+        "variables": {
+          "dbId": "contract_field",
+          "newCalculation": {
+            "type": "SUM"
+          }
+        }
+      }
+    },
+    {
+      "id": "graphql.FieldRowValueMutation",
+      "route": "POST /api/graphql",
+      "body": {
+        "query": "relay:web/client/components/DataCatalogApp/DirectoryPage/DirectoryTableContainer/DirectoryTable/DirectoryRow/__generated__/FieldRowValueMutation.graphql.js",
+        "variables": {
+          "categoryId": "contract_category",
+          "dbId": "contract_field",
+          "newDescription": "Row description",
+          "newName": "Contract field row",
+          "newVisibilityStatus": "VISIBLE"
+        }
+      }
+    },
+    {
+      "id": "graphql.VisibilityRowMutation",
+      "route": "POST /api/graphql",
+      "body": {
+        "query": "relay:web/client/components/DataCatalogApp/FieldDetailsPage/FieldDetailsSection/__generated__/VisibilityRowMutation.graphql.js",
+        "variables": {
+          "dbCategoryId": "contract_category",
+          "dbFieldId": "contract_field",
+          "newVisibilityStatus": "HIDDEN"
+        }
+      }
+    },
+    {
+      "id": "graphql.CategoryGroupRowValueMutation",
+      "route": "POST /api/graphql",
+      "body": {
+        "query": "relay:web/client/components/DataCatalogApp/DirectoryPage/DirectoryTableContainer/DirectoryTable/DirectoryRow/__generated__/CategoryGroupRowValueMutation.graphql.js",
+        "variables": {
+          "dbId": "contract_category_child",
+          "newName": "Contract child renamed",
+          "newVisibilityStatus": "VISIBLE"
+        }
+      }
+    },
+    {
+      "id": "graphql.EditGroupModalMutation",
+      "route": "POST /api/graphql",
+      "body": {
+        "query": "relay:web/client/components/DataCatalogApp/common/GroupActionModals/__generated__/EditGroupModalMutation.graphql.js",
+        "variables": {
+          "dbCategoryId": "contract_category",
+          "newCategoryName": "Contract category renamed"
+        }
+      }
+    },
+    {
+      "id": "graphql.useParentCategoryChangeForCategoryMutation",
+      "route": "POST /api/graphql",
+      "body": {
+        "query": "relay:web/client/components/DataCatalogApp/DirectoryPage/hooks/ParentCategoryChange/__generated__/useParentCategoryChangeForCategoryMutation.graphql.js",
+        "variables": {
+          "dbCategoryId": "contract_category_child",
+          "dbNewParentCategoryId": "root"
+        }
+      }
+    },
+    {
+      "id": "graphql.useParentCategoryChangeForFieldMutation",
+      "route": "POST /api/graphql",
+      "body": {
+        "query": "relay:web/client/components/DataCatalogApp/DirectoryPage/hooks/ParentCategoryChange/__generated__/useParentCategoryChangeForFieldMutation.graphql.js",
+        "variables": {
+          "dbFieldId": "contract_field_copy",
+          "dbNewParentCategoryId": "contract_category_child",
+          "dbOriginalParentCategoryId": "contract_category",
+          "insertNewMapping": false
+        }
+      }
+    },
+    {
+      "id": "graphql.useBatchParentCategoryChangeMutation",
+      "route": "POST /api/graphql",
+      "body": {
+        "query": "relay:web/client/components/DataCatalogApp/DirectoryPage/hooks/ParentCategoryChange/__generated__/useBatchParentCategoryChangeMutation.graphql.js",
+        "variables": {
+          "dbCategoryIds": [],
+          "dbFieldIds": [
+            "contract_field"
+          ],
+          "dbNewParentCategoryId": "contract_category_batch",
+          "dbOriginalParentCategoryId": "contract_category",
+          "insertNewCategory": true,
+          "insertNewMapping": true,
+          "newFieldMappingObjects": [
+            {
+              "field_id": "contract_field",
+              "category_id": "contract_category_batch"
+            }
+          ],
+          "newParentCategoryName": "Contract batch category"
+        }
+      }
+    },
+    {
+      "id": "graphql.NameInputMutation",
+      "route": "POST /api/graphql",
+      "body": {
+        "query": "relay:web/client/components/FieldSetupApp/UnpublishedFieldsTable/UnpublishedFieldTableRows/__generated__/NameInputMutation.graphql.js",
+        "variables": {
+          "fieldId": "contract_unpublished_field",
+          "name": "Contract unpublished renamed"
+        }
+      }
+    },
+    {
+      "id": "graphql.ShortNameInputMutation",
+      "route": "POST /api/graphql",
+      "body": {
+        "query": "relay:web/client/components/FieldSetupApp/UnpublishedFieldsTable/UnpublishedFieldTableRows/__generated__/ShortNameInputMutation.graphql.js",
+        "variables": {
+          "fieldId": "contract_unpublished_field",
+          "shortName": "Contract unp"
+        }
+      }
+    },
+    {
+      "id": "graphql.DescriptionInputMutation",
+      "route": "POST /api/graphql",
+      "body": {
+        "query": "relay:web/client/components/FieldSetupApp/UnpublishedFieldsTable/UnpublishedFieldTableRows/__generated__/DescriptionInputMutation.graphql.js",
+        "variables": {
+          "fieldId": "contract_unpublished_field",
+          "description": "Changed by the contract cases"
+        }
+      }
+    },
+    {
+      "id": "graphql.CalculationInputMutation",
+      "route": "POST /api/graphql",
+      "body": {
+        "query": "relay:web/client/components/FieldSetupApp/UnpublishedFieldsTable/UnpublishedFieldTableRows/__generated__/CalculationInputMutation.graphql.js",
+        "variables": {
+          "fieldId": "contract_unpublished_field",
+          "calculation": {
+            "type": "SUM"
+          }
+        }
+      }
+    },
+    {
+      "id": "graphql.UpdateCalculationActionMutation",
+      "route": "POST /api/graphql",
+      "body": {
+        "query": "relay:web/client/components/FieldSetupApp/FieldSetupPageHeaderActions/__generated__/UpdateCalculationActionMutation.graphql.js",
+        "variables": {
+          "id": "contract_unpublished_field",
+          "calculation": {
+            "type": "SUM"
+          }
+        }
+      }
+    },
+    {
+      "id": "graphql.CategoryInputMutation",
+      "route": "POST /api/graphql",
+      "body": {
+        "query": "relay:web/client/components/FieldSetupApp/UnpublishedFieldsTable/UnpublishedFieldTableRows/__generated__/CategoryInputMutation.graphql.js",
+        "variables": {
+          "categoryId": "root",
+          "unpublishedFieldId": "contract_unpublished_field"
+        }
+      }
+    },
+    {
+      "id": "graphql.UpdateCategoryActionMutation",
+      "route": "POST /api/graphql",
+      "body": {
+        "query": "relay:web/client/components/FieldSetupApp/FieldSetupPageHeaderActions/__generated__/UpdateCategoryActionMutation.graphql.js",
+        "variables": {
+          "fieldIds": [
+            "contract_unpublished_field"
+          ],
+          "fieldCategoryMappingObjs": [
+            {
+              "unpublished_field_id": "contract_unpublished_field",
+              "category_id": "root"
+            }
+          ]
+        }
+      }
+    },
+    {
+      "id": "graphql.UnpublishedFieldTableRowsQuery",
+      "route": "POST /api/graphql",
+      "body": {
+        "query": "relay:web/client/components/FieldSetupApp/UnpublishedFieldsTable/UnpublishedFieldTableRows/__generated__/UnpublishedFieldTableRowsQuery.graphql.js",
+        "variables": {
+          "pageSize": 10,
+          "searchText": "%%"
+        }
+      },
+      "note": "The table wraps the search box text in % (UnpublishedFieldTableRows/index.jsx:35), so an empty box sends %%. The seeded category and datasource mappings are in the response, so both mapping item shapes are pinned."
+    },
+    {
+      "id": "graphql.UnpublishedFieldTableRowsPaginationQuery",
+      "route": "POST /api/graphql",
+      "body": {
+        "query": "relay:web/client/components/FieldSetupApp/UnpublishedFieldsTable/UnpublishedFieldTableRows/__generated__/UnpublishedFieldTableRowsPaginationQuery.graphql.js",
+        "variables": {
+          "first": 10,
+          "searchText": "%%",
+          "after": null
+        }
+      },
+      "note": "The table wraps the search box text in % (UnpublishedFieldTableRows/index.jsx:35), so an empty box sends %%. The seeded category and datasource mappings are in the response, so both mapping item shapes are pinned."
+    },
+    {
+      "id": "graphql.UnpublishedFieldRowMutation",
+      "route": "POST /api/graphql",
+      "body": {
+        "query": "relay:web/client/components/FieldSetupApp/UnpublishedFieldsTable/UnpublishedFieldTableRows/__generated__/UnpublishedFieldRowMutation.graphql.js",
+        "variables": {
+          "id": "contract_published_row",
+          "name": "Contract published row",
+          "shortName": "Published row",
+          "description": "",
+          "calculation": {
+            "type": "SUM"
+          },
+          "fieldCategoryMappings": [
+            {
+              "category_id": "root"
+            }
+          ],
+          "fieldPipelineDatasourceMappings": [
+            {
+              "pipeline_datasource_id": "contract_source"
+            }
+          ]
+        }
+      },
+      "note": "Publishes an id with no unpublished row, so delete_unpublished_field_by_pk is null and the seeded unpublished field survives for the next run; the inserted field is deleted below."
+    },
+    {
+      "id": "graphql.BatchPublishModalMutation",
+      "route": "POST /api/graphql",
+      "body": {
+        "query": "relay:web/client/components/FieldSetupApp/FieldSetupPageHeaderActions/BatchPublishAction/__generated__/BatchPublishModalMutation.graphql.js",
+        "variables": {
+          "fieldIds": [
+            "contract_published_batch"
+          ],
+          "fieldObjects": [
+            {
+              "id": "contract_published_batch",
+              "name": "Contract published batch",
+              "short_name": "Published batch",
+              "description": "",
+              "calculation": {
+                "type": "SUM"
+              },
+              "field_category_mappings": {
+                "data": [
+                  {
+                    "category_id": "root"
+                  }
+                ]
+              }
+            }
+          ]
+        }
+      },
+      "note": "As above: the deleted-unpublished list is empty so the seed survives."
+    },
+    {
+      "id": "graphql.DeleteFieldModalMutation.published_row",
+      "route": "POST /api/graphql",
+      "body": {
+        "query": "relay:web/client/components/DataCatalogApp/common/GroupActionModals/__generated__/DeleteFieldModalMutation.graphql.js",
+        "variables": {
+          "dbFieldId": "contract_published_row"
+        }
+      }
+    },
+    {
+      "id": "graphql.DeleteFieldModalMutation.published_batch",
+      "route": "POST /api/graphql",
+      "body": {
+        "query": "relay:web/client/components/DataCatalogApp/common/GroupActionModals/__generated__/DeleteFieldModalMutation.graphql.js",
+        "variables": {
+          "dbFieldId": "contract_published_batch"
+        }
+      }
+    },
+    {
+      "id": "graphql.useSelfServeMutation",
+      "route": "POST /api/graphql",
+      "body": {
+        "query": "relay:web/client/components/DataUploadApp/AddDataModal/__generated__/useSelfServeMutation.graphql.js",
+        "variables": {
+          "fileSummariesToUnlink": [],
+          "insertNewSource": true,
+          "selfServeSource": {
+            "source_id": "contract_upload_source"
+          }
+        }
+      },
+      "capture": {
+        "self_serve_source_id": "/data/insert_self_serve_source/returning/0/id#relay"
+      }
+    },
+    {
+      "id": "graphql.useDeleteSourceMutation",
+      "route": "POST /api/graphql",
+      "body": {
+        "query": "relay:web/client/components/DataUploadApp/SourceTable/__generated__/useDeleteSourceMutation.graphql.js",
+        "variables": {
+          "selfServeSourceId": "{self_serve_source_id}",
+          "sourceId": "contract_upload_source",
+          "isDataprep": false,
+          "dataprepFlowId": 0
+        }
+      }
+    },
+    {
+      "id": "graphql.patchDimensionServiceQuery.anonymous",
+      "route": "POST /api/graphql",
+      "body": {
+        "query": "relay:web/client/components/DataCatalogApp/common/patchLegacyServices/__generated__/patchDimensionServiceQuery.graphql.js",
+        "variables": {}
+      },
+      "session": "anonymous",
+      "note": "Anonymous users get 401 unless public access is on; then only this query is allowed."
+    },
+    {
+      "id": "graphql.patchFieldServiceQuery.anonymous",
+      "route": "POST /api/graphql",
+      "body": {
+        "query": "relay:web/client/components/DataCatalogApp/common/patchLegacyServices/__generated__/patchFieldServiceQuery.graphql.js",
+        "variables": {}
+      },
+      "session": "anonymous"
+    },
+    {
+      "id": "graphql.DeleteFieldModalMutation.copy",
+      "route": "POST /api/graphql",
+      "body": {
+        "query": "relay:web/client/components/DataCatalogApp/common/GroupActionModals/__generated__/DeleteFieldModalMutation.graphql.js",
+        "variables": {
+          "dbFieldId": "contract_field_copy"
+        }
+      }
+    },
+    {
+      "id": "graphql.DeleteFieldModalMutation",
+      "route": "POST /api/graphql",
+      "body": {
+        "query": "relay:web/client/components/DataCatalogApp/common/GroupActionModals/__generated__/DeleteFieldModalMutation.graphql.js",
+        "variables": {
+          "dbFieldId": "contract_field"
+        }
+      }
+    },
+    {
+      "id": "graphql.DeleteCategoryModalMutation.batch",
+      "route": "POST /api/graphql",
+      "body": {
+        "query": "relay:web/client/components/DataCatalogApp/common/GroupActionModals/__generated__/DeleteCategoryModalMutation.graphql.js",
+        "variables": {
+          "dbCategoryId": "contract_category_batch"
+        }
+      }
+    },
+    {
+      "id": "graphql.DeleteCategoryModalMutation.child",
+      "route": "POST /api/graphql",
+      "body": {
+        "query": "relay:web/client/components/DataCatalogApp/common/GroupActionModals/__generated__/DeleteCategoryModalMutation.graphql.js",
+        "variables": {
+          "dbCategoryId": "contract_category_child"
+        }
+      }
+    },
+    {
+      "id": "graphql.DeleteCategoryModalMutation",
+      "route": "POST /api/graphql",
+      "body": {
+        "query": "relay:web/client/components/DataCatalogApp/common/GroupActionModals/__generated__/DeleteCategoryModalMutation.graphql.js",
+        "variables": {
+          "dbCategoryId": "contract_category"
+        }
+      }
+    }
+  ]
+}

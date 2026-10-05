@@ -1,0 +1,5 @@
+{"count": "1", "end_date": "2021-05-01", "indicator_id": "demo_status", "start_date": "2021-05-01"}
+{"count": "1", "end_date": "2021-06-30", "indicator_id": "demo_status_discarded", "start_date": "2021-06-30"}
+{"count": "2", "end_date": "2021-05-20", "indicator_id": "demo_status_suspected", "start_date": "2021-05-01"}
+{"count": "5", "end_date": "2021-07-05", "indicator_id": "demo_status_confirmed", "start_date": "2021-05-01"}
+{"count": "6", "end_date": "2021-07-05", "indicator_id": "demo_malaria_positive", "start_date": "2021-05-01"}

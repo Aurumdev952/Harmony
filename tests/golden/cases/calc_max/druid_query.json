@@ -1,0 +1,71 @@
+[
+  {
+    "aggregations": [
+      {
+        "aggregator": {
+          "fieldName": "max",
+          "name": "yellow_fever_cases",
+          "type": "doubleMax"
+        },
+        "filter": {
+          "dimension": "field",
+          "type": "selector",
+          "value": "yellow_fever_cases"
+        },
+        "type": "filtered"
+      },
+      {
+        "aggregator": {
+          "fieldName": "count",
+          "name": "yellow_fever_cases__count",
+          "type": "longSum"
+        },
+        "filter": {
+          "dimension": "field",
+          "type": "selector",
+          "value": "yellow_fever_cases"
+        },
+        "type": "filtered"
+      }
+    ],
+    "context": {
+      "resultAsArray": true
+    },
+    "dataSource": "harmony_demo_20260101",
+    "dimensions": [
+      "StateName"
+    ],
+    "filter": {
+      "fields": [
+        {
+          "dimension": "__time",
+          "intervals": [
+            "2024-01-01/2024-04-01"
+          ],
+          "type": "interval"
+        },
+        {
+          "dimension": "field",
+          "type": "selector",
+          "value": "yellow_fever_cases"
+        },
+        {
+          "field": {
+            "dimension": "StateName",
+            "type": "selector",
+            "value": null
+          },
+          "type": "not"
+        }
+      ],
+      "type": "and"
+    },
+    "granularity": "all",
+    "having": null,
+    "intervals": [
+      "2024-01-01/2024-04-01"
+    ],
+    "postAggregations": [],
+    "queryType": "groupBy"
+  }
+]

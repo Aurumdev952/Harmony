@@ -96,12 +96,7 @@ def try_get_role_and_resource(
             }
         )
 
-    role_permission_resource_type = role.permissions[0].resource_type
-    if (
-        resource
-        and role
-        and resource.resource_type_id != role_permission_resource_type.id
-    ):
+    if resource and role and resource.resource_type_id != role.resource_type_id:
         errors.append(
             {
                 'fields': ['resourceType', 'roleName'],
@@ -111,7 +106,7 @@ def try_get_role_and_resource(
                 )
                 % (
                     role.name,
-                    role_permission_resource_type.name,
+                    role.resource_type.name,
                     resource.name,
                     resource.resource_type.name,
                 ),

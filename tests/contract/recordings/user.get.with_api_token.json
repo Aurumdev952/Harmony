@@ -1,0 +1,101 @@
+{
+  "content_type": "application/json",
+  "headers": [],
+  "id": "user.get.with_api_token",
+  "pinned": {},
+  "response_schema": {
+    "properties": {
+      "$uri": {
+        "type": "string",
+        "x-format": "api-uri"
+      },
+      "acls": {
+        "maxItems": 0,
+        "type": "array"
+      },
+      "apiTokens": {
+        "items": {
+          "properties": {
+            "$uri": {
+              "type": "string",
+              "x-format": "api-uri"
+            },
+            "created": {
+              "type": "string",
+              "x-format": "date"
+            },
+            "id": {
+              "type": "string"
+            },
+            "isRevoked": {
+              "type": "boolean"
+            },
+            "revoked": {
+              "type": "string",
+              "x-format": "date"
+            },
+            "token": {
+              "type": "null"
+            }
+          },
+          "required": [
+            "$uri",
+            "created",
+            "id",
+            "isRevoked",
+            "revoked",
+            "token"
+          ],
+          "type": "object"
+        },
+        "type": "array"
+      },
+      "created": {
+        "properties": {
+          "$date": {
+            "type": "integer"
+          }
+        },
+        "required": [
+          "$date"
+        ],
+        "type": "object"
+      },
+      "firstName": {
+        "type": "string"
+      },
+      "lastName": {
+        "type": "string"
+      },
+      "phoneNumber": {
+        "type": "string"
+      },
+      "roles": {
+        "maxItems": 0,
+        "type": "array"
+      },
+      "status": {
+        "type": "string"
+      },
+      "username": {
+        "type": "string",
+        "x-format": "email"
+      }
+    },
+    "required": [
+      "$uri",
+      "acls",
+      "apiTokens",
+      "created",
+      "firstName",
+      "lastName",
+      "phoneNumber",
+      "roles",
+      "status",
+      "username"
+    ],
+    "type": "object"
+  },
+  "route": "GET /api2/user/<id>",
+  "status": 200
+}

@@ -1,0 +1,16 @@
+{
+  "description": "Raw table download for a user restricted to Pará.",
+  "endpoint": "table/disaggregated",
+  "policy": {
+    "query_policies": [
+      {
+        "dimension": "StateName",
+        "dimension_value": "Pará"
+      },
+      {
+        "dimension": "source",
+        "dimension_value": null
+      }
+    ]
+  }
+}

@@ -8,6 +8,8 @@
 - [Flask web tests](flask_web_tests.md) — run tests/web on py3.8, call handlers directly, worktree-guard and auth/policy traps
 - [Potion route test harness](potion_route_test_harness.md) — test /api2 routes through the real app on a throwaway Postgres; WP-0h authz traps
 - [Flask route tests in-process](flask-route-tests-in-process.md) — conftest double import, subclass Potion resources, AUTHORIZABLE_DIMENSIONS, urlbox recorder
+- [Gunicorn server checks](gunicorn_server_checks.md) — test web/gunicorn_server.py despite its gevent patch, mypy strict on 3.8, live run with a stub app
+- [Request logging wiring](request_logging_wiring.md) — test create_app/create_celery log wiring: non-gunicorn path gaps, global Celery signals, mypy on tasks
 - [Post-WP-2f tooling](post_wp2f_tooling.md) — tests/web on plain uv py3.9, lint-gate and noqa traps, guard workarounds, graphql stub
 - [ruff format vs py3.8](ruff_format_py38_trap.md) — ruff format writes parenthesized `with` that the 3.8 web image rejects; nest them, parse under 3.8
 - [Absolute URLs and script root](absolute_urls_and_script_root.md) — Host and SCRIPT_NAME are caller-controlled; build token URLs from url_map on the configured origin

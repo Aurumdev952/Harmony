@@ -1,0 +1,209 @@
+{"timestamp": "2026-10-04T21:17:59.590+00:00", "level": "WARNING", "logger": "py.warnings", "message": "/home/aurum/aurum/work/zenysis/Harmony/.claude/worktrees/agent-abf0fb3ac72eeff4c/venv38/lib/python3.8/site-packages/sqlalchemy/orm/relationships.py:2224: SAWarning: Cascade settings \"delete\" should not be combined with a viewonly=True relationship.   This configuration will raise an error in version 1.4.  Note that in versions prior to 1.4, these cascade settings may still produce a mutating effect even though this relationship is marked as viewonly=True.\n  util.warn(\n", "source": "warnings.py:_showwarnmsg:109", "deployment": "harmony_demo"}
+{"timestamp": "2026-10-04T21:17:59.748+00:00", "level": "WARNING", "logger": "ZenysisLogger", "message": "Environment variable NOREPLY_EMAIL not set", "source": "settings.py:getenv:11", "deployment": "harmony_demo"}
+{"timestamp": "2026-10-04T21:17:59.748+00:00", "level": "WARNING", "logger": "ZenysisLogger", "message": "Environment variable SUPPORT_EMAIL not set", "source": "settings.py:getenv:11", "deployment": "harmony_demo"}
+{"timestamp": "2026-10-04T21:17:59.748+00:00", "level": "WARNING", "logger": "ZenysisLogger", "message": "Environment variable REDIS_HOST not set", "source": "settings.py:getenv:11", "deployment": "harmony_demo"}
+{"timestamp": "2026-10-04T21:17:59.748+00:00", "level": "WARNING", "logger": "ZenysisLogger", "message": "Environment variable HASURA_HOST not set", "source": "settings.py:getenv:11", "deployment": "harmony_demo"}
+{"timestamp": "2026-10-04T21:17:59.748+00:00", "level": "WARNING", "logger": "ZenysisLogger", "message": "Environment variable RENDERBOT_EMAIL not set", "source": "settings.py:getenv:11", "deployment": "harmony_demo"}
+{"timestamp": "2026-10-04T21:17:59.748+00:00", "level": "WARNING", "logger": "ZenysisLogger", "message": "Environment variable URLBOX_API_KEY not set", "source": "settings.py:getenv:11", "deployment": "harmony_demo"}
+{"timestamp": "2026-10-04T21:17:59.788+00:00", "level": "WARNING", "logger": "ZenysisLogger", "message": "Environment variable EMAIL_HOST_PASSWORD not set", "source": "settings.py:getenv:11", "deployment": "harmony_demo"}
+{"timestamp": "2026-10-04T21:17:59.789+00:00", "level": "WARNING", "logger": "ZenysisLogger", "message": "Environment variable MAILGUN_SMTP_ACCOUNT_ID not set", "source": "settings.py:getenv:11", "deployment": "harmony_demo"}
+{"timestamp": "2026-10-04T21:17:59.789+00:00", "level": "WARNING", "logger": "ZenysisLogger", "message": "Environment variable EMAIL_HOST_USER not set", "source": "settings.py:getenv:11", "deployment": "harmony_demo"}
+{"timestamp": "2026-10-04T21:17:59.789+00:00", "level": "WARNING", "logger": "ZenysisLogger", "message": "Environment variable EMAIL_USE_ENCRYPTION not set", "source": "settings.py:getenv:11", "deployment": "harmony_demo"}
+{"timestamp": "2026-10-04T21:17:59.789+00:00", "level": "WARNING", "logger": "ZenysisLogger", "message": "Environment variable EMAIL_TAG_HEADER_NAME not set", "source": "settings.py:getenv:11", "deployment": "harmony_demo"}
+{"timestamp": "2026-10-04T21:17:59.789+00:00", "level": "WARNING", "logger": "ZenysisLogger", "message": "Environment variable REDIS_HOST not set", "source": "settings.py:getenv:11", "deployment": "harmony_demo"}
+{"timestamp": "2026-10-04T21:17:59.789+00:00", "level": "WARNING", "logger": "ZenysisLogger", "message": "Environment variable REDIS_HOST not set", "source": "settings.py:getenv:11", "deployment": "harmony_demo"}
+{"timestamp": "2026-10-04T21:17:59.789+00:00", "level": "WARNING", "logger": "ZenysisLogger", "message": "Environment variable HASURA_ADMIN_SECRET not set", "source": "settings.py:getenv:11", "deployment": "harmony_demo"}
+{"timestamp": "2026-10-04T21:17:59.789+00:00", "level": "WARNING", "logger": "ZenysisLogger", "message": "Environment variable SQLALCHEMY_DATABASE_URI is not set", "source": "provider.py:get:10", "deployment": "harmony_demo"}
+{"timestamp": "2026-10-04T21:17:59.800+00:00", "level": "WARNING", "logger": "ZenysisLogger", "message": "Environment variable OBJECT_STORAGE_ALIAS not set", "source": "settings.py:getenv:11", "deployment": "harmony_demo"}
+{"timestamp": "2026-10-04T21:17:59.801+00:00", "level": "WARNING", "logger": "ZenysisLogger", "message": "Environment variable MAPBOX_ACCESS_TOKEN not set", "source": "settings.py:getenv:11", "deployment": "harmony_demo"}
+20261004.231759.821 INFO 683668:MainThread: Context impl PostgresqlImpl.
+20261004.231759.822 INFO 683668:MainThread: Will assume transactional DDL.
+20261004.231759.862 WARNING 683668:MainThread: /home/aurum/aurum/work/zenysis/Harmony/.claude/worktrees/agent-abf0fb3ac72eeff4c/venv38/lib/python3.8/site-packages/sqlalchemy/orm/relationships.py:1994: SAWarning: Setting backref / back_populates on relationship Resource.users to refer to viewonly relationship User.user_acl_backref should include sync_backref=False set on the Resource.users relationship.  (this warning may be suppressed after 10 occurrences)
+  util.warn_limited(
+
+20261004.231759.863 WARNING 683668:MainThread: /home/aurum/aurum/work/zenysis/Harmony/.claude/worktrees/agent-abf0fb3ac72eeff4c/venv38/lib/python3.8/site-packages/sqlalchemy/orm/relationships.py:1994: SAWarning: Setting backref / back_populates on relationship User.user_acl_backref to refer to viewonly relationship Resource.users should include sync_backref=False set on the User.user_acl_backref relationship.  (this warning may be suppressed after 10 occurrences)
+  util.warn_limited(
+
+20261004.231759.863 WARNING 683668:MainThread: /home/aurum/aurum/work/zenysis/Harmony/.claude/worktrees/agent-abf0fb3ac72eeff4c/venv38/lib/python3.8/site-packages/sqlalchemy/orm/relationships.py:1994: SAWarning: Setting backref / back_populates on relationship Resource.groups to refer to viewonly relationship Group.security_group_acl_backref should include sync_backref=False set on the Resource.groups relationship.  (this warning may be suppressed after 10 occurrences)
+  util.warn_limited(
+
+20261004.231759.871 WARNING 683668:MainThread: /home/aurum/aurum/work/zenysis/Harmony/.claude/worktrees/agent-abf0fb3ac72eeff4c/venv38/lib/python3.8/site-packages/sqlalchemy/orm/relationships.py:1994: SAWarning: Setting backref / back_populates on relationship QueryPolicy.roles to refer to viewonly relationship Role.query_policy_role_backref should include sync_backref=False set on the QueryPolicy.roles relationship.  (this warning may be suppressed after 10 occurrences)
+  util.warn_limited(
+
+20261004.231800.023 WARNING 683668:MainThread: /home/aurum/aurum/work/zenysis/Harmony/.claude/worktrees/agent-abf0fb3ac72eeff4c/venv38/lib/python3.8/site-packages/sqlalchemy/orm/relationships.py:1994: SAWarning: Setting backref / back_populates on relationship Role.permissions to refer to viewonly relationship Permission.role_permissions_backref should include sync_backref=False set on the Role.permissions relationship.  (this warning may be suppressed after 10 occurrences)
+  util.warn_limited(
+
+20261004.231800.023 WARNING 683668:MainThread: /home/aurum/aurum/work/zenysis/Harmony/.claude/worktrees/agent-abf0fb3ac72eeff4c/venv38/lib/python3.8/site-packages/sqlalchemy/orm/relationships.py:1994: SAWarning: Setting backref / back_populates on relationship Permission.role_permissions_backref to refer to viewonly relationship Role.permissions should include sync_backref=False set on the Permission.role_permissions_backref relationship.  (this warning may be suppressed after 10 occurrences)
+  util.warn_limited(
+
+20261004.231800.124 INFO 683668:MainThread: Running upgrade  -> 3b18f32329fa, Initial Data Version
+20261004.231800.178 INFO 683668:MainThread: Running upgrade 3b18f32329fa -> c04c7f84420e, Adding support for RBAC
+20261004.231800.358 INFO 683668:MainThread: Running upgrade c04c7f84420e -> 6ba94d12d7d8, Enforce non-nullable resource_type_id column for Roles
+20261004.231800.451 INFO 683668:MainThread: Running upgrade 6ba94d12d7d8 -> deed35b6fd36, Permission Table Naming Refactor and Addition of Groups
+20261004.231800.542 INFO 683668:MainThread: Running upgrade deed35b6fd36 -> 8e52d9ff28d7, Add support for public roles in the database
+20261004.231800.548 INFO 683668:MainThread: Running upgrade 8e52d9ff28d7 -> 9a628ffd6795, Add roles to explicitly define query permissions
+20261004.231800.604 INFO 683668:MainThread: Running upgrade 9a628ffd6795 -> be489b5a4343, Introduce SA Models for Dynamic Configuration
+20261004.231800.637 INFO 683668:MainThread: Running upgrade be489b5a4343 -> b619b8b27577, Prevent cascade deletion of resources, remove redundant id column in 'group_users' Table
+20261004.231800.661 INFO 683668:MainThread: Running upgrade b619b8b27577 -> 8d2c718eadfa, Create schema for Grid Dashboards in SQL.
+20261004.231800.682 INFO 683668:MainThread: Running upgrade 8d2c718eadfa -> 18429a152520, Rename `group` and related tables to `security_group`
+20261004.231800.694 INFO 683668:MainThread: Running upgrade 18429a152520 -> 12786dfb3980, Remove name column from Dashboard
+20261004.231800.700 INFO 683668:MainThread: Running upgrade 12786dfb3980 -> 010bef7d6239, Adding AlertNotification and AlertDefinition models for Alerts feature.
+20261004.231800.714 INFO 683668:MainThread: Running upgrade 010bef7d6239 -> 1b25c9c0b5dc, Migration to fix alerts schemas, move `AlertDefinition.checks` to type JSON.
+20261004.231800.730 INFO 683668:MainThread: Running upgrade 1b25c9c0b5dc -> b2690a565224, Drop Pending User Table and introduce concept of User Status
+20261004.231800.758 INFO 683668:MainThread: Running upgrade b2690a565224 -> 961f42e2e5e9, Make Configuration and Dashboard Specification native JSON objects
+20261004.231800.791 INFO 683668:MainThread: Running upgrade 961f42e2e5e9 -> 4189ebe6c090, Convert Alert Defintions to JSONB
+20261004.231800.802 INFO 683668:MainThread: Running upgrade 4189ebe6c090 -> ad0d35c05a7d, Prevent Role and Permission deletes until a Resource Type is completely deleted. Move
+Configuration and Dashboard Models to use JSONB
+20261004.231800.838 INFO 683668:MainThread: Running upgrade ad0d35c05a7d -> dc3a3339dab6, Convert resource type to enum
+20261004.231800.854 INFO 683668:MainThread: Running upgrade dc3a3339dab6 -> 1a448e61b057, Add Query Policy and User Preferences. Add new User, Group, Dashboard and Query permissions.
+20261004.231801.081 INFO 683668:MainThread: Running upgrade 1a448e61b057 -> fab84c999c8a, Create Analyst Role
+20261004.231801.109 INFO 683668:MainThread: Running upgrade fab84c999c8a -> 58add9b07431, Simplify configuration API and remove 'enabled' and 'description' fields.
+20261004.231801.113 INFO 683668:MainThread: Running upgrade 58add9b07431 -> 2c2d9357157c, Add overwrite fields for configuration table.
+20261004.231801.118 INFO 683668:MainThread: Running upgrade 2c2d9357157c -> 7df5cba3d971, Convert `public_roles` => `default_roles`
+20261004.231801.122 INFO 683668:MainThread: Running upgrade 7df5cba3d971 -> 0331609ed38d, Delete alert notifications when associated definition is deleted.
+20261004.231801.129 INFO 683668:MainThread: Running upgrade 0331609ed38d -> 3c9bde88ba8a, Add modified/creation statistics to the Dashboard Table
+20261004.231801.137 INFO 683668:MainThread: Running upgrade 3c9bde88ba8a -> d0252bd4b32e, Add a Phone Number column to the User Table
+20261004.231801.140 INFO 683668:MainThread: Running upgrade d0252bd4b32e -> 9a211d5417c7, Add Tables for Location Matching
+20261004.231801.197 INFO 683668:MainThread: Running upgrade 9a211d5417c7 -> 0c2dd30d5bee, Add 'is_important' column to dashboards. Mark all dashboards as unimportant by default.
+20261004.231801.201 INFO 683668:MainThread: Running upgrade 0c2dd30d5bee -> a06ef37f9e93, Basic Indicator tables
+20261004.231801.215 INFO 683668:MainThread: Running upgrade a06ef37f9e93 -> f2b1e3aa0001, Add Mapped Locations table for storing user created location matches.
+20261004.231801.223 INFO 683668:MainThread: Running upgrade f2b1e3aa0001 -> 70e1269c0db2, Add history table and indicator constituents for calculated indicators
+20261004.231801.277 INFO 683668:MainThread: Running upgrade 70e1269c0db2 -> 23525d8da689, Add Case Management Models
+20261004.231801.293 INFO 683668:MainThread: Running upgrade 23525d8da689 -> 3846793ccd75, Onboard Alerts to use AuthZ
+20261004.231801.452 INFO 683668:MainThread: Running upgrade 3846793ccd75 -> afa5069f67d0, Add user-specific Dashboard Metadata
+20261004.231801.462 INFO 683668:MainThread: Running upgrade afa5069f67d0 -> 4ba4caf5d5b4, Add modification/creation times for records in the history table
+20261004.231801.468 INFO 683668:MainThread: Running upgrade 4ba4caf5d5b4 -> 3badb035b6ba, Add dashboard views metadata
+20261004.231801.473 INFO 683668:MainThread: Running upgrade 3badb035b6ba -> 43f128934e5d, Allow user deletions for history records without deleting the underlying history record.
+20261004.231801.478 INFO 683668:MainThread: Running upgrade 43f128934e5d -> 7bc724e03ded, Add raw formula field to indicator.
+20261004.231801.480 INFO 683668:MainThread: Running upgrade 7bc724e03ded -> e92d061b0bfc, Add 'flagged_locations' table for location matching.
+20261004.231801.490 INFO 683668:MainThread: Running upgrade e92d061b0bfc -> 853e0e8aa6a0, Add created field on user model
+20261004.231801.492 INFO 683668:MainThread: Running upgrade 853e0e8aa6a0 -> 213b541d942f, Add user query session table
+20261004.231801.501 INFO 683668:MainThread: Running upgrade 213b541d942f -> 0dc00a57046c, Moves case management information to the backend
+20261004.231801.620 INFO 683668:MainThread: Running upgrade 0dc00a57046c -> 1a712d1436eb, Finished moving case management information to the backend by changing existing tables
+20261004.231801.692 INFO 683668:MainThread: Running upgrade 1a712d1436eb -> 678bbb66356c, Add feed update objects
+20261004.231801.718 INFO 683668:MainThread: Running upgrade 678bbb66356c -> 18246ae1f1a2, Add userId column to feeds table.
+20261004.231801.721 INFO 683668:MainThread: Running upgrade 18246ae1f1a2 -> 657727059a29, Change type for user_id from boolean to integer
+20261004.231801.744 INFO 683668:MainThread: Running upgrade 657727059a29 -> 58ea420663e7, Change type for generation_timestamp to datetime (previously string) and rename to generation_datetime
+20261004.231801.751 INFO 683668:MainThread: Running upgrade 58ea420663e7 -> f66b2477cc4d, Create initial models for indicator db functionality.
+20261004.231801.842 INFO 683668:MainThread: Running upgrade f66b2477cc4d -> 05cc6c8d7b0a, Change user_query_session users to cascade user deletes
+20261004.231801.853 INFO 683668:MainThread: Running upgrade 05cc6c8d7b0a -> be6b1d1a30d2, empty message
+20261004.231801.877 INFO 683668:MainThread: Running upgrade be6b1d1a30d2 -> 86cb7933619c, empty message
+20261004.231801.884 INFO 683668:MainThread: Running upgrade 86cb7933619c -> 915286bb532c, Adds case_type_metadata_from_druid_field table
+20261004.231801.898 INFO 683668:MainThread: Running upgrade 915286bb532c -> 34ef9489bfc1, empty message
+20261004.231801.915 INFO 683668:MainThread: Running upgrade 34ef9489bfc1 -> de78dcd90eb3, empty message
+20261004.231801.923 INFO 683668:MainThread: Running upgrade de78dcd90eb3 -> 0d0f346a242f, Add crontabSchedule, SchedulerEntry, DashboardReportSchedule
+20261004.231801.973 INFO 683668:MainThread: Running upgrade 0d0f346a242f -> 951e632061d2, Adds full dimension data columnn for AlertNotifications
+20261004.231801.979 INFO 683668:MainThread: Running upgrade 951e632061d2 -> f3e8008ed008, Case management remodeling
+20261004.231802.002 INFO 683668:MainThread: Running upgrade f3e8008ed008 -> 1683303b140a, Add naming_druid_dimension_id to case_type_metadata_from_druid_dimension, and also change the primary_druid_dimension to use an id
+20261004.231802.083 INFO 683668:MainThread: Running upgrade 1683303b140a -> 1fdcf826e468, Add show_case_type_in_dossier to case_type table
+20261004.231802.088 INFO 683668:MainThread: Running upgrade 1fdcf826e468 -> 83644d6eb47f, Removing Resource Type from Role object.
+WARNING: upgrading and downgrading is destructive, this will not backfill values.
+20261004.231802.110 INFO 683668:MainThread: Running upgrade 83644d6eb47f -> 9a485a630d00, Create query policy, query policy type, query policy role mapping tables.
+20261004.231802.143 INFO 683668:MainThread: Running upgrade 9a485a630d00 -> ca5ccf4e8a59, Migrate query policy resources to roles.
+20261004.231802.149 INFO 683668:MainThread: Running upgrade ca5ccf4e8a59 -> 856eb1abdbce, Creates ACL, ResourceRole, ResourceRolePermission tables
+20261004.231802.274 INFO 683668:MainThread: Running upgrade 856eb1abdbce -> 546034ace769, Removes default_roles and introduces sitewide_acl table
+20261004.231802.330 INFO 683668:MainThread: Running upgrade 546034ace769 -> a43bff717c71, Creates field in role for dashboard resourceRole
+20261004.231802.393 INFO 683668:MainThread: Running upgrade a43bff717c71 -> 25faffac83d1, Add back id column to security_group_users model.
+20261004.231802.407 INFO 683668:MainThread: Running upgrade 25faffac83d1 -> 93bb8d693499, Add data export field to role model. Also adds new permissions for DQL and CM
+20261004.231802.494 INFO 683668:MainThread: Running upgrade 93bb8d693499 -> 6722855f6ce5, Updates ondelete for resource roles
+20261004.231802.505 INFO 683668:MainThread: Running upgrade 6722855f6ce5 -> e15c910d7f81, Add description to data catalog field model
+20261004.231802.507 INFO 683668:MainThread: Running upgrade e15c910d7f81 -> 31805c1630cf, Add dimensions_values column to alert_definitions table to allow for
+dimension value filtering in alerts
+20261004.231802.509 INFO 683668:MainThread: Running upgrade 31805c1630cf -> 6b05b608e3b3, Add dimension category mapping and
+add description to the dimension model
+20261004.231802.534 INFO 683668:MainThread: Running upgrade 6b05b608e3b3 -> fce9e77aafea, This migration adds the initial tables for pipeline entity matching
+20261004.231802.566 INFO 683668:MainThread: Running upgrade fce9e77aafea -> 60327b532405, This migration adds uniqueness constraints to canonical_pipeline_entity and
+raw_pipeline_entity as well as fixing an issue where we had an entity_type
+column on canonical_pipeline_entity instead of an entity_type_id foreign key on
+the pipeline_entity_type table
+20261004.231802.588 INFO 683668:MainThread: Running upgrade 60327b532405 -> bb520d4aa8fd, Change type of Validation Status column to add concept of queued to Entity Matching tables
+20261004.231802.598 INFO 683668:MainThread: Running upgrade bb520d4aa8fd -> 1fe113553bb6, Create table for DashboardSession
+20261004.231802.604 INFO 683668:MainThread: Running upgrade 1fe113553bb6 -> 65fda57202a5, Add use recipient permissions and use single email thread columns
+20261004.231802.608 INFO 683668:MainThread: Running upgrade 65fda57202a5 -> 1d52cbac7f72, Add user and date columns to PipelineEntityMatch
+20261004.231802.621 INFO 683668:MainThread: Running upgrade 1d52cbac7f72 -> 522563aa77c7, Add a field representing if a match is a self match or not.
+20261004.231802.628 INFO 683668:MainThread: Running upgrade 522563aa77c7 -> aad4ae0ffda6, empty message
+20261004.231802.667 INFO 683668:MainThread: Running upgrade aad4ae0ffda6 -> c6c1151430dd, This migration adds an index to the canonical_entity_id column of
+pipeline_entity_match to improve query performance
+20261004.231802.670 INFO 683668:MainThread: Running upgrade c6c1151430dd -> 4d1872f4a1d3, Add Data Digest Overview
+20261004.231802.676 INFO 683668:MainThread: Running upgrade 4d1872f4a1d3 -> 02d20fb0c3ed, Add visibility_status property to data catalog category model.
+20261004.231802.681 INFO 683668:MainThread: Running upgrade 02d20fb0c3ed -> e1e665f992c7, Add DataUploadFileSummary (data_upload_file_summary) table.
+20261004.231802.692 INFO 683668:MainThread: Running upgrade e1e665f992c7 -> b8be31b0936f, Add a field representing the joined string of all the values in
+entity_metadata column jsonb
+20261004.231802.696 INFO 683668:MainThread: Running upgrade b8be31b0936f -> c8a9fb8f786b, empty message
+20261004.231802.711 INFO 683668:MainThread: Running upgrade c8a9fb8f786b -> 6d4dc6809e6c, Add self serve summary table
+20261004.231802.718 INFO 683668:MainThread: Running upgrade 6d4dc6809e6c -> aae58915bafb, Add dashboard_report_groups
+20261004.231802.725 INFO 683668:MainThread: Running upgrade aae58915bafb -> 04ccddbe1441, Adds non-nullable constraints to fields in the SelfServeSource and DataUploadFileSummary
+data upload tables
+20261004.231802.730 INFO 683668:MainThread: Running upgrade 04ccddbe1441 -> 596dfa77bb84, Add visibility status to field category mapping table
+20261004.231802.734 INFO 683668:MainThread: Running upgrade 596dfa77bb84 -> 703e797521a0, Add BANNED pipeline entity match type
+20261004.231802.774 INFO 683668:MainThread: Running upgrade 703e797521a0 -> 5f298008d3b8, Adds an `in_latest`_datasource` column to the raw_pipeline_entity db table.
+20261004.231802.778 INFO 683668:MainThread: Running upgrade 5f298008d3b8 -> 671f6396c2be, Update dashboard resource onupdate to cascade
+20261004.231802.783 INFO 683668:MainThread: Running upgrade 671f6396c2be -> f4a399b73f71, Adding a field column to alert_definitions, a later migration will populate the column
+20261004.231802.784 INFO 683668:MainThread: Running upgrade f4a399b73f71 -> ed989d15dc61, Populating the existing field column in 'alert_definitions' to store the full field object
+20261004.231802.787 INFO 683668:MainThread: Running upgrade ed989d15dc61 -> 1d82c5f424f4, Mark all official dashboards as viewable by sitewide registered users
+20261004.231802.790 INFO 683668:MainThread: Running upgrade 1d82c5f424f4 -> 50f9404b84ae, For alert definitions:
+ - switch to storing a list of fields instead of a singular field
+ - switch to a list of DimensionValueFilterItems in filters instead of a list of dimension_values
+ - add optional title
+ - add "type" to alert checks
+ - add non-nullable constraints
+20261004.231802.808 INFO 683668:MainThread: Running upgrade 50f9404b84ae -> 0b6daf057ae2, Update data catalog field table to support copies one to many mapping
+20261004.231802.812 INFO 683668:MainThread: Running upgrade 0b6daf057ae2 -> f9f6f74c64ee, Create unpublished field table
+20261004.231802.819 INFO 683668:MainThread: Running upgrade f9f6f74c64ee -> 2be1fb67c14f, Changing title field of alert definition to be non-nullable and populating it with a default value
+20261004.231802.823 INFO 683668:MainThread: Running upgrade 2be1fb67c14f -> 1183eb8e2a0a, For data upload, add user_file_name column to data_upload_file_summary.
+20261004.231802.829 INFO 683668:MainThread: Running upgrade 1183eb8e2a0a -> fa4b961b5ecd, alerts: Add compared_val column to AlertDefinition
+20261004.231802.831 INFO 683668:MainThread: Running upgrade fa4b961b5ecd -> 77142d54b64d, Add DataprepFlow and DataprepJob Tables and a foreignkey on SelfServeSource to DataprepFlow
+20261004.231802.868 INFO 683668:MainThread: Running upgrade 77142d54b64d -> 70d2040c87e3, Create unpublished field mapping tables
+20261004.231802.901 INFO 683668:MainThread: Running upgrade 70d2040c87e3 -> 1bb8b462a580, Rename the Data Digest Overview table to Pipeline Run Metadata
+20261004.231802.903 INFO 683668:MainThread: Running upgrade 1bb8b462a580 -> c35c7fbe172f, Standardize enum type names that were previously unspecified.
+20261004.231802.906 INFO 683668:MainThread: Running upgrade c35c7fbe172f -> 1ee42f0ba37d, Create a temporary `legacy_specification` column in the dashboard table so that users
+can still view their non-upgraded dashboard during the launch of the modern dashboard
+experience.
+20261004.231802.909 INFO 683668:MainThread: Running upgrade 1ee42f0ba37d -> 59f23455295a, allow null file summary
+20261004.231802.910 INFO 683668:MainThread: Running upgrade 59f23455295a -> 0899aad0cf2f, Set file summary in self serve source to not nullable
+20261004.231802.914 INFO 683668:MainThread: Running upgrade 0899aad0cf2f -> fc7d305d0341, Delete `message` column from alert_notifications table
+20261004.231802.915 INFO 683668:MainThread: Running upgrade fc7d305d0341 -> f193e47caa08, This migration adds the `Data Uploader` role and `can_upload_data` permission that will be
+used by data-upload.
+20261004.231802.931 INFO 683668:MainThread: Running upgrade f193e47caa08 -> a53982a375ec, This migration adds a new banned_raw_pipeline_entity_match table which represents
+raw pipeline entities that should not be matched together.
+20261004.231802.955 INFO 683668:MainThread: Running upgrade a53982a375ec -> 7d247dadfba0, Add a Manager Role
+20261004.231803.004 INFO 683668:MainThread: Running upgrade 7d247dadfba0 -> de1372d2c1b3, Create geo_dimension_metadata, hierarchical_dimension_metadata,
+non_hierarchical_dimensions tables and updates existing dimension table.
+20261004.231803.033 INFO 683668:MainThread: Running upgrade de1372d2c1b3 -> 1d09a4f69ae4, Adds a reference to PipelineDatasource in SelfServeSource.
+20261004.231803.042 INFO 683668:MainThread: Running upgrade 1d09a4f69ae4 -> 84a8f91cfbb3, This migration removes the default permission to dashboard tool for the manager role.
+20261004.231803.053 INFO 683668:MainThread: Running upgrade 84a8f91cfbb3 -> 4c19fa30d958, Add quarterly and semi-annual scheduled dashboard reporting periods
+20261004.231803.069 INFO 683668:MainThread: Running upgrade 4c19fa30d958 -> 347d0217289b, Drop location-related postgres tables as part of deprecating old products:
+MFExplorer, ReviewAdmin, LocationAdmin, GeoExporer
+20261004.231803.097 INFO 683668:MainThread: Running upgrade 347d0217289b -> 925fed9a10e4, Remove HistoryRecord model
+20261004.231803.104 INFO 683668:MainThread: Running upgrade 925fed9a10e4 -> bb8d1e7a1640, Remove indicators and indicatorGroup model
+20261004.231803.118 INFO 683668:MainThread: Running upgrade bb8d1e7a1640 -> d5a1a7abe938, Add Role Administrator and Moderator Roles.
+20261004.231803.198 INFO 683668:MainThread: Running upgrade d5a1a7abe938 -> d325772895f7, Data Upload Roles
+20261004.231803.221 INFO 683668:MainThread: Running upgrade d325772895f7 -> eb1742dac26e, Update Data Upload models to enable the uploading of multiple (dataprep)
+ files to one self-serve data source (ie appending behavior).
+20261004.231803.234 INFO 683668:MainThread: Running upgrade eb1742dac26e -> edcaeb0d4329, empty message
+20261004.231803.252 INFO 683668:MainThread: Running upgrade eb1742dac26e -> 5259b9c6d7a6, Creates a table for dashboard report generators and corresponding storage space
+to store its recipient groups
+20261004.231803.277 INFO 683668:MainThread: Running upgrade 5259b9c6d7a6, edcaeb0d4329 -> 2235d00f9ebb, This is a merge migration for microplanning branch being merged into master
+20261004.231803.278 INFO 683668:MainThread: Running upgrade 2235d00f9ebb -> b281ae64d45d, Adds a new table to track current report generator run
+20261004.231803.300 INFO 683668:MainThread: Running upgrade b281ae64d45d -> 1e6aa4f75d79, Use timezone for started_at and disallow nulls for successul
+20261004.231803.306 INFO 683668:MainThread: Running upgrade 1e6aa4f75d79 -> fcd59de9d36d, Only allow a single dashboard report generator to be created per dashboard
+20261004.231803.312 INFO 683668:MainThread: Running upgrade fcd59de9d36d -> e8f6ad35d0f0, empty message
+20261004.231803.314 INFO 683668:MainThread: Running upgrade e8f6ad35d0f0 -> ed9866de10d8, Empty Migration needed to add new entity matching roles
+20261004.231803.336 INFO 683668:MainThread: Running upgrade ed9866de10d8 -> 97b0abb262bf, Pipeline entity type metadata columns migration which also generates data for the new table
+with the migration seed script.
+20261004.231803.350 INFO 683668:MainThread: Running upgrade 97b0abb262bf -> 70835f75f7c6, This migration adds a created, last_modified datetime fields to the
+data catalog tables.
+20261004.231803.386 INFO 683668:MainThread: Running upgrade 70835f75f7c6 -> ae9a40cd9103, Add source config table
+20261004.231803.394 INFO 683668:MainThread: Running upgrade ae9a40cd9103 -> 3c3ef4a761ed, Creates a new table to store generated API tokens states
+20261004.231803.412 INFO 683668:MainThread: Running upgrade 3c3ef4a761ed -> 6aec17d57ff8, This migration generates the materialized views used to make entity matching quicker
+20261004.231803.429 INFO 683668:MainThread: Running upgrade 6aec17d57ff8 -> fe9a588011c4, This migration removes the JSON blob from QueryPolicy and instead uses SQL columns
+to describe what is allowed under the policy
+20261004.231803.439 INFO 683668:MainThread: Running upgrade fe9a588011c4 -> 189373be1240, Update the Entity Matching raw_distinct_metadata_materialized_view
+20261004.231803.447 INFO 683668:MainThread: Running upgrade 189373be1240 -> 99859a8ef2fc, Adds fields to dashboard to control download permissions for registered and unregistered users
+20261004.231803.452 INFO 683668:MainThread: Running upgrade 99859a8ef2fc -> 3071258606d2, Update dataprep_job table to enable adding jobs that fail before even being
+created as a job in dataprep. These jobs would have a null job_id,
+created_on_dataprep, and last_modified_on_dataprep.
+20261004.231803.455 INFO 683668:MainThread: Running upgrade 3071258606d2 -> bcfc6763c18c, Creates db tables for the new DV cache in the db instead of web server RAM
+20261004.231803.489 INFO 683668:MainThread: Running upgrade bcfc6763c18c -> c30c94961873, Makes the materialized view for the Distinct Metadata materialized view sorted alphabetically.
+20261004.231803.496 INFO 683668:MainThread: Running upgrade c30c94961873 -> 2b730c14f514, Introduces triggers for data catalog last modified column updates
+--- exit: 0, stderr lines: 208, non-JSON: 190, alembic.runtime.migration: 0, version: 2b730c14f514

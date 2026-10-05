@@ -29,7 +29,9 @@ def build_dimension_count_aggregation(dimension: str) -> dict:
         'type': 'filtered',
         'filter': {
             'type': 'not',
-            'field': {'type': 'selector', 'dimension': dimension, 'value': ''},
+            # Druid null test (WP-8a N1): value None is "is null" in every null mode;
+            # '' matched null rows only under legacy null handling.
+            'field': {'type': 'selector', 'dimension': dimension, 'value': None},
         },
         'aggregator': {'type': 'longMax', 'fieldName': 'count', 'name': dimension},
     }

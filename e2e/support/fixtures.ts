@@ -5,23 +5,43 @@ import { BASE_URL } from './env';
 
 type Allowance = { pattern: RegExp; reason: string };
 
-const STACK_ORIGIN = new URL(BASE_URL).origin;
+const STACK = new URL(BASE_URL);
 
 /**
  * Collects what a user would experience as breakage: uncaught page errors,
- * 5xx responses and failed requests. It also blocks and records every request
- * that leaves the disposable stack (CDNs, tile servers, analytics), so the
- * suite never makes an external call. Every test fails at teardown if any were
- * seen, unless the test allowed that exact message with a written reason
- * (a known defect or a limit of the disposable stack).
+ * 5xx responses and failed requests, in every page of a watched browser
+ * context, popups included. It also blocks and records every HTTP request and
+ * WebSocket that leaves the disposable stack (CDNs, tile servers, analytics),
+ * so the suite never makes an external call. Every test fails at teardown if
+ * any were seen, unless the test allowed that exact message with a written
+ * reason (a known defect or a limit of the disposable stack).
  */
 export class AppErrors {
   readonly seen: string[] = [];
 
   private readonly allowances: Allowance[] = [];
 
-  /** Starts collecting from a page; the test fixture watches its own page. */
-  async watch(page: Page): Promise<void> {
+  /** Starts collecting from a context; the test fixture watches its own. */
+  async watchContext(context: BrowserContext): Promise<void> {
+    context.pages().forEach(page => this.watchPage(page));
+    context.on('page', page => this.watchPage(page));
+    await context.route(
+      url => url.origin !== STACK.origin && url.protocol.startsWith('http'),
+      route => {
+        this.seen.push(`external request blocked: ${route.request().url()}`);
+        return route.abort('blockedbyclient');
+      },
+    );
+    await context.routeWebSocket(
+      url => url.host !== STACK.host,
+      ws => {
+        this.seen.push(`external websocket blocked: ${ws.url()}`);
+        return ws.close();
+      },
+    );
+  }
+
+  private watchPage(page: Page): void {
     page.on('pageerror', error => this.seen.push(`page error: ${error.message}`));
     page.on('response', response => {
       if (response.status() >= 500) {
@@ -36,13 +56,6 @@ export class AppErrors {
         this.seen.push(`request failed: ${request.method()} ${request.url()} ${failure}`);
       }
     });
-    await page.route(
-      url => url.origin !== STACK_ORIGIN && url.protocol.startsWith('http'),
-      route => {
-        this.seen.push(`external request blocked: ${route.request().url()}`);
-        return route.abort('blockedbyclient');
-      },
-    );
   }
 
   allow(pattern: RegExp, reason: string): void {
@@ -66,7 +79,7 @@ export const test = base.extend<Fixtures>({
   appErrors: [
     async ({ page }, use) => {
       const errors = new AppErrors();
-      await errors.watch(page);
+      await errors.watchContext(page.context());
       await use(errors);
       expect(errors.unexpected(), 'page errors, 5xx responses or failed requests').toEqual([]);
     },
@@ -77,9 +90,8 @@ export const test = base.extend<Fixtures>({
     await use(async () => {
       const context = await browser.newContext({ storageState: { cookies: [], origins: [] } });
       contexts.push(context);
-      const page = await context.newPage();
-      await appErrors.watch(page);
-      return page;
+      await appErrors.watchContext(context);
+      return context.newPage();
     });
     await Promise.all(contexts.map(context => context.close()));
   },

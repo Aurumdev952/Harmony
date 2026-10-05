@@ -3,6 +3,7 @@
 Its effect on query results is proven against live Druid by
 scripts/druid/null_audit (WP-8a evidence); this pins its shape.
 '''
+
 import json
 import os
 import subprocess

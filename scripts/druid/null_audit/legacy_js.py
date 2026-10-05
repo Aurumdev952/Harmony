@@ -3,6 +3,7 @@
 `run_audit.py parity --js` can compare it with the native one on a Druid that
 still runs JavaScript. Harmony never sends it.
 '''
+
 WHO_EPI_WEEK_EXTRACTION_FORMULA = '''
 function epiWeekOfYear(time) {
   /* Calculate WHO epi year start for a year. */

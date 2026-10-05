@@ -26,6 +26,7 @@ and fails unless both agree with each other and with the Python port.
 The golden fixtures are not touched: their responses are synthetic, so the
 audit is differential, the same data under two Druid configurations.
 '''
+
 import argparse
 import json
 import sys
@@ -185,8 +186,22 @@ def _run_index_task(base: str, datasource: str, task: dict) -> None:
         return None
 
     version = _wait(f'{datasource} segments to be served', served, TASK_TIMEOUT_S)
-    counts = _sql(base, f'SELECT COUNT(*) AS n, SUM("count") AS c FROM "{datasource}"')
-    print(f'{datasource} version {version} served: {counts}')
+    counts = requests.post(
+        f'{base}/druid/v2',
+        json={
+            'queryType': 'timeseries',
+            'dataSource': datasource,
+            'granularity': 'all',
+            'intervals': ['1000-01-01/3000-01-01'],
+            'aggregations': [
+                {'type': 'count', 'name': 'n'},
+                {'type': 'longSum', 'name': 'c', 'fieldName': 'count'},
+            ],
+        },
+        timeout=60,
+    )
+    counts.raise_for_status()
+    print(f'{datasource} version {version} served: {counts.json()[0]["result"]}')
 
 
 _VALUE_LEAVES = {'selector', 'in', 'bound', 'regex', 'search', 'like'}

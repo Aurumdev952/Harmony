@@ -13,6 +13,7 @@ Both rewrites leave fixtures that already carry the change alone, so the check
 holds before and after the fixtures are regenerated. The posted queries are then compared with the rewritten ones as canonical
 queries. Exits non-zero on any other difference or any body change.
 '''
+
 import sys
 from pathlib import Path
 from typing import Any

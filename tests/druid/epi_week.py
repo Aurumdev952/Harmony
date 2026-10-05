@@ -12,6 +12,7 @@ extraction to `MM-ww` cascaded into an inline map lookup reproduces it with no
 JavaScript. The map holds every (month, ISO week) pair the Gregorian calendar
 can produce; the calendar repeats every 400 years, so one cycle enumerates them.
 '''
+
 from datetime import date, datetime, timedelta, timezone
 from typing import Dict
 

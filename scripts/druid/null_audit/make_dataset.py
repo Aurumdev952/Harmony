@@ -11,6 +11,7 @@ select real rows. Rows are sparse, so filtered aggregators are empty in some
 groups. A few rows carry each null shape (absent Sex or Age, a location that did
 not match), so every null path the query builder meets is present in the data.
 '''
+
 import argparse
 import json
 import random
@@ -53,7 +54,7 @@ def _location(values: tuple) -> Row:
 
 
 def rows(seed: int = SEED) -> List[Row]:
-    rng = random.Random(seed)
+    rng = random.Random(seed)  # noqa: S311 seeded, so the dataset is reproducible
     unmatched = {name: '' for name in LOCATION_DIMENSIONS}
     output: List[Row] = []
     for day in sorted(set(_dates())):

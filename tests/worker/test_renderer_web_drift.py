@@ -59,3 +59,19 @@ def test_the_web_app_asks_only_for_what_the_renderer_accepts(monkeypatch):
     assert page_renderer.DEFAULT_HEIGHT in spec.HEIGHTS
     assert page_renderer.RENDER_TIMEOUT_SECONDS <= renderer.max_timeout_seconds
     assert page_renderer.RENDER_MAX_BYTES == renderer.max_bytes
+
+
+def test_the_renderer_answers_before_the_web_app_stops_reading(monkeypatch):
+    # A render that overruns is killed at its deadline plus the clean-up grace
+    # and answered 504; the web app must still be reading then, or it logs a
+    # read timeout instead of the renderer's code. Its read timeout is also the
+    # render token's and the slot's lifetime.
+    monkeypatch.delenv('RENDERER_CLEANUP_GRACE_SECONDS', raising=False)
+    latest_answer = (
+        page_renderer.RENDER_TIMEOUT_SECONDS + settings_from_env().cleanup_grace_seconds
+    )
+    read_timeout = (
+        page_renderer.RENDER_TIMEOUT_SECONDS + page_renderer.RESPONSE_MARGIN_SECONDS
+    )
+
+    assert latest_answer < read_timeout

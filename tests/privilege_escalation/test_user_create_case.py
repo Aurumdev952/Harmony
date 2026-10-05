@@ -2,6 +2,7 @@
 ignoring case to another account's, through the real route.'''
 
 import pytest
+from sqlalchemy import func
 
 
 def _create(admin, username):
@@ -17,26 +18,32 @@ def _create(admin, username):
     )
 
 
+def _usernames_equal_ignoring_case(app, username):
+    # pylint: disable=import-outside-toplevel
+    from models.alchemy.user import User
+
+    with app.app_context():
+        return [
+            user.username
+            for user in User.query.filter(func.lower(User.username) == username.lower())
+        ]
+
+
 @pytest.mark.parametrize('spelling', [str.upper, str.title])
-def test_create_refuses_another_case_of_an_existing_username(make_user, spelling):
+def test_create_refuses_another_case_of_an_existing_username(app, make_user, spelling):
     admin = make_user(roles=['admin'])
     existing = make_user()
 
     response = _create(admin, spelling(existing.username))
 
     assert response.status_code == 400, response.get_data(as_text=True)[:300]
-    users = admin.request('GET', '/api2/user').get_json()
-    taken = [
-        user['username']
-        for user in users
-        if user['username'].lower() == existing.username.lower()
-    ]
-    assert taken == [existing.username]
+    assert _usernames_equal_ignoring_case(app, existing.username) == [existing.username]
 
 
-def test_create_accepts_a_new_username(make_user):
+def test_create_accepts_a_new_username(app, make_user):
     admin = make_user(roles=['admin'])
 
     response = _create(admin, 'brand.new.account@escalation.test')
 
     assert response.status_code in (200, 201), response.get_data(as_text=True)[:300]
+    assert _usernames_equal_ignoring_case(app, 'brand.new.account@escalation.test')

@@ -21,7 +21,14 @@ print(json.dumps(schema))
 '''
 
 
-def _data_schema() -> dict:
+_QUOTING_PROBE = '''
+import json
+from db.druid.indexing.common import build_empty_to_null_transforms
+print(json.dumps(build_empty_to_null_transforms(['a"b\\\\c', 'field'])))
+'''
+
+
+def _run(probe: str):
     # A subprocess keeps the dummy settings out of this test session's modules.
     env = {
         **os.environ,
@@ -33,7 +40,7 @@ def _data_schema() -> dict:
         'DEFAULT_SECRET_KEY': 'test-only-not-a-secret',
     }
     result = subprocess.run(
-        [sys.executable, '-c', _PROBE],
+        [sys.executable, '-c', probe],
         cwd=REPO_ROOT,
         env=env,
         capture_output=True,
@@ -44,7 +51,7 @@ def _data_schema() -> dict:
 
 
 def test_every_dimension_but_field_stores_empty_as_null():
-    schema = _data_schema()
+    schema = _run(_PROBE)
     dimensions = [
         d if isinstance(d, str) else d['name']
         for d in schema['dimensionsSpec']['dimensions']
@@ -59,3 +66,14 @@ def test_every_dimension_but_field_stores_empty_as_null():
             'name': name,
             'expression': f'if("{name}" == \'\', null, "{name}")',
         }
+
+
+def test_dimension_names_are_escaped_inside_the_expression():
+    # A quote or backslash in a configured dimension name must not end the quoted
+    # identifier early; Druid's expression grammar takes Java-style escapes.
+    [transform] = _run(_QUOTING_PROBE)
+    assert transform == {
+        'type': 'expression',
+        'name': 'a"b\\c',
+        'expression': 'if("a\\"b\\\\c" == \'\', null, "a\\"b\\\\c")',
+    }

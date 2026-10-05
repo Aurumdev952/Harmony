@@ -1,3 +1,4 @@
+import json
 import math
 import os
 from datetime import datetime
@@ -23,12 +24,14 @@ def build_empty_to_null_transforms(dimensions: List[str]) -> List[dict]:
     `''` is a value of its own, which would split every "no value" group in two and
     slip past the builder's null filters. Storing null keeps today's semantics.
     `field` is multi-valued for zero rows and never empty, so it is left alone.
+    Names are quoted with JSON escapes, which Druid's expression grammar shares.
     '''
     return [
         {
             'type': 'expression',
             'name': dimension,
-            'expression': f'if("{dimension}" == \'\', null, "{dimension}")',
+            'expression': f'if({json.dumps(dimension)} == \'\', null, '
+            f'{json.dumps(dimension)})',
         }
         for dimension in dimensions
         if dimension != FIELD_NAME

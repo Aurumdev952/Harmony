@@ -14,6 +14,7 @@ import zipfile
 from collections.abc import Iterator
 
 import psycopg2
+from psycopg2 import sql
 import pytest
 import sqlalchemy as sa
 
@@ -100,7 +101,7 @@ def fixture_database(postgres_database: str) -> Iterator[str]:
 
 def _rows(url: str, table: str) -> list[tuple]:
     with psycopg2.connect(url) as conn, conn.cursor() as cursor:
-        cursor.execute(f"SELECT * FROM {table}")
+        cursor.execute(sql.SQL("SELECT * FROM {}").format(sql.Identifier(table)))
         rows = cursor.fetchall()
     conn.close()
     return sorted(rows, key=repr)

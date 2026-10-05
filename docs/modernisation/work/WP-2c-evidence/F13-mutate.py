@@ -29,7 +29,8 @@ MUTATIONS = {
 
 try:
     for label, (old, new) in MUTATIONS.items():
-        assert ORIGINAL.count(old) == 1, label
+        if ORIGINAL.count(old) != 1:
+            raise SystemExit(f"mutation {label!r} does not apply to the current code")
         TARGET.write_text(ORIGINAL.replace(old, new))
         result = subprocess.run(
             ["uv", "run", "pytest", "tests/db", "-q", "-p", "no:warnings"],

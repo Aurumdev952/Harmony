@@ -61,7 +61,7 @@ INSERT INTO unpublished_field_dimension_mapping (unpublished_field_id, dimension
     SELECT 'uf_' || g, 'dim_' || (g % 200 + 1) FROM generate_series(1, 10000) g;
 INSERT INTO source_config (config, source_id, is_active)
     SELECT '{{}}', g, true FROM generate_series(1, 100) g;
-"""
+"""  # noqa: S608 (only integer constants are interpolated)
 
 
 def load(source, name):
@@ -104,7 +104,7 @@ def counts():
             "unpublished_field_dimension_mapping",
             "source_config",
         ):
-            cur.execute(f"SELECT count(*) FROM {t}")
+            cur.execute(f"SELECT count(*) FROM {t}")  # noqa: S608 (fixed table names)
             out[t] = cur.fetchone()[0]
     conn.close()
     return out

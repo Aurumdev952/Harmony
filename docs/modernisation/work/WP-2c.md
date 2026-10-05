@@ -5,7 +5,7 @@ status: review
 owner_role: "qa"
 instances:
   - name: "qa-3"
-    files: ["tests/contract/**", "docs/modernisation/work/WP-2c.md"]
+    files: ["tests/contract/**", "tests/db/test_import_data_into_table.py", "docs/modernisation/work/WP-2c.md"]
 branch: "mig/WP-2c-api-contract-recordings"
 requirements: [QA-2, INV-1, INV-6]
 contracts_consumed: [C-4, C-5, C-10]
@@ -27,8 +27,9 @@ Units, in order. Each line names the change and the check that ends it.
 6. Review fixes (QA and reviewer, changes-requested, 2026-10-04/05): stack secrets, pinned images, internal network, image tags by input hash; enum and set pins, cookie attributes, missing pins and captures reported as diffs, `request_schema` dropped, declared empty maps; populated nested collections; Relay per-operation coverage; inventory gaps; one replay path; history split. Check: offline suite, replay twice on a fresh stack and again on a second fresh stack, from a clean clone of the branch head.
 7. Round-3 review fixes (QA and reviewer, changes-requested, 2026-10-06): apiTokens stored through PATCH; catalogue rows seeded so the Relay queries that read them record items, and the 11 deferred Relay mutations recorded; replay reports changed pins as diffs; stale `/graphql` row; maps for resource roles and source date ranges; F10/F11 numbering; remember-me login; Linux-only note; phase-5 notes in `INVENTORY.md`; date-format test row. Check: offline suite, ruff, record twice on fresh stacks with identical output, replay twice on each of two fresh stacks, broken recordings red.
 8. Round-4 review fixes (reviewer, changes-requested, 2026-10-04): merge `mig/integration` and drop the bcrypt shim image (F3 fixed by WP-0b); merge backend's F12 fix and correct the token case notes; F13 rewritten around the upsert remedy and the real code path; a seeded published field so field-page queries pin datasource and dimension mappings; the unpublished-field table queries run after the category mapping is restored; empty connections enforced by `test_catalogue`; capture errors never echo values; token dates sent as the client does. Check: offline suite, ruff, record twice on fresh stacks with identical output, replay twice on each of two fresh stacks, a broken recording red.
+9. Final round (lead, 2026-10-05): merge core's F13 fix (`mig/WP-2c-api-contract-recordings-core` at `effacb8`); re-record `BatchPublishModalContentsQuery` and the unpublished-field cases on a fresh stack; drop the empty-connection annotation; F13 text to core's final design; core's three follow-ups under Requests. Check: `tests/db` 9 passed (6 failed with the pre-fix `utils.py`), offline suite, dry run, ruff, record twice on fresh stacks with identical output, replay twice on each of two fresh stacks, a broken recording red.
 
-Files: `tests/contract/**`, this file and QA memory. No production code changes.
+Files: QA's commits touch `tests/contract/**`, this file, QA memory, and one line of the shared `tests/db/test_import_data_into_table.py` (ruff S608). The branch also carries production fixes merged from their owners' branches: backend's F12 (`web/server/routes/views/users.py`) and core's F13 (`db/postgres/utils.py`).
 
 ## Contract changes
 
@@ -74,6 +75,12 @@ None of these block WP-2c; each comes from a finding below or from the review.
   - 2026-10-04 backend-2c: failing tests are in at `d23076f`. The fix is in `db/postgres/utils.py` (core), so a core instance applies it on `mig/WP-2c-api-contract-recordings-core`. Tick this line when that branch merges.
   - 2026-10-04 core-2c: fixed at `d016bce` on `mig/WP-2c-api-contract-recordings-core`, which merges back through backend's branch. Ticked at the lead's request; the merge is still pending. Two defects in the proposed patch were fixed: delete-before-upsert cascaded into exported rows, and sequences were set before the import could still fail. See "F13: core review and fix".
   - 2026-10-04 qa-3: once that branch merges, QA re-records and drops the `empty connection` annotation from the BatchPublish row in `INVENTORY.md`. `test_catalogue` fails until both happen.
+  - 2026-10-05 qa-3: merged at `84b8cf7`. Re-recorded on fresh stacks: six recordings now pin the unpublished-field mapping items, and the annotation is gone. See unit 9.
+- [ ] core: export the data-catalog tables in one `REPEATABLE READ READ ONLY` transaction. `export_tables_to_zip` copies each table in its own autocommit transaction, so an export taken during edits can be inconsistent, and the fixed import now refuses such an archive (core's F13 follow-up).
+- [ ] core: COPY maps CSV columns by position, so a target whose column order differs from the source (a schema built by `create_all` against one built by Alembic) misloads. Map columns by name from the CSV header. This predates F13 (core's F13 follow-up).
+- [ ] backend: `POST /api/import_self_serve` waits 120 s for the import subprocess. When the import outlives it, `communicate` raises, the `with Popen` block waits for the child anyway, and the route can answer with an error for an import that then commits (`web/server/routes/api.py`, core's F13 follow-up).
+- [ ] core: `ci/lint_python.sh mig/integration` format-checks every Python file the branch changes, and `db/postgres/utils.py` would be reformatted (three `with` blocks and one call). Run `ruff format` on it in a format-only commit, or tell the lead to accept the red format step. Found by qa-3 on 2026-10-05.
+- [ ] backend: the same lint step fails on the F12 files. `web/server/routes/views/users.py:432` is E712 (`APIToken.is_revoked == False`; `APIToken.is_revoked.is_(False)` keeps the SQL), and `users.py` and `web/server/api/user_api_models.py` would be reformatted. Found by qa-3 on 2026-10-05.
 
 ## Log
 
@@ -89,6 +96,7 @@ None of these block WP-2c; each comes from a finding below or from the review.
 - 2026-10-04 backend-2c (supporting, F13): failing tests `tests/db/test_import_data_into_table.py` (3 failed, 1 passed at `00e5047`) and the proposed core patch `WP-2c-evidence/F13-db-postgres-utils.patch` (4 passed with it); handed to core through the lead.
 - 2026-10-04 backend-2c (supporting, F12): `issue_api_token` stores the generated token and the route calls it, commit `48ff9a3`. Checks: the new `tests/web/test_api_token_issue.py` failed against the old behaviour (`check_token_validity` False) and passes, 2 of 2, including the admin app's later save and revoke. `tests/web` gives 70 passed, 1 failed; the failure is the existing `test_graphql_endpoint_removed` (`flask_migrate` is missing from the uv env, also at `00e5047`). The contract offline suite gives 51 passed, and the dry run reports 231 cases, 0 problems. Replay on a fresh stack: 231 passed, twice. The live F12 check passed. ruff and mypy on the changed files are clean. Stack down.
 - 2026-10-04 qa-3 unit 8: round-4 fixes S1-S9. Merged `mig/integration` (`cbaf776`) and backend's F12 branch (`fd187c8`); commits `f7e4895`, `24cc64c` and `ed1a07c`. Check: ruff clean; offline `57 passed`; dry run `234 cases, 0 problems`; two recordings on fresh stacks, identical; replay `291 passed` twice on each of two fresh stacks; one broken recording red; stack down. Status review.
+- 2026-10-05 qa-3 unit 9: merged core's F13 branch at `effacb8` (`84b8cf7`; conflicts only in this file, both sides kept). `tests/db` 9 passed, and 6 failed with `b6e49b8`'s `db/postgres/utils.py`. Re-recorded on a fresh stack: six recordings changed, each only by an empty list becoming an item schema, and the BatchPublish annotation is dropped. Replaced the f-string `SELECT` in `tests/db/test_import_data_into_table.py` with `psycopg2.sql.Identifier`, and cleared ruff in core's two evidence scripts (S608 noqa on constant SQL, an `assert` turned into `SystemExit`). The changed-files lint still fails on core's and backend's production files: two requests added. Check: ruff clean on QA's files and the evidence scripts; offline `57 passed`; dry run `234 cases, 0 problems`; two recordings on fresh stacks, identical; replay `291 passed` twice on each of two fresh stacks; one broken recording red; stack down. Status review.
 - 2026-10-04 core-2c (supporting, F13): reviewed backend's patch as owner and found two defects (a cascade into exported rows, and sequences rewound by a failed import), each shown by a new test that fails with the patch. Fix `d016bce`: one transaction; upsert referenced tables, then delete absent rows; empty and reload the leaves; count check; non-lowering sequences, set last. Merged backend's `8804af2`. Checks: `tests/db` 9 passed, 4 of 4 mutations killed, ruff and mypy clean on the changed files, golden 269 passed, perf old vs new recorded under "F13: core review and fix". `scripts/data_catalog/import_db_tables.py` (lead) needs no change.
 
 ## Review fixes
@@ -113,7 +121,7 @@ None of these block WP-2c; each comes from a finding below or from the review.
 | # | Finding | Fix | Evidence |
 |---|---|---|---|
 | R1 | apiTokens empty (QA, reviewer) | `user.generate_api_token` captures the token's `$uri` and `id`. `user.update.persist_api_token` then PATCHes the user with the token, as the admin app does (`UserViewModal/index.jsx:321`). `user.get.with_api_token` now pins the item shape: `$uri`, `created`, `id`, `isRevoked`, `revoked` and `token: null`. F12 logged. | `recordings/user.get.with_api_token.json` |
-| R2 | Nine Relay queries recorded empty connections (reviewer) | `stack/seed_catalog.py` (run by `init.sh`) seeds a dimension, two pipeline datasources, an unpublished field with mappings, a Dataprep flow and a self-serve source. The unpublished-field table queries now send `%%`, as the client does. The `ALL_SOURCES` pipeline-run seed carries `next_run`. At `fa72fe0`, 14 Relay recordings had an empty top-level connection; 13 now record items. The 14th, `BatchPublishModalContentsQuery`, stays empty because `self_serve.import.exported_zip` deletes the seeded datasource mapping (F13). Corrected in round 4: `UnpublishedFieldTableRowsQuery` pins the same node's scalars, but no recording pins the unpublished datasource-mapping item shape until F13 is fixed. The 11 deferred mutations are recorded too, so 51 of 51 Relay operations are covered. | `/tmp/wp2c_edges.py` over the recordings; `INVENTORY.md` Relay table |
+| R2 | Nine Relay queries recorded empty connections (reviewer) | `stack/seed_catalog.py` (run by `init.sh`) seeds a dimension, two pipeline datasources, an unpublished field with mappings, a Dataprep flow and a self-serve source. The unpublished-field table queries now send `%%`, as the client does. The `ALL_SOURCES` pipeline-run seed carries `next_run`. At `fa72fe0`, 14 Relay recordings had an empty top-level connection; 13 now record items. The 14th, `BatchPublishModalContentsQuery`, stays empty because `self_serve.import.exported_zip` deletes the seeded datasource mapping (F13). Corrected in round 4: `UnpublishedFieldTableRowsQuery` pins the same node's scalars, but no recording pins the unpublished datasource-mapping item shape until F13 is fixed. Closed in unit 9: with core's fix merged, `BatchPublishModalContentsQuery` records the field and its mappings. The 11 deferred mutations are recorded too, so 51 of 51 Relay operations are covered. | `/tmp/wp2c_edges.py` over the recordings; `INVENTORY.md` Relay table |
 | R3 | A changed pinned value raised instead of a diff (reviewer) | During replay, `observe` never raises: it replaces an unsafe value with a marker. `record.py` passes `recording=True`, which still refuses unsafe pins. New test: `test_a_replay_reports_an_unsafe_pinned_value_without_echoing_it`. | broken-recording run below |
 | R4 | Stale `POST /graphql` row (reviewer) | Row deleted. WP-0d removed `r/graphql_api.py` and `zen_environment.js`. | `INVENTORY.md` |
 | R5 | `data_upload.sources_date_ranges` and `resource.roles*` keyed by data (reviewer, QA) | `maps: ["$"]` and `maps: ["$.groupRoles", "$.userRoles"]`. | the three recordings |
@@ -136,25 +144,25 @@ None of these block WP-2c; each comes from a finding below or from the review.
 
 ## Evidence
 
-Round 4 was re-run in full on 2026-10-04 by qa-3 at `ed1a07c`, which includes `mig/integration` `327980c` and backend's `8804af2`. Live runs used a disposable stack with `CONTRACT_PROJECT=wp2c-r3 CONTRACT_WEB_PORT=58773` and `eval "$(tests/contract/stack/stack.sh env)"`. The stock image built as `harmony-contract-web-server:f46617f35db7`. All commands ran under `uv run --locked`.
+The final round was re-run in full on 2026-10-05 by qa-3 at `84b8cf7` plus the unit-9 changes. That tree carries `mig/integration` `327980c`, backend's `8804af2` and core's `effacb8`. Live runs used a disposable stack with `CONTRACT_PROJECT=wp2c-r5 CONTRACT_WEB_PORT=58781` and `eval "$(tests/contract/stack/stack.sh env)"`. The stock image built as `harmony-contract-web-server:f46617f35db7`, the same as in round 4. All commands ran under `uv run --locked`.
 
-- **Static**: `ruff format --line-length 88 --check tests/contract` reports 17 files already formatted; `ruff check tests/contract` reports all checks passed.
+- **Static**: `ruff format --line-length 88 --check tests/contract` reports 17 files already formatted. `ruff check tests/contract tests/db db/postgres/utils.py` reports all checks passed. The CI step `ci/lint_python.sh mig/integration` lints the 26 Python files the branch changes. QA's files and core's evidence scripts pass it (unit 9 fixed an S608 in `tests/db`, two in `F13-perf.py` and an S101 in `F13-mutate.py`). It still fails on the merged production files: E712 at `users.py:432`, and `ruff format` would change `db/postgres/utils.py`, `users.py` and `user_api_models.py`. Those are owner requests above.
+- **F13 fix**: `ZEN_ENV=harmony_demo pytest tests/db` reports `9 passed`. With `db/postgres/utils.py` from `b6e49b8` (before the fix) it reports `6 failed, 3 passed`.
 - **Dry run**: `python -m tests.contract.record --dry-run` reports `234 cases, 0 problems`.
-- **Offline suite**: `pytest tests/contract -m "not stack"` reports `57 passed, 234 deselected`.
+- **Offline suite**: `pytest tests/contract -m "not stack"` reports `57 passed, 234 deselected`. With the old BatchPublish row restored, `test_catalogue` fails with `BatchPublishModalContentsQuery: marked empty connection but a recording has items`.
 - **Properties**: `test_schema.py` passes 22 tests under `--hypothesis-seed` 1, 2 and 3.
 - **Recording is reproducible**: all 234 cases were recorded on a fresh stack. Then `stack.sh down`, `stack.sh up`, and a second recording. Neither run had an error or skip, and `diff -r` between the two sets is empty.
-  - Against round 3, seven recordings changed, all because of the seeded field or the reordered queries: `CreateCalculationIndicatorViewQuery`, `DataStatusPageSelfServeQuery`, `QueryBuilderQuery`, `patchFieldMetadataServiceQuery`, `useFieldHierarchyRootQuery` and the two `UnpublishedFieldTableRows` queries.
-  - Three recordings are new: the seeded-field and root cases.
-  - Backend's F12 fix changed no recording.
+  - Against round 4, six recordings changed, all because the import keeps the seeded mappings: `BatchPublishModalContentsQuery`, `CategoryInputMutation`, `UnpublishedFieldTableRowsQuery`, `UnpublishedFieldTableRowsPaginationQuery`, `UpdateCalculationActionMutation` and `UpdateCategoryActionMutation`.
+  - Every removed line in that diff is a `"maxItems": 0` (eight in all), each replaced by an item schema. No key, type or pin changed elsewhere.
+  - `BatchPublishModalContentsQuery` now pins the publishable field and its category and datasource mapping items.
 - **Replay, same stack**: `pytest tests/contract` (offline plus `stack`) reports `291 passed`, twice back to back.
 - **Replay, new stack**: after `stack.sh down` and `stack.sh up`, the same command reports `291 passed`, twice.
-- **Broken recording turns red**: `pipelineDatasource.name` was renamed to `datasourceName` in the newly pinned mapping item of `recordings/graphql.FieldDetailsPageQuery.seeded_field.json`. `pytest -m stack` then reports `$.data.node.fieldPipelineDatasourceMappings[].pipelineDatasource: missing key 'datasourceName'`, with `1 failed, 233 passed`. The file was restored, and `diff -r` against the recorded set was empty again.
-- **Isolation**: only `forward` publishes a port (`127.0.0.1:58773`). With WP-0b in the base, Redis now runs with `requirepass` (overlay active) alongside the Hasura admin secret. `stack.sh down` removed the secrets file and left no `wp2c-r3` container.
-- **No secrets or PII in fixtures** (INV-6): `test_recordings_hold_no_values_that_look_like_secrets_or_pii` scans all 234 recordings. As before, 27 values are pinned across 23 recordings.
+- **Broken recording turns red**: `pipelineDatasourceId` was renamed to `datasourceKey` in `recordings/graphql.BatchPublishModalContentsQuery.json`. `pytest -m stack` then reports `$.data.publishableFields.edges[].node.unpublishedFieldPipelineDatasourceMappings[]: missing key 'datasourceKey'`, with `1 failed, 233 passed`. The file was restored, and `diff -r` against the recorded set was empty again.
+- **Isolation**: only `forward` publishes a port (`127.0.0.1:58781`). `stack.sh down` removed the secrets file and left no `wp2c-r5` container.
+- **No secrets or PII in fixtures** (INV-6): `test_recordings_hold_no_values_that_look_like_secrets_or_pii` scans all 234 recordings. The re-recording added no pinned value.
 
 Limits:
 - 17 of 145 routes are deferred, each with its reason in `INVENTORY.md`: object storage, Dataprep, Urlbox rendering, `hierarchy` under the mock Druid, dead client code, and a static GeoJSON asset. No Relay operation is deferred.
-- `BatchPublishModalContentsQuery` records an empty connection, and the unpublished-field datasource-mapping list is empty in `UnpublishedFieldTableRowsQuery`, `UnpublishedFieldTableRowsPaginationQuery`, `CategoryInputMutation`, `UpdateCalculationActionMutation` and `UpdateCategoryActionMutation`. All of this is F13: the import case deletes the seeded mapping, and no client operation creates one. No recording pins that item shape until core's fix merges.
 - Other lists are empty in every recording because no case or seed fills them:
   - mapping lists on fields that the cases create or delete: `CreateCalculationIndicatorViewMutation*` (no mappings at creation), `FieldAboutPanelQuery` and `FieldDetailsPageQuery` on `contract_field`, `DirectoryTableContainerQuery` on `contract_category`, and `DeleteFieldModalMutation*`'s `fieldCategoryMapping`. The seeded-field and root cases pin these shapes.
   - Dataprep jobs, file summaries and category children.
@@ -201,25 +209,29 @@ Found while recording. None is fixed here (QA never edits production code); each
   - Repro: stack up, run `user.generate_api_token`, then `GET /api2/user/<id>`.
   - Expected: the new token in `apiTokens`. Actual: `apiTokens` is `[]` until `user.update.persist_api_token` PATCHes it in.
   - Evidence: `recordings/user.generate_api_token.json`, `recordings/user.update.persist_api_token.json`, `recordings/user.get.with_api_token.json`.
-- **F13. Importing a self-serve export deletes rows it does not import.**
-  - Code path: `POST /api/import_self_serve` (`web/server/routes/api.py:177`) runs `scripts/data_catalog/import_db_tables.py` in a subprocess (`api.py:185`). That script passes `DATA_CATALOG_TABLE_NAMES` (`import_db_tables.py:27`, the list and order of tables the import replaces) to `import_data_into_table` (`db/postgres/utils.py:157`). Before each `COPY`, that function runs `TRUNCATE TABLE ... RESTART IDENTITY CASCADE` (`utils.py:197`).
-  - `CASCADE` also empties every table that has a foreign key into the listed tables but is not in the export:
+- **F13. Importing a self-serve export deleted rows it does not import.** Fixed by core at `d016bce` (merged here at `84b8cf7`). The text below the code path describes the behaviour before the fix.
+  - Code path: `POST /api/import_self_serve` (`web/server/routes/api.py:177`) runs `scripts/data_catalog/import_db_tables.py` in a subprocess (`api.py:185`). That script passes `DATA_CATALOG_TABLE_NAMES` (`import_db_tables.py:27`, the list and order of tables the import replaces) to `import_data_into_table` (`db/postgres/utils.py`). Before the fix, that function ran `TRUNCATE TABLE ... RESTART IDENTITY CASCADE` before each `COPY`.
+  - `CASCADE` also emptied every table that has a foreign key into the listed tables but is not in the export:
     - `unpublished_field_category_mapping`, `unpublished_field_pipeline_datasource_mapping` and `unpublished_field_dimension_mapping`;
     - `geo_dimension_metadata`, `hierarchical_dimension_metadata` and `non_hierarchical_dimension`;
     - `source_config`.
 
-    Re-importing an unchanged export therefore loses Field Setup mappings and dimension metadata. The import also runs in autocommit, so a failed import leaves the earlier tables already replaced.
+    Re-importing an unchanged export therefore lost Field Setup mappings and dimension metadata. The import also ran in autocommit, so a failed import left the earlier tables already replaced.
   - Repro: stack up (the seed gives the unpublished field one category mapping and one datasource mapping), run `self_serve.export`, then `self_serve.import.exported_zip`, then count the rows in the two mapping tables.
-  - Expected: 1 and 1. Actual: 0 and 0, while `pipeline_datasource` and `category` keep their rows.
-  - Evidence: the round-3 F13 reproduction (`/tmp/wp2c_f13.py`); backend's failing tests `tests/db/test_import_data_into_table.py` (3 failed, 1 passed at `00e5047`); `recordings/graphql.BatchPublishModalContentsQuery.json` (no publishable field).
-  - Remedy, which core is implementing on `mig/WP-2c-api-contract-recordings-core` from backend's `d23076f`:
-    1. Run the whole import in one transaction.
-    2. COPY each listed table into a staging table.
-    3. Upsert the staged rows into the live table on its primary key, parents first.
-    4. Delete only the live rows the export lacks, children first.
+  - Expected: 1 and 1. Actual before the fix: 0 and 0, while `pipeline_datasource` and `category` kept their rows. After the fix both mappings survive: `BatchPublishModalContentsQuery`, recorded after the import case, carries them.
+  - The fix, in one transaction (details under "F13: core review and fix"):
+    1. Check that the archive has every listed table, then COPY each into a staging table.
+    2. Empty the leaf tables, the ones no foreign key references (the mapping tables, `dataprep_job`, `data_upload_file_summary`).
+    3. Upsert the referenced tables on their primary keys, parents first.
+    4. Delete only the rows the export lacks, children first. A cascade now reaches only rows that referenced a row the export removed.
+    5. Reload the leaves, then check that each imported table holds exactly the archive's row count.
+    6. Advance the id sequences after every check has passed, never below the value already used.
 
-    Dependent rows survive while the export still carries the row they reference.
-  - Ruled out: `DELETE` without `CASCADE`. The dependent foreign keys are themselves `ON DELETE CASCADE`, so deleting the parents still empties `source_config` and the datasource mapping (reviewer, verified on a stack). A plain `TRUNCATE` without `CASCADE` errors on those foreign keys.
+    There is no `TRUNCATE ... CASCADE`. Dependent rows survive while the export still carries the row they reference.
+  - INV-2 before and after, and the performance table (old against new at 50k and 100k fields), are under "F13: core review and fix". In short: a failed or inconsistent import now changes nothing, readers see the old catalogue until commit, and the import is slower but stays inside the route's 120 s timeout at both sizes.
+  - Ruled out: `DELETE` without `CASCADE`. The dependent foreign keys are themselves `ON DELETE CASCADE`, so deleting the parents still empties `source_config` and the datasource mapping (reviewer, verified on a stack). A plain `TRUNCATE` without `CASCADE` errors on those foreign keys. Deleting absent rows before the upsert, as backend's first patch did, cascades into rows the export carries (core).
+  - Evidence: `tests/db/test_import_data_into_table.py` (9 passed; 6 failed with the pre-fix code); `recordings/graphql.BatchPublishModalContentsQuery.json`, which records the publishable field after the import case; the round-3 reproduction (`/tmp/wp2c_f13.py`).
+  - Follow-ups (core's export transaction and COPY column order, backend's 120 s timeout) are under Requests.
 
 ## Backend support: F12 and F13 (backend-2c)
 

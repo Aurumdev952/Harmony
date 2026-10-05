@@ -44,11 +44,71 @@
                 "type": "string"
               },
               "unpublishedFieldCategoryMappings": {
-                "maxItems": 0,
+                "items": {
+                  "properties": {
+                    "category": {
+                      "properties": {
+                        "id": {
+                          "type": "string"
+                        },
+                        "name": {
+                          "type": "string"
+                        }
+                      },
+                      "required": [
+                        "id",
+                        "name"
+                      ],
+                      "type": "object"
+                    },
+                    "categoryId": {
+                      "type": "string"
+                    },
+                    "id": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "category",
+                    "categoryId",
+                    "id"
+                  ],
+                  "type": "object"
+                },
                 "type": "array"
               },
               "unpublishedFieldPipelineDatasourceMappings": {
-                "maxItems": 0,
+                "items": {
+                  "properties": {
+                    "datasource": {
+                      "properties": {
+                        "id": {
+                          "type": "string"
+                        },
+                        "name": {
+                          "type": "string"
+                        }
+                      },
+                      "required": [
+                        "id",
+                        "name"
+                      ],
+                      "type": "object"
+                    },
+                    "id": {
+                      "type": "string"
+                    },
+                    "pipelineDatasourceId": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "datasource",
+                    "id",
+                    "pipelineDatasourceId"
+                  ],
+                  "type": "object"
+                },
                 "type": "array"
               }
             },

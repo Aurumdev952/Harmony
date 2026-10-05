@@ -89,7 +89,37 @@
                           "type": "array"
                         },
                         "unpublishedFieldPipelineDatasourceMappings": {
-                          "maxItems": 0,
+                          "items": {
+                            "properties": {
+                              "datasource": {
+                                "properties": {
+                                  "id": {
+                                    "type": "string"
+                                  },
+                                  "name": {
+                                    "type": "string"
+                                  }
+                                },
+                                "required": [
+                                  "id",
+                                  "name"
+                                ],
+                                "type": "object"
+                              },
+                              "id": {
+                                "type": "string"
+                              },
+                              "pipelineDatasourceId": {
+                                "type": "string"
+                              }
+                            },
+                            "required": [
+                              "datasource",
+                              "id",
+                              "pipelineDatasourceId"
+                            ],
+                            "type": "object"
+                          },
                           "type": "array"
                         }
                       },

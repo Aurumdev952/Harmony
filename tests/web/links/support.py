@@ -35,6 +35,7 @@ class FakeUser:
     is_active: bool = True
     is_anonymous: bool = False
     reset_password_token: Optional[str] = None
+    status_id: int = 1  # active
 
     def get_id(self):
         return str(self.id)

@@ -8,20 +8,35 @@ from flask_user.signals import user_forgot_password
 from werkzeug.exceptions import BadGateway
 
 from log import LOG
-from models.alchemy.user import User
+from models.alchemy.user import User, UserStatusEnum
 from web.server.errors import ItemNotFound, NotificationError
 from web.server.data.data_access import Transaction
-from web.server.security.usernames import find_user_by_username
+from web.server.security.usernames import find_user_by_username, username_taken
 from web.server.util.deployment_links import deployment_url
 
 
+def may_set_password_from_reset(user: User) -> bool:
+    '''Whether a valid reset token lets `user` set a password: an active
+    account, or a pending one (an invitee an admin sent a reset link: its
+    first password) with no registered account equal to it ignoring case. A
+    deactivated account may not set a password and sign in again.'''
+    if user.status_id == UserStatusEnum.ACTIVE.value:
+        return True
+    return user.status_id == UserStatusEnum.PENDING.value and not username_taken(
+        user.username, except_user_id=user.id, ignore_pending=True
+    )
+
+
 def send_reset_password(email: str) -> None:
-    '''Mail a reset link to the account `email` names. For the anonymous
-    forgot-password form, the one caller that has only a typed string.'''
+    '''Mail a reset link to the active account `email` names. For the anonymous
+    forgot-password form, the one caller that has only a typed string. Any
+    other account answers as an unknown one: a pending invitee completes its
+    invitation, whose token a reset would replace, and a deactivated account
+    may not reset.'''
     logger = _logger()
     with Transaction() as transaction:
         user = find_user_by_username(email, transaction.run_raw())
-        if not user:
+        if not user or user.status_id != UserStatusEnum.ACTIVE.value:
             logger.warning('User does not exist with email: \'%s\'', email)
             raise ItemNotFound('user', {'username': email})
         _mail_reset_link(transaction, user, logger)

@@ -2,6 +2,7 @@
 
 import sqlite3
 
+from flask import redirect
 from flask_user import UserManager, SQLAlchemyAdapter
 from flask_login import AnonymousUserMixin, LoginManager, current_user
 from sqlalchemy import create_engine, event
@@ -18,6 +19,7 @@ from web.server.routes.views.flask_user_views import (
     unauthenticated,
     logout,
 )
+from web.server.util.deployment_links import deployment_url
 from web.server.util.util import validate_email, validate_password
 
 
@@ -55,6 +57,13 @@ class HarmonyUserManager(UserManager):
         return not username_taken(new_username, self.db_adapter.db.session, own_id)
 
 
+def open_reset_page(token):
+    '''flask-user's `/user/reset-password/<token>`: Harmony's reset page, which
+    posts to `/api2/authentication/reset_password`, is the one place a reset
+    token sets a password, so this view only sends the browser there.'''
+    return redirect(deployment_url('auth.reset_password', token=token))
+
+
 def initialize_user_manager(app, db):
     db_adapter = UsernameAdapter(db, UserClass=User)
     login_manager = LoginManager()
@@ -70,6 +79,7 @@ def initialize_user_manager(app, db):
         logout_view_function=logout,
         unauthenticated_view_function=unauthenticated,
         unauthorized_view_function=app.user_authentication_router.unauthorized,
+        reset_password_view_function=open_reset_page,
     )
 
     # Replaces flask-user's loader: a flask-login session signs in its account

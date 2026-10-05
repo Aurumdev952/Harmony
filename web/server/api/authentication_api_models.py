@@ -20,22 +20,14 @@ from web.server.api.authentication_api_schemas import (
 )
 from web.server.data.data_access import Transaction
 from web.server.errors import ItemNotFound
-from web.server.routes.views.admin import send_reset_password
+from web.server.routes.views.admin import (
+    may_set_password_from_reset,
+    send_reset_password,
+)
 from web.server.routes.views.authentication import try_authenticate_user
 from web.server.util.api_validation import GenericValidationError
 from web.server.security.usernames import username_taken
 from web.server.util.authentication import create_user_access_token, login_user
-
-
-def _may_complete_reset(user):
-    '''An active account, or a pending one with no registered account equal to
-    it ignoring case. A deactivated account may not set a password and sign in
-    again.'''
-    if user.status_id == UserStatusEnum.ACTIVE.value:
-        return True
-    return user.status_id == UserStatusEnum.PENDING.value and not username_taken(
-        user.username, except_user_id=user.id, ignore_pending=True
-    )
 
 
 class AuthenticationResource(Resource):
@@ -185,7 +177,7 @@ class AuthenticationResource(Resource):
             raise GenericValidationError({"token": "expired_token"})
 
         user = user_manager.get_user_by_id(user_id)
-        if user is None or not _may_complete_reset(user):
+        if user is None or not may_set_password_from_reset(user):
             raise GenericValidationError({"token": "invalid_reset_link"})
 
         # A pending account that follows a reset link, as an admin can send to an

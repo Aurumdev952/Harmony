@@ -18,6 +18,7 @@ from config.loader import import_configuration_module
 from models.alchemy.user import User
 from tests.web.usernames.accounts import ACCOUNTS, ACCOUNTS_CREATED, PASSWORD
 from web.server.app_db import create_db
+from web.server.configuration.flask import FlaskConfiguration
 from web.server.database.setup import initialize_user_manager
 from web.server.security.signal_handlers import install_login_manager_signal_handlers
 
@@ -59,10 +60,17 @@ def build_app(database_uri):
         JWT_ACCESS_COOKIE_NAME='accessKey',
         JWT_CSRF_METHODS=[],
         JWT_TOKEN_WEB_COOKIE_EXPIRATION=timedelta(days=1),
-        USER_ENABLE_EMAIL=False,
-        USER_ENABLE_USERNAME=True,
-        USER_ENABLE_CHANGE_USERNAME=True,
         WTF_CSRF_ENABLED=False,
+        # flask-user registers the views production enables, at its URLs.
+        **{
+            name: value
+            for name, value in vars(FlaskConfiguration()).items()
+            if name.startswith('USER_')
+        },
+    )
+    # Harmony's own reset page, which mailed reset links open.
+    app.add_url_rule(
+        '/user/reset-password', 'auth.reset_password', lambda: 'reset page'
     )
     db = create_db()
     db.init_app(app)

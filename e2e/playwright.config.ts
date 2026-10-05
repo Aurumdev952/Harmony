@@ -22,10 +22,12 @@ export default defineConfig({
   timeout: 90_000,
   expect: {
     timeout: 15_000,
-    // The visual project's image renders the same pixels on every run, so the
-    // only slack is Playwright's per-pixel colour threshold; any pixel past
-    // it fails. (A project-level expect would replace this whole object.)
-    toHaveScreenshot: { maxDiffPixels: 0, threshold: 0.2 },
+    // Re-rendering in the pinned image moves a pixel by at most 2 levels per
+    // channel (13 of 120 snapshots differ at all), and 0.05 absorbs that. The
+    // default 0.2 also let text change from #313234 to #646567 pass. Any pixel
+    // past the threshold fails. (A project-level expect would replace this
+    // whole object.)
+    toHaveScreenshot: { maxDiffPixels: 0, threshold: 0.05 },
   },
   reporter: [['list'], ['html', { open: 'never', outputFolder: `./report/${RUN}` }]],
   use: {

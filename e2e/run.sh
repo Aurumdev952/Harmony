@@ -39,12 +39,21 @@ ASSETS="${CONTRACT_PROJECT}-assets"
 PYTHON_IMAGE="python:3.12-slim@sha256:f77ac9e44ae96ef2c90b8053ea08c31f8be030f824196b0ae4db6d462c84e51f"
 # mcr.microsoft.com/playwright:v1.56.1-noble
 PLAYWRIGHT_IMAGE="mcr.microsoft.com/playwright@sha256:f1e7e01021efd65dd1a2c56064be399f3e4de00fd021ac561325f2bfbb2b837a"
+# The web-client image's base (docker/web/Dockerfile_web-client): the client
+# builds on Node 18.17, and its native packages do not compile on newer Nodes.
+NODE_IMAGE="node:18.17.1-bookworm@sha256:933bcfad91e9052a02bc29eb5aa29033e542afac4174f9524b79066d97b23c24"
+
+# Under rootless Docker a container's root is the calling user; elsewhere
+# containers run as the caller, so files they write or read keep their owner.
+DOCKER_USER=()
+if ! docker info --format '{{.SecurityOptions}}' | grep -q rootless; then
+  DOCKER_USER=(--user "$(id -u):$(id -g)")
+fi
 
 build_client() {
-  if [[ ! -d "${ROOT}/node_modules" ]]; then
-    (cd "${ROOT}" && yarn install --frozen-lockfile)
-  fi
-  (cd "${ROOT}" && yarn build)
+  docker run --rm "${DOCKER_USER[@]}" \
+    -v "${ROOT}:/src" -w /src -e HOME=/tmp \
+    "${NODE_IMAGE}" sh -c 'yarn install --frozen-lockfile && yarn build'
 }
 
 ensure_playwright() {
@@ -124,15 +133,9 @@ run_project() {
 }
 
 # The image's browser reaches the stack through the forwarder's network
-# namespace, as 127.0.0.1:5000. Under rootless Docker the container's root is
-# the calling user; elsewhere it runs as the caller, so the credentials file
-# keeps its owner.
+# namespace, as 127.0.0.1:5000.
 run_visual() {
-  local user=()
-  if ! docker info --format '{{.SecurityOptions}}' | grep -q rootless; then
-    user=(--user "$(id -u):$(id -g)")
-  fi
-  docker run --rm "${user[@]}" \
+  docker run --rm "${DOCKER_USER[@]}" \
     --network "container:$(container_of forward)" --shm-size 1g \
     -v "${ROOT}/e2e:/e2e" \
     -v "${E2E_CREDENTIALS_FILE}:/run/e2e/credentials.env:ro" \

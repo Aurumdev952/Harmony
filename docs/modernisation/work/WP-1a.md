@@ -4,10 +4,8 @@ title: "Performance baseline"
 status: review
 owner_role: "qa"
 instances:
-  - name: "qa-8"
-    files: ["scripts/perf/**", "docs/modernisation/perf/**", "docs/modernisation/work/WP-1a.md"]
   - name: "qa-9"
-    files: ["scripts/perf/**", "docs/modernisation/perf/**", "docs/modernisation/work/WP-1a.md"]
+    files: ["scripts/perf/**", "tests/perf/**", "docs/modernisation/perf/**", "docs/modernisation/work/WP-1a.md"]
 branch: "mig/WP-1a-perf-baseline"
 requirements: [PERF-7]
 contracts_consumed: [C-3]
@@ -72,6 +70,7 @@ None.
 - 2026-10-06 qa-10 unit R2.2 (reviewer 1): the reference is the WP's base, `git merge-base HEAD mig/integration`, never `main` (decision 0011). `stack.sh reference` with no commit picks it; `baseline.py` records `integration_merge_base` in the meta and the report says "the WP's base" or names the merge base when the reference is another commit (a phase-exit run). The docstring, `stack.sh` and the README give the reason: `main` is the pre-migration tree, hundreds of commits behind, so a run against it would charge the WP with every merged WP's cost or gain. Check: `test_the_report_says_whether_the_reference_is_the_wps_base` seen failing first (`AttributeError`), 39 pass; `stack.sh reference` with no argument started `2ddc30c`, the merge base; shellcheck clean.
 - 2026-10-06 qa-10 unit R2.3 (reviewer 2): `web-reference` gets its own `redis-reference` (profile `reference`, started and removed with it by `stack.sh reference`), so from WP-1b neither side can answer from bytes the other cached. The README states decision 0011's cache rule (both sides with the result cache off from WP-1b, except WP-1b's own hit-path check, now described as a second run that is evidence for the 50 ms target, not a verdict), and a request to core for the switch is under Requests. Check: `test_the_reference_web_has_its_own_redis` seen failing first, 40 pass; live, after `stack.sh reference`, a key written through `web-reference`'s `REDIS_HOST` (`redis-reference`) is absent from `web`'s (`redis`) (`/tmp/wp1a-redis-probe.sh`); shellcheck clean.
 - 2026-10-06 qa-10 unit R2.4 (reviewer 3): the tests moved from `scripts/perf/test_baseline.py` to `tests/perf/test_baseline.py`, with `tests/perf/conftest.py` putting `scripts/perf` on `sys.path`, so `ci/pytest_suites.sh` runs them (it takes every directory under `tests/`) on the `uv.lock` environment, and `tests/**`'s ruff per-file ignores cover their asserts and `random`. The three findings left in `scripts/perf` carry a `noqa` with the reason: S311 in `baseline.py` (the bootstrap is seeded so a run's files give the same verdict) and `dataset.py` (seeded so two runs write the same CSV), S104 in `druid_forward.py` (it listens inside its container on internal Compose networks; no port of it is published). Check: `uv run --locked pytest -m 'not stack' -- tests/perf` 40 passed; `ci/lint_python.sh mig/integration` "All checks passed!" and 5 files formatted (`ruff check scripts/perf` reported 82 findings before: 76 S101, 5 S311, 1 S104).
+- 2026-10-06 qa-10 unit R2.5 (reviewer 4): the front matter keeps one instance claim, qa-9's, which now also covers `tests/perf/**`; qa-8's identical claim is gone. Every instance of this WP (qa-6 to qa-10) resumed the same branch in turn, so one claim describes it, and the gate needs no second one for this round. Check: `task_gate.py WP-1a` listed 2 unclaimed files (`tests/perf/*`) and every changed file as claimed by both qa-8 and qa-9 before; after, it reports only the status and the two open verdicts.
 
 ## Evidence
 

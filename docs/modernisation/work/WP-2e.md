@@ -89,6 +89,11 @@ None of these block WP-2e.
   - Failing first: with the page-error alternative removed, both data-digest page tests fail on `page error: l`.
   - A probe of the error's stack shows what that error is: APIService's jQuery error callback rejects with a `ZenHTTPError`, and the class's minified name is `l` (`web/client/services/APIService.js:96-104`). Nothing catches the rejection.
   - The pinned pattern rejects `page error: TypeError: x is undefined`, `page error: l2`, a 500 on `/api2/dashboard`, and a failed request to the digest. The three data-digest tests (pages, en, a11y) pass.
+- 2026-10-06 qa-5t round 2, unit 5 (reviewer finding 5): `E2E_A11Y_UPDATE=1` now only shrinks the baseline. A new rule or a higher count keeps the old count and fails the test with "an update only shrinks the baseline". A reviewer-accepted regression is written only when it is named in `E2E_A11Y_ACCEPT=page:rule[,...]`. The rule lives in `support/a11y.ts` (`nextBaseline`, `acceptedRegressions`), and `tests/a11y-baseline.spec.ts` tests it without a browser in five cases: a shrink, a refused growth, a refused new rule, an accepted growth limited to its page and rule, and parsing. The a11y project now has 26 tests. Checks:
+  - Failing first: the five cases failed with "Cannot find module '../support/a11y'" before the module existed, and pass after.
+  - Against the stack, with `login.button-name` removed from the baseline and `admin-roles.color-contrast` raised to 95, an update run fails login with `login: button-name 0 -> 1`, leaves login without the rule, and shrinks admin-roles to 94.
+  - With `E2E_A11Y_ACCEPT=login:button-name` both tests pass, and the file is byte-identical to the committed baseline.
+  - The full a11y project passes 26.
 
 ## Evidence
 

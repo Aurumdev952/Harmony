@@ -3,7 +3,7 @@ import { defineConfig, devices } from '@playwright/test';
 import { ADMIN_STATE, BASE_URL } from './support/env';
 
 const VISUAL_SPEC = /visual\.spec\.ts$/;
-const A11Y_SPEC = /a11y\.spec\.ts$/;
+const A11Y_SPEC = /a11y(-baseline)?\.spec\.ts$/;
 // run.sh runs each project as its own invocation, in order (see projects
 // below), and each keeps its own results and report.
 const RUN = process.env.E2E_RUN ?? 'local';

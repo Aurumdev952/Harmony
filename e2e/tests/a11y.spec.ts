@@ -3,6 +3,8 @@ import path from 'path';
 
 import AxeBuilder from '@axe-core/playwright';
 
+import { acceptedRegressions, nextBaseline } from '../support/a11y';
+import type { Counts } from '../support/a11y';
 import { SIGNED_OUT } from '../support/auth';
 import { expect, test } from '../support/fixtures';
 import { PAGES, openSettled } from '../support/pages';
@@ -11,13 +13,14 @@ import { PAGES, openSettled } from '../support/pages';
 // counts. FE-8 is met when WP-7c to 7e have driven this file to `{}`. Until
 // then a page may not gain a rule or a node, and a page that improves must
 // shrink its entry, so the baseline never holds slack a regression could
-// hide in. Regenerate with E2E_A11Y_UPDATE=1 (review the diff); a run limited
-// with --grep rewrites only the pages it ran.
+// hide in. E2E_A11Y_UPDATE=1 writes the improvements and nothing else; a run
+// limited with --grep rewrites only the pages it ran. A regression a reviewer
+// accepted is written only when named in E2E_A11Y_ACCEPT=page:rule[,...]
+// (support/a11y.ts).
 const BASELINE_FILE = path.join(__dirname, '..', 'a11y', 'baseline.json');
 const UPDATE = process.env.E2E_A11Y_UPDATE === '1';
+const ACCEPTED = acceptedRegressions(process.env.E2E_A11Y_ACCEPT);
 const BLOCKING = new Set(['serious', 'critical']);
-
-type Counts = Record<string, number>;
 
 const baseline: Record<string, Counts> = JSON.parse(readFileSync(BASELINE_FILE, 'utf8'));
 const PAGE_NAMES = new Set(PAGES.map(({ name }) => name));
@@ -76,11 +79,16 @@ test.describe('axe baseline at 1440 px @a11y', () => {
           blocking.map(v => [v.id, v.nodes.length] as const).sort(),
         );
         if (UPDATE) {
-          if (Object.keys(now).length > 0) {
-            updated[pageCase.name] = now;
+          const next = nextBaseline(pageCase.name, baseline[pageCase.name] ?? {}, now, ACCEPTED);
+          if (Object.keys(next.counts).length > 0) {
+            updated[pageCase.name] = next.counts;
           } else {
             delete updated[pageCase.name];
           }
+          expect(
+            next.refused,
+            'an update only shrinks the baseline; name an accepted regression in E2E_A11Y_ACCEPT',
+          ).toEqual([]);
           return;
         }
 

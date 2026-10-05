@@ -139,6 +139,7 @@ C-5 (session and JWT format, owned by backend). Old: a render token was a plain 
 - [x] infra: add the `render-egress` service, the `render-egress` network, and `RENDERER_EGRESS_PROXY` and `RENDERER_MAP_ORIGINS` on `renderer` (and `depends_on`), from `WP-1h-evidence/infra-request/compose.render-egress.yaml`, with a `tests/infra/test_renderer.py` check that `render-egress` is the only service on both `render` and a network with a route out. Without it the renderer starts with no map origins, and every dashboard with a map fails fast with `egress_blocked`: an INV-1 regression for map exports. So this blocks deploying WP-1h, not merging it. Verified by hand in `WP-1h-evidence/unit-8-maps-egress.md`. Done in 0618f25; see the 2026-10-05 infra log line.
 - [x] infra: in `.github/workflows/renderer.yml`, run `pytest tests/worker/renderer` inside the image just built, on pull requests too, under `--network none`, the seccomp profile, `--cap-drop ALL --cap-add SYS_CHROOT --init --read-only --tmpfs /tmp` (the command is in `unit-8-maps-egress.md`). Today the browser tests (egress fence, sandbox flags, maps) are skipped in every CI suite because the uv 3.9 environment has no Playwright (interrogate, Opus). Blocks nothing. Done in f4c02e2; see the 2026-10-05 infra log line.
 - [ ] human: render a dashboard with a map tile on a staging deployment once `render-egress` is deployed. Agents have no Mapbox access token, so the real Mapbox path is proven only up to the TLS session (unit 8c). Blocks nothing in code.
+- [ ] WP-0i (backend-7): `docs/modernisation/work/WP-0i-evidence/test_render_routes.flipped.py:159` uses a parenthesised `with`, which integration's ruff config (target py38 since 61db9f8) refuses as invalid syntax. It is the only failure of `ci/lint_python.sh 61db9f8` on a trial merge of this branch, and it reaches this branch only through the WP-0i merge. Blocks the PR gate for whichever of WP-0i and WP-1h lands first.
 
 ## Follow-ups (recorded, not done here)
 
@@ -178,6 +179,13 @@ C-5 (session and JWT format, owned by backend). Old: a render token was a plain 
   - actionlint with shellcheck, zizmor (also with `--persona=auditor`), `docker build --check` and ruff: all clean.
 
   Not shown: a GitHub run, which happens on push. See [infra-render-egress.md](WP-1h-evidence/infra-render-egress.md).
+- 2026-10-05 backend-8: merged infra's `mig/WP-1h-export-renderer-infra-2` (d301d84: the `render-egress` service and network, and in-image renderer tests on PRs). Infra's control run showed Chromium handing the render token to the proxy for a map origin on the dashboard's host, since cookies ignore ports. So the threat model now names `render-egress`'s header stripping as the control for plain-http map origins. The renderer also refuses to start with a map origin on the dashboard's host (e0821a0, test-first), because over https the proxy cannot strip anything inside the tunnel. The ruff py39 format of 4 web files was replaced with 3.8 syntax (6fc6a87), because the web image still runs 3.8. check, on a trial merge with `mig/integration` 61db9f8 (no conflicts; aborted afterwards):
+  - `ci/check_py38_syntax.py` over 856 files: 0 problems;
+  - `ci/pytest_suites.sh`: all 9 suites passed (`tests/web` 278 passed, 1 xfailed; `tests/worker` 134 passed, 1 skipped);
+  - `tests/infra` on the 3.13 lane: 219 passed;
+  - `uv run --locked mypy`: clean;
+  - `ci/lint_python.sh 61db9f8`: clean except one parenthesised `with` in WP-0i's evidence file (request above).
+  On the branch head, `docker/renderer/test_in_image.sh` gave 159 passed and 0 skipped. Infra's leftover local images and mine were deleted.
 
 ## Evidence
 

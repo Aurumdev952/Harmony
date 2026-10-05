@@ -187,7 +187,7 @@
           "field": {
             "dimension": "StateName",
             "type": "selector",
-            "value": ""
+            "value": null
           },
           "type": "not"
         },

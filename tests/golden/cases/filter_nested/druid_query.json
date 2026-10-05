@@ -56,12 +56,12 @@
               {
                 "dimension": "Age",
                 "type": "selector",
-                "value": ""
+                "value": null
               },
               {
                 "dimension": "StateName",
                 "type": "selector",
-                "value": ""
+                "value": null
               }
             ],
             "type": "or"
@@ -87,9 +87,22 @@
                 },
                 {
                   "field": {
-                    "dimension": "Age",
-                    "type": "selector",
-                    "value": "15-49"
+                    "fields": [
+                      {
+                        "dimension": "Age",
+                        "type": "selector",
+                        "value": "15-49"
+                      },
+                      {
+                        "field": {
+                          "dimension": "Age",
+                          "type": "selector",
+                          "value": null
+                        },
+                        "type": "not"
+                      }
+                    ],
+                    "type": "and"
                   },
                   "type": "not"
                 }

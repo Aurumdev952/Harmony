@@ -1,6 +1,6 @@
 # Harmony modernisation specification
 
-Version 1.9, 2026-10-05 (decisions 0001, 0003, 0004, 0005, 0006, 0007, 0008, 0009). Status: approved for execution.
+Version 1.10, 2026-10-05 (decisions 0001, 0003, 0004, 0005, 0006, 0007, 0008, 0009, 0010). Status: approved for execution.
 
 This is the binding guide for every agent and engineer working on the Harmony migration. Where this spec and another document disagree, this spec wins. The other documents explain why and describe the work in detail:
 
@@ -157,7 +157,7 @@ Each WP is one pull request, or a short stack of them. Detail lives in the named
 | 0h | Close privilege escalations in group and role management | backend | core, security, qa | 2b | yes |
 | 0i | Guard the dashboard render and thumbnail routes | backend | security, qa | none | yes |
 | 0j | Refuse username changes and password resets that reach a higher-privileged account | backend | security, qa | 0h | yes |
-| 0k | Build outgoing links from the configured origin; match usernames exactly | backend | security, qa | 0i | yes |
+| 0k | Build outgoing links from the configured origin; match usernames exactly; refuse deactivated accounts (decision 0010) | backend | security, qa | 0i | yes |
 | 1a | Performance baseline | qa | core | none | no |
 | 1b | Shared result cache | core | none | 1a | yes |
 | 1c | Columnar parsing | core | none | 1a, golden cases | no |

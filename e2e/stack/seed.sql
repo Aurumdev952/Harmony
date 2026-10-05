@@ -1,7 +1,8 @@
 -- Applied after populate_query_models_from_config.py has loaded harmony_demo's
 -- one configured indicator. Stacked bar, overlapping bar and scatterplot need
 -- two indicators, so the e2e stack adds a second one in the same category.
--- The offline query client answers any field, so it needs no Druid data.
+-- The e2e Druid broker (druid_broker.py, over tests/golden/synth.py) answers
+-- it from synth's fact table through the `extra_fields` option.
 INSERT INTO field (id, name, short_name, description, calculation, created, last_modified)
 VALUES (
   'e2e_yellow_fever_deaths',

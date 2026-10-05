@@ -1,4 +1,8 @@
-'''Deterministic stand-in for a Druid broker, used only when recording fixtures.
+'''Deterministic stand-in for a Druid broker.
+
+Two callers: `record.py` when recording the golden fixtures, and the e2e
+stack's broker (`e2e/stack/druid_broker.py`), which serves it over HTTP so the
+production Druid client gets the same answers in the browser suites.
 
 Given the exact native query the app posts, it answers with rows shaped the way
 Druid 0.23 answers: array rows for groupBy (`resultAsArray`), `{timestamp, result}`

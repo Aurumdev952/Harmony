@@ -104,6 +104,7 @@ None of these block WP-2e.
   - home and overview, and alerts and not-found, are byte-identical (`sha256sum`) at all three widths. simple-query and advanced-query differ in 24-36 pixels by at most 2 levels per channel, which is re-render noise.
   - `run.sh visual`: 71 passed (17 pages x 3 widths, plus 20 chart types); `--grep @pages`: 42 passed.
 - 2026-10-06 qa-5t round 2, unit 8 (reviewer finding 8): added a Deferrals section stating that QA-4's CI half waits on the infra (WP-2f) job. Added the frontend-platform request (WP-6e, FE-11) for ESLint flat-config coverage of the `e2e/` TypeScript, with `no-floating-promises`. Brought the infra request up to date with this round's runner (client build in Node 18.17, host Chromium deps). Corrected unit 3's `pages.spec.ts` count from 46 to 42.
+- 2026-10-06 qa-5t round 2, unit 9 (reviewer nit 9): two stale comments are corrected. `e2e/stack/seed.sql` now says the e2e broker answers the second indicator through synth's `extra_fields`. It used to say the offline client answers any field. `tests/golden/synth.py`'s docstring now names both of its callers, `record.py` and `e2e/stack/druid_broker.py`. Check: ruff check and format are clean on `tests/golden` and `e2e/stack`; the 3.8 guard (`uv run --no-project -p cpython-3.8.20 python ci/check_py38_syntax.py tests/golden e2e/stack`) reports 8 files and 0 problems; `pytest tests/golden` passes 269.
 
 ## Evidence
 

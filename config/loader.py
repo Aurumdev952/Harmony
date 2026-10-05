@@ -1,24 +1,6 @@
 import os
 
-MODULE_PATHS = [
-    # Top Level
-    '',
-    # Directories
-    'calculated_indicator_defs',
-    'calculated_indicator_defs.calculated_indicator_defs',
-    # Files
-    'aggregation_rules',
-    'aggregation',
-    'calculated_indicators',
-    'data_status',
-    'datatypes',
-    'druid',
-    'filters',
-    'general',
-    'indicators',
-    'pipeline_sources',
-    'ui',
-]
+from harmony.core.deployment import load_deployment
 
 
 def get_configuration_module():
@@ -34,9 +16,4 @@ def get_configuration_module():
 
 
 def import_configuration_module(zenysis_environment=None):
-    zenysis_environment = zenysis_environment or os.getenv('ZEN_ENV')
-    configuration_module = __import__(
-        f'config.{zenysis_environment}',
-        fromlist=MODULE_PATHS,
-    )
-    return configuration_module
+    return load_deployment(zenysis_environment or os.getenv('ZEN_ENV') or '')

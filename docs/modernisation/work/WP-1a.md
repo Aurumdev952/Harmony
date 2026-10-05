@@ -32,6 +32,12 @@ None.
 
 ## Requests
 
+- [ ] core, frontend-platform: make the latest dashboard model's defaults (`models/python/dashboard/latest/visualization_settings/`) agree with the frontend's, or reject the specs they produce. A spec that is valid against the model, created through `POST /api2/dashboard`, blanks or breaks the dashboard in three ways (routed by the lead to WP-5g and the frontend wave; blocks no unit here, because `scripts/perf/dashboard_specs.py` sets the frontend values itself):
+  1. `TableSettings.active_theme` defaults to `Custom`, and `custom_theme` is optional. Expected: the table renders with the frontend default `Default` theme. Actual: `Invariant Violation: customTheme must exist if selected` (web/client/models/visualizations/Table/TableSettings/index.js:167), and the whole dashboard unmounts.
+  2. `selected_field` defaults to `''` for EXPANDOTREE, HEATTILES, MAP and NUMBER_TREND (also BUMP_CHART, EPICURVE, SUNBURST, BOX_PLOT). Expected: the first series is shown. Actual: `TypeError: Cannot read properties of undefined (reading 'formatFieldValue')` in ExpandoTree/index.jsx:114-115, and the dashboard unmounts.
+  3. `SeriesSettingsObject.data_label_format` defaults to `'0%'`, while the frontend default is `'none'` (QueryResultSeries.defaultValues). Expected: 200000 renders as 200000. Actual: it renders as 20000000% on axes and in tables.
+  Repro: with the perf stack up, run `docker compose -p harmony-wp1a-perf-web exec -T web python -c` with `related.to_dict(related.to_model(DashboardSpecification, spec))` on a compact spec (as in dashboard_specs.py, without its `VIEW_SETTINGS`, `selectedField` and `dataLabelFormat` overrides). POST the result and open `/dashboard/<slug>?screenshot=1`. Evidence: the unit 5 log line.
+
 ## Log
 
 - 2026-10-04 qa-6 unit 1: `scripts/perf/dataset.py` (200,000 synthetic cases, seed 20261004, 2023-01-01 to 2025-12-31, 579 demo municipalities); check: CPython 3.9 and 3.13 both write sha256 `fba5ded7a21a9e371343e5a720f4b875406f81b4e35835a00672156f481ed2c9`; `process_csv.py` reads 200,000 rows into 193,959 base rows, `fill_dimension_data.py` writes 387,918 Druid rows (sorted sha256 `4a3d3118…be47`, identical on a second run); field sums 200,000 `yellow_fever_cases` and 1,000,000 `yellow_fever_test_indicator`; ruff check and format clean.

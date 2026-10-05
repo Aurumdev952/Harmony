@@ -1,3 +1,4 @@
+from contextlib import ExitStack
 from types import SimpleNamespace
 from unittest import mock
 
@@ -31,20 +32,25 @@ def test_signed_in_user_without_view_permission_is_sent_to_unauthorized_page(
     app.register_blueprint(DashboardPageRouter(None, 'en').generate_blueprint())
     signed_in = SimpleNamespace(is_authenticated=True)
 
-    with mock.patch(
-        'web.server.routes.dashboard.get_dashboard',
-        return_value=SimpleNamespace(resource_id=7),
-    ), mock.patch(
-        'web.server.routes.dashboard.is_authorized', return_value=False
-    ), mock.patch(
-        'web.server.routes.dashboard.current_user', signed_in
-    ), mock.patch(
-        'web.server.routes.views.authentication.current_user', signed_in
-    ), mock.patch(
-        'web.server.routes.views.authentication.get_user_string', lambda user: 'u'
-    ), mock.patch(
-        'web.server.routes.views.authentication.get_configuration', return_value=False
-    ):
+    patches = (
+        mock.patch(
+            'web.server.routes.dashboard.get_dashboard',
+            return_value=SimpleNamespace(resource_id=7),
+        ),
+        mock.patch('web.server.routes.dashboard.is_authorized', return_value=False),
+        mock.patch('web.server.routes.dashboard.current_user', signed_in),
+        mock.patch('web.server.routes.views.authentication.current_user', signed_in),
+        mock.patch(
+            'web.server.routes.views.authentication.get_user_string', lambda user: 'u'
+        ),
+        mock.patch(
+            'web.server.routes.views.authentication.get_configuration',
+            return_value=False,
+        ),
+    )
+    with ExitStack() as stack:
+        for patch in patches:
+            stack.enter_context(patch)
         response = app.test_client().get(path, base_url=HOST)
 
     assert response.status_code == 302

@@ -29,7 +29,7 @@ volumes:
 
 services:
   nginx:
-    image: nginxproxy/nginx-proxy:alpine
+    image: nginxproxy/nginx-proxy:1.11.6-alpine@sha256:99376e95c8754547213d411222a2c4dca046d974e753ae2a1c9aef09b2c03364
     ports:
       - 80:80
       - 443:443
@@ -46,9 +46,20 @@ services:
       # This html directory is only used to write let's encrypt challenge
       # files during the cert issuing process.
       - nginx_html:/usr/share/nginx/html
-      # environment:
+    environment:
       # TODO: Establish if TRUST_DOWNSTREAM_PROXY needs to be set to true
       # - TRUST_DOWNSTREAM_PROXY=false
+      # Access lines as JSON with the app's keys (WP-2g); `$$` is a literal `$`.
+      # nginx-proxy cannot forward an X-Request-ID without a conf.d file on the
+      # host, so the id is the one the app returns. `$$uri` has no query string.
+      LOG_FORMAT_ESCAPE: json
+      LOG_FORMAT: >-
+        {"timestamp":"$$time_iso8601","level":"INFO","logger":"nginx.access",
+        "message":"$$request_method $$uri $$status","deployment":"${ZEN_ENV}",
+        "request_id":"$$upstream_http_x_request_id",
+        "http":{"method":"$$request_method","host":"$$host","path":"$$uri",
+        "status":$$status,"bytes":$$body_bytes_sent,"duration_s":$$request_time},
+        "client_ip":"$$remote_addr","user_agent":"$$http_user_agent"}
       # healthcheck:
       #   # TODO: Healthcheck causes problems with initial cert generation,
       #   # Further investigation required.
@@ -59,7 +70,7 @@ services:
       #   retries: 3
     logging: *default-logging
   nginx-letsencrypt-companion:
-    image: nginxproxy/acme-companion
+    image: nginxproxy/acme-companion:2.8.2@sha256:e3c5fb08bf623ae93dbc945d78fe50040c1fa107ddf59f7ee04ba6a61f34cbc1
     volumes:
       - /var/run/docker.sock:/var/run/docker.sock:ro
         # NOTE: These are the same volumes used by the nginx image.
@@ -81,11 +92,13 @@ services:
   # see: https://docs.docker.com/storage/volumes/#back-up-restore-or-migrate-data-volumes
   # 'flags_extra': {'volumes-from': 'nginx'},
   redis:
-    image: redis:alpine
-    ports:
-      - 6379:6379
+    image: redis:8.10.2-alpine@sha256:3811787313eba226a2ef38658c6ccb91cd5e110edc89c37767de373120a0e5a0
+    command: [ "redis-server", "--requirepass", "${REDIS_PASSWORD:?set REDIS_PASSWORD to a random value, e.g. openssl rand -hex 32}" ]
+    environment:
+      REDISCLI_AUTH: ${REDIS_PASSWORD:?set REDIS_PASSWORD}
     healthcheck:
-      test: [ "CMD", "redis-cli", "--raw", "incr", "ping" ]
+      # redis-cli exits 0 on NOAUTH, so match the reply instead.
+      test: [ "CMD-SHELL", "redis-cli ping | grep -qx PONG" ]
       interval: 30s
       timeout: 30s
       start_period: 0s
@@ -118,8 +131,6 @@ services:
     platform: linux/amd64
     pull_policy: always
     image: ${DOCKER_NAMESPACE:-ghcr.io/zenysis}/${DOCKER_IMAGE_PREFIX:-harmony}-web:${DOCKER_TAG:-latest}
-    ports:
-      - 5000:5000
     environment:
       - ZEN_ENV=${ZEN_ENV}
       - HSTS=off
@@ -131,10 +142,12 @@ services:
       - MAILGUN_SMTP_ACCOUNT_ID=${MAILGUN_SMTP_ACCOUNT_ID:-}
       - EMAIL_TAG_HEADER_NAME=${EMAIL_TAG_HEADER_NAME:-X-Mailgun-Tag}
       - EMAIL_USE_ENCRYPTION=${EMAIL_USE_ENCRYPTION:-tls}
-      - DEFAULT_SECRET_KEY=${DEFAULT_SECRET_KEY:-changeme}
+      - DEFAULT_SECRET_KEY=${DEFAULT_SECRET_KEY:?set DEFAULT_SECRET_KEY to a random value, e.g. openssl rand -hex 32}
+      - JWT_SECRET_KEY=${JWT_SECRET_KEY:?set JWT_SECRET_KEY to a random value different from DEFAULT_SECRET_KEY, e.g. openssl rand -hex 32}
       - DRUID_HOST=${DRUID_HOST}
       - MAPBOX_ACCESS_TOKEN=${MAPBOX_ACCESS_TOKEN}
       - REDIS_HOST=redis
+      - REDIS_PASSWORD=${REDIS_PASSWORD:?set REDIS_PASSWORD}
       - HASURA_HOST=http://hasura:8080
       - HASURA_ADMIN_SECRET=${HASURA_ADMIN_SECRET:?HASURA_ADMIN_SECRET must be set}
       - SQLALCHEMY_DATABASE_URI=${DATABASE_URL}
@@ -143,6 +156,8 @@ services:
       - RENDERBOT_EMAIL=${RENDERBOT_EMAIL:-}
       - OBJECT_STORAGE_ALIAS=${OBJECT_STORAGE_ALIAS}
       - ZEN_GUNICORN_WORKER_THREADS=${ZEN_GUNICORN_WORKER_THREADS:-4}
+      - LOG_FORMAT=json
+      - LOG_STREAM=stdout
     volumes:
       # Map minio config folder
       - ${MC_CONFIG_PATH}:/root/.mc
@@ -157,9 +172,6 @@ services:
   worker:
     platform: linux/amd64
     image: ${DOCKER_NAMESPACE:-ghcr.io/zenysis}/${DOCKER_IMAGE_PREFIX:-harmony}-web:${DOCKER_TAG:-latest}
-    # Assign some random ports for worker service to work
-    ports:
-      - 61234:61234
     environment:
       - ZEN_ENV=${ZEN_ENV}
       - EMAIL_HOST=${EMAIL_HOST}
@@ -168,8 +180,10 @@ services:
       - MAILGUN_SMTP_ACCOUNT_ID=${MAILGUN_SMTP_ACCOUNT_ID:-}
       - EMAIL_TAG_HEADER_NAME=${EMAIL_TAG_HEADER_NAME:-X-Mailgun-Tag}
       - EMAIL_USE_ENCRYPTION=${EMAIL_USE_ENCRYPTION:-tls}
-      - DEFAULT_SECRET_KEY=${DEFAULT_SECRET_KEY:-changeme}
-      - BROKER_URL=redis://redis:6379/0
+      - DEFAULT_SECRET_KEY=${DEFAULT_SECRET_KEY:?set DEFAULT_SECRET_KEY to a random value, e.g. openssl rand -hex 32}
+      - JWT_SECRET_KEY=${JWT_SECRET_KEY:?set JWT_SECRET_KEY to a random value different from DEFAULT_SECRET_KEY, e.g. openssl rand -hex 32}
+      - REDIS_HOST=redis
+      - REDIS_PASSWORD=${REDIS_PASSWORD:?set REDIS_PASSWORD}
       - SQLALCHEMY_DATABASE_URI=${DATABASE_URL}
       - HASURA_HOST=http://hasura:8080
       - DRUID_HOST=${DRUID_HOST}
@@ -177,14 +191,16 @@ services:
       - URLBOX_API_KEY=${URLBOX_API_KEY:-}
       - RENDERBOT_EMAIL=${RENDERBOT_EMAIL:-}
       - OBJECT_STORAGE_ALIAS=${OBJECT_STORAGE_ALIAS}
+      - LOG_FORMAT=json
+      - LOG_STREAM=stdout
     command:
       [
         "celery",
+        "-q",
         "-A",
         "web.background_worker.celery",
         "worker",
-        "--beat",
-        "--loglevel=INFO"
+        "--beat"
       ]
     healthcheck:
       test:

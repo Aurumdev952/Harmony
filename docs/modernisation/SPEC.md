@@ -1,6 +1,6 @@
 # Harmony modernisation specification
 
-Version 1.4, 2026-10-05 (decisions 0001, 0003, 0004). Status: approved for execution.
+Version 1.11, 2026-10-05 (decisions 0001, 0003, 0004, 0005, 0006, 0007, 0008, 0009, 0010, 0011). Status: approved for execution.
 
 This is the binding guide for every agent and engineer working on the Harmony migration. Where this spec and another document disagree, this spec wins. The other documents explain why and describe the work in detail:
 
@@ -38,7 +38,7 @@ These hold at every commit on `main`. A change that breaks one MUST NOT merge.
 - **INV-4.** Stored dashboards, saved queries and alert definitions load and render. Readers for `$ref` URIs stay until WP-5g finishes.
 - **INV-5.** Translations (`I18N.text`, the French, Portuguese and Amharic locales) and the Ethiopian calendar keep working.
 - **INV-6.** No secret, credential, token or production data enters the repository, logs, test fixtures or agent transcripts.
-- **INV-7.** The stack never gains a long-running service without losing one. Dagster's daemon replaces host cron.
+- **INV-7.** The stack never gains a long-running service without losing one. Dagster's daemon replaces host cron. The export renderer sidecar counts against Hasura and `render-egress` is time-boxed to WP-7g (decision 0009).
 - **INV-8.** CI is green on `main`.
 
 ## 3. Requirements
@@ -70,7 +70,7 @@ Each requirement names the work packages (WP, section 5) that satisfy it.
 | PERF-4 | Independent Druid sub-queries within one request MUST run concurrently. | 1f, 5b |
 | PERF-5 | Static assets MUST have content-hashed names and be served `immutable`. | 1g, 6b |
 | PERF-6 | Page renders MUST NOT call Druid. | 1d |
-| PERF-7 | No phase may raise p95 latency on the baseline cases (`scripts/perf/`) by more than 10%. | all |
+| PERF-7 | No phase may raise p95 latency on the baseline cases (`scripts/perf/`) by more than 10%, judged by the paired A/B run of decision 0011. | all |
 | PERF-8 | Pipeline runs MUST reindex only the months whose inputs changed. | 8c |
 
 ### Backend
@@ -78,7 +78,7 @@ Each requirement names the work packages (WP, section 5) that satisfy it.
 | ID | Requirement | WP |
 |---|---|---|
 | BE-1 | `harmony/core` MUST NOT import `flask`, `fastapi` or `starlette`. An import-linter contract enforces this. | 4a-4f |
-| BE-2 | All runtime configuration MUST load through `harmony.core.settings` (pydantic-settings). Deployment modules MUST NOT perform I/O when imported. | 3a, 4a |
+| BE-2 | All runtime configuration MUST load through `harmony.core.settings` (pydantic-settings). Deployment modules MUST NOT perform I/O when imported. | 3a, 4a, 4b, 4c, 4f, 5a, 8d, 8e |
 | BE-3 | Database access MUST go through `harmony.core.db`, using the SQLAlchemy 2 `select()` style. Sessions are synchronous. | 3c, 3e, 4b |
 | BE-4 | Every HTTP route MUST live under `harmony/api/` and be declared with typed Pydantic request and response models. | 5a-5h |
 | BE-5 | New endpoints MUST live under `/api/v3/`. Errors MUST use the `ApiError` envelope (C-10). | 5a |
@@ -156,6 +156,8 @@ Each WP is one pull request, or a short stack of them. Detail lives in the named
 | 0g | Browser-share report from nginx logs | infra | qa | none | no |
 | 0h | Close privilege escalations in group and role management | backend | core, security, qa | 2b | yes |
 | 0i | Guard the dashboard render and thumbnail routes | backend | security, qa | none | yes |
+| 0j | Refuse username changes and password resets that reach a higher-privileged account | backend | security, qa | 0h | yes |
+| 0k | Build outgoing links from the configured origin; match usernames exactly; refuse deactivated accounts (decision 0010) | backend | security, qa | 0i | yes |
 | 1a | Performance baseline | qa | core | none | no |
 | 1b | Shared result cache | core | none | 1a | yes |
 | 1c | Columnar parsing | core | none | 1a, golden cases | no |

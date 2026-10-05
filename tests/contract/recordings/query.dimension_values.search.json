@@ -1,0 +1,70 @@
+{
+  "content_type": "application/json",
+  "headers": [],
+  "id": "query.dimension_values.search",
+  "pinned": {},
+  "response_schema": {
+    "items": {
+      "properties": {
+        "$uri": {
+          "type": "string",
+          "x-format": "api-uri"
+        },
+        "datasources": {
+          "items": {
+            "type": "integer"
+          },
+          "type": "array"
+        },
+        "description": {
+          "type": "string"
+        },
+        "dimension": {
+          "type": "string"
+        },
+        "filter": {
+          "properties": {
+            "dimension": {
+              "type": "string"
+            },
+            "type": {
+              "type": "string"
+            },
+            "value": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "dimension",
+            "type",
+            "value"
+          ],
+          "type": "object"
+        },
+        "id": {
+          "type": "integer"
+        },
+        "name": {
+          "type": "string"
+        },
+        "subtitle": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "$uri",
+        "datasources",
+        "description",
+        "dimension",
+        "filter",
+        "id",
+        "name",
+        "subtitle"
+      ],
+      "type": "object"
+    },
+    "type": "array"
+  },
+  "route": "GET /api2/query/dimension_values/search/<dimension>",
+  "status": 200
+}

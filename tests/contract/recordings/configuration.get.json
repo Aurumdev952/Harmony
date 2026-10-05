@@ -1,0 +1,35 @@
+{
+  "content_type": "application/json",
+  "headers": [],
+  "id": "configuration.get",
+  "pinned": {
+    "/defaultValue": "/overview",
+    "/key": "default_url"
+  },
+  "response_schema": {
+    "properties": {
+      "$uri": {
+        "type": "string",
+        "x-format": "api-uri"
+      },
+      "defaultValue": {
+        "type": "string"
+      },
+      "key": {
+        "type": "string"
+      },
+      "value": {
+        "type": "string"
+      }
+    },
+    "required": [
+      "$uri",
+      "defaultValue",
+      "key",
+      "value"
+    ],
+    "type": "object"
+  },
+  "route": "GET /api2/configuration/<key>",
+  "status": 200
+}

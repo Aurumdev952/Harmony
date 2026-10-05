@@ -3,103 +3,99 @@ name: Integration
 on:
   # Trigger on all pull requests.
   pull_request:
+  # And on main itself, so a red main shows even when a PR merged without
+  # being up to date with its base (INV-8).
+  push:
+    branches:
+      - main
 
 permissions: {}
 
+# A new push to a PR cancels the run still going for the previous one. A run on
+# main is never cancelled once it starts. GitHub keeps only one pending run per
+# group, though, so of several quick pushes to main the middle ones are skipped.
+concurrency:
+  group: integration-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
 jobs:
-  lint-python:
-    name: Python - Lint
+  python:
+    name: Python 3.9 - lint, types, tests
     runs-on: ubuntu-24.04
     permissions:
       contents: read
-      pull-requests: read
-    strategy:
-      matrix:
-        python-version: ['3.9']
+    steps:
+      - name: Checkout repo
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          # The PR merge commit and its first parent, the base, for the changed-file diff.
+          fetch-depth: 2
+          persist-credentials: false
+      - name: Set up uv
+        uses: astral-sh/setup-uv@c18668ad3cf93ea998bef934396af7bb5c839dc7 # v10.2.0
+        with:
+          version: '0.12.5'
+          enable-cache: true
+          cache-suffix: app39
+      - name: Lockfiles match pyproject.toml
+        run: |
+          uv lock --check
+          uv lock --check --project ci/tools313
+      - name: Install
+        run: uv sync --locked
+      - name: Pipeline suite tools
+        # tests/pipeline runs the Zeus steps, which shell out to lz4, lz4cat and pigz.
+        # Installed before the linters so a lint failure cannot skip it.
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y --no-install-recommends lz4 pigz
+      - name: Ruff
+        env:
+          RUFF_OUTPUT_FORMAT: github
+        run: ci/lint_python.sh HEAD^1
+      - name: Python 3.8 syntax (web image)
+        # The web image still runs Python 3.8; this job runs 3.9, which accepts
+        # 3.9-only syntax. uv fetches the pinned CPython 3.8. WP-3b removes the step.
+        if: '!cancelled()'
+        run: uv run --no-project -p cpython-3.8.20 python ci/check_py38_syntax.py config data db log models graphql util web scripts tests/web
+      - name: Mypy
+        # Run it even if ruff fails, so we can see all the errors at once.
+        if: '!cancelled()'
+        run: uv run --locked mypy
+      - name: Pytest
+        # Every directory under tests/ runs, each in its own process; tests/infra
+        # runs in the 3.13 job. The contract replay needs the compose stack: it
+        # skips without CONTRACT_BASE_URL, and tests marked `stack` are deselected.
+        if: '!cancelled()'
+        run: ci/pytest_suites.sh
+
+  python-313:
+    name: Python 3.13 - standalone tools
+    runs-on: ubuntu-24.04
+    permissions:
+      contents: read
     steps:
       - name: Checkout repo
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
-      - name: List changed files
-        env:
-          GH_TOKEN: ${{ github.token }}
-          PR_NUMBER: ${{ github.event.pull_request.number }}
-        run: |
-          gh pr view "$PR_NUMBER" --json files -q '.files[].path' > "$RUNNER_TEMP/changed-files"
-          echo "Changed files:"
-          cat "$RUNNER_TEMP/changed-files"
-      - name: Setup Python ${{ matrix.python-version }} (api)
-        id: setup-python
-        uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
+      - name: Set up uv
+        uses: astral-sh/setup-uv@c18668ad3cf93ea998bef934396af7bb5c839dc7 # v10.2.0
         with:
-          python-version: ${{ matrix.python-version }}
-      - name: Restore cache
-        uses: actions/cache/restore@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
-        id: cache-venv
-        with:
-          path: venv
-          key: ${{ runner.os }}-python-${{ steps.setup-python.outputs.python-version }}-${{ matrix.python-version }}-venv-all-requirements-${{ hashFiles('requirements.txt', 'requirements-web.txt', 'requirements-dev.txt', 'requirements-pipeline.txt') }}
-      - name: Install dependencies
-        if: steps.cache-venv.outputs.cache-hit != 'true'
-        run: |
-          python -m pip install --upgrade pip
-          python -m venv venv
-          source venv/bin/activate
-          pip install wheel==0.43.0
-          pip install --no-build-isolation --verbose -r requirements.txt -r requirements-web.txt -r requirements-dev.txt -r requirements-pipeline.txt
-      - name: Cache dependencies
-        uses: actions/cache/save@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
-        if: steps.cache-venv.outputs.cache-hit != 'true'
-        with:
-          path: venv
-          key: ${{ steps.cache-venv.outputs.cache-primary-key }}
-      - name: Black
-        # Only Python files that changed in this PR and still exist. The entire project isn't compliant.
-        run: |
-          mapfile -t changed_files < <(grep -E '\.py$' "$RUNNER_TEMP/changed-files" | while IFS= read -r f; do if [ -e "$f" ]; then echo "$f"; fi; done)
-          if (( ${#changed_files[@]} )); then
-            echo "black evaluating: ${changed_files[*]}"
-            source venv/bin/activate
-            black --skip-string-normalization -t py39 --check "${changed_files[@]}"
-          else
-            echo "no python files found for black to evaluate"
-          fi
-      - name: Pylint
-        # Run it even if black fails, so we can see all the errors at once.
+          version: '0.12.5'
+          enable-cache: true
+          cache-suffix: tools313
+      - name: Mypy (strict)
+        run: uv run --project ci/tools313 --locked mypy --config-file ci/tools313/pyproject.toml
+      - name: Pytest
         if: '!cancelled()'
-        run: |
-          mapfile -t changed_files < <(grep -E '\.py$' "$RUNNER_TEMP/changed-files" | while IFS= read -r f; do if [ -e "$f" ]; then echo "$f"; fi; done)
-          if (( ${#changed_files[@]} )); then
-            echo "pylint evaluating: ${changed_files[*]}"
-            source venv/bin/activate
-            pylint_report=$(pylint --reports=no "${changed_files[@]}" -f json) || true
-            # Map "refactor" and "convention" to "notice".
-            pylint_report=$(jq 'map(.type |= if (. == "refactor") or (. == "convention") then "notice" else . end)' <<<"$pylint_report")
-            jq -r '.[] | "::" + .type + " file=" + .path + ",line=" + (.line|tostring) + ",col=" + (.column|tostring) + ",title=" + .symbol + " / " + ."message-id" + "::" + .message' <<<"$pylint_report"
-            errors=$(jq '[.[] | select(.type == "error")] | length' <<<"$pylint_report")
-            if [ "$errors" -gt 0 ]; then
-              echo "pylint encountered $errors errors"
-              echo "$pylint_report"
-              exit 1
-            fi
-          else
-            echo "no python files found for pylint to evaluate"
-          fi
-      - name: MyPy
-        # Run it even if black/pylint fails, so we can see all the errors at once.
-        if: '!cancelled()'
-        run: |
-          source venv/bin/activate
-          result=$(mypy --show-column-numbers --no-color-output --config-file mypy.ini) || true
-          echo "$result" | xargs -L1 python scripts/mypy_parse.py
+        run: uv run --project ci/tools313 --locked pytest tests/infra
 
   lint-js:
     name: JS - Lint
     runs-on: ubuntu-24.04
     permissions:
       contents: read
-      pull-requests: read
     strategy:
       matrix:
         node-version: ['18.17']
@@ -107,12 +103,10 @@ jobs:
       - name: Checkout repo
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
+          fetch-depth: 2
           persist-credentials: false
       - name: List changed files
-        env:
-          GH_TOKEN: ${{ github.token }}
-          PR_NUMBER: ${{ github.event.pull_request.number }}
-        run: gh pr view "$PR_NUMBER" --json files -q '.files[].path' > "$RUNNER_TEMP/changed-files"
+        run: git -c core.quotePath=false diff --name-only --diff-filter=d HEAD^1 HEAD > "$RUNNER_TEMP/changed-files"
       - name: Use Node.js ${{ matrix.node-version }}
         id: setup-node
         uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
@@ -138,10 +132,10 @@ jobs:
         # Only js and jsx files changed in this PR. The entire project isn't compliant.
         # eslint may have messages when there aren't warnings/errors, so check the counts explicitly.
         run: |
-          mapfile -t changed_files < <(grep -E '\.jsx?$' "$RUNNER_TEMP/changed-files" | grep -v '^web/public/' | while IFS= read -r f; do if [ -e "$f" ]; then echo "$f"; fi; done)
+          mapfile -t changed_files < <(grep -E '\.jsx?$' "$RUNNER_TEMP/changed-files" | grep -v '^web/public/' || true)
           if (( ${#changed_files[@]} )); then
             echo "eslint evaluating: ${changed_files[*]}"
-            eslint_report=$(./node_modules/.bin/eslint "${changed_files[@]}" -f json) || true
+            eslint_report=$(./node_modules/.bin/eslint -f json -- "${changed_files[@]}") || true
             jq -r '.[] | "::warning file=" + .filePath + (.messages | .[] | ",line=" + (.line|tostring) + ",col=" + (.column|tostring) + ",title=" + .ruleId + "::" + .message)' <<<"$eslint_report"
             fail=$(jq -r '[.[] | select(.warningCount > 0 or .errorCount > 0)] | length > 0' <<<"$eslint_report")
             if [ "$fail" = "true" ]; then
@@ -154,10 +148,10 @@ jobs:
       - name: Lint (.scss)
         # Only scss files changed in this PR. The entire project isn't compliant.
         run: |
-          mapfile -t changed_files < <(grep -E '\.scss$' "$RUNNER_TEMP/changed-files" | while IFS= read -r f; do if [ -e "$f" ]; then echo "$f"; fi; done)
+          mapfile -t changed_files < <(grep -E '\.scss$' "$RUNNER_TEMP/changed-files" || true)
           if (( ${#changed_files[@]} )); then
             echo "stylelint evaluating: ${changed_files[*]}"
-            ./node_modules/stylelint/bin/stylelint.js "${changed_files[@]}"
+            ./node_modules/stylelint/bin/stylelint.js -- "${changed_files[@]}"
           else
             echo "no .scss files found for stylelint to evaluate"
           fi

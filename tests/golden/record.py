@@ -9,6 +9,7 @@ Recording runs the current code and answers each Druid query with
 `expected_response.json`. Read tests/golden/README.md before regenerating an
 existing case: it changes what INV-2 compares against.
 '''
+
 import argparse
 import sys
 from pathlib import Path

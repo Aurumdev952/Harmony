@@ -1,2 +1,6 @@
+- [Running db/druid Python checks](running_druid_python_checks.md) — uv on the host; run ci/pytest_suites.sh with settings env unset
 - [Druid setup traps](druid-setup-traps.md) — password provider, Postgres major pinning, cluster binds, extension checksum table
 - [Worktree tooling traps](worktree-tooling-traps.md) — Bash guard rejections, Write-tool workaround, pytest basename clash
+- [Druid version facts](druid_version_facts.md) — verified 32/38 facts; ZooKeeper still required in 38 (skill and decision 0007 agree)
+- [Null audit host traps](null_audit_host_traps.md) — worktree hook, Docker pools, segment waits, tmpfs metadata
+- [Null semantics findings](null_semantics_findings.md) — WP-8a N0-N3: what SQL nulls change and the agreed fixes

@@ -1,0 +1,196 @@
+{
+  "content_type": "text/html",
+  "headers": [],
+  "id": "graphql.CategoryInputMutation",
+  "pinned": {},
+  "response_schema": {
+    "properties": {
+      "data": {
+        "properties": {
+          "delete_unpublished_field_category_mapping": {
+            "properties": {
+              "returning": {
+                "items": {
+                  "properties": {
+                    "category_id": {
+                      "type": "string"
+                    },
+                    "id": {
+                      "type": "string"
+                    },
+                    "unpublished_field_id": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "category_id",
+                    "id",
+                    "unpublished_field_id"
+                  ],
+                  "type": "object"
+                },
+                "type": "array"
+              }
+            },
+            "required": [
+              "returning"
+            ],
+            "type": "object"
+          },
+          "insert_unpublished_field_category_mapping_one": {
+            "properties": {
+              "category": {
+                "properties": {
+                  "id": {
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "id"
+                ],
+                "type": "object"
+              },
+              "id": {
+                "type": "string"
+              },
+              "unpublished_field": {
+                "properties": {
+                  "calculation": {
+                    "properties": {
+                      "type": {
+                        "type": "string"
+                      }
+                    },
+                    "required": [
+                      "type"
+                    ],
+                    "type": "object"
+                  },
+                  "description": {
+                    "type": "string"
+                  },
+                  "id": {
+                    "type": "string"
+                  },
+                  "name": {
+                    "type": "string"
+                  },
+                  "serializedCalculation": {
+                    "properties": {
+                      "type": {
+                        "type": "string"
+                      }
+                    },
+                    "required": [
+                      "type"
+                    ],
+                    "type": "object"
+                  },
+                  "shortName": {
+                    "type": "string"
+                  },
+                  "unpublishedFieldCategoryMappings": {
+                    "items": {
+                      "properties": {
+                        "category": {
+                          "properties": {
+                            "id": {
+                              "type": "string"
+                            },
+                            "name": {
+                              "type": "string"
+                            }
+                          },
+                          "required": [
+                            "id",
+                            "name"
+                          ],
+                          "type": "object"
+                        },
+                        "categoryId": {
+                          "type": "string"
+                        },
+                        "id": {
+                          "type": "string"
+                        }
+                      },
+                      "required": [
+                        "category",
+                        "categoryId",
+                        "id"
+                      ],
+                      "type": "object"
+                    },
+                    "type": "array"
+                  },
+                  "unpublishedFieldPipelineDatasourceMappings": {
+                    "items": {
+                      "properties": {
+                        "datasource": {
+                          "properties": {
+                            "id": {
+                              "type": "string"
+                            },
+                            "name": {
+                              "type": "string"
+                            }
+                          },
+                          "required": [
+                            "id",
+                            "name"
+                          ],
+                          "type": "object"
+                        },
+                        "id": {
+                          "type": "string"
+                        },
+                        "pipelineDatasourceId": {
+                          "type": "string"
+                        }
+                      },
+                      "required": [
+                        "datasource",
+                        "id",
+                        "pipelineDatasourceId"
+                      ],
+                      "type": "object"
+                    },
+                    "type": "array"
+                  }
+                },
+                "required": [
+                  "calculation",
+                  "description",
+                  "id",
+                  "name",
+                  "serializedCalculation",
+                  "shortName",
+                  "unpublishedFieldCategoryMappings",
+                  "unpublishedFieldPipelineDatasourceMappings"
+                ],
+                "type": "object"
+              }
+            },
+            "required": [
+              "category",
+              "id",
+              "unpublished_field"
+            ],
+            "type": "object"
+          }
+        },
+        "required": [
+          "delete_unpublished_field_category_mapping",
+          "insert_unpublished_field_category_mapping_one"
+        ],
+        "type": "object"
+      }
+    },
+    "required": [
+      "data"
+    ],
+    "type": "object"
+  },
+  "route": "POST /api/graphql",
+  "status": 200
+}

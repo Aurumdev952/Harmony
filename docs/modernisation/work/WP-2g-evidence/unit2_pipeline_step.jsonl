@@ -1,0 +1,2 @@
+{"timestamp": "2026-10-04T18:26:31.736+00:00", "level": "INFO", "logger": "ZenysisLogger", "message": "Processed 1200 rows from sample.csv", "source": "pipeline_step.py:<module>:2", "deployment": "harmony_demo"}
+{"timestamp": "2026-10-04T18:26:31.736+00:00", "level": "ERROR", "logger": "ZenysisLogger", "message": "Step failed", "source": "pipeline_step.py:<module>:6", "deployment": "harmony_demo", "exc_info": "Traceback (most recent call last):\n  File \"/tmp/wp2g/pipeline_step.py\", line 4, in <module>\n    1 / 0\nZeroDivisionError: division by zero"}

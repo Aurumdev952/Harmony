@@ -1,3 +1,4 @@
+from contextlib import ExitStack
 from types import SimpleNamespace
 from unittest import mock
 
@@ -35,16 +36,23 @@ def fixture_request_context(bare_flask_app):
 
 def _run_as_caller(query, system_client, policy=None, superuser=False):
     policy = Filter(**POLICY) if policy is None else policy
-    with mock.patch(
-        'web.server.routes.views.query_policy.SuperUserPermission',
-        return_value=SimpleNamespace(can=lambda: superuser),
-    ), mock.patch(
-        'web.server.routes.views.query_policy.is_public_dashboard_user',
-        return_value=False,
-    ), mock.patch(
-        'web.server.routes.views.query_policy._construct_authorization_filter',
-        return_value=policy,
-    ):
+    patches = (
+        mock.patch(
+            'web.server.routes.views.query_policy.SuperUserPermission',
+            return_value=SimpleNamespace(can=lambda: superuser),
+        ),
+        mock.patch(
+            'web.server.routes.views.query_policy.is_public_dashboard_user',
+            return_value=False,
+        ),
+        mock.patch(
+            'web.server.routes.views.query_policy._construct_authorization_filter',
+            return_value=policy,
+        ),
+    )
+    with ExitStack() as stack:
+        for patch in patches:
+            stack.enter_context(patch)
         g.identity = object()
         return AuthorizedQueryClient(system_client).run_query(query)
 

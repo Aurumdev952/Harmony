@@ -1,62 +1,306 @@
 [project]
 name = "harmony"
 version = "0"
+# The CI and dev interpreter. WP-3b moves everything to CPython 3.13 by changing
+# this line to "==3.13.*" and running `uv lock` (plus whatever pins 3.13 forces).
 requires-python = "==3.9.*"
-
-[dependency-groups]
-# The query engine's import closure, pinned as in requirements*.txt, so the golden
-# suite (tests/golden) runs on the host without Druid, Postgres or a container.
-# WP-2f replaces this with the full web, pipeline and dev groups.
-golden = [
+# Shared by the web server and the pipeline (exported to requirements.txt).
+dependencies = [
+    "setuptools==71.1.0",
     "attrs==21.4.0",
-    "related>=0.7.0",
-    "Flask==1.0.1",
+    # Also pinned in the Dockerfiles; some installs need wheel before anything else.
+    "wheel==0.43.0",
+    "Cython<3.0.0",
+    "celery==5.4.0",
     "Werkzeug==0.16.1",
-    "Jinja2==2.10.1",
     "MarkupSafe==0.23",
-    "itsdangerous==2.0.1",
+    "Flask==1.0.1",
     "Flask-Principal==0.4.0",
+    "Flask-Migrate==2.5.2",
     "Flask-SQLAlchemy==2.4.0",
-    "SQLAlchemy==1.3.24",
-    "flask-jwt-extended==3.25.1",
-    "PyJWT==1.7.1",
-    "flask-login==0.4.1",
-    "pandas>=1.3,<2.0",
-    "numpy==1.21.0",
-    "scipy>=1.2.1",
-    "requests==2.28.1",
-    "ijson-bigint==3.2.0.post1",
-    "python-rapidjson==1.9",
+    "flask-user==0.6.21 ; platform_python_implementation != 'PyPy'",
+    # passlib 1.7.4 (via flask-user) raises on bcrypt >= 5.0; lift with WP-3d/WP-5d.
+    "bcrypt==4.0.1 ; platform_python_implementation != 'PyPy'",
+    "WTForms==2.1",
+    # Flask 1.0.1 needs Jinja2 2.10.1.
+    "Jinja2==2.10.1",
+    # Later releases removed itsdangerous.json, which Flask 1.0.1 imports.
+    "itsdangerous==2.0.1",
+    "importlib_metadata<5",
+    "ethiopian-date-converter==0.1.5",
+    "hvac>=0.7.0",
+    "pandas>=1.3,<2.0 ; platform_python_implementation != 'PyPy'",
+    "psycopg2-binary==2.8.5 ; platform_python_implementation != 'PyPy'",
     "python-dateutil>=2.8.1",
-    "toposort==1.5",
+    "requests==2.28.1 ; platform_python_implementation != 'PyPy'",
+    "httpx[socks]==0.27.0",
+    "six>=1.9.0",
     "stringcase==1.2.0",
+    "toposort==1.5",
+    "coloredlogs==5.0",
     "python-slugify",
     "retry>=0.9.2",
-    "six>=1.9.0",
-    "future==0.18.3",
-    "ethiopian-date-converter==0.1.5",
+    "watchdog>=0.8.3",
+    "pyyaml>=3.12",
     "boto3==1.16.25",
-    "WTForms==2.1",
-    "flask-user==0.6.21",
-    # requirements.txt pins 2.8.5, which has no CPython 3.9 wheel; only its
-    # error codes are imported here.
-    "psycopg2-binary==2.8.6",
-    "celery==5.4.0",
+    "SQLAlchemy==1.3.24",
+    "related>=0.7.0",
+    # gspread pulls in google-auth and cryptography; importing cryptography aborts
+    # PyPy 7.3.9, and no pipeline code imports gspread (WP-0d).
+    "gspread>=5.4.0 ; platform_python_implementation != 'PyPy'",
+    # numpy 1.16.0-1.16.2 break on PyPy, and 1.21.0 has no PyPy build.
+    "numpy==1.21.0 ; platform_python_implementation != 'PyPy'",
+    "numpy==1.15.4 ; platform_python_implementation == 'PyPy'",
+    "python-nginx==1.2",
+    # Our fork fixes response-schema inference from type annotations. The pipeline
+    # needs it too, through the alerts code.
     "Flask-Potion",
     "pylib",
     "pydruid",
+    "python-rapidjson==1.9",
+    "openpyxl>=3.0.9",
+    # Works around https://github.com/lloyd/yajl/issues/130.
+    "ijson-bigint==3.2.0.post1",
+    "types-jsonschema==4.17.0.8",
+    "future==0.18.3",
+    # harmony.core.settings (WP-4a). The last releases supporting CPython 3.8 and
+    # PyPy 3.8, which the web and pipeline images run until WP-3b.
+    "pydantic==2.10.6",
+    "pydantic-settings==2.8.1",
 ]
-dev = ["pytest>=7.4.3", "freezegun>=1.5"]
+
+[dependency-groups]
+# Exported to requirements-web.txt.
+web = [
+    "flask-jwt-extended==3.25.1",
+    "blinker==1.4",
+    "flask-caching==2.0.1",
+    "flask-login==0.4.1",
+    "gunicorn[gevent]==20.0.4",
+    "isodate>=0.5.4",
+    "redis==5.0.1",
+    "scipy>=1.2.1",
+    "twilio==6.24.1",
+    "PyJWT==1.7.1",
+    "typing_extensions==4.12.2",
+    "alembic>=1.7.1",
+]
+# Exported to requirements-pipeline.txt.
+pipeline = [
+    "xlrd>=1.0.0",
+    "pyshp",
+    # shapely 2.0 needs numpy 1.19, above the PyPy numpy pin.
+    "shapely==1.8",
+    "pyproj==3.4.1",
+    "contextlib2",
+    "lxml ; platform_python_implementation != 'PyPy'",
+    "savReaderWriter ; platform_python_implementation != 'PyPy'",
+    "oauthlib",
+    "requests_oauthlib",
+    "isoweek",
+    "unidecode==1.1.1",
+    "zeep==3.4.0 ; platform_python_implementation != 'PyPy'",
+    "scikit-learn>=0.21.3 ; platform_python_implementation != 'PyPy'",
+    "scipy>=1.2.1 ; platform_python_implementation != 'PyPy'",
+    "typing_extensions==4.12.2",
+    "netCDF4 ; platform_python_implementation != 'PyPy'",
+    "dataclasses",
+    "croniter==1.3.7",
+    "lz4==4.3.2 ; platform_python_implementation != 'PyPy'",
+]
+# Exported to requirements-dev.txt.
+dev = [
+    "pytest>=7.4.3",
+    "pytest-selenium==4.0.1",
+    "selenium==4.5.0",
+    "pytest-flask>=0.15.0",
+    "pytest-xdist>=1.29.0",
+    "pytest-metadata>=1.8.0",
+    "junit-xml>=1.9",
+    "deepdiff==5.5.0",
+    "ordered-set==4.0.2",
+    "pytest-asyncio==0.20.3",
+    "pytest-httpx==0.30.0",
+    "freezegun==1.5.5",
+    # Newer releases need attrs>=22.2; attrs is pinned at 21.4.0.
+    "hypothesis==6.91.0",
+    "jsonschema==4.17.3",
+    "pip-licenses==1.7.1",
+    "termcolor==1.1.0",
+    "googlemaps==4.2.0",
+    "geopy==2.1.0",
+    "ruff==0.16.10",
+    "PyInstaller>=3.4",
+    "pytest-env==0.6.2",
+    "coverage==5.2.1",
+    "pytest-picked==0.4.4",
+    "mypy==1.3",
+    "sqlalchemy-stubs==0.4",
+    "types-botocore==1.0.2",
+    "types-certifi==0.1.3",
+    "types-Flask==0.1.2",
+    "types-Jinja2==0.1.3",
+    "types-jwt==0.1.3",
+    "types-python-dateutil==0.1.2",
+    "types-redis==0.1.17",
+    "types-requests==0.1.8",
+    "types-Werkzeug==0.1.8",
+    "testfixtures==6.17.1",
+    "alchemy-mock==0.4.3",
+    "factory-boy==3.2.0",
+    # BE-1: harmony.core imports no web framework (tests/core runs it).
+    "import-linter==2.5.2",
+]
 
 [tool.uv]
 package = false
-default-groups = ["dev", "golden"]
+default-groups = "all"
+# The lock serves CI and development on CPython. The pipeline image's PyPy venv
+# installs from requirements*.txt until PyPy goes (WP-8d).
+environments = ["platform_python_implementation == 'CPython'"]
+# Lock-only: 2.8.5 has no CPython 3.9 wheel and needs libpq headers to build.
+# requirements.txt keeps 2.8.5 for the images (the web image is CPython 3.8).
+override-dependencies = [
+    "psycopg2-binary==2.8.6 ; platform_python_implementation != 'PyPy'",
+]
+# `uv sync` builds 29 packages from source (3 git, 26 sdists). Their build tools
+# are pinned here, recorded in uv.lock and enforced by --locked. The list is every
+# build requirement a fresh-cache `uv sync --locked -v` installs.
+build-constraint-dependencies = [
+    "setuptools==82.0.1",
+    "cython==3.3.0",
+    "cffi==2.0.0",
+    "greenlet==3.2.5",
+    "pycparser==2.23",
+    "pytest-runner==6.0.1",
+]
 
 [tool.uv.sources]
 Flask-Potion = { git = "https://github.com/Zenysis/potion.git", rev = "bd398c18e8710a4e7cc87d9abb6ba9a95e7ba792" }
 pylib = { git = "https://github.com/room77/py77.git", rev = "70280110ec342a6f6db1c102e96756fcc3c3c01b" }
 pydruid = { git = "https://github.com/druid-io/pydruid.git", rev = "2420109553812470ed4d91cd0f8d5e70bbf2cfd3" }
 
+[tool.ruff]
+line-length = 88
+extend-exclude = ["web/public", "node_modules"]
+# The web image still runs Python 3.8, so the formatter must not emit 3.9+ syntax
+# (parenthesised with-statements) until WP-3b moves every image to 3.13. That
+# includes tests, which builders and gates also run on the 3.8 web environment.
+target-version = "py38"
+
+[tool.ruff.per-file-target-version]
+# Standalone tools on CPython 3.13 (PEP 723 scripts); the rest targets 3.8 (above)
+# until WP-3b.
+"prod/browser_share/**" = "py313"
+"docker/export_requirements.py" = "py313"
+"tests/infra/**" = "py313"
+
+[tool.ruff.format]
+# black --skip-string-normalization, which CI ran before ruff.
+quote-style = "preserve"
+
+[tool.ruff.lint]
+# CI applies this set to the Python files a PR changes, and E9, F63, F7 and F82
+# to the whole tree.
+select = ["E4", "E7", "E9", "F", "S"]
+# S603 and S607 flag every subprocess call, even a fixed argument list with no
+# shell; the shell=True rules (S602, S604, S605) stay on.
+ignore = ["S603", "S607"]
+
+[tool.ruff.lint.per-file-ignores]
+# Tests assert, draw synthetic data from `random`, use placeholder credentials and
+# fixed temp paths, and name wildcard addresses (to assert nothing binds to them).
+"tests/**" = ["S101", "S104", "S105", "S106", "S108", "S311"]
+
+[tool.mypy]
+files = ["web/server", "models", "db", "harmony/core"]
+plugins = ["sqlmypy", "pydantic.mypy"]
+ignore_missing_imports = false
+show_error_codes = true
+namespace_packages = true
+explicit_package_bases = true
+# Always on under the mypy daemon, so on here too for the same results.
+local_partial_types = true
+
+[[tool.mypy.overrides]]
+# --strict, which mypy only accepts globally.
+module = ["harmony.core", "harmony.core.*"]
+disallow_any_generics = true
+disallow_subclassing_any = true
+disallow_untyped_calls = true
+disallow_untyped_defs = true
+disallow_incomplete_defs = true
+check_untyped_defs = true
+disallow_untyped_decorators = true
+warn_unused_ignores = true
+warn_return_any = true
+no_implicit_reexport = true
+strict_equality = true
+strict_concatenate = true
+
+[[tool.mypy.overrides]]
+module = ["models.python.dashboard.*", "web.server.migrations.*"]
+ignore_errors = true
+
+[[tool.mypy.overrides]]
+# config.* is loaded dynamically per deployment; the rest ship no type information.
+module = [
+    "config.*",
+    "flask_potion.*",
+    "flask_user.*",
+    "flask_principal.*",
+    "flask_login.*",
+    "flask_migrate.*",
+    "flask_sqlalchemy.*",
+    "related.*",
+    "slugify.*",
+    "pydruid.*",
+    "alembic.*",
+    "pylib.*",
+    "past.*",
+    "future.*",
+    "hvac.*",
+    "toposort.*",
+    "stringcase.*",
+    "wtforms.*",
+    "celery.*",
+    "twilio.*",
+    "ethiopian_date.*",
+    "scipy.*",
+    "psycopg2.*",
+    "pandas.*",
+    "_pypyjson.*",
+    "factory.*",
+    "alchemy_mock.*",
+    "ijson.*",
+    "rapidjson.*",
+    "flask_jwt_extended.*",
+    "boto3.*",
+]
+ignore_missing_imports = true
+
+[tool.importlinter]
+# The legacy packages are in the graph so an import that reaches a web framework
+# through them breaks the contract too.
+root_packages = ["harmony", "config", "data", "db", "log", "models", "util", "web"]
+include_external_packages = true
+
+[[tool.importlinter.contracts]]
+name = "BE-1: harmony.core imports no web framework"
+type = "forbidden"
+source_modules = ["harmony.core"]
+forbidden_modules = ["flask", "fastapi", "starlette"]
+
 [tool.pytest.ini_options]
 pythonpath = ["."]
-testpaths = ["tests/golden"]
+# CI runs every directory under tests/ (ci/pytest_suites.sh, one process each),
+# so a new suite needs no workflow change.
+testpaths = ["tests"]
+# Plugins pinned in the dev group that no suite uses and that break suites:
+# pytest-selenium 4.0.1 raises an INTERNALERROR on pytest 8 whenever a test fails,
+# hiding which one; pytest-flask 1.3.0 pushes a request context around any test
+# with an `app` fixture, so Flask-Login state leaks into tests/web.
+addopts = "-p no:selenium -p no:flask"
+markers = [
+    "stack: needs the running docker compose stack; CI's unit job deselects it",
+]

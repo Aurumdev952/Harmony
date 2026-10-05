@@ -1,0 +1,12 @@
+{
+  "content_type": "application/json",
+  "headers": [],
+  "id": "user.ownership",
+  "pinned": {},
+  "response_schema": {
+    "maxItems": 0,
+    "type": "array"
+  },
+  "route": "GET /api2/user/<id>/ownership",
+  "status": 200
+}

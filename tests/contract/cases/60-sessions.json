@@ -1,0 +1,113 @@
+{
+  "cases": [
+    {
+      "id": "user_query_session.generate_link",
+      "route": "POST /api2/user_query_session/generate_link",
+      "body": {
+        "userId": "{admin_user_id}",
+        "queryUuid": null,
+        "queryBlob": {
+          "sourceType": "SHARED",
+          "viewType": "TABLE",
+          "visualizationType": "TABLE",
+          "querySelections": {
+            "fields": [
+              {
+                "id": "yellow_fever_cases",
+                "calculation": {
+                  "type": "SUM",
+                  "filter": {
+                    "type": "FIELD",
+                    "fieldId": "yellow_fever_cases"
+                  }
+                },
+                "canonicalName": "Yellow Fever Cases",
+                "shortName": "Yellow Fever Cases",
+                "userDefinedLabel": "",
+                "customizableFilterItems": [],
+                "showNullAsZero": false
+              }
+            ],
+            "filters": [],
+            "groups": [
+              {
+                "type": "GROUPING_DIMENSION",
+                "item": {
+                  "dimension": "StateName",
+                  "includeAll": false,
+                  "includeNull": false,
+                  "includeTotal": false,
+                  "name": "State"
+                }
+              },
+              {
+                "type": "GROUPING_GRANULARITY",
+                "item": {
+                  "granularity": "month",
+                  "includeTotal": false,
+                  "name": "Month"
+                }
+              }
+            ]
+          }
+        }
+      },
+      "capture": {
+        "query_session_hash": ""
+      }
+    },
+    {
+      "id": "user_query_session.by_query_uuid",
+      "route": "GET /api2/user_query_session/<hash>/by_query_uuid",
+      "path": "/api2/user_query_session/{query_session_hash}/by_query_uuid"
+    },
+    {
+      "id": "query.table.by_hash",
+      "route": "GET /api2/query/table",
+      "query": {
+        "h": "{query_session_hash}"
+      },
+      "note": "The link DownloadDataTab.jsx builds for the aggregated CSV."
+    },
+    {
+      "id": "query.table_disaggregated.by_hash",
+      "route": "GET /api2/query/table/disaggregated",
+      "query": {
+        "h": "{query_session_hash}"
+      }
+    },
+    {
+      "id": "query.table.by_hash.missing_hash",
+      "route": "GET /api2/query/table"
+    },
+    {
+      "id": "query.table.by_hash.unknown_hash",
+      "route": "GET /api2/query/table",
+      "query": {
+        "h": "contract-no-such-hash"
+      }
+    },
+    {
+      "id": "share.email.preview",
+      "route": "POST /api2/share/email",
+      "body": {
+        "attachments": [
+          {
+            "filename": "contract.csv",
+            "content": "a,b\n1,2\n"
+          }
+        ],
+        "imageUrl": "",
+        "isPreview": true,
+        "message": "Contract message",
+        "queryUrl": "http://127.0.0.1/advanced-query#h={query_session_hash}",
+        "sender": "{env:CONTRACT_USERNAME}",
+        "subject": "Contract subject",
+        "recipients": [
+          "{env:CONTRACT_USERNAME}"
+        ]
+      },
+      "note": "Mail goes to the stack's mailpit sink."
+    }
+  ]
+}

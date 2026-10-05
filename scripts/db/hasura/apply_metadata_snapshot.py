@@ -27,7 +27,7 @@ def build_metadata_dict():
     # Loop over each metadata file and add it to the combined output dictionary.
     for metadata_file in sorted(glob(f'{METADATA_FOLDER}/*.yaml')):
         with open(metadata_file) as input_file:
-            data = yaml.load(input_file, Loader=yaml.Loader)
+            data = yaml.safe_load(input_file)
 
             # If the data is a dict, then we should merge it with the output object
             # directly. The keys in the data dictionary should be top level keys in the
@@ -46,7 +46,10 @@ def build_metadata_dict():
 def wait_for_hasura(hasura_host):
     for attempt in range(HEALTH_ATTEMPTS):
         try:
-            if requests.get(f'{hasura_host}/healthz', timeout=10).ok:
+            health = requests.get(
+                f'{hasura_host}/healthz', timeout=10, allow_redirects=False
+            )
+            if health.ok:
                 return True
         except requests.exceptions.RequestException:
             pass
@@ -84,6 +87,8 @@ def main():
             headers={'X-Hasura-Admin-Secret': hasura_admin_secret},
             json={'type': 'replace_metadata', 'args': build_metadata_dict()},
             timeout=120,
+            # A redirect would re-send the admin secret, possibly to another host.
+            allow_redirects=False,
         )
     except requests.exceptions.RequestException as error:
         LOG.error(

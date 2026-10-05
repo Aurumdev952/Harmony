@@ -1,0 +1,10 @@
+{
+  "content_type": "text/csv",
+  "headers": [],
+  "id": "field.names_csv",
+  "non_empty": true,
+  "pinned": {},
+  "response_schema": null,
+  "route": "GET /api/field_names",
+  "status": 200
+}

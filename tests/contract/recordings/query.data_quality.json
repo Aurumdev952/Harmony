@@ -1,0 +1,198 @@
+{
+  "content_type": "application/json",
+  "headers": [],
+  "id": "query.data_quality",
+  "pinned": {},
+  "response_schema": {
+    "properties": {
+      "dataQuality": {
+        "properties": {
+          "overall": {
+            "properties": {
+              "dimensions": {
+                "properties": {},
+                "required": [],
+                "type": "object"
+              },
+              "geo": {
+                "properties": {
+                  "lat": {
+                    "type": "integer"
+                  },
+                  "lng": {
+                    "type": "integer"
+                  }
+                },
+                "required": [
+                  "lat",
+                  "lng"
+                ],
+                "type": "object"
+              },
+              "indicatorCharacteristics": {
+                "properties": {
+                  "ageScore": {
+                    "type": "number"
+                  },
+                  "completenessTrendIsUp": {
+                    "type": "boolean"
+                  },
+                  "endIntervalTimestamp": {
+                    "type": "number"
+                  },
+                  "firstEverReportTimestamp": {
+                    "type": "number"
+                  },
+                  "freshnessScore": {
+                    "type": "number"
+                  },
+                  "lastReportTimestamp": {
+                    "type": "number"
+                  },
+                  "maxAgeScore": {
+                    "type": "integer"
+                  },
+                  "maxFreshnessScore": {
+                    "type": "integer"
+                  },
+                  "maxScore": {
+                    "type": "integer"
+                  },
+                  "reportingPeriod": {
+                    "type": "number"
+                  },
+                  "score": {
+                    "type": "integer"
+                  },
+                  "success": {
+                    "type": "boolean"
+                  }
+                },
+                "required": [
+                  "ageScore",
+                  "completenessTrendIsUp",
+                  "endIntervalTimestamp",
+                  "firstEverReportTimestamp",
+                  "freshnessScore",
+                  "lastReportTimestamp",
+                  "maxAgeScore",
+                  "maxFreshnessScore",
+                  "maxScore",
+                  "reportingPeriod",
+                  "score",
+                  "success"
+                ],
+                "type": "object"
+              },
+              "outlierAnalysis": {
+                "properties": {
+                  "firstReportDate": {
+                    "type": "string",
+                    "x-format": "date"
+                  },
+                  "maxScore": {
+                    "type": "integer"
+                  },
+                  "numFacilities": {
+                    "type": "integer"
+                  },
+                  "numValues": {
+                    "type": "integer"
+                  },
+                  "percentageExtremeOutliers": {
+                    "type": "integer"
+                  },
+                  "percentageModerateOutliers": {
+                    "type": "integer"
+                  },
+                  "score": {
+                    "type": "integer"
+                  },
+                  "success": {
+                    "type": "boolean"
+                  }
+                },
+                "required": [
+                  "firstReportDate",
+                  "maxScore",
+                  "numFacilities",
+                  "numValues",
+                  "percentageExtremeOutliers",
+                  "percentageModerateOutliers",
+                  "score",
+                  "success"
+                ],
+                "type": "object"
+              },
+              "reportingCompleteness": {
+                "properties": {
+                  "averageReportCount": {
+                    "type": "integer"
+                  },
+                  "firstReportTimestamp": {
+                    "type": "number"
+                  },
+                  "maxReportCount": {
+                    "type": "integer"
+                  },
+                  "maxScore": {
+                    "type": "integer"
+                  },
+                  "minReportCount": {
+                    "type": "integer"
+                  },
+                  "modeReportCount": {
+                    "type": "integer"
+                  },
+                  "reportCountStd": {
+                    "type": "number"
+                  },
+                  "score": {
+                    "type": "integer"
+                  },
+                  "success": {
+                    "type": "boolean"
+                  },
+                  "totalReports": {
+                    "type": "integer"
+                  }
+                },
+                "required": [
+                  "averageReportCount",
+                  "firstReportTimestamp",
+                  "maxReportCount",
+                  "maxScore",
+                  "minReportCount",
+                  "modeReportCount",
+                  "reportCountStd",
+                  "score",
+                  "success",
+                  "totalReports"
+                ],
+                "type": "object"
+              }
+            },
+            "required": [
+              "dimensions",
+              "geo",
+              "indicatorCharacteristics",
+              "outlierAnalysis",
+              "reportingCompleteness"
+            ],
+            "type": "object"
+          }
+        },
+        "required": [
+          "overall"
+        ],
+        "type": "object"
+      }
+    },
+    "required": [
+      "dataQuality"
+    ],
+    "type": "object"
+  },
+  "route": "POST /api2/query/data_quality",
+  "status": 200
+}

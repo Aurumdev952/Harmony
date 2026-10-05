@@ -62,8 +62,22 @@ CASES = [
     # (label, port, tls, Host header, request target, extra headers)
     ("direct gunicorn", 58841, False, "attacker.invalid", PATH, ()),
     ("direct gunicorn", 58841, False, "real.org:@attacker.invalid", PATH, ()),
-    ("direct gunicorn", 58841, False, "real.org", PATH, ("SCRIPT_NAME: @attacker.invalid",)),
-    ("direct gunicorn", 58841, False, "real.org", "/@attacker.invalid" + PATH, ("SCRIPT_NAME: @attacker.invalid",)),
+    (
+        "direct gunicorn",
+        58841,
+        False,
+        "real.org",
+        PATH,
+        ("SCRIPT_NAME: @attacker.invalid",),
+    ),
+    (
+        "direct gunicorn",
+        58841,
+        False,
+        "real.org",
+        "/@attacker.invalid" + PATH,
+        ("SCRIPT_NAME: @attacker.invalid",),
+    ),
     ("nginx https", 58843, True, "real.org", PATH, ()),
     ("nginx https", 58843, True, "attacker.invalid", PATH, ()),
     ("nginx https", 58843, True, "real.org:@attacker.invalid", PATH, ()),
@@ -73,18 +87,41 @@ CASES = [
     ("nginx https", 58843, True, "real.org:8443", PATH, ()),
     ("nginx https", 58843, True, "real.org.", PATH, ()),
     ("nginx https", 58843, True, "real.org", "https://attacker.invalid" + PATH, ()),
-    ("nginx https", 58843, True, "real.org", "https://real.org:@attacker.invalid" + PATH, ()),
+    (
+        "nginx https",
+        58843,
+        True,
+        "real.org",
+        "https://real.org:@attacker.invalid" + PATH,
+        (),
+    ),
     ("nginx https", 58843, True, "attacker.invalid", "https://real.org" + PATH, ()),
-    ("nginx https", 58843, True, "real.org", PATH, ("X-Forwarded-Host: attacker.invalid",)),
+    (
+        "nginx https",
+        58843,
+        True,
+        "real.org",
+        PATH,
+        ("X-Forwarded-Host: attacker.invalid",),
+    ),
     ("nginx https", 58843, True, "real.org", PATH, ("SCRIPT_NAME: @attacker.invalid",)),
     ("nginx https", 58843, True, "real.org", PATH, ("Script-Name: @attacker.invalid",)),
-    ("nginx https", 58843, True, "real.org", "/@attacker.invalid" + PATH, ("SCRIPT_NAME: @attacker.invalid",)),
+    (
+        "nginx https",
+        58843,
+        True,
+        "real.org",
+        "/@attacker.invalid" + PATH,
+        ("SCRIPT_NAME: @attacker.invalid",),
+    ),
     ("nginx http", 58842, False, "real.org", PATH, ()),
     ("nginx http", 58842, False, "real.org:@attacker.invalid", PATH, ()),
     ("nginx http", 58842, False, "attacker.invalid", PATH, ()),
 ]
 
-print("| Path | Host header | Request target | Extra header | Status | Location | Mailed link |")
+print(
+    "| Path | Host header | Request target | Extra header | Status | Location | Mailed link |"
+)
 print("|---|---|---|---|---|---|---|")
 mailed_links()  # start from an empty mailbox
 for label, port, tls, host, target, extra in CASES:

@@ -15,14 +15,20 @@ WEB = "wp0k-host-web-1"
 
 
 def admin_session():
-    with open("/tmp/wp0k-stack/stack.env") as env:
+    with open("/tmp/wp0k-stack/stack.env") as env:  # noqa: S108 (the local probe stack's env file)
         password = next(
-            line.strip().split("=", 1)[1] for line in env if line.startswith("CONTRACT_PASSWORD=")
+            line.strip().split("=", 1)[1]
+            for line in env
+            if line.startswith("CONTRACT_PASSWORD=")
         )
     session = requests.Session()
     session.post(
         f"{BASE}/api2/authentication/login?set_cookie=true",
-        json={"email": "contract-admin@harmony.invalid", "password": password, "remember_me": False},
+        json={
+            "email": "contract-admin@harmony.invalid",
+            "password": password,
+            "remember_me": False,
+        },
     ).raise_for_status()
     return session
 
@@ -30,7 +36,9 @@ def admin_session():
 def mailed():
     return subprocess.run(
         ["docker", "exec", WEB, "python", "/zenysis/probe_mail.py"],
-        check=True, capture_output=True, text=True,
+        check=True,
+        capture_output=True,
+        text=True,
     ).stdout.strip()
 
 
@@ -49,7 +57,10 @@ print("|---|---|---|")
 for query_url in QUERY_URLS:
     response = session.post(
         f"{BASE}/api2/share/email",
-        headers={"Host": "attacker.invalid", "Cookie": f"accessKey={session.cookies['accessKey']}"},
+        headers={
+            "Host": "attacker.invalid",
+            "Cookie": f"accessKey={session.cookies['accessKey']}",
+        },
         json={
             "subject": "WP-0k probe",
             "sender": "contract-admin@harmony.invalid",

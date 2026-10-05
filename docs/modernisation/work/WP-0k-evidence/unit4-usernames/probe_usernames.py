@@ -30,7 +30,7 @@ MIXED = f"Mixed.Case.{LABEL}@{DOMAIN}"
 
 
 def secret_from_env_file(name):
-    with open("/tmp/wp0k-stack/stack.env") as env:
+    with open("/tmp/wp0k-stack/stack.env") as env:  # noqa: S108 (the local probe stack's env file)
         for line in env:
             if line.startswith(f"{name}="):
                 return line.strip().split("=", 1)[1]
@@ -39,10 +39,20 @@ def secret_from_env_file(name):
 
 def create_user(username, password):
     subprocess.run(
-        ["docker", "exec", WEB, "python", "scripts/create_user.py",
-         f"--username={username}", f"--password={password}",
-         "--first_name=Probe", "--last_name=User", "--overwrite"],
-        check=True, capture_output=True,
+        [
+            "docker",
+            "exec",
+            WEB,
+            "python",
+            "scripts/create_user.py",
+            f"--username={username}",
+            f"--password={password}",
+            "--first_name=Probe",
+            "--last_name=User",
+            "--overwrite",
+        ],
+        check=True,
+        capture_output=True,
     )
 
 
@@ -76,47 +86,100 @@ older_password, mixed_password, look_alike_password = (
 )
 create_user(OLDER, older_password)
 create_user(MIXED, mixed_password)
-admin, _ = login("contract-admin@harmony.invalid", secret_from_env_file("CONTRACT_PASSWORD"))
+admin, _ = login(
+    "contract-admin@harmony.invalid", secret_from_env_file("CONTRACT_PASSWORD")
+)
 
 session, response = login(MIXED.lower(), mixed_password)
-rows.append(("log in typing the username in lower case", response.status_code,
-             identity(session), whoami(session)))
+rows.append(
+    (
+        "log in typing the username in lower case",
+        response.status_code,
+        identity(session),
+        whoami(session),
+    )
+)
 
-response = admin.post(f"{BASE}/api2/user/invite", json=[{"name": "Lookalike", "email": LOOK_ALIKE}])
-rows.append((f"admin invites the look-alike {LOOK_ALIKE}", response.status_code, "", ""))
+response = admin.post(
+    f"{BASE}/api2/user/invite", json=[{"name": "Lookalike", "email": LOOK_ALIKE}]
+)
+rows.append(
+    (f"admin invites the look-alike {LOOK_ALIKE}", response.status_code, "", "")
+)
 token = subprocess.run(
     ["docker", "exec", WEB, "python", "/zenysis/probe_token.py", LOOK_ALIKE],
-    check=True, capture_output=True, text=True,
+    check=True,
+    capture_output=True,
+    text=True,
 ).stdout.strip()
 
 registrant = requests.Session()
 response = registrant.post(
     f"{BASE}/api2/authentication/register",
-    json={"email": LOOK_ALIKE, "firstname": "Look", "lastname": "Alike",
-          "password": look_alike_password, "invite_token": token},
+    json={
+        "email": LOOK_ALIKE,
+        "firstname": "Look",
+        "lastname": "Alike",
+        "password": look_alike_password,
+        "invite_token": token,
+    },
 )
-rows.append(("the look-alike registers", response.status_code,
-             identity(registrant), whoami(registrant)))
+rows.append(
+    (
+        "the look-alike registers",
+        response.status_code,
+        identity(registrant),
+        whoami(registrant),
+    )
+)
 
 session, response = login(LOOK_ALIKE, look_alike_password)
-rows.append(("the look-alike logs in with its own password", response.status_code,
-             identity(session), whoami(session)))
+rows.append(
+    (
+        "the look-alike logs in with its own password",
+        response.status_code,
+        identity(session),
+        whoami(session),
+    )
+)
 
 session, response = login(OLDER, older_password)
-rows.append(("the older account logs in", response.status_code,
-             identity(session), whoami(session)))
+rows.append(
+    (
+        "the older account logs in",
+        response.status_code,
+        identity(session),
+        whoami(session),
+    )
+)
 
-response = admin.post(f"{BASE}/api2/user/invite", json=[{"name": "Again", "email": MIXED.upper()}])
+response = admin.post(
+    f"{BASE}/api2/user/invite", json=[{"name": "Again", "email": MIXED.upper()}]
+)
 pending = subprocess.run(
-    ["docker", "exec", WEB, "python", "-c",
-     "import sys; from sqlalchemy import create_engine, text; import os; "
-     "e = create_engine(os.environ['SQLALCHEMY_DATABASE_URI']); "
-     "print(e.execute(text('select count(*) from \"user\" where lower(username) = lower(:u)'), u=sys.argv[1]).scalar())",
-     MIXED],
-    check=True, capture_output=True, text=True,
+    [
+        "docker",
+        "exec",
+        WEB,
+        "python",
+        "-c",
+        "import sys; from sqlalchemy import create_engine, text; import os; "
+        "e = create_engine(os.environ['SQLALCHEMY_DATABASE_URI']); "
+        "print(e.execute(text('select count(*) from \"user\" where lower(username) = lower(:u)'), u=sys.argv[1]).scalar())",
+        MIXED,
+    ],
+    check=True,
+    capture_output=True,
+    text=True,
 ).stdout.strip()
-rows.append((f"admin invites {MIXED.upper()} (exists as {MIXED})", response.status_code,
-             "", f"accounts equal to it ignoring case: {pending}"))
+rows.append(
+    (
+        f"admin invites {MIXED.upper()} (exists as {MIXED})",
+        response.status_code,
+        "",
+        f"accounts equal to it ignoring case: {pending}",
+    )
+)
 
 print(f"| Step (run `{LABEL}`) | Status | JWT identity | Signed in as |")
 print("|---|---|---|---|")

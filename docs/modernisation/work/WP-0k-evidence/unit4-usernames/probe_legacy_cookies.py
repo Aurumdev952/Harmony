@@ -18,7 +18,7 @@ BASE = "http://127.0.0.1:58841"
 
 
 def jwt_key():
-    with open("/tmp/wp0k-stack/stack.env") as env:
+    with open("/tmp/wp0k-stack/stack.env") as env:  # noqa: S108 (the local probe stack's env file)
         for line in env:
             if line.startswith("JWT_SECRET_KEY="):
                 return line.strip().split("=", 1)[1]
@@ -28,8 +28,13 @@ def jwt_key():
 def legacy_cookie(identity):
     now = int(time.time())
     claims = {
-        "iat": now, "nbf": now, "jti": str(uuid.uuid4()), "exp": now + 3600,
-        "identity": identity, "fresh": False, "type": "access",
+        "iat": now,
+        "nbf": now,
+        "jti": str(uuid.uuid4()),
+        "exp": now + 3600,
+        "identity": identity,
+        "fresh": False,
+        "type": "access",
         "user_claims": {"needs": ["*"], "query_needs": ["*"], "remember_me": False},
     }
     token = jwt.encode(claims, jwt_key(), algorithm="HS256")
@@ -37,7 +42,9 @@ def legacy_cookie(identity):
 
 
 def whoami(identity):
-    page = requests.get(f"{BASE}/overview", cookies={"accessKey": legacy_cookie(identity)}).text
+    page = requests.get(
+        f"{BASE}/overview", cookies={"accessKey": legacy_cookie(identity)}, timeout=30
+    ).text
     match = re.search(r'"username": "([^"]+)"', page)
     return match.group(1) if match else "(not signed in)"
 

@@ -91,6 +91,15 @@ None. The suite is written against today's Flask path and later re-pointed at `h
     - Lint: `ci/lint_python.sh mig/integration` exit 0. The tree-wide E9/F63/F7/F82 check is clean, and ruff check and format are clean on the 19 changed files.
     - Types: `uv run --locked mypy` gives "Success: no issues found in 517 source files".
     - Fresh stack (`evidence_run.sh`, project `harmony-wp2b-qafinal`, port 58780, on a no-commit trial merge of 2e58b75 that was aborted afterwards): the whole suite gave 5255 passed, then `-m authz_http` gave 580 and 580. Leftovers: users=0 groups=0 authz_roles=0 saved_queries=0 api_tokens=0.
+- 2026-10-05 qa: security's Low on 7933e17. The old 401-before-save assert was the only pin for "a token id with no `api_token` row gets 401", and a server that accepts row-less tokens passed the new test. Added `test_api_token_without_a_row_is_refused_for_a_recreated_username`:
+  - issue a token, delete the user (the token rows cascade), and recreate the same username;
+  - the old bearer gets 401;
+  - control: a token issued to the recreated user gets 200.
+
+  The old bearer is never used before the delete, so no memoised validity hides the missing row.
+  - Checks: `ruff check` and `ruff format --check` clean. On a fresh stack (`harmony-wp2b-qafinal`, port 58780, trial merge of WP-2c 2e58b75, aborted afterwards), `-m authz_http -k test_api_tokens` gave 2 passed.
+  - Mutant: a copy that uses the bearer once before the delete gets 200 at the 401 assert, so the assert catches a row-less token being accepted. The mutant was untracked and deleted after the run.
+  - That mutant also exposed T1 (below, for security triage).
 
 ## Evidence
 
@@ -175,6 +184,11 @@ Two more, found by calling the production functions, pinned as today:
 
 - **Alert `read_via`.** `AlertNotificationResource` read: the SQL list filter joins on the parent alert definition's `authorization_resource_id` (correct), but the item-level check (`HybridRelationshipNeed.__call__`) reads the parent's own primary key. No HTTP path evaluates the item check today. Owner accept until WP-5f; WP-4e's `can()` models it as the parent alert's resource. Pinned by `test_alert_notification_item_check_uses_the_parent_primary_key`.
 - **Superuser tokens ignore their own `query_needs`.** A `needs: ['*']` token keeps `RoleNeed('admin')`, so its `query_needs` never reach the filter and the query is unfiltered. Owner WP-4e; issuance WP-5d. Pinned by `superuser_token_ignores_its_own_query_needs` and `..._via_group_...`.
+- **T1 (found 2026-10-05, not yet triaged). A deleted user's recently used API token stays valid for up to 10 minutes, and it signs in as anyone who gets the same username.**
+  - **Cause:** `login_from_request` memoises `check_token_validity` by token id (`CACHE_DEFAULT_TIMEOUT` is 10 minutes). Only `update_user_api_tokens` clears that memo. Deleting the user cascades the `api_token` rows but leaves a cached `True`.
+  - **Effect:** the JWT identity is the username, so if an account with the same username is created within the window, the old token authenticates as the new account.
+  - **Reproduce:** the memo-warming mutant of `test_api_token_without_a_row_is_refused_for_a_recreated_username`, which uses the bearer once before the delete, gets 200 instead of 401.
+  - **Not pinned:** the outcome depends on cache timing. Suggested owner: WP-5d (tokens). Security to triage.
 
 ### Security triage (from the WP-2b security review, 2026-10-05)
 
@@ -226,3 +240,7 @@ Owners are the WPs that resolve each finding; "accept until phase N" means recor
 | security | approved | 2026-10-05 | 2026-10-05 sec-2b round 3 at f2e04ac: F1-F7 closed; pure layer 4675 under two seeds; live 580 twice on a private stack; on integration plus WP-0h's dc65f70 production diff exactly the 10 intended pins fail (8 to 403, 2 role rows survive) and everything else passes; nine server-side mutants each fail only their own pin (silent policy drop, policies and export kept on PATCH, unlink instead of delete on both /roles routes, revocation ignored, unsaved token accepted, cache not cleared, url removed from rendering params); /roles empty map confirmed Medium (a user_admin can delete _default_role for the whole deployment); semgrep registry, Trail of Bits and elttam clean bar the known loopback false positive; token-leak rules 13 false positives; ownership clean. Low for qa when flipping the WP-0h pins: _delete_if_present (test_escalation.py:66-68) must accept 200 (admin DELETE /api2/role returns 200) or the flipped empty-map pins fail in cleanup; ALL_VALUES_POLICIES labels at :23-36 are not stable across fresh stacks (comment that only the URIs matter). Hypothesis's own dependencies remain unpinned until WP-2f's dev group. |
 
 After these verdicts, 7933e17 changed one live pin (`test_api_tokens.py`) to follow WP-2c's F12 fix (log, 2026-10-05 final). This change is part of the merge with WP-2c, and the reviewer and security have not seen it. A short acknowledgement from each is requested before the integration merge.
+
+- Security acknowledged 7933e17 (approval stands) and raised one Low: no pin covered a row-less token. That pin is now added (log, 2026-10-05).
+- Reviewer acknowledgement is pending.
+- T1 still needs security triage.

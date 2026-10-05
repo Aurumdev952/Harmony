@@ -61,3 +61,29 @@ def test_api_token_authenticates_from_issue_until_revoked(stack):
     _save_tokens(stack, holder, [{**saved, 'isRevoked': True}])
     assert stack.request(bearer, 'GET', PROBE).status_code == 401
     assert _stored_tokens(stack, holder) == [(issued['id'], True)]
+
+
+def test_api_token_without_a_row_is_refused_for_a_recreated_username(stack):
+    '''A token whose id has no api_token row gets 401, even though its identity
+    (the username) resolves to a live user. Deleting the user cascades its token
+    rows; recreating the username gives the old token a user but no row. The
+    bearer is never used before the delete, so no memoised validity hides the
+    missing row.'''
+    original = stack.ensure_user('token-orphan', [])
+    issued = stack.admin_json('POST', f'{original.user_uri}/generate_api_token')
+    stack.admin_json('DELETE', original.user_uri)
+
+    recreated = stack.ensure_user('token-orphan', [])
+    assert recreated.user_uri != original.user_uri
+    assert _stored_tokens(stack, recreated) == []
+
+    orphan = new_session()
+    orphan.headers['Authorization'] = f'Bearer {issued["token"]}'
+    assert stack.request(orphan, 'GET', PROBE).status_code == 401
+
+    # Control: a token issued to the recreated user is accepted, so the 401
+    # above comes from the missing row, not from the user or the signing key.
+    fresh = stack.admin_json('POST', f'{recreated.user_uri}/generate_api_token')
+    bearer = new_session()
+    bearer.headers['Authorization'] = f'Bearer {fresh["token"]}'
+    assert stack.request(bearer, 'GET', PROBE).status_code == 200

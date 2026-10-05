@@ -191,11 +191,9 @@ def test_output_over_the_size_limit_is_refused(client, renderer, monkeypatch):
 
 @pytest.fixture(name='app_log')
 def fixture_app_log(caplog):
-    # The app logger does not propagate to the root logger caplog listens on.
-    logger = logging.getLogger('ZenysisLogger')
-    logger.addHandler(caplog.handler)
-    yield caplog
-    logger.removeHandler(caplog.handler)
+    # The app logger propagates to the root logger caplog listens on (WP-2g).
+    caplog.set_level(logging.INFO, logger='ZenysisLogger')
+    return caplog
 
 
 def test_a_failed_render_is_logged_without_the_token(

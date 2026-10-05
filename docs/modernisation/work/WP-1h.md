@@ -323,6 +323,14 @@ C-5 (session and JWT format, owned by backend). Old: a render token was a plain 
 - 2026-10-06 backend-8 R2-9: security approved round 2 at 20e5c0e (sec-1h; the lead records the cell) and left two non-blocking notes.
   - **Note 1, fixed.** After a late answer, `run_isolated` could wait one more grace period for the child to exit. That pushed the slot release to the watchdog's stuck threshold of deadline + 2 × grace. The wait for the child to exit is now bounded by the time left before deadline + grace, so the watchdog keeps a full grace period of margin. check: `test_a_late_answer_still_frees_the_slot_by_the_deadline_plus_grace` (an answer at 2.6 s of a 3.0 s limit, then a child that cannot exit) failed, then passed. `tests/worker` on the host: 150 passed, 1 skipped. The in-image suite on a fresh head image under full hardening: 176 passed, 0 skipped; the images were deleted afterwards. ruff and mypy are clean.
   - **Note 2, for the reviewer.** An uncached thumbnail retrieve holds a web worker for up to 10 s while it waits for the slot. The web app runs gunicorn's gevent workers, so that wait is a cooperative sleep, not a held OS thread. It is an availability cost only.
+- 2026-10-06 backend-8 R3-1 (reviewer round 2): merged `mig/integration` bc5cb2d in 1d9f915. That brings in WP-0i, 0h, 2b, 2c, 2g, 4a and 8a. The resolutions follow the reviewer:
+  - `config/settings.py` keeps integration's `DRUID_HOST` and `DRUID_LAST_VALUE` and drops `RENDERBOT_EMAIL` and `URLBOX_API_KEY`;
+  - `pyproject.toml` mypy `files` keeps `harmony`, and `plugins` keeps `pydantic.mypy`;
+  - `docker-compose.yaml` web keeps `LOG_FORMAT` and `LOG_STREAM` as well as `RENDERER_URL`, `RENDER_WEB_ORIGIN` and the networks;
+  - `tests/web/test_redis_password.py` auto-merged to integration's `bare_flask_app` side;
+  - the backend and infra memory indexes are unions.
+
+  WP-2g's `ZenysisLogger` propagates to root, so `test_export_renderer.py`'s `app_log` fixture captured every line twice and 5 log tests failed. The fixture now only sets the level. check: `tests/web/render` 5 failed after the merge, then 241 passed, 1 xfailed; `tests/web` 381 passed, 1 xfailed.
 
 ## Evidence
 

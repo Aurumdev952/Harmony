@@ -162,6 +162,75 @@ def test_a_plain_http_fetch_from_an_allowed_origin_is_relayed_without_credential
     assert not [line for line in lines if line.lower().startswith('proxy-')]
 
 
+class KeptAliveUpstream:
+    """A map server that ignores `Connection: close`: it answers the first request
+    and keeps reading, recording every byte that reaches it."""
+
+    def __init__(self) -> None:
+        self.received = b''
+        self.server = socket.create_server(('127.0.0.1', 0))
+        self.port = self.server.getsockname()[1]
+        threading.Thread(target=self._serve, daemon=True).start()
+
+    def _serve(self) -> None:
+        connection, _ = self.server.accept()
+        connection.settimeout(3)
+        answered = False
+        with connection:
+            while True:
+                try:
+                    data = connection.recv(65536)
+                except OSError:
+                    return
+                if not data:
+                    return
+                self.received += data
+                if not answered and b'\r\n\r\n' in self.received:
+                    answered = True
+                    connection.sendall(
+                        b'HTTP/1.1 200 OK\r\nContent-Length: 5\r\n'
+                        b'Connection: keep-alive\r\n\r\nstyle'
+                    )
+
+    def close(self) -> None:
+        self.server.close()
+
+
+def test_a_second_request_on_a_kept_alive_connection_never_reaches_the_map_origin():
+    # Found by security review: after the first relayed request the proxy copied
+    # the client's later bytes upstream raw, Cookie included.
+    upstream = KeptAliveUpstream()
+    try:
+        with proxying(f'http://127.0.0.1:{upstream.port}') as port:
+            with socket.create_connection(('127.0.0.1', port), timeout=5) as client:
+                client.sendall(
+                    f'GET http://127.0.0.1:{upstream.port}/styles HTTP/1.1\r\n'
+                    f'Host: 127.0.0.1:{upstream.port}\r\n\r\n'.encode()
+                )
+                first = client.recv(65536)
+                client.sendall(
+                    f'GET http://127.0.0.1:{upstream.port}/tiles HTTP/1.1\r\n'
+                    f'Host: 127.0.0.1:{upstream.port}\r\n'
+                    'Cookie: accessKey=eyJ.secret\r\n\r\n'.encode()
+                )
+                rest = b''
+                try:
+                    while chunk := client.recv(65536):
+                        rest += chunk
+                except OSError:
+                    pass
+    finally:
+        upstream.close()
+
+    assert status_of(first) == 200
+    assert first.endswith(b'Connection: close\r\n\r\nstyle')
+    assert b'keep-alive' not in first
+    assert b'/styles' in upstream.received
+    assert b'/tiles' not in upstream.received
+    assert b'accessKey' not in upstream.received
+    assert b'Cookie' not in upstream.received
+
+
 @pytest.mark.parametrize(
     'request_line',
     [

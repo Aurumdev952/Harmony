@@ -5,7 +5,8 @@ on the internal render network and on a network with a route out, so the
 renderer keeps none of its own. Chromium sends every connection that is not to
 the dashboard origin here. A CONNECT to an allowed https origin is tunnelled, and
 a plain GET or HEAD from an allowed http origin is relayed without cookies or
-credentials. Everything else is refused before any connection is made.
+credentials, one request per connection. Everything else is refused before any
+connection is made.
 '''
 
 import json
@@ -40,6 +41,11 @@ DROPPED_HEADERS = {
     'authorization',
 }
 
+# Replaced with `Connection: close` in a relayed response, so the client never
+# sends a second request on the connection.
+HOP_BY_HOP_RESPONSE_HEADERS = {b'connection', b'keep-alive', b'proxy-connection'}
+MAX_RESPONSE_HEAD_BYTES = 64 * 1024
+
 Origin = tuple[str, str, int]
 
 
@@ -63,6 +69,53 @@ def _relay(client: socket.socket, upstream: socket.socket) -> None:
                 if not data:
                     return
                 key.data.sendall(data)
+
+
+def _with_connection_close(head: bytes) -> bytes:
+    '''A response head whose connection headers say `Connection: close`.'''
+    lines = head.split(b'\r\n')
+    kept = [
+        line
+        for line in lines[1:]
+        if line.split(b':', 1)[0].strip().lower() not in HOP_BY_HOP_RESPONSE_HEADERS
+    ]
+    return b'\r\n'.join([lines[0], *kept, b'Connection: close'])
+
+
+def _relay_one_response(client: socket.socket, upstream: socket.socket) -> None:
+    '''Copies the upstream's answer to the client, telling the client to close.
+
+    Nothing more from the client is relayed: a later request on a kept-alive
+    connection would reach the map origin with its headers unfiltered. Any byte
+    or close from the client ends the relay.
+    '''
+    pending = b''
+    head_sent = False
+    with selectors.DefaultSelector() as selector:
+        selector.register(client, selectors.EVENT_READ)
+        selector.register(upstream, selectors.EVENT_READ)
+        while True:
+            ready = selector.select(IDLE_TIMEOUT_SECONDS)
+            if not ready:
+                return
+            for key, _ in ready:
+                if key.fileobj is client:
+                    return
+                data = upstream.recv(65536)
+                if not data:
+                    if pending:
+                        client.sendall(pending)
+                    return
+                if head_sent:
+                    client.sendall(data)
+                    continue
+                pending += data
+                head, separator, body = pending.partition(b'\r\n\r\n')
+                if separator:
+                    client.sendall(_with_connection_close(head) + separator + body)
+                    head_sent = True
+                elif len(pending) > MAX_RESPONSE_HEAD_BYTES:
+                    return
 
 
 def _connect_origin(target: str) -> Optional[Origin]:
@@ -162,7 +215,7 @@ def build_proxy(settings: EgressProxySettings) -> ThreadingHTTPServer:
             with upstream:
                 upstream.sendall(('\r\n'.join(head) + '\r\n\r\n').encode('latin-1'))
                 self.close_connection = True
-                _relay(self.connection, upstream)
+                _relay_one_response(self.connection, upstream)
 
         do_GET = _fetch  # noqa: N815
         do_HEAD = _fetch  # noqa: N815

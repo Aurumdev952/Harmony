@@ -127,40 +127,76 @@ def test_text_line_is_readable_with_context():
     assert bound.endswith(': hello world [request_id=abc123]'), bound
 
 
-@pytest.mark.parametrize(
-    'raw, secret',
-    [
-        ('Authorization: Bearer abc.def-ghi', 'abc.def-ghi'),
-        ('headers {"Authorization": "Basic dXNlcjpodW50ZXIy"}', 'dXNlcjpodW50ZXIy'),
-        ('got bearer s3cr3tT0ken', 's3cr3tT0ken'),
-        (
-            'jwt eyJhbGciOiJIUzI1NiJ9.eyJzdWIiOiJ4In0.c2lnbmF0dXJlLXZhbHVl here',
-            'eyJzdWIiOiJ4In0',
-        ),
-        ('broker redis://:hunter2@redis:6379/0', 'hunter2'),
-        ('db postgresql://zen:hunter2@db/zenysis', 'hunter2'),
-        ('Cookie: accessKey=abc123; session=def456', 'abc123'),
-        ('set accessKey=abc123; Path=/', 'abc123'),
-        ("kwargs {'email_host_password': 'hunter2', 'port': 25}", 'hunter2'),
-        ('JWT_SECRET_KEY=hunter2hunter2', 'hunter2hunter2'),
-        ('GET /user/register?token=InviteTok.abc&next=/', 'InviteTok.abc'),
-        ('GET /user/reset-password/ResetTok.abc.def HTTP/1.1', 'ResetTok.abc.def'),
-        ('password: hunter2', 'hunter2'),
-        ("{'api_key': 'k-123'}", 'k-123'),
-        ('X-Hasura-Admin-Secret: adm1n', 'adm1n'),
-        # gunicorn body-parsing errors, as they appear in app tracebacks.
-        ('NoMoreData: No more data after: b\'{"note": "b0dy"}\'', 'b0dy'),
-        ("InvalidChunkSize: Invalid chunk size: b'b0dy'", 'b0dy'),
-        (
-            "Invalid chunk terminator is not '\\r\\n': b'b0dy\\r\\nmore'",
-            'b0dy',
-        ),
-    ],
-)
+_SECRETS = [
+    ('Authorization: Bearer abc.def-ghi', 'abc.def-ghi'),
+    ('headers {"Authorization": "Basic dXNlcjpodW50ZXIy"}', 'dXNlcjpodW50ZXIy'),
+    ('got bearer s3cr3tT0ken', 's3cr3tT0ken'),
+    (
+        'jwt eyJhbGciOiJIUzI1NiJ9.eyJzdWIiOiJ4In0.c2lnbmF0dXJlLXZhbHVl here',
+        'eyJzdWIiOiJ4In0',
+    ),
+    ('broker redis://:hunter2@redis:6379/0', 'hunter2'),
+    ('db postgresql://zen:hunter2@db/zenysis', 'hunter2'),
+    ('Cookie: accessKey=abc123; session=def456', 'abc123'),
+    ('Cookie: theme=dark; sid=s3cr3t', 's3cr3t'),
+    ('set accessKey=abc123; Path=/', 'abc123'),
+    ('redirect with session=abc123&next=/', 'abc123'),
+    ("kwargs {'email_host_password': 'hunter2', 'port': 25}", 'hunter2'),
+    ('JWT_SECRET_KEY=hunter2hunter2', 'hunter2hunter2'),
+    ('GET /user/register?token=InviteTok.abc&next=/', 'InviteTok.abc'),
+    ('GET /user/reset-password/ResetTok.abc.def HTTP/1.1', 'ResetTok.abc.def'),
+    ('password: hunter2', 'hunter2'),
+    ("{'api_key': 'k-123'}", 'k-123'),
+    ('X-Hasura-Admin-Secret: adm1n', 'adm1n'),
+    # Quoted values run to the closing quote, through spaces and semicolons.
+    ('password="hunter two"', 'two'),
+    ('{"password": "a;b c", "user": "x"}', 'b c'),
+    ("{'api_key': 'k 1;2'}", '1;2'),
+    (r'{"token": "a\"b c"}', 'b c'),
+    # A Basic credential with no header name in front of it.
+    ('auth failed for Basic dXNlcjpodW50ZXIy', 'dXNlcjpodW50ZXIy'),
+    # Headers as (name, value) tuples, and the WSGI environ.
+    (
+        "[('Authorization', 'Basic dXNlcjpodW50ZXIy'), ('Host', 'x')]",
+        'dXNlcjpodW50ZXIy',
+    ),
+    ("[('X-Api-Key', 'k-123')]", 'k-123'),
+    ("[(b'authorization', b'Token abc123')]", 'abc123'),
+    ("[('Cookie', 'theme=dark; sid=s3cr3t')]", 's3cr3t'),
+    ("{'HTTP_COOKIE': 'theme=dark; sid=s3cr3t'}", 's3cr3t'),
+    # gunicorn body-parsing errors, as they appear in app tracebacks.
+    ('NoMoreData: No more data after: b\'{"note": "b0dy"}\'', 'b0dy'),
+    ("InvalidChunkSize: Invalid chunk size: b'b0dy'", 'b0dy'),
+    (
+        "Invalid chunk terminator is not '\\r\\n': b'b0dy\\r\\nmore'",
+        'b0dy',
+    ),
+    # The ValueError that InvalidChunkSize is raised from, chained in tracebacks.
+    ("ValueError: invalid literal for int() with base 16: b'b0dy1zz'", 'b0dy1zz'),
+]
+
+
+@pytest.mark.parametrize('raw, secret', _SECRETS)
 def test_redact_removes_secret_values(raw, secret):
     redacted = redact(raw)
     assert secret not in redacted, redacted
     assert '[REDACTED]' in redacted
+
+
+@pytest.mark.parametrize('formatter', [JsonFormatter, TextFormatter])
+@pytest.mark.parametrize('raw, secret', _SECRETS)
+def test_formatted_lines_carry_no_secret_values(formatter, raw, secret):
+    line = formatter().format(_record('%s', (raw,)))
+    assert secret not in line, line
+
+
+@pytest.mark.parametrize('formatter', [JsonFormatter, TextFormatter])
+def test_stack_info_is_redacted(formatter):
+    record = _record()
+    record.stack_info = 'Stack (most recent call last):\n  login(password=hunter2)'
+    line = formatter().format(record)
+    assert 'hunter2' not in line, line
+    assert 'login(password=[REDACTED]' in line, line
 
 
 @pytest.mark.parametrize(
@@ -171,6 +207,9 @@ def test_redact_removes_secret_values(raw, secret):
         'Database schema version is: 9a628ffd6795',
         'User \'7\' logged in',
         'GET /api/v1/query 200',
+        # Only a Basic value that decodes to user:password is a credential.
+        'Basic auth is disabled',
+        'basic configuration loaded',
         # Query strings are stripped only from gunicorn's client URIs.
         'Fetching http://druid:8082/druid/v2/?pretty',
     ],
@@ -311,6 +350,10 @@ _HOSTILE = {
     'jwt': 'eyJ-' * 2000,
     'slashes': '/' * 8000,
     'segments': 'a/' * 4000,
+    'quoted': "token='" * 1142,
+    'tuples': "'token', " * 800,
+    'basic': 'Basic ' + 'A' * 8000,
+    'cookies': 'HTTP_COOKIE_' * 666,
 }
 
 

@@ -17,6 +17,8 @@ a log call by mistake, not a licence to log them.
 
 from __future__ import annotations
 
+import base64
+import binascii
 import json
 import logging
 import logging.config
@@ -26,7 +28,18 @@ import sys
 import threading
 from datetime import datetime, timezone
 from types import TracebackType
-from typing import Any, Dict, Mapping, Optional, Tuple, Type
+from typing import (
+    Any,
+    Callable,
+    Dict,
+    Mapping,
+    Match,
+    Optional,
+    Pattern,
+    Tuple,
+    Type,
+    Union,
+)
 
 from log import context
 
@@ -49,7 +62,31 @@ _SENSITIVE_WORD = (
 )
 # A whole run of word characters and hyphens that names a secret.
 _SENSITIVE_KEY = r'(?<![\w-])(?=[\w-]*?' + _SENSITIVE_WORD + r')(?=([\w-]+))\2'
-_REDACTIONS = (
+# key=value, key: value, 'key': 'value' and the header tuple ('key', 'value').
+_SEPARATOR = r'(?:["\']?\s*[:=]|["\']\s*,)\s*'
+# A quoted value runs to its closing quote; `b` prefixes a bytes literal.
+_QUOTED = r'b?"(?:[^"\\\r\n]|\\.)*|b?\'(?:[^\'\\\r\n]|\\.)*'
+_OPENING_QUOTE = re.compile(r'b?["\']', re.IGNORECASE)
+
+
+def _redact_value(match: Match[str]) -> str:
+    opening = _OPENING_QUOTE.match(match.group(3))
+    return match.group(1) + (opening.group() if opening else '') + REDACTED
+
+
+def _redact_basic_credentials(match: Match[str]) -> str:
+    '''Redact a Basic value only when it decodes to user:password, so prose like
+    "Basic auth is disabled" stays readable.'''
+    try:
+        decoded = base64.b64decode(match.group(2), validate=True)
+    except binascii.Error:
+        return match.group()
+    return match.group(1) + REDACTED if b':' in decoded else match.group()
+
+
+_REDACTIONS: Tuple[
+    Tuple[Pattern[str], Union[str, Callable[[Match[str]], str]]], ...
+] = (
     # scheme://user:password@host
     (
         re.compile(
@@ -57,16 +94,20 @@ _REDACTIONS = (
         ),
         r'\1' + REDACTED + '@',
     ),
-    # key=value, key: value, 'key': 'value' and "key": "Basic value"
     (
         re.compile(
-            r'(?i)(["\']?' + _SENSITIVE_KEY + r'["\']?\s*[:=]\s*["\']?)'
-            r'(?:(?:bearer|basic|digest|token)\s+)?(?!\[REDACTED\])[^\s"\',;&)}\]]+'
+            r'(?i)(["\']?' + _SENSITIVE_KEY + _SEPARATOR + r')(?!b?["\']?\[REDACTED\])'
+            r'(' + _QUOTED + r'|(?:(?:bearer|basic|digest|token)\s+)?'
+            r'[^\s"\',;&)}\]]+)'
         ),
-        r'\1' + REDACTED,
+        _redact_value,
     ),
+    # Cookie headers in any form, including the WSGI environ's HTTP_COOKIE.
     (
-        re.compile(r'(?i)\b((?:set-)?cookie["\']?\s*[:=]\s*["\']?)[^\r\n"\']+'),
+        re.compile(
+            r'(?i)(?<![a-z0-9])((?:set-)?cookie' + _SEPARATOR + r'b?["\']?)'
+            r'[^\r\n"\']+'
+        ),
         r'\1' + REDACTED,
     ),
     (
@@ -80,6 +121,10 @@ _REDACTIONS = (
         r'\1' + REDACTED,
     ),
     (
+        re.compile(r'(?i)(?<![\w-])(basic\s+)([A-Za-z0-9+/]+={0,2})'),
+        _redact_basic_credentials,
+    ),
+    (
         re.compile(
             r'(?<![A-Za-z0-9_-])eyJ[A-Za-z0-9_-]+\.eyJ[A-Za-z0-9_-]+\.[A-Za-z0-9_-]*'
         ),
@@ -91,11 +136,12 @@ _REDACTIONS = (
         r'\1' + REDACTED,
     ),
     # gunicorn's body-parsing errors repeat the request body bytes they choked on,
-    # in its own lines and in app tracebacks alike.
+    # in its own lines and in app tracebacks alike. InvalidChunkSize is raised from
+    # int(size, 16), whose ValueError is chained into the same traceback.
     (
         re.compile(
-            r'(No more data after|Invalid chunk size|Invalid chunk terminator[^:\n]*)'
-            r': [^\n]+'
+            r'(No more data after|Invalid chunk size|Invalid chunk terminator[^:\n]*'
+            r'|invalid literal for int\(\) with base 16): [^\n]+'
         ),
         r'\1: ' + REDACTED,
     ),

@@ -7,12 +7,16 @@ Sessions are named by the cases. The prefix decides how they authenticate:
               authenticates today;
   anonymous*  no credentials.
 A case that would change its session (logging in or out) uses its own name.
+
+A case with ``seed`` first runs ``stack/stack.sh seed <args>`` against the
+compose project in CONTRACT_PROJECT (``stack.sh env`` exports it).
 """
 
 from __future__ import annotations
 
 import json
 import os
+import subprocess
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any
@@ -30,6 +34,19 @@ from .cases import (
 )
 
 TIMEOUT_SECONDS = 300
+STACK_SCRIPT = Path(__file__).parent / "stack" / "stack.sh"
+
+
+def seed_stack(args: list[str]) -> None:
+    done = subprocess.run(  # noqa: S603 - a fixed script; arguments come from case files
+        [str(STACK_SCRIPT), "seed", *args],
+        capture_output=True,
+        text=True,
+        timeout=TIMEOUT_SECONDS,
+        check=False,
+    )
+    if done.returncode:
+        raise RuntimeError(f"stack.sh seed {' '.join(args)}: {done.stderr.strip()}")
 
 
 @dataclass
@@ -109,6 +126,8 @@ class Runner:
         missing = [p for p in placeholders(case) if p not in self.captures]
         if missing:
             raise SkipCase(f"{case.id} needs {missing}, which no earlier case captured")
+        if case.seed:
+            seed_stack([str(arg) for arg in substitute(list(case.seed), self.captures)])
         path = substitute(case.path, self.captures)
         query = substitute(dict(case.query), self.captures)
         query = {

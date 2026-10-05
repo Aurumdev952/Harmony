@@ -9,6 +9,7 @@ from .cases import (
     describe_set_cookie,
     observe,
     pin_value,
+    placeholders,
     substitute,
 )
 from .runner import Credentials
@@ -204,3 +205,21 @@ def test_a_replay_reports_an_unsafe_pinned_value_without_echoing_it():
         "pinned /owner: 'team-a' != '<not shown: a value looks like email>'",
     ]
     assert "someone" not in " ".join(problems)
+
+
+def test_a_seed_step_waits_for_the_captures_it_names():
+    case = make_case(seed=["thumbnail", "{dashboard_resource_id}"])
+    assert list(placeholders(case)) == ["dashboard_resource_id"]
+    assert substitute(list(case.seed), {"dashboard_resource_id": 12}) == [
+        "thumbnail",
+        12,
+    ]
+
+
+def test_a_root_pin_tells_a_cached_string_from_an_empty_one():
+    case = make_case(pin=[""])
+    recorded = observe(case, 200, JSON, b'"iVBORw0K"', recording=True)
+    assert compare(recorded, observe(case, 200, JSON, b'"iVBORw0K"')) == []
+    assert compare(recorded, observe(case, 200, JSON, b'""')) == [
+        "pinned : 'iVBORw0K' != ''"
+    ]

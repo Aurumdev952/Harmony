@@ -28,8 +28,9 @@ from .inventory import load_inventory, load_relay_operations
 def dry_run(cases: list[Case]) -> int:
     for case in cases:
         body = "multipart" if case.files else ("json" if case.body is not None else "-")
+        seed = f" seed={list(case.seed)}" if case.seed else ""
         print(
-            f"{case.id:56} {case.session:14} {case.method:6} {case.path} query={dict(case.query)} body={body}"
+            f"{case.id:56} {case.session:14} {case.method:6} {case.path} query={dict(case.query)} body={body}{seed}"
         )
     problems = catalogue.all_problems(cases, load_inventory(), load_relay_operations())
     for problem in problems:

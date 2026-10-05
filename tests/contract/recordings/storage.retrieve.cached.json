@@ -2,7 +2,9 @@
   "content_type": "application/json",
   "headers": [],
   "id": "storage.retrieve.cached",
-  "pinned": {},
+  "pinned": {
+    "": "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR4nGNgAAACAAFUok9dAAAAAElFTkSuQmCC"
+  },
   "response_schema": {
     "type": "string"
   },

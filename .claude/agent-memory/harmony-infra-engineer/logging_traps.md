@@ -9,6 +9,7 @@ metadata:
 - **Celery 5.4 writes plain text to stdout** outside logging: the banner (stopped by the global `-q`, which must come before `worker`) and, on SIGTERM, `worker: Warm shutdown (MainProcess)`, which no option stops.
 - **`--loglevel` on the worker is ignored** once `log.celery_signals` connects `setup_logging`; `LOG_LEVEL` applies. The old production config logged `ZenysisLogger` at DEBUG, so the INFO default drops those lines.
 - **nginx-proxy 1.11.6 passes a client `X-Request-ID` through** unchanged and sets none of its own.
+- **Decisions at close-out (2026-10-05):** `LOG_LEVEL=DEBUG` stays a root level (documented, not scoped to `ZenysisLogger`) so library debugging still works. A key that is also an English word (`session`) is redacted only when quoted, since `session:` appears in prose. Newline escaping in the `text` format was deferred to WP-5a as optional.
 
 **Why:** the reviewer and QA found each of these in WP-2g's first review round (2026-10-05).
 **How to apply:** check these before changing `log/config.py`, the worker command or nginx logging. See [[infra-tooling-traps]].

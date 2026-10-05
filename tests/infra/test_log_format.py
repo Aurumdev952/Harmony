@@ -155,6 +155,9 @@ _SECRETS = [
     ('{"session": "abc123"}', 'abc123'),
     ("[('session', 'abc123')]", 'abc123'),
     ('{"session": abc123}', 'abc123'),
+    # A capitalised auth scheme before an unquoted value.
+    ('"session": Bearer opaqueTOKEN123', 'opaqueTOKEN123'),
+    ("('session', Basic dXNlcjpodW50ZXIy)", 'dXNlcjpodW50ZXIy'),
     ('remember_token=rem123; Path=/', 'rem123'),
     ('csrf_access_token=csrf123&next=/', 'csrf123'),
     ("kwargs {'email_host_password': 'hunter2', 'port': 25}", 'hunter2'),

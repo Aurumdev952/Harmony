@@ -77,7 +77,7 @@ _OPENING_QUOTE = re.compile(r'b?["\']', re.IGNORECASE)
 # The value after a separator, unless an earlier pattern already redacted it.
 _VALUE = (
     r'(?!b?["\']?\[REDACTED\])(?P<value>' + _QUOTED + r'|'
-    r'(?:(?:bearer|basic|digest|token)\s+)?[^\s"\',;&)}\]]+)'
+    r'(?:(?i:bearer|basic|digest|token)\s+)?[^\s"\',;&)}\]]+)'
 )
 
 

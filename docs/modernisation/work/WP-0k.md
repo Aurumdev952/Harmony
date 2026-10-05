@@ -22,7 +22,7 @@ instances:
       - docs/modernisation/work/WP-0k-evidence/**
       - .claude/agent-memory/harmony-backend-engineer/**
 branch: "mig/WP-0k-configured-links-exact-usernames"
-requirements: [SEC-7]
+requirements: []          # decision 0006 names no SEC row; INV-1 and INV-3 apply
 contracts_consumed: [C-5]
 contracts_changed: []
 security_review: true

@@ -50,6 +50,9 @@ instances:
       - tests/infra/test_renderer.py
       - ci/tools313/pyproject.toml
       - ci/tools313/uv.lock
+  - name: "qa-1h-flip"
+    files:
+      - tests/authz/test_render_routes.py
 branch: "mig/WP-1h-export-renderer"
 requirements: [SEC-7, SEC-9, SEC-10]
 contracts_consumed: []
@@ -193,7 +196,7 @@ C-5 (session and JWT format, owned by backend). Old: a render token was a plain 
 - [ ] human: render a dashboard with a map tile on a staging deployment once `render-egress` is deployed. Agents have no Mapbox access token, so the real Mapbox path is proven only up to the TLS session (unit 8c). Blocks nothing in code.
 - [ ] infra: type-check the renderer against Playwright's real types in CI (reviewer round 1, finding 5). The project lane now runs `harmony/worker` under strict per-module flags, with `playwright.*` as a missing import. Suggested: in `ci/tools313/pyproject.toml` add `playwright==1.63.0` to the lane's dependencies (the Python package only; no browsers are needed to type-check), and add `harmony/worker` to its strict `files`. The command that passes today is `uv run --no-project -p 3.12 --with playwright==1.63.0 --with mypy==1.3.0 mypy --config-file /dev/null --strict --explicit-package-bases --python-version 3.12 harmony/worker`. This blocks nothing in WP-1h.
 - [ ] infra: give `renderer` a restart policy outside prod too (for example `restart: unless-stopped` in `docker-compose.yaml`). Since R2-2, the renderer exits with status 70 when a render slot is stuck past its deadline plus two clean-up grace periods, and only prod's `restart: always` brings it back. This blocks nothing in WP-1h.
-- [ ] qa (qa-2b): when WP-1h merges, apply `WP-1h-evidence/test_render_routes.wp1h.py` as `tests/authz/test_render_routes.py` in place of WP-0i's flipped overlay (QA round 1, medium). WP-0i's overlay pins the urlbox fake, the exact pre-WP-1h claims and a `DEPLOYMENT_BASE_URL` render URL, so `tests/authz` goes red once WP-2b and the flip land. This version is QA's own scratch adaptation (`/tmp/qa1h2-ev/test_render_routes.wp1h-adapted.py`) with only the header docstring refreshed. It changes the fake to `requests.post`, accepts the two C-5 claims (`render`, `policy`) and expects `RENDER_WEB_ORIGIN`. Every status and identity expectation is unchanged. Run at the round-2 head over WP-2b's suite (39b3a64): the 18 render cases passed, and the whole no-server layer gave 4681 passed and 583 skipped (the live-stack layer), the same totals as QA's run at abda42c. This blocks nothing in WP-1h.
+- [x] qa (qa-2b): when WP-1h merges, apply `WP-1h-evidence/test_render_routes.wp1h.py` as `tests/authz/test_render_routes.py` in place of WP-0i's flipped overlay (QA round 1, medium). WP-0i's overlay pins the urlbox fake, the exact pre-WP-1h claims and a `DEPLOYMENT_BASE_URL` render URL, so `tests/authz` goes red once WP-2b and the flip land. This version is QA's own scratch adaptation (`/tmp/qa1h2-ev/test_render_routes.wp1h-adapted.py`) with only the header docstring refreshed. It changes the fake to `requests.post`, accepts the two C-5 claims (`render`, `policy`) and expects `RENDER_WEB_ORIGIN`. Every status and identity expectation is unchanged. Run at the round-2 head over WP-2b's suite (39b3a64): the 18 render cases passed, and the whole no-server layer gave 4681 passed and 583 skipped (the live-stack layer), the same totals as QA's run at abda42c. This blocks nothing in WP-1h. Done on 2026-10-06 by backend-8 on the lead's instruction, with the `mig/integration` bc5cb2d merge (instance `qa-1h-flip`, see the R3-2 log line), as WP-0i did with `qa-0i-flip`.
 
 ## Follow-ups (recorded, not done here)
 
@@ -331,6 +334,7 @@ C-5 (session and JWT format, owned by backend). Old: a render token was a plain 
   - the backend and infra memory indexes are unions.
 
   WP-2g's `ZenysisLogger` propagates to root, so `test_export_renderer.py`'s `app_log` fixture captured every line twice and 5 log tests failed. The fixture now only sets the level. check: `tests/web/render` 5 failed after the merge, then 241 passed, 1 xfailed; `tests/web` 381 passed, 1 xfailed.
+- 2026-10-06 backend-8 R3-2 (reviewer round 2, blocking, INV-8): integration's `tests/authz/test_render_routes.py` is WP-0i's flipped overlay. It patches `page_renderer.Transaction` and a urlbox `requests.get`, so on this merge it gave 8 failures (`tests/authz` 8 failed, 4673 passed, 583 skipped). It is replaced with `WP-1h-evidence/test_render_routes.wp1h.py`, minus that file's two header lines. This is the qa flip, done by backend on the lead's instruction under the instance `qa-1h-flip`, as WP-0i did with `qa-0i-flip`. The qa-2b request is ticked. check: `tests/authz` 4681 passed, 583 skipped; ruff check and format: clean.
 
 ## Evidence
 

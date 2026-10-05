@@ -1,6 +1,9 @@
 # Overlay on druid_setup/single/docker-compose.yml for the performance stack.
-# scripts/perf/stack.sh applies it; it works on the compose file before and
-# after WP-0b (published ports, DRUID_POSTGRES_PASSWORD, pinned images).
+# scripts/perf/stack.sh applies it. The metadata password reaches Druid the
+# way druid_setup ships it since WP-0b: common.env names the environment
+# variable DRUID_POSTGRES_PASSWORD, so the value never lands in
+# runtime.properties or the startup log. Do not set
+# druid_metadata_storage_connector_password here.
 #
 # What it changes, and why:
 # - No fixed container names and no published ports except coordinator, broker
@@ -39,8 +42,6 @@ services:
   postgres:
     image: postgres:17.11-bookworm@sha256:639ab7ceb90e13123085b741fb31ef493fba25463002f6da665352e7b534b652
     ports: !reset []
-    environment:
-      POSTGRES_PASSWORD: ${DRUID_POSTGRES_PASSWORD:?}
 
   memcache:
     container_name: !reset null
@@ -61,7 +62,6 @@ services:
       - perf_share:/home/share
     environment:
       <<: *perf-druid-env
-      druid_metadata_storage_connector_password: ${DRUID_POSTGRES_PASSWORD:?}
 
   broker:
     container_name: !reset null
@@ -72,7 +72,6 @@ services:
       - ${PERF_REQUEST_LOG_DIR:?}:/opt/druid/requestlogs
     environment:
       <<: *perf-druid-env
-      druid_metadata_storage_connector_password: ${DRUID_POSTGRES_PASSWORD:?}
       druid_request_logging_type: file
       druid_request_logging_dir: /opt/druid/requestlogs
 
@@ -85,7 +84,6 @@ services:
       - perf_output:/data/output
     environment:
       <<: *perf-druid-env
-      druid_metadata_storage_connector_password: ${DRUID_POSTGRES_PASSWORD:?}
       druid_segmentCache_locations: '[{"path": "/data/output/druid", "maxSize": 20000000000}]'
 
   middlemanager:
@@ -97,7 +95,6 @@ services:
       - perf_output:/data/output
     environment:
       <<: *perf-druid-env
-      druid_metadata_storage_connector_password: ${DRUID_POSTGRES_PASSWORD:?}
       druid_worker_capacity: "2"
       druid_indexer_runner_javaOptsArray: '["-server", "-Xmx1g", "-Xms256m", "-XX:MaxDirectMemorySize=1g", "-XX:+UseG1GC", "-XX:+ExitOnOutOfMemoryError", "-Ddruid.processing.buffer.sizeBytes=134217728", "-Ddruid.processing.numMergeBuffers=2", "-Ddruid.processing.numThreads=2", "-Djava.util.logging.manager=org.apache.logging.log4j.jul.LogManager"]'
 
@@ -108,7 +105,6 @@ services:
       - 127.0.0.1:${PERF_ROUTER_PORT:?}:8888
     environment:
       <<: *perf-druid-env
-      druid_metadata_storage_connector_password: ${DRUID_POSTGRES_PASSWORD:?}
 
   druid:
     image: python:3.12-slim@sha256:f77ac9e44ae96ef2c90b8053ea08c31f8be030f824196b0ae4db6d462c84e51f

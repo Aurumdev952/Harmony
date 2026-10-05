@@ -46,15 +46,12 @@ export PERF_REFERENCE_IMAGE="${PERF_REFERENCE_IMAGE:-no-reference-image}"
 export PERF_USERNAME="${PERF_USERNAME:-perf-admin@harmony.invalid}"
 export PERF_REPO_ROOT="${ROOT}"
 export PERF_STACK_DIR="${HERE}/stack"
-# Read by druid_setup/single before WP-0b (image tags) and after it (bind address).
-export DRUID_VERSION=0.23.0 ZOOKEEPER_VERSION=3.8 DRUID_BIND_ADDRESS=127.0.0.1
+# druid_setup/single requires a bind address; the overlay replaces its ports.
+export DRUID_BIND_ADDRESS=127.0.0.1
 
 SECRETS_DIR="${XDG_STATE_HOME:-${HOME}/.local/state}/harmony-perf"
 SECRETS="${SECRETS_DIR}/${PERF_PROJECT}.env"
 SECRET_NAMES=(PERF_PASSWORD POSTGRES_PASSWORD REDIS_PASSWORD HASURA_ADMIN_SECRET DEFAULT_SECRET_KEY JWT_SECRET_KEY DRUID_POSTGRES_PASSWORD)
-
-# The digest WP-2c's contract stack builds docker/web/Dockerfile_web-server from.
-PYTHON_38="python:3.8@sha256:d411270700143fa2683cc8264d9fa5d3279fd3b6afff62ae81ea2f9d070e390c"
 
 DRUID_SERVICES=(postgres memcache zookeeper coordinator broker historical middlemanager router druid)
 
@@ -139,7 +136,6 @@ build_image() {
     return 0
   fi
   docker build --platform linux/amd64 \
-    --build-context "python:3.8=docker-image://${PYTHON_38}" \
     -f "$1/docker/web/Dockerfile_web-server" \
     -t "harmony-perf-web-server:${tag}" "$1" >&2
   docker build --platform linux/amd64 \

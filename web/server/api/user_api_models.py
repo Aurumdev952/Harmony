@@ -13,7 +13,7 @@ from flask_potion.signals import before_create, before_delete, after_delete
 from flask_user import current_user
 from werkzeug.exceptions import BadRequest, Forbidden
 
-from models.alchemy.user import User, UserAcl
+from models.alchemy.user import User, UserAcl, UserStatusEnum
 from web.server.api.api_models import PrincipalResource
 from web.server.api.model_schemas import (
     USER_ROLES_SCHEMA,
@@ -148,6 +148,16 @@ class UserResource(PrincipalResource):
         with AuthorizedOperation('edit_user', 'site'):
             if obj['username'] != db_user.username and username_taken(
                 obj['username'], except_user_id=db_user.id
+            ):
+                raise BadRequest('Another account has this username.')
+            # Activating one account of a case-only pair made before WP-0k
+            # would leave two registered accounts equal ignoring case.
+            activating = (
+                obj.get('status_id') == UserStatusEnum.ACTIVE.value
+                and db_user.status_id != UserStatusEnum.ACTIVE.value
+            )
+            if activating and username_taken(
+                obj['username'], except_user_id=db_user.id, ignore_pending=True
             ):
                 raise BadRequest('Another account has this username.')
             # NOTE: this whole block must run in the same transaction

@@ -16,7 +16,7 @@ import pytest
 import sqlalchemy
 from werkzeug.exceptions import BadRequest
 
-from models.alchemy.user import User
+from models.alchemy.user import User, UserStatusEnum
 from tests.web.usernames.accounts import PASSWORD
 from tests.web.usernames.tokens import (
     login,
@@ -28,14 +28,29 @@ ANN = 'ann@moh.gov.rw'  # account 6
 LOOK_ALIKE = 'j_hn.doe@moh.gov.rw'  # pattern-matches account 1, john.doe
 
 
-def _username(app, user_id):
+def _column(app, user_id, column):
     with app.app_context():
         engine = app.extensions['sqlalchemy'].db.engine
         with engine.connect() as connection:
             return connection.execute(
-                sqlalchemy.text('SELECT username FROM "user" WHERE id = :id'),
+                # The column names are this file's own.
+                sqlalchemy.text(f'SELECT {column} FROM "user" WHERE id = :id'),  # noqa: S608
                 {'id': user_id},
             ).scalar()
+
+
+def _username(app, user_id):
+    return _column(app, user_id, 'username')
+
+
+def _set_status(app, user_id, status):
+    with app.app_context():
+        engine = app.extensions['sqlalchemy'].db.engine
+        with engine.begin() as connection:
+            connection.execute(
+                sqlalchemy.text('UPDATE "user" SET status_id = :status WHERE id = :id'),
+                {'status': status.value, 'id': user_id},
+            )
 
 
 def _change_username_page(app, username, new_username):
@@ -138,7 +153,9 @@ def _patch_user(app, user_api, monkeypatch, user_id, obj):
     monkeypatch.setattr(
         user_api,
         'build_user_updates',
-        lambda obj, *_roles: {'username': obj['username']},
+        lambda obj, *_roles: {
+            name: obj[name] for name in ('username', 'status_id') if name in obj
+        },
     )
 
     def update(user, updates):
@@ -192,3 +209,43 @@ def test_change_username_page_accepts_ones_own_name_in_a_case_only_pair(app):
 
     assert response.status_code == 302
     assert _username(app, 5) == 'Ann@moh.gov.rw'
+
+
+@pytest.mark.parametrize(
+    'user_id, username, status',
+    [
+        (11, 'dup.shell@moh.gov.rw', UserStatusEnum.PENDING),  # twin of active 10
+        (6, ANN, UserStatusEnum.INACTIVE),  # twin of active 5
+    ],
+)
+def test_user_patch_does_not_activate_a_twin_of_a_registered_account(
+    app, request_ctx, user_api, monkeypatch, user_id, username, status
+):
+    _set_status(app, user_id, status)
+
+    with pytest.raises(BadRequest):
+        _patch_user(
+            app,
+            user_api,
+            monkeypatch,
+            user_id,
+            {'username': username, 'status_id': UserStatusEnum.ACTIVE.value},
+        )
+
+    assert _column(app, user_id, 'status_id') == status.value
+
+
+def test_user_patch_reactivates_an_account_with_no_twin(
+    app, request_ctx, user_api, monkeypatch
+):
+    _set_status(app, 8, UserStatusEnum.INACTIVE)
+
+    _patch_user(
+        app,
+        user_api,
+        monkeypatch,
+        8,
+        {'username': 'jane.doe@moh.gov.rw', 'status_id': UserStatusEnum.ACTIVE.value},
+    )
+
+    assert _column(app, 8, 'status_id') == UserStatusEnum.ACTIVE.value

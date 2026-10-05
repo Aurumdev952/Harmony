@@ -11,6 +11,7 @@
 #                                  `up` prints the playwright command to run
 #   e2e/run.sh visual [args]       run the visual suite on a stack that is up
 #                                  (--update-snapshots rewrites e2e/visual/)
+#   e2e/run.sh client              rebuild the client if its sources changed
 #   e2e/run.sh build               rebuild the production client bundles
 #
 # The stack is WP-2c's tests/contract/stack (internal network, generated
@@ -50,10 +51,27 @@ if ! docker info --format '{{.SecurityOptions}}' | grep -q rootless; then
   DOCKER_USER=(--user "$(id -u):$(id -g)")
 fi
 
+# Everything web/webpack.prod.config.js reads, relative to the repository.
+CLIENT_SOURCES=(web/client web/public/scss web/public/images web/public/fonts web/public/js
+  web/webpack.prod.config.js package.json yarn.lock)
+# Written next to the bundles after a build: the hash of the sources it was
+# built from.
+CLIENT_STAMP="${ROOT}/web/public/build/e2e-sources.sha256"
+
+# A hash of the content of every client source file, so an uncommitted edit
+# counts as a change and no git checkout is needed.
+client_sources_hash() {
+  (cd "${ROOT}" && find "${CLIENT_SOURCES[@]}" -type f -print0 | LC_ALL=C sort -z |
+    xargs -0 sha256sum | sha256sum | cut -c1-64)
+}
+
 build_client() {
+  local hash
+  hash="$(client_sources_hash)"
   docker run --rm "${DOCKER_USER[@]}" \
     -v "${ROOT}:/src" -w /src -e HOME=/tmp \
     "${NODE_IMAGE}" sh -c 'yarn install --frozen-lockfile && yarn build'
+  echo "${hash}" >"${CLIENT_STAMP}"
 }
 
 ensure_playwright() {
@@ -66,10 +84,16 @@ ensure_playwright() {
   "${ROOT}/e2e/node_modules/.bin/playwright" install chromium
 }
 
+# Serving bundles older than the sources would test the wrong client, so any
+# difference from the stamp rebuilds.
 ensure_client() {
-  if [[ ! -f "${ROOT}/web/public/build/min/sourcemap.json" ]]; then
-    build_client
+  if [[ -f "${ROOT}/web/public/build/min/sourcemap.json" && -f "${CLIENT_STAMP}" &&
+    "$(cat "${CLIENT_STAMP}")" == "$(client_sources_hash)" ]]; then
+    echo "e2e: client build matches its sources"
+    return
   fi
+  echo "e2e: client sources changed since the last build (or no build); building"
+  build_client
 }
 
 container_of() {
@@ -165,6 +189,9 @@ case "${1:-}" in
     ensure_playwright
     export_env
     run_visual "${@:2}"
+    ;;
+  client)
+    ensure_client
     ;;
   build)
     build_client

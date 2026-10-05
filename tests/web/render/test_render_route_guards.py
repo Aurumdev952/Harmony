@@ -9,7 +9,7 @@ from datetime import timedelta
 
 import pytest
 
-from tests.web.render.fakes import (
+from render_fakes import (
     DASHBOARDS,
     DASHBOARD_SLUG,
     DEPLOYMENT_ORIGIN,

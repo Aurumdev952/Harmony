@@ -12,7 +12,7 @@ from urllib.parse import urlsplit
 import pytest
 from flask import g
 
-from tests.web.render.fakes import DASHBOARDS, DASHBOARD_SLUG, DEPLOYMENT_ORIGIN
+from render_fakes import DASHBOARDS, DASHBOARD_SLUG, DEPLOYMENT_ORIGIN
 from web.server.routes.views import page_renderer as page_renderer_views
 from web.server.routes.views.dashboard import get_email_attachments, send_email
 
@@ -230,3 +230,34 @@ def test_app_startup_validates_the_configured_origin(configured, refused):
             validate_deployment_base_url(flask_app)
     else:
         validate_deployment_base_url(flask_app)
+
+
+def test_gunicorn_app_refuses_an_unusable_origin_before_touching_the_database(
+    monkeypatch,
+):
+    # pylint: disable=import-outside-toplevel
+    from web.server import app as app_module
+
+    monkeypatch.setenv('SERVER_SOFTWARE', 'gunicorn/20.0.4')
+    monkeypatch.setenv('SQLALCHEMY_DATABASE_URI', 'postgresql://tests@db.invalid/t')
+    monkeypatch.setenv('JWT_SECRET_KEY', 'tests-web-jwt-key-' + 'k' * 32)
+    load_config = app_module.initialize_zenysis_module
+
+    def load_config_with_a_hostile_origin(app):
+        load_config(app)
+        monkeypatch.setattr(
+            app.zen_config.general,
+            'DEPLOYMENT_BASE_URL',
+            'https://harmony.tests.invalid@attacker.invalid',
+        )
+
+    def touch_database(*_args, **_kwargs):
+        raise AssertionError('the database was touched before the origin check')
+
+    monkeypatch.setattr(
+        app_module, 'initialize_zenysis_module', load_config_with_a_hostile_origin
+    )
+    monkeypatch.setattr(app_module, 'initialize_database_seed_values', touch_database)
+
+    with pytest.raises(ValueError, match='DEPLOYMENT_BASE_URL'):
+        app_module.create_app(zenysis_environment='harmony_demo', skip_db_check=True)

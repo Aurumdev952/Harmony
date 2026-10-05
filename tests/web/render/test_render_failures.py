@@ -17,7 +17,7 @@ from flask import Flask
 from flask_caching import Cache
 
 from log import LOG
-from tests.web.render.fakes import DASHBOARD_SLUG, DictCache
+from render_fakes import DASHBOARD_SLUG, DictCache
 from web.server.redis import thumbnail_storage_service
 from web.server.routes.views import page_renderer as page_renderer_views
 from web.server.routes.views.dashboard import get_email_attachments

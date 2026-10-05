@@ -1,6 +1,6 @@
 - [Legacy Flask test and lint env](legacy-flask-test-and-lint-env.md) — py3.8 uv recipe, CI pylint/black on changed files, worktree-hook command traps
 - [Narrowed admin tokens](narrowed-admin-tokens.md) — superuser from identity not account; render token is a narrowed admin JWT; managers decide reach
-- [Tooling traps](tooling-traps.md) — ownership.py via uv, compound bash refused in worktrees, last_modified as a WHERE-clause probe
+- [Tooling traps](tooling-traps.md) — ownership.py via uv, compound bash refused in worktrees, task_gate's stale branch ref, caplog doubling
 - [Local Flask stack](local-flask-stack.md) — run legacy Flask, Alembic and replays without images: py3.8 venv, Druid stub, SERVER_SOFTWARE=gunicorn
 - [Flask local test env](flask_local_test_env.md) — import and build the Flask app without Docker: py3.8 uv env, env placeholders, route mocks
 - [py3.8 web tests](py38_web_tests.md) — run tests/web on Flask 1.0 / Python 3.8 with uv despite the worktree guard

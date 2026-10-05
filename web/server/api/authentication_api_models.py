@@ -98,9 +98,21 @@ class AuthenticationResource(Resource):
             password = payload['password']
             invite_token = payload['invite_token']
 
-            # if the token does not correspond to any user, do not allow registration
-            pending_user = transaction.find_one_by_fields(
-                User, True, {'reset_password_token': invite_token}
+            # Only a pending invitation registers. `reset_password_token`
+            # defaults to the empty string and also holds forgot-password
+            # tokens, so an empty token, or the token of an account that is
+            # not pending, would set another account's password.
+            pending_user = (
+                transaction.find_one_by_fields(
+                    User,
+                    True,
+                    {
+                        'reset_password_token': invite_token,
+                        'status_id': UserStatusEnum.PENDING.value,
+                    },
+                )
+                if invite_token
+                else None
             )
             if not pending_user:
                 raise BadRequest("Invalid invitation link")
@@ -119,8 +131,9 @@ class AuthenticationResource(Resource):
             ):
                 raise BadRequest("Another account has this email address")
 
-            # Enable user account
+            # Enable user account; the invitation is spent.
             pending_user.status_id = UserStatusEnum.ACTIVE.value
+            pending_user.reset_password_token = ''
 
             # Hash password field
             hashed_password = user_manager.hash_password(password)

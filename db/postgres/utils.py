@@ -70,13 +70,9 @@ def export_tables_to_zip(
     Args:
         tables: List of all tables to export
     '''
-    with (
-        psycopg_connection(sql_connection_string) as conn,
-        zipfile.ZipFile(
-            output_filename, 'w', zipfile.ZIP_DEFLATED, compresslevel=3
-        ) as zip_file,
-        make_temp_directory() as temp_dir_name,
-    ):
+    with psycopg_connection(sql_connection_string) as conn, zipfile.ZipFile(
+        output_filename, 'w', zipfile.ZIP_DEFLATED, compresslevel=3
+    ) as zip_file, make_temp_directory() as temp_dir_name:
         cursor = conn.cursor()
         for table in tables:
             LOG.info('Beginning export of table: %s', table)
@@ -329,11 +325,9 @@ def import_data_into_table(
         disable_migration_check: Import even when the archive's Alembic version
             differs from the database's.
     '''
-    with (
-        psycopg_connection(sql_connection_string) as conn,
-        zipfile.ZipFile(input_file) as zip_file,
-        make_temp_directory() as temp_dir_name,
-    ):
+    with psycopg_connection(sql_connection_string) as conn, zipfile.ZipFile(
+        input_file
+    ) as zip_file, make_temp_directory() as temp_dir_name:
         members = set(zip_file.namelist())
         missing = [
             name

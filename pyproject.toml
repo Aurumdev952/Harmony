@@ -65,8 +65,6 @@ dependencies = [
     "pydruid==0.6.9",
     "python-rapidjson==1.17",
     "openpyxl>=3.0.9",
-    # Works around https://github.com/lloyd/yajl/issues/130.
-    "ijson-bigint==3.2.0.post1",
     "types-jsonschema==4.17.0.8",
     # 0.18 imports imp, gone in Python 3.12.
     "future==1.0.0",
@@ -257,7 +255,6 @@ module = [
     "_pypyjson.*",
     "factory.*",
     "alchemy_mock.*",
-    "ijson.*",
     "rapidjson.*",
     "flask_jwt_extended.*",
     "boto3.*",

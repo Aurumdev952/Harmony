@@ -778,7 +778,6 @@ dependencies = [
     { name = "gspread" },
     { name = "httpx", extra = ["socks"] },
     { name = "hvac" },
-    { name = "ijson-bigint" },
     { name = "importlib-metadata" },
     { name = "itsdangerous" },
     { name = "jinja2" },
@@ -901,7 +900,6 @@ requires-dist = [
     { name = "gspread", specifier = ">=5.4.0" },
     { name = "httpx", extras = ["socks"], specifier = "==0.27.0" },
     { name = "hvac", specifier = ">=0.7.0" },
-    { name = "ijson-bigint", specifier = "==3.2.0.post1" },
     { name = "importlib-metadata", specifier = "<5" },
     { name = "itsdangerous", specifier = "==2.0.1" },
     { name = "jinja2", specifier = "==2.11.3" },
@@ -1084,12 +1082,6 @@ sdist = { url = "https://files.pythonhosted.org/packages/f5/08/8eea9d4b8302028f3
 wheels = [
     { url = "https://files.pythonhosted.org/packages/58/a2/bb081bab032533a855d44de1d56f8e8426114ff1ba5d1f07a438a0a654f8/idna-3.20-py3-none-any.whl", hash = "sha256:ab7ae7122974553370f0bdb919e1a960b2cd1bc1ef0276416d896db81c14582c", size = 69583, upload-time = "2026-09-17T14:11:03.168Z" },
 ]
-
-[[package]]
-name = "ijson-bigint"
-version = "3.2.0.post1"
-source = { registry = "https://pypi.org/simple" }
-sdist = { url = "https://files.pythonhosted.org/packages/89/4b/802bceb651f98723a2bbd362e5c86249bcb16c6f008454addcf7055806bf/ijson-bigint-3.2.0.post1.tar.gz", hash = "sha256:20097ceecc67e9a42fcd190fc108430b9e81e0f62666463a5a1f1f57cccd8305", size = 56940, upload-time = "2023-05-11T16:47:58.224Z" }
 
 [[package]]
 name = "importlib-metadata"

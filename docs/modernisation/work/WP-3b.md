@@ -21,6 +21,17 @@ instances:
       - tests/toolchain/**
       - docs/modernisation/work/WP-3b.md
       - docs/modernisation/work/WP-3b-evidence/**
+  # Supporting role, on mig/WP-3b-cpython-313-core-2. Its removal of ijson-bigint
+  # from pyproject.toml and uv.lock sits in infra-3's claim.
+  - name: "core-1"
+    files:
+      - db/druid/json_stream.py
+      - db/druid/query_builder.py
+      - db/druid/query_client.py
+      - web/server/query/**
+      - tests/druid/test_export_pandas_order.py
+      - tests/druid/test_druid_response_parsing.py
+      - tests/web/server/query/**
 branch: "mig/WP-3b-cpython-313"
 requirements: [INV-1, INV-2, INV-8, SEC-9, QA-4]
 contracts_consumed: []
@@ -58,7 +69,7 @@ None.
 
 Each item names the owner, the change, and what it blocks. Reproduce on this branch with `uv sync --locked`, then the command given.
 
-- [ ] **core (blocks unit 1b, and so the PR): make the query shaping work on pandas 2.2 / numpy 2.1 with 0 golden drift.** `uv run pytest tests/golden` gives 38 failed, 231 passed. All 85 cases still post the recorded Druid queries (Evidence), so every failure is in response shaping under `web/server/query/`:
+- [x] **core (blocks unit 1b, and so the PR): make the query shaping work on pandas 2.2 / numpy 2.1 with 0 golden drift.** Done by core-1, 2026-10-05, `d9382b0` on `mig/WP-3b-cpython-313-core-2`: golden 269 passed, no fixture changed. The four crash sites are fixed as listed. The row-order cases have one cause, `export_pandas` date filling: pandas 2.2 sorts every outer merge by its keys, even with `sort=False`. Evidence: "Core: pandas 2 shaping". `uv run pytest tests/golden` gives 38 failed, 231 passed. All 85 cases still post the recorded Druid queries (Evidence), so every failure is in response shaping under `web/server/query/`:
   1. `visualizations/hierarchy.py:217` `.drop('index', 'columns')`: pandas 2 takes no positional `axis` (TypeError). Cases `hierarchy_*` and `policy_hierarchy`.
   2. `data_quality/outliers_box_plot.py:58` `Series.iteritems()` was removed; `.items()`. Cases `dq_outliers_box_plot`, `policy_dq_outliers_box_plot`.
   3. `data_quality/data_quality_report.py:236` `pd.to_datetime(..., format=DRUID_DATE_FORMAT)` is now strict and rejects the `T00:00:00.000Z` suffix (ValueError). Cases `dq_data_quality`, `policy_dq_data_quality`.
@@ -70,13 +81,16 @@ Each item names the owner, the change, and what it blocks. Reproduce on this bra
   - `web/server/util/util.py:253-256,373,379,404`: `collections.Mapping`, `collections.Iterable` → `collections.abc.*`;
   - `web/server/potion/managers.py:128`: `collections.Mapping` (Potion update path).
   - Low: `web/server/util/data_catalog.py:205` invalid escape `"\^"` (SyntaxWarning on 3.12+, an error in a later Python); `web/dev_reloader.py:16` still watches `venv_pypy3`.
-- [ ] **core (blocks the PR, PERF-7): parse streamed Druid responses fast on 3.13 without losing Long.MIN_VALUE.** `db/druid/query_client.py` streams every `GroupByQueryBuilder` response (`streaming = True`) through `ijson.items(fp, 'item', use_float=True)`. Before this WP the web image built `ijson-bigint`'s C backend (`yajl2_c`). That fork's C code does not compile on 3.11+ (`PyGenObject has no member gi_code`), so on 3.13 ijson falls back to its pure-Python backend. `WP-3b-evidence/ijson_probe2.py`, 200,000 rows (19.6 MB): base image `yajl2_c` 0.20 s; this image `python` 3.31 s. The alternatives are wrong: upstream `ijson` 3.5.1's `yajl2_c` (0.14 s) and the `yajl2` ctypes backend over Debian's libyajl2 both fail with `integer overflow` on `-9223372036854775808`, which is the yajl bug the fork exists for. The stdlib `json` parser is fast and exact, but it does not stream. The choice is core's; infra keeps libyajl out of the image so ijson cannot pick the ctypes backend. Hosts with libyajl installed (this build host) get the ctypes backend in `uv sync` environments, so the golden suite here runs on it.
+- [x] **core (blocks the PR, PERF-7): parse streamed Druid responses fast on 3.13 without losing Long.MIN_VALUE.** Done by core-1, 2026-10-05, `ab662b4`: `db/druid/json_stream.iter_json_array` replaces ijson-bigint and needs no new dependency. It streams the response row by row with the stdlib's C scanner: 200,000 array rows parse in 0.47 s (yajl on 3.9: 0.37 s; the image's pure-Python ijson: 2.98 s) at a 9.6 MB peak on a 200 MB body. Every in-domain value, Long.MIN_VALUE included, equals yajl's. `0cc4efb` used msgspec at first; the lead's review (whole-body decode, resource exhaustion) replaced it. libyajl can stay out of every image; nothing imports ijson now. Evidence: "Core: PERF-7 parser". `db/druid/query_client.py` streams every `GroupByQueryBuilder` response (`streaming = True`) through `ijson.items(fp, 'item', use_float=True)`. Before this WP the web image built `ijson-bigint`'s C backend (`yajl2_c`). That fork's C code does not compile on 3.11+ (`PyGenObject has no member gi_code`), so on 3.13 ijson falls back to its pure-Python backend. `WP-3b-evidence/ijson_probe2.py`, 200,000 rows (19.6 MB): base image `yajl2_c` 0.20 s; this image `python` 3.31 s. The alternatives are wrong: upstream `ijson` 3.5.1's `yajl2_c` (0.14 s) and the `yajl2` ctypes backend over Debian's libyajl2 both fail with `integer overflow` on `-9223372036854775808`, which is the yajl bug the fork exists for. The stdlib `json` parser is fast and exact, but it does not stream. The choice is core's; infra keeps libyajl out of the image so ijson cannot pick the ctypes backend. Hosts with libyajl installed (this build host) get the ctypes backend in `uv sync` environments, so the golden suite here runs on it.
 - [ ] **pipeline (non-blocking, after unit 4):** drop `SetupEnvForPyPy` from `util/pipeline/bash/common.sh` and its callers in `pipeline/{harmony_demo,template}/process/run/*`, and the `_pypyjson`/`__pypy__` branches in `data/pipeline/datatypes/base_row.py` and `data/pipeline/io/druid_writer.py`. Without `venv_pypy3` the function prints a warning and keeps the CPython venv, so nothing breaks meanwhile. Also the invalid escapes in `data/pipeline/scripts/fetch_database_tables.py` and `xlsx_to_csv.py`. FYI: `savReaderWriter` left the `pipeline` group; it cannot import on Python 3.10+ (`from collections import Iterable`) and nothing in the repository imports it.
 - [ ] **qa (non-blocking):** `tests/pipeline/run.sh` defaults to 3.9 and says 3.12+ cannot import `config/`; `tests/pipeline/requirements.txt` pins `future==0.18.3`, which imports `imp` (gone in 3.12), and README line 29 says the same. On this branch the suite passes on 3.13 from the root lock (130 passed).
 - [ ] **lead and human (before this branch merges):** the root `pyproject.toml` now needs uv 0.12.16 or later (hashed build constraints, `required-version`). The build host's `uv` is 0.12.5, and every uv command in a checkout of this branch stops with "Required uv version `>=0.12.16` does not match", including `uv run --no-project` from the repo root. Update uv on the host (`uv self update` to 0.12.23) and tell the other roles. The CI job is renamed "Python 3.13 - lint, types, tests" and the "Python 3.13 - standalone tools" job is gone; if branch protection lists check names, update it.
 - [x] **lead / WP-2g core supporter: images built with uv compile bytecode at build time**, so a first start prints no compile-time SyntaxWarnings before logging is configured. The web image sets `UV_COMPILE_BYTECODE=1` for `.venv` and runs `python -m compileall` over the app code it copies (unit 3). The pipeline and dev images follow in units 4 and 5.
 - [ ] **human (before deploying this image): the web and worker processes now run as uid 1000 (`zenysis`).** The entrypoint `docker/web/run_as_zenysis.sh` starts as root, hands `/data/output` (the directory and its `*.log*` files), `/data/output/zenysis_static` and `/zenysis/uploads` to uid 1000, and copies `/root/.mc/config.json` into the user's home. Then it drops root with `setpriv`. On a host this changes the owner of `${DATA_PATH}/output` (top level, logs, static files) and `${DATA_PATH}/ubuntu/uploads` to uid 1000, which is `ubuntu` on Ubuntu hosts. Nothing else on the host changes. If a host's uid 1000 is someone else, say so before deploying.
 - [ ] **lead (non-blocking):** `scripts/watch/watch_util.py` invalid escape (SyntaxWarning); `.vscode/settings.json` excludes `venv_pypy3`.
+- [ ] **lead (from core-1, before merging core's work):** core's commits are on `mig/WP-3b-cpython-313-core-2` (head below), branched at `8dfe8da`. The suggested `mig/WP-3b-cpython-313-core` is checked out in the locked worktree `.claude/worktrees/agent-a870396bbd54f25e2`, which a worktree-isolated agent cannot touch. That branch has no work, so merge `-core-2` or fast-forward `-core` to it.
+- [ ] **infra (from core-1, non-blocking):** `docker/web/Dockerfile_web-server` lines 9-11 explain "No yajl" by ijson's ctypes backend. ijson is gone, so that reason is stale; libyajl is still not needed. Also rebuild the web image once to confirm the PERF-7 claim in it: `db/druid/json_stream.py` is stdlib-only, so nothing new is installed.
+- [ ] **qa (from core-1, non-blocking):** `tests/golden/README.md` ("gzip and `ijson` decoding of streamed responses") and the `tests/golden/harness.py` module docstring ("gzip and ijson decoding") name ijson; the client now decodes with `db.druid.json_stream`. Docs only; the suite needs no change (269 passed).
 
 ## Log
 
@@ -94,6 +108,9 @@ Each item names the owner, the change, and what it blocks. Reproduce on this bra
 - 2026-10-05 infra-3 unit 7: `requirements*.txt`, `docker/export_requirements.py`, its tests and `make requirements` deleted; the pin policy and passlib/bcrypt check moved to `tests/infra/test_pyproject_pins.py`. Check: grep finds no reader outside history docs; pin test fails on an unpinned `toposort`; `tests/infra` passes.
 - 2026-10-05 infra-3 unit 8: the Python 3.8 scaffolding retired (above). Check: suites as unit 2 (golden 38 failed / 231 passed, the core request; the rest pass); mypy 518 files; lint gate, actionlint, zizmor, policy.
 - 2026-10-05 infra-3: status review. Every infra unit is done and the three images build at the head. The pull request still waits on core's two blocking requests: golden on pandas 2 (unit 1b) and the ijson parse speed (PERF-7). It also waits on backend's `collections` fix, the lead's uv update, and the qa and reviewer verdicts. `task_gate.py WP-3b`: status and the two verdicts outstanding.
+- 2026-10-05 core-1 (supporting): branch `mig/WP-3b-cpython-313-core-2` at `8dfe8da` (the `-core` branch is held by a locked worktree; Requests). uv through `uvx --from uv==0.12.23 uv ...`, because the host's uv 0.12.5 fails `required-version`.
+- 2026-10-05 core-1 unit 1b: golden on pandas 2.2 (`d9382b0`). Five causes fixed in shaping, none in a fixture: outer-merge order in `export_pandas` date filling, positional `drop` axis, `Series.iteritems`, strict `to_datetime` format, `to_dict(into=...)`. Check: golden 269 passed; 6 unit tests, each red on `8dfe8da` for its cause; 3300 synthesised variants identical to pandas 1.5.3 on 3.9; ruff, lint gate, mypy 518 files.
+- 2026-10-05 core-1 PERF-7: `0cc4efb` moved parsing to msgspec (whole-body decode). The lead routed a security review finding (resource exhaustion), and `ab662b4` replaced it with a stdlib streaming decoder, `db/druid/json_stream.py`, with no new dependency. Check: `tests/druid` 222 passed (198 golden round trips, edge values, read boundaries, bounded memory, red on `0cc4efb` at 65.9 and 128.1 MiB); golden 269; every suite passes (core 25, druid 222, druid_setup 79, golden 269, graphql 22, infra 164, pipeline 130, toolchain 12, web 99); `uv lock --check`; lint gate; mypy 519 files.
 
 
 ## Evidence
@@ -190,6 +207,65 @@ Scripts are under `WP-3b-evidence/`; `web_stack/run.sh` is the runtime harness (
 - **Unit 6.** `web.yml` and `pipeline.yml` compute `image_tag` once in `prepare` (characters outside `[A-Za-z0-9_.-]` become `-`, cut at 128) and every build job uses `needs.prepare.outputs.image_tag`. The test runs the step's `run:` with `bash -e`: `mig/WP-3b-cpython-313` gives `mig-WP-3b-cpython-313`, and a 200-character name gives 128 characters.
 - **Unit 7.** The pin policy, with an allowance list no longer carrying `pandas>=1.3,<2.0` (now `==2.2.3`), has a new check that the allowance has no stale entries. Git sources must be pinned to 40-hex SHAs. The bcrypt check runs passlib in the locked environment. Making `toposort==1.5` loose fails `test_new_requirements_are_pinned_exactly`.
 - **Unit 8.** `ruff check --show-settings` shows `unresolved_target_version = 3.13` and empty per-file targets for `web/server/app.py` and `prod/browser_share/browser_share.py`.
+
+### Core: pandas 2 shaping (unit 1b, `d9382b0`)
+
+Scripts are in `WP-3b-evidence/core/`. The pre-WP reference is a `git archive 15bdde3` tree synced from its own lock: CPython 3.9.25, pandas 1.5.3, numpy 1.21.0, ijson-bigint `yajl2_c`. Its golden suite passes 269, and its shaping code is identical to `8dfe8da`.
+
+- **Causes**, one per class the lead listed, with each fixture as the oracle:
+
+  | Class | Cause | Cases | Fix |
+  |---|---|---|---|
+  | groupby / merge ordering | pandas 2.2 sets `sort = sort or how == "outer"` in `_MergeOperation`, so `export_pandas`'s date-filling `merge(how='outer', sort=False)` came back sorted by key. pandas 1.5 numbered keys by first appearance (left, then right) and emitted key by key. | the 12 row-order cases | `query_builder.outer_merge_in_appearance_order` restores that order. |
+  | datetime handling | pandas 1.5 ignored `format='%Y-%m-%d'` for ISO strings and parsed `2024-01-01T00:00:00.000Z` as UTC; pandas 2 applies the format strictly. | `dq_data_quality`, `policy_dq_data_quality` | `parse_druid_timestamps`: `format='ISO8601'`, the same `datetime64[ns, UTC]` values and NaT. |
+  | dtype / boxing | `to_dict('records', into)` no longer builds rows through `into`, and it writes boxed values back by column name. | `map_by_municipality`, `policy_map` | `[data_point(row) for row in df.to_dict('records')]`; values stay native `int`/`float`. |
+  | removed API | `DataFrame.drop('index', 'columns')`; `Series.iteritems()` | `hierarchy_*`, `policy_hierarchy`, `dq_outliers_box_plot`, `policy_dq_outliers_box_plot` | `drop(columns='index')`; `.items()` |
+  | NaN vs None, string vs object | no difference: pandas 2.2 keeps object strings and the same NaN handling (`fillna(np.nan)` still downcasts, with a FutureWarning) | none | none |
+
+- **Golden:** 269 passed, `git diff 8dfe8da -- tests/golden` empty.
+- **Unit tests**, each pinning the pandas 1.5.3 output of the pre-WP code (`capture.py` printed it in the base tree): `tests/druid/test_export_pandas_order.py` (2) and `tests/web/server/query/test_pandas2_shaping.py` (4). On `8dfe8da` with the 3.13 lock, each fails for its cause: order mismatch, `KeyError: 'MunicipalityName'`, `TypeError: DataFrame.drop() takes from 1 to 2 positional arguments`, `AttributeError: 'Series' object has no attribute 'iteritems'`, and an import error for the extracted `parse_druid_timestamps`.
+- **Beyond the recordings** (`fuzz.py`): every case replayed against fresh synthesised Druid answers, 20 seeds, plus 20 with NaN, ±Infinity and null forced in, is 3300 variants. Body digests on 3.13 / pandas 2.2 equal those on 3.9 / pandas 1.5.3 in all 3300, with no errors on either side. Reverting only the merge fix makes 134 of 825 variants (5 seeds) differ, so the check has teeth.
+- **The merge helper alone** (`merge_diff.py`): 417 random non-empty frame pairs, with duplicate and null keys on both sides, left-only and right-only keys, and int, float and bool columns. The helper on pandas 2.2 against `merge(how='outer', sort=False)` on pandas 1.5.3 gives identical columns, dtypes, index and rows in every pair. With an empty side pandas 1.5 took another path; `export_pandas` returns before merging an empty frame, and its right side is never empty.
+- **Cost:** 144k rows date-filled to 240k: 136 ms, against 45 ms for pandas 1.5's merge (pandas 2.2's own sorted merge alone is 75 ms).
+- **Left for pandas 3** (FutureWarnings, the same results on 2.2): `visualizations/base.py:106` object downcasting in `fillna`; `query_builder.py` `period_range(freq='m'|'w'|'q')` lowercase aliases.
+
+### Core: PERF-7 parser (`0cc4efb`, then `ab662b4`)
+
+The final timings were taken in one run (`final_measure.sh`, output in `final_measure.txt`; it expects the base tree at `/tmp/core3b/base` and the bodies from `parse_bench.py make` and `make_200mb.py`) on the shared build host, load average 13 to 17, with old and new measured back to back. Earlier runs on a quieter host gave the same numbers within 5%. "Old" is the base tree with ijson-bigint `yajl2_c` on CPython 3.9.25, the backend the 3.8 image used (no 3.8 interpreter is on the host).
+
+- **Design.** `db/druid/json_stream.iter_json_array(fp)` yields the elements of the top-level array. It decodes one element at a time with the stdlib's C decoder (`JSONDecoder.raw_decode`) from a rolling buffer fed by an incremental UTF-8 decoder over the gzip stream, and drops consumed text. No new dependency; ijson-bigint goes from `pyproject.toml` and `uv.lock`, and nothing imports ijson. Both streamed call sites (`DruidQueryClient_.run_raw_query` and `DruidQueryClient.run_raw_query`) return the iterator, as `ijson.items` did.
+- **Review finding (lead, 2026-10-05: resource exhaustion in `0cc4efb`).**
+  1. *Streaming.* `0cc4efb` decoded the whole body with msgspec. `ab662b4` streams again, so there is no whole-body step and no byte cap; a cap would only have made large queries fail that work today. A gzip bomb streams too: 64 MiB of whitespace stays under 8 MiB traced (`test_highly_compressed_body_streams_without_inflating`; 128.1 MiB on `0cc4efb`).
+  2. *Peak memory* (`memory_bench.py` under `/usr/bin/time -v`; growth over the post-import baseline; `stream` drops each row, `retain` keeps every row, as `export_pandas` eventually holds them all in its frame):
+
+     | Body | Consumer | Old (yajl stream) | `0cc4efb` (msgspec) | `ab662b4` (stream) |
+     |---|---|---|---|---|
+     | largest golden (`dq_data_quality`, 294 rows, 10 KB) | stream / retain | +0.0 / +0.0 MB (process 36.8 / 35.9 MB) | +0.0 / +0.0 MB | +0.0 / +0.0 MB (process 36.3 / 36.4 MB) |
+     | synthetic 200 MB (1,013,631 rows, 68 MB gzip) | stream | +0.6 MB, 1.89 s | +902.6 MB, 1.37 s | +9.6 MB, 2.48 s |
+     | synthetic 200 MB | retain | +705.9 MB, 2.96 s | +902.5 MB, 1.42 s | +670.8 MB, 3.12 s |
+
+  3. *Laziness.* Only `GroupByQueryBuilder` sets `streaming = True`. Its two call sites pass the result straight to `GroupByQueryBuilder.parse`, a generator, so `pydruid_query.result` stays a generator, and `export_pandas` still builds the frame in 100,000-row chunks. `static_data_query_client` already calls `list(...)`. Nothing catches parser errors or `DruidQueryError` around these calls. As with ijson, a malformed body raises (`ValueError`) during iteration.
+- **Parse speed** (`parse_bench.py`; gzip body; best of 5; peak growth):
+
+  | Parser | 200,000 array rows (36 MB) | 200,000 object rows (19.6 MB, infra's shape) |
+  |---|---|---|
+  | old: ijson-bigint `yajl2_c`, 3.9 | 0.366 s, streaming | 0.156 s |
+  | the 3.13 image before this: ijson pure Python | 2.984 s | 2.048 s |
+  | ijson `yajl2` ctypes (host libyajl) | `integer overflow` on Long.MIN_VALUE | |
+  | **`json_stream` (this branch)** | **0.468 s, +0 MB** | **0.185 s, +0 MB** |
+  | stdlib `json.load`, whole body | 0.435 s, +188 MB | 0.156 s, +104 MB |
+  | orjson 3.12.0, whole body | 0.287 s, +238 MB | 0.142 s, +173 MB |
+  | msgspec 0.21.1, whole body | 0.274 s, +163 MB | 0.120 s, +121 MB |
+
+- **End to end** (`e2e_bench.py`: `/api2/query/table` for `table_disaggregated`, its recorded response scaled with a unique municipality per copy, through the production client, `parse`, `export_pandas` and shaping; best of 3; the fake broker's own `json.dumps` and gzip subtracted):
+
+  | Rows | Old | 3.13 image before this (pure-Python ijson) | This branch |
+  |---|---|---|---|
+  | 200,000 | 2.21 s, 258 MB | 3.22 s, 230 MB | 1.95 s, 228 MB |
+  | 600,000 | 6.97 s, 670 MB | 10.27 s, 616 MB | 6.84 s, 616 MB |
+
+- **Values** (`edge_parse.py`; `edge_yajl2_c_py39.tsv` against `edge_py313.tsv`). On every document Druid sends, `json_stream` equals yajl in value and type: int64 extremes including Long.MIN_VALUE, `-0.0`, subnormals, max double, 17-digit rounding, quoted NaN and infinities, null and booleans, raw and escaped non-ASCII including surrogate pairs, and nested arrays and objects. It rejects, with `ValueError`, everything yajl rejected: bare NaN and Infinity, `1e309`, truncated bodies, invalid UTF-8. It differs only outside Druid's range, exactly as the 3.13 image's pure-Python ijson already does: integers beyond 64 bits stay exact where yajl refused them, and a lone `\ud800` escape stays as-is where yajl gave `?`. Rejected alternatives on the same inputs: orjson turns integers beyond 64 bits into lossy floats; whole-body `json` accepts bare NaN and `1e309` (as inf).
+- **Tests** (`tests/druid/test_druid_response_parsing.py`, 218 with parameters): 198 golden round trips (each `druid_response.json` entry, ASCII-escaped and raw UTF-8, through the real client, compared by type and value with the stdlib); edge values; bodies yajl rejected; every read boundary from 1 to 7 bytes over the golden and edge bodies; array framing; identity encoding; a 100,000-row body under 0.5 s (pure-Python ijson: 1.28 s, red); bounded memory for a 12 MB body and a highly compressed one (red on `0cc4efb` at 65.9 and 128.1 MiB). Golden: 269 passed.
 
 ## Verdicts
 

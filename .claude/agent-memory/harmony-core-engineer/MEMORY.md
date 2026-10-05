@@ -1,7 +1,4 @@
-- [Pipeline builds a Flask app](pipeline_builds_flask_app.md) — validate steps construct FlaskConfiguration; put startup checks at settings import
-- [Running legacy Python tests](running-legacy-python-tests.md): uv ephemeral env for Flask 1.0 / py3.8 tests, hook workarounds, Flask-in-pytest trap
-- [WP-0c findings](wp-0c-findings.md): /api/timeout is live; system-client raw queries reachable from /api/field; remember_me JWT claim
-- [Phase-file dead claims](project_phase_file_dead_claims.md) — "unused" routes may be live via ZenClient (no /api/ in the call); verify before deleting
-- [Worktree shell guard](feedback_worktree_shell_guard.md) — command forms the isolation guard refuses and the workarounds that pass
-- [Tooling traps](tooling_traps.md) — multi-Python test runs, black vs ruff format, mypy flags, pipeline suite scratch runs, 3.13 wheel checks
-- [Config import hook](config_import_hook.md) — alias semantics, PathFinder precedence, __spec__ restore, lazy DATASOURCE
+- [pandas 2 INV-2 traps](pandas2-inv2-traps.md) — outer merges always sort, strict to_datetime, to_dict(into); pinned in WP-3b
+- [Differential oracle method](differential-oracle-method.md) — pre-bump tree env + seeded synth fuzz to prove INV-2 beyond golden
+- [Worktree hook workarounds](worktree-isolation-hook-workarounds.md) — script files, uv shim, held branches, one suite per process
+- [Druid responses must stream](druid-response-streaming.md) — whole-body decode rejected in review; use db/druid/json_stream

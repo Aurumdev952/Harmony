@@ -183,10 +183,14 @@ pydruid = { git = "https://github.com/druid-io/pydruid.git", rev = "242010955381
 [tool.ruff]
 line-length = 88
 extend-exclude = ["web/public", "node_modules"]
+# The web image still runs Python 3.8, so the formatter must not emit 3.9+ syntax
+# (parenthesised with-statements) until WP-3b moves every image to 3.13. That
+# includes tests, which builders and gates also run on the 3.8 web environment.
+target-version = "py38"
 
 [tool.ruff.per-file-target-version]
-# Standalone tools on CPython 3.13 (PEP 723 scripts); the rest targets 3.9 from
-# requires-python until WP-3b.
+# Standalone tools on CPython 3.13 (PEP 723 scripts); the rest targets 3.8 (above)
+# until WP-3b.
 "prod/browser_share/**" = "py313"
 "docker/export_requirements.py" = "py313"
 "tests/infra/**" = "py313"

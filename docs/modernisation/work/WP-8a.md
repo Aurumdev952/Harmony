@@ -7,7 +7,7 @@ instances:
   - name: "data-platform-4"
     files: ["druid_setup/**", "db/druid/indexing/**", "scripts/druid/null_audit/**", "tests/druid/**", "docs/modernisation/work/WP-8a.md", "docs/modernisation/work/WP-8a-evidence/**", "docs/modernisation/decisions/*-wp-8a-*.md", ".claude/agent-memory/harmony-data-platform-engineer/**"]
   - name: "core-8a-c"
-    files: ["data/query/models/dimension.py", "data/query/models/granularity/**", "db/druid/aggregations/exact_unique_count_aggregation.py", "db/druid/util.py", "db/druid/post_aggregation_builder.py", "db/druid/js_formulas/**", "web/server/data/dimension_metadata_util/compute_sketch_sizes.py", "tests/core/test_null_selectors.py", "tests/core/test_negation_keeps_nulls.py", ".claude/agent-memory/harmony-core-engineer/**"]
+    files: ["data/query/models/dimension.py", "data/query/models/granularity/**", "db/druid/aggregations/exact_unique_count_aggregation.py", "db/druid/util.py", "db/druid/post_aggregation_builder.py", "db/druid/js_formulas/**", "web/server/data/dimension_metadata_util/compute_sketch_sizes.py", "db/druid/aggregations/last_value_aggregation.py", "tests/core/test_null_selectors.py", "tests/core/test_negation_keeps_nulls.py", "tests/core/test_last_value_native.py", "tests/core/test_policy_exclusion_keeps_nulls.py", ".claude/agent-memory/harmony-core-engineer/**"]
   - name: "pipeline-8a"
     files: ["data/alerts/alert.py", "tests/alerts/**", ".claude/agent-memory/harmony-pipeline-engineer/**"]
 branch: "mig/WP-8a-druid-js-null-audit"
@@ -81,6 +81,9 @@ The five audit cases (`scripts/druid/null_audit/cases/`) cover shapes the golden
 | sqlnull, real builder | 1 (`calc_last_value`) | 0 | [diff-10](WP-8a-evidence/diff-10-sqlnull-real-builder.txt) |
 | druid38, real builder | 1 (`calc_last_value`) | 0 | [diff-11](WP-8a-evidence/diff-11-druid38-real-builder.txt) |
 | nojs (0.23, legacy nulls, JavaScript off), real builder | 0 | 0 | [diff-12](WP-8a-evidence/diff-12-nojs-real-builder.txt) |
+| nojs, real builder + native LAST_VALUE (6d3a35f) | 0 | 0 | [diff-13](WP-8a-evidence/diff-13-nojs-native-last-value.txt) |
+| sqlnull, real builder + native LAST_VALUE | 0 | 0 | [diff-14](WP-8a-evidence/diff-14-sqlnull-native-last-value.txt) |
+| druid38, real builder + native LAST_VALUE | 0 | 0 | [diff-15](WP-8a-evidence/diff-15-druid38-native-last-value.txt) |
 
 "Builder fixes" are the core requests N1 and N2 below, simulated by `replay --candidate`. The simulation rewrites each posted query at the transport, so it proves the semantics before core lands the code.
 
@@ -93,7 +96,7 @@ The "real builder" rows replay the branch at 659bef9 (N1 and N2 landed, N3 not) 
 | N0 | The pipeline's `''` becomes a value of its own, distinct from null, instead of being stored as null. Every "no value" group splits in two (`""` and null), and `''` rows show as `""`. | `dq_data_quality`, `dq_outliers_*`, `group_dimension_include_null`, `table_disaggregated` (raw, both versions) | Regression. Legacy semantics are right for Harmony, where a missing location level means "no value". | Ingest transform `if("<dim>" == '', null, "<dim>")` on every dimension except `field` (`db/druid/indexing/common.py`, this WP). No-op on legacy (diff-8). C-8 (WP-8c) must carry the same rule: Parquet dimensions are null, never `''`. |
 | N1 | `selector value ''`, the builder's "has no value" test, matches only `''`, not null. `includeNull: false` groups then keep a null group, and count distinct counts null as a value. | 13 golden cases on sqlnull (the `filter_*`, `group_two_totals`, `hierarchy_*`, `policy_*`, `table_*`, `line_graph_heat_tiles_week` rows in diff-1), 60 once N0 makes the data null; `audit_count_distinct_nullable_dimension` | Regression | Builder emits `selector value null` (core request N1). On 38 three-valued logic happens to hide this, because `not(null = '')` is unknown and the row is dropped. The explicit test is right in both versions. |
 | N2 | Three-valued filters (Druid 28+): `NOT dim = v` and `NOT dim IN [...]` drop rows where `dim` is null. Legacy kept them. | `audit_not_selector_query_filter`, `audit_not_selector_calculation_filter`, `audit_not_in_query_filter` on druid38. For example, Acre `yellow_fever_cases` with `NOT Sex = F` falls from 2862.0 to 2656.0. | Regression for INV-2: "everything except females" has always included rows of unknown sex | Builder makes each value comparison under a `not` two-valued: `leaf AND NOT dim IS NULL` (core request N2, landed in 659bef9 in `db/druid/util.py` `_false_on_null`). No-op on 0.23 (diff-7, diff-9). It guards `selector` and `in` leaves, which are the only value leaves a query can carry: the request-deserialisable filters are `selector`, `in`, `field`, `field_in`, `interval` (on `__time`, never null) and `and`/`or`/`not`, and `RawFilter` is built only in code (alerts, data quality), never from request JSON. Leaves testing for null or `''` are left alone, because on legacy Druid they already match null rows. |
-| N3 | The Zenysis `aggregateLast` extension throws `NullPointerException` (`DelegateCombingColumnValueSelectorFactory.getLong`) under SQL-compatible nulls. It does not exist for 38. | `calc_last_value` | Regression; also blocks WP-8b | Native LAST_VALUE (core request N3, in progress on `mig/WP-8a-druid-js-null-audit-core`) |
+| N3 | The Zenysis `aggregateLast` extension throws `NullPointerException` (`DelegateCombingColumnValueSelectorFactory.getLong`) under SQL-compatible nulls. It does not exist for 38. | `calc_last_value` | Regression; also blocks WP-8b | Native LAST_VALUE (core, 4c1b7fe): with `HARMONY_DRUID_LAST_VALUE=native` the wrapper is posted as Druid's built-in `expression` aggregator with the extension's semantics. `extension` stays the default until WP-8b. See the INV-2 note on LAST_VALUE. |
 
 Not observed: aggregate-over-null differences, such as a sum over no rows giving null instead of 0. `DruidQueryClient_` already turns zero-count aggregates into null (the strict-null fields), so bodies match.
 
@@ -102,6 +105,12 @@ Not observed: aggregate-over-null differences, such as a sum over no rows giving
 - with N2, it matches legacy (diff-5 against diff-6).
 
 So N2 keeps policy decisions identical. Without N2 they would only become more restrictive, never less.
+
+`tests/core/test_policy_exclusion_keeps_nulls.py` (6d3a35f) pins N2's final form on the policy path end to end. A caller whose `QueryNeed` excludes a value posts real endpoint requests through `AuthorizedQueryClient`. Every posted filter must hold the exclusion as `not(and(in dim [v], not(dim IS NULL)))` and never as the bare `not(in)`. It covers:
+- a hierarchical dimension (`StateName`, `_construct_hierarchical_filter`) and a simple one (`source`, `_construct_single_filter`), each on `calc_last_value` and `calc_count_distinct_by_state`;
+- the exact COUNT_DISTINCT inner query, which `run_query` builds from the policy-ANDed `dimension_filter`. No golden case reaches it (harmony_demo's sketch sizes pick thetaSketch).
+
+All five cases fail with the N2 rewrite removed. The test does not decide reachability: whether a live identity reaches the exclusion branch is still for `tests/authz`.
 
 Reachability: I could not reach the exclusion from a JWT identity. The token and account intersection removes it, as `policy_jwt_exclude_values` pins. An audit case built for this (account with all states, token excluding Pará) posted only `source in [yellow_fever]`. Whether any live identity reaches the exclusion branch is for the policy suite (`tests/authz`).
 
@@ -134,6 +143,38 @@ Reachability: I could not reach the exclusion from a JWT identity. The token and
   - N1: on Druid 0.23 with legacy nulls, `selector value null` and `selector value ''` match the same rows, because `''` is stored as null (diff-7). Under SQL-compatible nulls, only `value null` matches a missing value.
   - N2: on 0.23, `NOT dim IS NULL` is true on every row that `dim = v` matches, so `and` returns the bare leaf. On 28 and later it turns "unknown" into "false" on null rows, so `not` keeps them as legacy did (diff-5 against diff-6).
 
+## INV-2 note: LAST_VALUE (N3)
+
+**What changes.** With `HARMONY_DRUID_LAST_VALUE=native`, `db/druid/util.py` builds the `aggregateLast` wrapper as a Druid `expression` aggregator (`db/druid/aggregations/last_value_aggregation.py`). The rewrite happens where pydruid assigns aggregator names, so the combine expression uses the posted name even after `ComplexCalculation` re-keys a calculation. It covers both LAST_VALUE classes: the query model and the deployment aggregation rules.
+- The accumulator is `[timestamp, value]`.
+- Fold: a later row replaces the accumulator; a row at the same time is combined with the inner sum, max or min.
+- Combine: segment partials merge the same way.
+- Finalize: returns the value.
+
+The default stays `extension`, so deployments on 0.23 post exactly what they post today: `calc_last_value`'s `druid_query.json` is unchanged and needs no regeneration. WP-8b sets `native` everywhere, deletes the `extension` branch, and drops `druid-aggregatable-first-last` from `loadList`. Until then, a deployment that turns on SQL-compatible nulls must also set `native`.
+
+**Semantics, extension against native.** Every row is "same" unless it says otherwise.
+
+| Aspect | Extension (0.23, legacy nulls) | Native | Evidence |
+|---|---|---|---|
+| Time ordering | Raw `__time` of each row, per result row (dimensions and granularity bucket), only among rows that pass the aggregator's filter | Same: `cast("__time", 'DOUBLE')` is exact for epoch milliseconds below 2^53 | live reference test, 5 granularities, 2 intervals |
+| Ties at the latest time | Inner aggregator applied to every tied row | Same: combined with `+`, `greatest` or `least` | live: shapes with tied rows exist (asserted); a mutation that keeps one tied row fails (1.0 against 122.0) |
+| Earlier rows in the bucket | Ignored | Same | live: buckets with more than one time exist (asserted) |
+| Merging segments | Later partial wins; equal times combine | Same; empty partials are skipped (`shouldCombineAggregateNullInputs: false`) | granularity `all` across 2018 to 2025 month segments |
+| Null metric on a row | Read as 0 (legacy) | `nvl(metric, 0.0)`: read as 0 in every null mode. Under SQL-compatible nulls the extension throws instead, and `doubleSum` would skip the null. Unreachable today: the rollup metrics `sum`, `count`, `min`, `max` are never null. | design |
+| No matching rows in a result row | 0, which the client turns into null through `__count` (SUM, MAX, MIN). COUNT has no `__count`, so it stays 0. | 0 in every null mode (`isNullUnlessAggregated: false`), so the bodies are the same | live: `test_native_last_value_with_no_rows_is_legacy_zero`, 4 operations, 3 modes |
+| MAX/MIN with no rows | -Infinity/+Infinity before the client nulls it | 0 before the client nulls it | not visible: masked by `__count` |
+| AVERAGE | Ratio of the last sum to the last count | Same; the post-aggregator reads finalized values | live, 2 intervals, 2 granularities |
+
+No row needed an options decision: the extension's semantics are preserved exactly.
+
+**Proof.**
+- `tests/core/test_last_value_native.py`: 11 offline tests pin the posted aggregator for every operation, the re-keyed name, the config aggregation rule, identifier quoting, the `extension` default (equal to the golden fixture) and rejection of unknown settings. Without the build hook, 8 of 11 fail.
+- `tests/druid/test_last_value_live.py`, on all three audit stacks: [n3-last-value-live](WP-8a-evidence/n3-last-value-live.txt), 20 passed.
+  - The production builder's native query equals a reference built from core aggregators only (group by exact `__time`, take the latest per group client-side) on 100 shapes per stack: SUM, COUNT, MAX and MIN × 2 intervals × 5 granularities × 5 groupings, including nullable `Sex` and `Age`.
+  - On `nojs` (0.23, legacy nulls), native and extension return identical rows on all 100 shapes.
+- Golden and audit replay with native on: diff-13 to diff-15. 0 differences in Druid rows, bodies or errors on all three modes; 80 cases differ in query text only. On each mode, `calc_last_value`'s Druid response and body equal the legacy 0.23 baseline (`legacy2`, which ran the extension).
+
 ## Interrogation (unit 7)
 
 The `pstack:interrogate` model panel (three reviewers) could not start on 2026-10-05: the session's subagent cap (20 concurrent) was reached. The filled prompt, with intent, scope (the WP-8a commits only) and six focus questions, is ready for the lead to dispatch. Until then, this is the lead pass over the same questions, with the paths traced:
@@ -156,10 +197,12 @@ None. Note for WP-8c (C-8 owner is this role): the Parquet ingest schema must st
 - [ ] qa (blocks review): regenerate `druid_query.json` for the 76 cases in the INV-2 note (`uv run python tests/golden/record.py <cases>`, list from `record.py --check`) on this branch. N2's final form (659bef9) is confirmed by the 2026-10-05 live replays (diff-9 to diff-12), so this is unblocked. N3 must not change any other case's query; if it does, regenerate those too. Check: before regenerating, `check_fixture_drift.py` reports `76 cases post changed queries; 0 other differences`; after, `uv run pytest tests/golden` is green.
 - [x] pipeline (N1): the same change in `data/alerts/alert.py:96` (`NotFilter(SelectorFilter(..., value=''))`). Done 2026-10-04 on `mig/WP-8a-druid-js-null-audit-pipeline`: the guard is now core's form, `~Filter(dimension=..., value=None)` (5b12e5f on `mig/WP-8a-druid-js-null-audit-core`), wrapped in `RawFilter` because the `SelectorFilter` model's `value` is a required `StringField` and rejects None. Relies on N0: under SQL-compatible nulls, `not(selector null)` keeps `''` rows, so it is right only while ingest stores `''` as null.
 - [x] core (N2, blocks unit 5): landed in 659bef9 and merged. Inside a negated filter, emit each value comparison as `and(leaf, not(selector dim null))`. Core guards `selector` and `in`, the only value leaves a query can carry (see N2 in the decision table), not the `bound`/`regex`/`search`/`like` this request also listed. Check passed: the three `audit_not_*` cases match legacy on druid38 with the real builder (diff-11).
-- [ ] core (N3, blocks unit 5 and WP-8b): a native LAST_VALUE that aggregates exactly the rows at the largest timestamp per group, ties included, without the `aggregateLast` extension. Check: `calc_last_value` matches legacy on sqlnull and druid38, and the native path equals the extension on legacy 0.23. In progress: core-8a-c, 2026-10-05. Design (per core-8a-c): `HARMONY_DRUID_LAST_VALUE=native` serialises the wrapper as Druid's built-in `expression` aggregator over a `[timestamp, value]` accumulator, and folds ties with the inner op. The default stays `extension` until WP-8b. Core-8a-c is replaying against this WP's audit stacks read-only.
-- [ ] core (N1b, from unit 7): in `data/pydruid_query/pydruid_query.py`, make `DEFAULT_FILTER` `Dimension('nation') == None` and update the `{'nation': ['']}` docstring example, or delete the module if WP-0d/WP-3a retire it. Check: a unit test that the default filter serialises as `selector value null`.
+- [x] core (N3, blocks unit 5 and WP-8b): a native LAST_VALUE that aggregates exactly the rows at the largest timestamp per group, ties included, without the `aggregateLast` extension. Landed in 4c1b7fe on `mig/WP-8a-druid-js-null-audit-core` (core-8a-c, 2026-10-05). The check passed with native on: `calc_last_value` matches legacy on sqlnull and druid38 (diff-14, diff-15), and native equals the extension on 0.23 with legacy nulls (nojs, 100 shapes, and diff-13). Semantics in the INV-2 note on LAST_VALUE. The default stays `extension` until WP-8b, which must set `native`, delete the extension branch and drop the extension from `loadList`. It does not change any other case's posted query, so the qa regeneration list stays at 76.
+- [ ] lead (N1b, from unit 7; reassigned from core): `data/pydruid_query/**` matches no ownership row, so it is the lead's (SPEC section 6) and the core hook refuses the edit. Recommendation: delete the module rather than fix it. Nothing imports it: a grep over every file type finds only the module-name entry in `tests/web/test_no_raw_queries_from_routes.py` and that test's synthetic source text, both harmless after deletion. It also cannot be imported without `DRUID_HOST` (WP-0d sweep, WP-3a). If it is kept instead, apply the original request: `DEFAULT_FILTER = Dimension('nation') == None`, the `{'nation': ['']}` docstring example, and a test that the default serialises as `selector value null`.
 - [ ] lead: dispatch the `pstack:interrogate` panel (claude-opus-5, claude-fable-5, claude-sonnet-5), which the subagent cap blocked, with the prompt in the Interrogation section's scope.
 - [ ] qa or core (from unit 7): can a saved query or dashboard filter carry `''` as a selected dimension value? If yes, add a golden case and decide it as N1.
+  - Core's answer from the server side (core-8a-c, 2026-10-05): not through the product. The filter picker's values come from `DimensionValuesLookup.load_dimensions_from_druid` (`web/server/data/dimension_values.py:61`), which queries with `Dimension(d) != None`. On legacy Druid `''` is null, and with N0 it is stored as null, so `''` is never offered. A stored `QueryPolicy` with `dimension_value=''` has no include values and no all-values flag, so it falls to `Dimension(d) == NO_FILTER_VAL` (deny) in every null mode.
+  - Only a hand-written or API-posted spec could carry `''`, and on SQL-null Druid that would match nothing. Left open for qa to confirm on the client: free-text or pasted filter values, and saved specs created before N0.
 - [x] qa-1a (WP-1a): use of host Druid. Answered by the lead 2026-10-04: WP-1a's `harmony-wp1a-perf-druid` may be used read-only. Not needed. Every WP-8a run uses its own throwaway projects `wp8a-legacy`, `wp8a-sqlnull` and `wp8a-druid38` (ports 58891 to 58893, loopback only, metadata on tmpfs). No WP-8a run touched WP-1a's project.
 
 ## Log
@@ -174,7 +217,14 @@ None. Note for WP-8c (C-8 owner is this role): the Parquet ingest schema must st
 - 2026-10-05 data-platform-4 resumed from data-platform-3 (host reboot), branch at 659bef9. The strict xfail on `test_builder_emits_the_native_extraction` was already removed by core in c808afa. `uv run pytest tests/druid` 11 passed, no markers.
 - 2026-10-05 data-platform-4 drift check covers N2: `check_fixture_drift.py` rewrites fixtures by an independent statement of N1 and N2, and `run_audit.py diff` separates query-text-only cases from result changes; check: `76 cases post changed queries; 0 other differences`, ruff (pyflakes) clean.
 - 2026-10-05 data-platform-4 unit 5/6 live replays with the real builder (659bef9) on fresh `legacy`, `nojs`, `sqlnull` and `druid38` stacks (ports 58891 to 58893, dataset sha256 35af2e55…c81c regenerated and identical, 9459 rows after rollup in each); check: 0 result differences on legacy and nojs; only `calc_last_value` (N3) on sqlnull and druid38; nojs native epi week parity 0 mismatches over 73414 days; nojs refuses JavaScript. `uv run pytest tests/golden tests/druid tests/alerts`: 210 passed, 76 failed, all posted-query fixture checks pending the qa regeneration.
-- 2026-10-05 data-platform-4 unit 7 (lead pass): interrogation section above. The model panel is blocked by the subagent cap and requested from the lead. One act-on finding (N1b, core request), one question for review. Status set to review as the lead directed. These remain open and must close before `ready`: N3 (core-8a-c), N1b (core), the qa fixture regeneration, and the panel.
+- 2026-10-05 data-platform-4 unit 7 (lead pass): interrogation section above. The model panel is blocked by the subagent cap and requested from the lead. One act-on finding (N1b, core request), one question for review. Status set to review as the lead directed. These remain open and must close before `ready`: N3 (core-8a-c), N1b (core), the qa fixture regeneration, and the panel.- 2026-10-05 core-8a-c (supporting) N3 native LAST_VALUE, 4c1b7fe. Checks:
+  - `tests/core/test_last_value_native.py` 11 passed (8 fail without the build hook);
+  - `tests/druid/test_last_value_live.py` 20 passed on nojs, sqlnull and druid38 (a tie-dropping mutation fails);
+  - native replay of all 90 cases on the three stacks: 0 differences in rows, bodies or errors against `legacy2`;
+  - `uv run pytest tests/core tests/druid tests/golden`: 247 passed, 8 skipped (live tests, no ports set), 76 failed. All failures are the pre-existing `test_druid_queries` fixture checks pending the qa regeneration;
+  - ruff check and black 22.6 `-S` clean on touched files, and ruff format with quote-style preserved;
+  - mypy 1.3.0 clean on `db/druid/aggregations/last_value_aggregation.py` and `db/druid/util.py`.
+- 2026-10-05 core-8a-c (supporting) N2 policy check, 6d3a35f: `tests/core/test_policy_exclusion_keeps_nulls.py` 5 passed, all 5 fail with the N2 rewrite removed. N1b is reassigned to the lead (path is outside core). The `''` question is answered from the server side.
 
 ## Evidence
 

@@ -41,9 +41,13 @@ def _false_on_null(raw_filter):
     `NOT Sex = F` drops rows with no Sex; legacy Druid kept them, and so does
     this form. It is the bare leaf on legacy Druid. Leaves that test for null or
     '' (one value on legacy Druid) are left alone, and nested `not` filters were
-    already rewritten when they were built.
+    already rewritten when they were built. Built filters are rebuilt
+    (`build_filter_from_dict`), so a leaf that already carries its guard keeps it
+    once.
     '''
     filter_type = raw_filter.get('type')
+    if filter_type == 'and' and _is_guarded_leaf(raw_filter):
+        return raw_filter
     if filter_type in ('and', 'or'):
         return {
             **raw_filter,
@@ -57,11 +61,25 @@ def _false_on_null(raw_filter):
         return raw_filter
     if any(value in (None, '') for value in values):
         return raw_filter
+    return {'type': 'and', 'fields': [raw_filter, _is_not_null(raw_filter)]}
 
-    is_null = {'type': 'selector', 'dimension': raw_filter['dimension'], 'value': None}
-    if 'extractionFn' in raw_filter:
-        is_null['extractionFn'] = raw_filter['extractionFn']
-    return {'type': 'and', 'fields': [raw_filter, {'type': 'not', 'field': is_null}]}
+
+def _is_not_null(leaf):
+    '''`NOT dimension IS NULL`, tested on the leaf's extraction output if any.'''
+    is_null = {'type': 'selector', 'dimension': leaf['dimension'], 'value': None}
+    if 'extractionFn' in leaf:
+        is_null['extractionFn'] = leaf['extractionFn']
+    return {'type': 'not', 'field': is_null}
+
+
+def _is_guarded_leaf(raw_filter):
+    '''Whether `raw_filter` is exactly what `_false_on_null` makes of a leaf.'''
+    fields = raw_filter['fields']
+    return (
+        len(fields) == 2
+        and fields[0].get('type') in ('selector', 'in')
+        and fields[1] == _is_not_null(fields[0])
+    )
 
 
 Filter.build_filter = _build_filter_workaround

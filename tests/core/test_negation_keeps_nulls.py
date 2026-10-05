@@ -132,3 +132,52 @@ def test_exclude_values_policy_keeps_rows_with_no_value():
         'type': 'not',
         'field': _false_on_null(leaf),
     }
+
+
+def _rebuilt(built):
+    '''Calculations and the optimizers turn built filters back into pydruid
+    filters (`build_filter_from_dict`) and build them again.'''
+    return Filter.build_filter(db.druid.util.build_filter_from_dict(built))
+
+
+def test_rebuilding_a_guarded_filter_does_not_guard_it_again():
+    for query_filter in (
+        NotFilter(field=SelectorFilter(dimension='Sex', value='F')),
+        NotFilter(field=InFilter(dimension='Age', values=['50+'])),
+        NotFilter(
+            field=AndFilter(
+                fields=[
+                    SelectorFilter(dimension='Sex', value='F'),
+                    NotFilter(field=InFilter(dimension='Age', values=['50+'])),
+                ]
+            )
+        ),
+    ):
+        built = _built(query_filter)
+        assert _rebuilt(built) == built
+        assert _rebuilt(_rebuilt(built)) == built
+
+
+def test_guarding_a_guarded_leaf_with_an_extraction_function_keeps_one_guard():
+    '''`build_filter_from_dict` drops a selector's extractionFn (pydruid's
+    `Filter` has no slot for it), so the guard is checked on its own output. No
+    builder emits a leaf with an extractionFn today.'''
+    leaf = Filter(dimension='Sex', value='F')
+    leaf.filter['filter']['extractionFn'] = {'type': 'substring', 'index': 0}
+    guarded = Filter.build_filter(~leaf)['field']
+    # pylint: disable=protected-access
+    assert db.druid.util._false_on_null(guarded) == guarded
+
+
+def test_a_conjunction_that_only_looks_guarded_is_guarded():
+    '''An `and` whose null test is on another dimension is not the guard.'''
+    other_null = {'type': 'not', 'field': _is_null('Age')}
+    built = Filter.build_filter(
+        ~db.druid.util.build_filter_from_dict(
+            {'type': 'and', 'fields': [SEX_IS_F, other_null]}
+        )
+    )
+    assert built == {
+        'type': 'not',
+        'field': {'type': 'and', 'fields': [_false_on_null(SEX_IS_F), other_null]},
+    }

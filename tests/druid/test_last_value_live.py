@@ -5,7 +5,7 @@ among those its filter keeps; rows tied at that time all count. The reference
 here uses core aggregators only: it groups by the exact `__time` as well, and
 keeps the latest entry of each group client-side. The native query is what the
 production builder posts (`GroupByQueryBuilder` with
-`HARMONY_DRUID_LAST_VALUE=native`).
+`settings.DRUID_LAST_VALUE = 'native'`).
 
 Runs only against Druids named in `LAST_VALUE_LIVE_PORTS` (router ports, comma
 separated), loaded with the WP-8a audit dataset (`scripts/druid/null_audit`).
@@ -35,8 +35,8 @@ from data.query.models.calculation.last_value_calculation import (
     AggregationOperation,
     LastValueCalculation,
 )
+from config import settings
 from data.query.models.query_filter import FieldFilter
-from db.druid.aggregations.last_value_aggregation import LAST_VALUE_SETTING
 from db.druid.query_builder import GroupByQueryBuilder
 from tests.golden.harness import _array_header
 
@@ -180,7 +180,7 @@ def _shapes():
 
 @pytest.fixture
 def native(monkeypatch):
-    monkeypatch.setenv(LAST_VALUE_SETTING, 'native')
+    monkeypatch.setattr(settings, 'DRUID_LAST_VALUE', 'native')
 
 
 @pytest.mark.parametrize('port', PORTS)
@@ -260,9 +260,9 @@ def test_native_last_value_with_no_rows_is_legacy_zero(native, port, operation):
 @pytest.mark.parametrize('port', sorted(EXTENSION_PORTS & set(PORTS)))
 def test_native_and_extension_post_the_same_rows(monkeypatch, port):
     for operation, _metric, _combine, interval, granularity, grouping in _shapes():
-        monkeypatch.setenv(LAST_VALUE_SETTING, 'extension')
+        monkeypatch.setattr(settings, 'DRUID_LAST_VALUE', 'extension')
         extension_query = _builder_query(operation, granularity, grouping, interval)
-        monkeypatch.setenv(LAST_VALUE_SETTING, 'native')
+        monkeypatch.setattr(settings, 'DRUID_LAST_VALUE', 'native')
         native_query = _builder_query(operation, granularity, grouping, interval)
         assert extension_query != native_query
         assert _post(port, native_query) == _post(port, extension_query), (
@@ -271,6 +271,108 @@ def test_native_and_extension_post_the_same_rows(monkeypatch, port):
             granularity,
             grouping,
         )
+
+
+MANY_GROUPS = ['StateName', 'MunicipalityName', 'Sex', 'Age', 'source']
+# (result name, operation, metric, the core aggregator that combines ties)
+SEVERAL_FIELDS = [
+    ('last_sum', AggregationOperation.SUM, 'sum', 'doubleSum'),
+    ('last_count', AggregationOperation.COUNT, 'count', 'doubleSum'),
+    ('last_max', AggregationOperation.MAX, 'max', 'doubleMax'),
+    ('last_min', AggregationOperation.MIN, 'min', 'doubleMin'),
+]
+
+
+def _several_last_values():
+    '''One calculation with every LAST_VALUE operation, AVERAGE included (it
+    posts two LAST_VALUE aggregators).'''
+    calculation = LastValueCalculation(
+        filter=FieldFilter(FIELD), operation=AggregationOperation.AVERAGE
+    ).to_druid('last_average')
+    for name, operation, _metric, _combine in SEVERAL_FIELDS:
+        other = LastValueCalculation(
+            filter=FieldFilter(FIELD), operation=operation
+        ).to_druid(name)
+        calculation.add_aggregations(other.aggregations)
+        calculation.add_post_aggregations(other.post_aggregations)
+    return calculation
+
+
+@pytest.mark.parametrize('port', PORTS)
+def test_many_groups_with_several_last_values(native, port):
+    '''Druid reserves `maxSizeBytes` per group and aggregator for the
+    accumulator; every value must fit it, across many groups at once.'''
+    query = (
+        GroupByQueryBuilder(
+            datasource=DATASOURCE,
+            granularity='day',
+            grouping_fields=list(MANY_GROUPS),
+            intervals=[INTERVALS[0]],
+            calculation=_several_last_values(),
+        )
+        .prepare()
+        .query_dict
+    )
+    posted = [
+        aggregator['aggregator']
+        for aggregator in query['aggregations']
+        if aggregator.get('aggregator', {}).get('type') == 'expression'
+    ]
+    assert len(posted) == len(SEVERAL_FIELDS) + 2
+    assert all(aggregator['maxSizeBytes'] == 32 for aggregator in posted)
+    native_rows = _rows(query, _post(port, query))
+    assert len(native_rows) > 1000, len(native_rows)
+    for name, _operation, metric, combine in SEVERAL_FIELDS:
+        reference = _reference(port, query, metric, combine)
+        assert set(native_rows) == set(reference), name
+        for key, expected in reference.items():
+            assert native_rows[key][name] == expected['value'], (name, key)
+
+
+@pytest.mark.parametrize('port', PORTS)
+@pytest.mark.parametrize('granularity', ['all', 'month'])
+def test_subtotals_reaggregate_the_latest_rows(native, port, granularity):
+    '''`subtotalsSpec` re-aggregates the finer groups' partial results with
+    `combine`: the latest time across the merged groups wins, and groups tied
+    at that time add up.'''
+    calculation = LastValueCalculation(filter=FieldFilter(FIELD)).to_druid(RESULT)
+    query = (
+        GroupByQueryBuilder(
+            datasource=DATASOURCE,
+            granularity=granularity,
+            grouping_fields=['StateName', 'MunicipalityName'],
+            intervals=[INTERVALS[0]],
+            calculation=calculation,
+            subtotal_dimensions=['MunicipalityName'],
+        )
+        .prepare()
+        .query_dict
+    )
+    assert query['subtotalsSpec'] == [
+        ['StateName', 'MunicipalityName'],
+        ['StateName'],
+    ]
+    result = _post(port, query)
+    by_state = {**query, 'dimensions': ['StateName']}
+    full = _reference(port, query, 'sum', 'doubleSum')
+    subtotal = _reference(port, by_state, 'sum', 'doubleSum')
+    # Druid returns each subtotal grouping as one block, in spec order.
+    assert len(result) == len(full) + len(subtotal)
+    full_rows = _rows(query, result[: len(full)])
+    subtotal_rows = _rows(
+        {**query, 'dimensions': ['StateName', 'MunicipalityName']},
+        result[len(full) :],
+    )
+    assert set(full_rows) == set(full)
+    for key, expected in full.items():
+        assert full_rows[key][RESULT] == expected['value'], key
+    for (bucket, (state,)), expected in subtotal.items():
+        assert subtotal_rows[(bucket, (state, None))][RESULT] == expected['value'], (
+            bucket,
+            state,
+        )
+    # Not vacuous: some state has several rows tied at its latest time.
+    assert any(expected['rows'] > 1 for expected in subtotal.values())
 
 
 def test_shapes_cover_every_operation_but_average():

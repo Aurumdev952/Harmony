@@ -10,17 +10,17 @@ and equal timestamps are combined with `inner`.
 The extension exists for Druid 0.23 only and fails under SQL-compatible nulls
 (WP-8a, N3). `build_last_value` serialises the wrapper either as the extension
 or as Druid's built-in `expression` aggregator, which keeps a
-`[timestamp, value]` accumulator with the same semantics. The setting
-`HARMONY_DRUID_LAST_VALUE` picks one: `extension` (default) or `native`. WP-8b
-switches every deployment to `native` and deletes the extension.
+`[timestamp, value]` accumulator with the same semantics.
+`settings.DRUID_LAST_VALUE` (`HARMONY_DRUID_LAST_VALUE`, checked when settings
+load) picks one: `extension` (default) or `native`. WP-8b switches every
+deployment to `native` and deletes the extension (decision 0007, rule 5).
 '''
 
 import json
-import os
 
-LAST_VALUE_SETTING = 'HARMONY_DRUID_LAST_VALUE'
+from config import settings
+
 EXTENSION = 'extension'
-NATIVE = 'native'
 
 # How two values at the same timestamp combine, per inner aggregator type.
 _COMBINE = {
@@ -33,20 +33,16 @@ _COMBINE = {
 # to 2^53, so the accumulator can keep the timestamp next to a double value.
 _BEFORE_ALL_TIME = '-9007199254740992.0'
 
-
-def last_value_implementation() -> str:
-    implementation = os.environ.get(LAST_VALUE_SETTING) or EXTENSION
-    if implementation not in (EXTENSION, NATIVE):
-        raise ValueError(
-            f'{LAST_VALUE_SETTING} must be {EXTENSION!r} or {NATIVE!r}, '
-            f'not {implementation!r}'
-        )
-    return implementation
+# Bytes Druid reserves per group for the accumulator (default 1024). A nullable
+# ARRAY<DOUBLE> of two takes 23: a null byte, a 4-byte length, and a null byte
+# plus 8 bytes per element. A value that does not fit fails the query; it is
+# never truncated.
+MAX_SIZE_BYTES = 32
 
 
 def build_last_value(name: str, aggregator: dict) -> dict:
     '''Serialise an `aggregateLast` wrapper as the Druid aggregator `name`.'''
-    if last_value_implementation() == EXTENSION:
+    if settings.DRUID_LAST_VALUE == EXTENSION:
         return {**aggregator, 'name': name}
     return native_last_value(name, aggregator['aggregator'])
 
@@ -95,6 +91,7 @@ def native_last_value(name: str, inner: dict) -> dict:
         'isNullUnlessAggregated': False,
         'shouldCombineAggregateNullInputs': False,
         'finalize': 'array_offset(o, 1)',
+        'maxSizeBytes': MAX_SIZE_BYTES,
     }
 
 

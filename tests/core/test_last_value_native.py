@@ -8,6 +8,8 @@ posted; `tests/druid/test_last_value_live.py` proves the results on live Druid.
 
 import json
 import os
+import subprocess
+import sys
 from pathlib import Path
 
 import pytest
@@ -24,8 +26,9 @@ from data.query.models.calculation.last_value_calculation import (
     LastValueCalculation,
 )
 from data.query.models.query_filter import FieldFilter
+from config import settings
 from db.druid.aggregations.last_value_aggregation import (
-    LAST_VALUE_SETTING,
+    MAX_SIZE_BYTES,
     native_last_value,
 )
 from db.druid.calculations.complex_calculation import ComplexCalculation
@@ -93,17 +96,18 @@ def _expected_native(
         'isNullUnlessAggregated': False,
         'shouldCombineAggregateNullInputs': False,
         'finalize': 'array_offset(o, 1)',
+        'maxSizeBytes': 32,
     }
 
 
 @pytest.fixture
 def native(monkeypatch):
-    monkeypatch.setenv(LAST_VALUE_SETTING, 'native')
+    monkeypatch.setattr(settings, 'DRUID_LAST_VALUE', 'native')
 
 
 def test_extension_is_the_default(monkeypatch):
     '''Deployments on Druid 0.23 keep posting the extension until WP-8b.'''
-    monkeypatch.delenv(LAST_VALUE_SETTING, raising=False)
+    monkeypatch.setattr(settings, 'DRUID_LAST_VALUE', 'extension')
     golden = json.loads(GOLDEN_QUERY.read_text())[0]['aggregations'][0]
     assert _posted(_last_value())[FIELD] == golden
 
@@ -174,10 +178,46 @@ def test_unsupported_inner_aggregator_is_rejected():
         native_last_value('x', {'type': 'longFirst', 'fieldName': 'sum'})
 
 
-def test_unknown_setting_is_rejected(monkeypatch):
-    monkeypatch.setenv(LAST_VALUE_SETTING, 'javascript')
-    with pytest.raises(ValueError, match=LAST_VALUE_SETTING):
-        _posted(_last_value())
+def _load_settings(value):
+    '''`settings.DRUID_LAST_VALUE` in a fresh process, with the setting unset
+    when `value` is None.'''
+    environment = {**os.environ, 'HARMONY_DRUID_LAST_VALUE': value or ''}
+    return subprocess.run(
+        [
+            sys.executable,
+            '-c',
+            'from config import settings; print(settings.DRUID_LAST_VALUE)',
+        ],
+        env=environment,
+        cwd=Path(__file__).parents[2],
+        capture_output=True,
+        text=True,
+        check=False,
+    )
+
+
+def test_settings_default_to_the_extension():
+    loaded = _load_settings(None)
+    assert loaded.stdout.strip() == 'extension', loaded.stderr
+
+
+def test_settings_read_native():
+    loaded = _load_settings('native')
+    assert loaded.stdout.strip() == 'native', loaded.stderr
+
+
+def test_an_unknown_setting_fails_when_settings_load():
+    '''A typo stops the process at startup instead of at the first query.'''
+    loaded = _load_settings('Native')
+    assert loaded.returncode != 0
+    assert "HARMONY_DRUID_LAST_VALUE must be 'extension' or 'native'" in loaded.stderr
+
+
+def test_the_accumulator_fits_in_max_size_bytes():
+    '''Druid writes the accumulator as a nullable ARRAY<DOUBLE> of two: a null
+    byte, a 4-byte length, then a null byte and 8 bytes per element.'''
+    accumulator_bytes = 1 + 4 + 2 * (1 + 8)
+    assert accumulator_bytes <= MAX_SIZE_BYTES < 1024
 
 
 @pytest.mark.parametrize(

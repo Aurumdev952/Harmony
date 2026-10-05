@@ -3,6 +3,6 @@
 - [WP-0c findings](wp-0c-findings.md): /api/timeout is live; system-client raw queries reachable from /api/field; remember_me JWT claim
 - [Phase-file dead claims](project_phase_file_dead_claims.md) — "unused" routes may be live via ZenClient (no /api/ in the call); verify before deleting
 - [Worktree shell guard](feedback_worktree_shell_guard.md) — command forms the isolation guard refuses and the workarounds that pass
-- [Tooling traps](tooling_traps.md) — multi-Python test runs, black vs ruff format, mypy flags, pipeline suite scratch runs, 3.13 wheel checks
+- [Tooling traps](tooling_traps.md) — multi-Python runs, black vs ruff, ruff py39 with-parens/AST check, E712 on SQLA, mypy flags, 3.13 wheels
 - [Config import hook](config_import_hook.md) — alias semantics, PathFinder precedence, __spec__ restore, lazy DATASOURCE
 - [Postgres bulk-replace traps](postgres-bulk-replace-traps.md) — upsert before delete under CASCADE; setval survives rollback; DELETE not TRUNCATE in long txns

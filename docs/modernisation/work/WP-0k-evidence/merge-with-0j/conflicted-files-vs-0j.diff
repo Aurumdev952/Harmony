@@ -50,26 +50,73 @@ index 482f8a8..42abbc3 100644
              for recepient in recepients:
                  msg = current_app.email_renderer.create_add_dashboard_user_message(
 diff --git a/web/server/api/user_api_models.py b/web/server/api/user_api_models.py
-index 52d74a5..36399ad 100644
+index 52d74a5..f501a97 100644
 --- a/web/server/api/user_api_models.py
 +++ b/web/server/api/user_api_models.py
-@@ -56,6 +56,7 @@ from web.server.routes.views.users import (
+@@ -9,7 +9,7 @@ from flask import current_app, g
+ from flask_potion import fields
+ from flask_potion.routes import ItemRoute, Route
+ from flask_potion.schema import FieldSet
+-from flask_potion.signals import before_delete, after_delete
++from flask_potion.signals import before_create, before_delete, after_delete
+ from flask_user import current_user
+ from werkzeug.exceptions import BadRequest, Forbidden
+ 
+@@ -35,7 +35,7 @@ from web.server.potion.managers import UserResourceManager
+ from web.server.routes.views.authorization import (
+     AuthorizedOperation,
+ )
+-from web.server.routes.views.admin import send_reset_password
++from web.server.routes.views.admin import send_reset_password_for_account
+ from web.server.api.user_api_schemas import (
+     FRONTEND_USER_UPDATE_SCHEMA,
+     INVITE_OBJECT_SCHEMA,
+@@ -56,6 +56,8 @@ from web.server.routes.views.users import (
      update_user_groups,
      update_user_roles_from_map,
  )
++from web.server.data.data_access import get_db_adapter
 +from web.server.security.usernames import username_taken
  from web.server.security.grants import (
      held_roles_from_uris,
      member_groups_from_uris,
-@@ -146,6 +147,8 @@ class UserResource(PrincipalResource):
+@@ -146,6 +148,10 @@ class UserResource(PrincipalResource):
      )
      def update_user(self, db_user, obj):
          with AuthorizedOperation('edit_user', 'site'):
-+            if username_taken(obj['username'], except_user_id=db_user.id):
++            if obj['username'] != db_user.username and username_taken(
++                obj['username'], except_user_id=db_user.id
++            ):
 +                raise BadRequest('Another account has this username.')
              # NOTE: this whole block must run in the same transaction
              # and can leave db in incosistent state like this but should be
              # addressed seaparately of why I'm here and requires quite a big refactoring
+@@ -229,7 +235,7 @@ class UserResource(PrincipalResource):
+                 message = f'User {username} does not have a valid e-mail address.'
+                 return StandardResponse(message, BAD_REQUEST, False), BAD_REQUEST
+ 
+-            send_reset_password(username)
++            send_reset_password_for_account(user.id)
+ 
+             message = (
+                 f'User password has been reset and instructions e-mailed to {username}.'
+@@ -394,6 +400,16 @@ class UserResource(PrincipalResource):
+         return group_name in group_names
+ 
+ 
++@before_create.connect_via(UserResource)
++def before_create_user(sender, item):
++    '''`POST /api2/user` may not add an account equal to another ignoring
++    case. The new item may already be in the session, so no flush runs first.'''
++    session = get_db_adapter().session
++    with session.no_autoflush:
++        if username_taken(item.username, session):
++            raise BadRequest('Another account has this username.')
++
++
+ @before_delete.connect_via(UserResource)
+ def before_delete_user(sender, item):
+     if current_user.is_authenticated and item.id == current_user.id:
 diff --git a/web/server/routes/views/users.py b/web/server/routes/views/users.py
 index 7a57f4f..7f3632d 100644
 --- a/web/server/routes/views/users.py

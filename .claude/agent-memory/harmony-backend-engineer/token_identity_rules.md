@@ -5,10 +5,12 @@ metadata:
   type: project
 ---
 
-Since WP-0k (2026-10-05) a JWT signs in only the account it was issued to:
-- session tokens carry `user_claims.user_id`; `create_user_access_token` and `login_user` take a `User`, not a username (WP-0h/0j harness helpers had to change on merge);
+Since WP-0k (2026-10-05) a JWT signs in only the account it was issued to (`account_for_token` in `signal_handlers.py`):
+- session and render tokens carry `user_claims.user_id`; `create_user_access_token` and `login_user` take a `User`, not a username (WP-0h/0j harness helpers had to change on merge);
 - API tokens (`user_claims.id`) are checked against the `api_token` row on every request; there is no memo any more;
-- tokens with neither (pre-0k sessions, render tokens) are refused when `user.created` is in a later second than `iat`.
+- pre-0k sessions get the one non-pending account equal to the identity ignoring case, else nobody;
+- every token: account active, username exactly the identity, `created` not in a later second than `iat`.
+- Fake users in other suites (SimpleNamespace) need `is_active=True` now that `authentication_required` checks it.
 
 **Why:** WP-2b T1/T2 showed deleted users' tokens signing in recreated usernames.
 

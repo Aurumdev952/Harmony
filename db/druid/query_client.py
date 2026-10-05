@@ -2,11 +2,11 @@ import gzip
 import json
 import logging
 import os
-import ijson
 
 from abc import ABC, abstractmethod
 from typing import Dict, Any
 
+import msgspec
 import requests
 
 from db.druid.errors import DruidQueryError
@@ -24,6 +24,10 @@ from web.server.util.error_links import get_error_background_link_msg
 # or staleness), so multiple unused sessions could potentially accumulate.
 # TODO: fix this type
 _SESSIONS: Dict[Any, Any] = {}
+
+# Reads a whole streamed response. Druid's longs stay exact Python ints (including
+# Long.MIN_VALUE) and its doubles become floats; it quotes NaN and the infinities.
+_decode_druid_json = msgspec.json.Decoder().decode
 
 
 def _get_session(druid_configuration):
@@ -162,7 +166,7 @@ class DruidQueryClient_(DruidQueryRunner):
                 if r.headers.get('Content-Encoding', '') == 'gzip'
                 else r.raw
             )
-            return ijson.items(fp, 'item', use_float=True)
+            return _decode_druid_json(fp.read())
 
         ret = r.json()
         if LOG.level <= logging.DEBUG and os.getenv('LOG_DRUID_RESPONSES'):
@@ -230,7 +234,7 @@ class DruidQueryClient(DruidQueryRunner):
                 if r.headers.get('Content-Encoding', '') == 'gzip'
                 else r.raw
             )
-            return ijson.items(fp, 'item', use_float=True)
+            return _decode_druid_json(fp.read())
         return r.json()
 
     @classmethod

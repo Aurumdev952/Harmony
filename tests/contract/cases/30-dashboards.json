@@ -34,7 +34,8 @@
       "capture": {
         "dashboard": "/$uri",
         "dashboard_id": "/$uri#id",
-        "dashboard_resource": "/resource"
+        "dashboard_resource": "/resource",
+        "dashboard_resource_id": "/resource#id"
       }
     },
     {
@@ -289,7 +290,14 @@
       "query": {
         "key": "contract-dashboard"
       },
-      "note": "stack.sh seeds this thumbnail into Redis: a miss renders through Urlbox, which the stack cannot reach, and leaves a PENDING marker that stalls later reads for 10 minutes."
+      "seed": [
+        "thumbnail",
+        "{dashboard_resource_id}"
+      ],
+      "pin": [
+        ""
+      ],
+      "note": "The seed step writes the admin's v2 cache entry (thumbnail:v2:<resource id>:<policy digest>, WP-0i), which only exists after dashboard.create. The pin tells that hit from a miss: a miss renders through Urlbox, which the stack cannot reach, and answers \"\" with the same shape."
     },
     {
       "id": "storage.retrieve.unknown_slug",
@@ -297,7 +305,7 @@
       "query": {
         "key": "contract-no-such-dashboard"
       },
-      "note": "The handler dereferences the missing dashboard, so this is a 500 today (WP-2c finding F11)."
+      "note": "A 404 since WP-0i (it was a 500, WP-2c finding F11)."
     },
     {
       "id": "user.ownership.with_dashboard",

@@ -25,8 +25,9 @@ resampled as pairs) is over 1:
   30% in an A/A run on a loaded host, enough to hide a 25% regression. A
   slowdown of every request by a factor raises p95 by the same factor.
 
-The bounds' one-sided level is 5% split across the cases, so an A/A run fails
-less than one time in twenty. The report gives each case's `detects`: the
+Each bound's one-sided level is 5% split over both bounds of every case
+(Bonferroni), so an A/A run fails at most one time in twenty; the README gives
+the rates measured by scripts/perf/probes/level.py. The report gives each case's `detects`: the
 smallest slowdown of every candidate request that would have failed it. On an
 A/A run that is what the run could see; a passing run's claim is only as
 strong as its largest `detects`.
@@ -109,7 +110,8 @@ SIDES = ('reference', 'candidate')
 DATASET_START = '2023-01-01'
 DATASET_END = '2026-01-01'
 P95_REGRESSION_LIMIT = 0.10
-# One-sided error rate of a paired run's verdict, split across its cases.
+# One-sided error rate of a paired run's verdict, split over both bounds of
+# every case (case_alpha).
 FAMILY_ALPHA = 0.05
 BOOTSTRAP_RESAMPLES = 4000
 # Below this, a bootstrap of p95 resamples little more than the maximum and an
@@ -272,6 +274,14 @@ def summarise_dashboard(record: dict[str, Any]) -> PerfSample:
         max_ms=round(max(latencies), 1),
         druid_queries=None,
     )
+
+
+def case_alpha(cases: int) -> float:
+    """The level of each one-sided bound. A case has two bounds (p95 and
+    paired median) and either can fail it, so the family budget is split over
+    twice the cases: an A/A run then fails any bound at most FAMILY_ALPHA of
+    the time (Bonferroni)."""
+    return FAMILY_ALPHA / (2 * cases)
 
 
 def beyond_limit(point: float, lower: float) -> bool:
@@ -848,7 +858,7 @@ def finish_paired(
     meta: dict[str, Any],
 ) -> int:
     """Write a paired run's files, print the verdicts, return the exit code."""
-    alpha = FAMILY_ALPHA / len(rounds)
+    alpha = case_alpha(len(rounds))
     results = [
         paired_result(case_id, reference_ms, candidate_ms, alpha)
         for case_id, (reference_ms, candidate_ms) in rounds.items()

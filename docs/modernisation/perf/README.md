@@ -24,7 +24,15 @@ A case or dashboard fails when either of two ratios is over 1.10 and the lower b
 | p95 ratio (candidate p95 / reference p95) | PERF-7 as written. The only check that sees a slowdown confined to the slow tail. |
 | paired median ratio (median over rounds of candidate time / reference time in that round) | A slowdown of every request. Shared load cancels within a round, so this sees through noise that hides a 25% slowdown from p95. |
 
-The bounds are one-sided at 5% split across all cases, so an A/A run (both sides the same commit) fails less than one time in twenty.
+Each bound is one-sided at 5% split over both bounds of every case (Bonferroni: 5% / (2 x 24) per bound), so that an A/A run (both sides the same commit) fails about one time in twenty or less. Measured by `scripts/perf/probes/level.py` over 500 simulated full runs per noise model (`probes/2026-10-06-level-bounds.txt`):
+
+| Noise | A/A runs that fail (95% interval) | Round 1's split over cases only |
+|---|---:|---:|
+| This host's real noise (the committed A/A run, each round's sides swapped at random) | 3.0% (1.8 to 4.9) | 4.2% |
+| Synthetic: shared load, 10% of requests stall 1x to 3x, jitter 0.15 | 3.6% (2.3 to 5.6) | 6.2% |
+| Synthetic, heavy: 25% stall, jitter 0.30 | 6.6% (4.7 to 9.1) | 10.4% |
+
+Under the heaviest synthetic stalls the run still fails more often than 5%: a bootstrap over 30 to 100 rounds is a little optimistic when a quarter of the requests stall. On this host's real noise it holds.
 
 **Reading the `detects` column.** `detects` is the smallest slowdown of every candidate request that would have failed that case. A pass is only as strong as the largest `detects`, and the run prints that value on its last line.
 

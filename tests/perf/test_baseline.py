@@ -421,6 +421,24 @@ def test_a_paired_run_writes_both_sides_and_fails_on_a_clear_regression(
     assert 'FAIL: perf-mixed-6' in out
 
 
+def test_the_error_budget_is_split_over_both_bounds_of_every_case():
+    # Each case has two one-sided bounds (p95 and paired median), and either
+    # can fail it, so an A/A run fails at most FAMILY_ALPHA of the time only
+    # when the budget is split over twice the number of cases.
+    assert baseline.FAMILY_ALPHA == 0.05
+    assert baseline.case_alpha(24) == pytest.approx(0.05 / 48)
+
+
+def test_a_paired_run_judges_each_bound_at_the_split_level(tmp_path: Path, capsys):
+    stem = baseline.paired_stem(tmp_path, '2026-10-06', 'a' * 40, 'b' * 40, 'alpha')
+    ms = [float(v) for v in range(100, 130)]
+    samples = [sample('q', 128.0), sample('r', 128.0)]
+    rounds = {'q': (ms, ms), 'r': (ms, ms)}
+    baseline.finish_paired(stem, samples, samples, rounds, _paired_meta())
+    assert 'one-sided 1.25%' in Path(f'{stem}.md').read_text()
+    assert 'one-sided 1.25%' in capsys.readouterr().out
+
+
 @given(
     st.lists(st.floats(min_value=1, max_value=1e4), min_size=20, max_size=120),
     st.floats(min_value=0.5, max_value=2),
@@ -469,7 +487,9 @@ def test_independent_stalls_trip_the_bare_p95_ratio_but_not_the_paired_verdict()
             load = rng.uniform(1, 3)
             reference.append(latency(load))
             candidate.append(latency(load))
-        result = baseline.paired_result(f'c{case}', reference, candidate, 0.05 / cases)
+        result = baseline.paired_result(
+            f'c{case}', reference, candidate, baseline.case_alpha(cases)
+        )
         bare_over += result.ratio > 1.10
         regressed += result.regressed
     assert bare_over > 0
@@ -502,7 +522,9 @@ def test_a_uniform_fifteen_percent_slowdown_fails_every_case_on_a_loaded_host():
     cases = 24
     for case in range(cases):
         reference, candidate = _loaded_host_rounds(rng, 1.15)
-        result = baseline.paired_result(f'c{case}', reference, candidate, 0.05 / cases)
+        result = baseline.paired_result(
+            f'c{case}', reference, candidate, baseline.case_alpha(cases)
+        )
         assert result.regressed, result
 
 
@@ -514,7 +536,7 @@ def test_a_tail_regression_fails_on_p95_even_when_the_typical_request_is_unchang
     candidate = [
         ms * (3 if index % 10 == 0 else 1) for index, ms in enumerate(reference)
     ]
-    result = baseline.paired_result('c', reference, candidate, 0.05 / 24)
+    result = baseline.paired_result('c', reference, candidate, baseline.case_alpha(24))
     assert result.shift == pytest.approx(1)
     assert not result.shift_regressed
     assert result.p95_regressed and result.regressed

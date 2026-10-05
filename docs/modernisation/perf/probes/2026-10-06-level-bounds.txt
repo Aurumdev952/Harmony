@@ -1,0 +1,36 @@
+cases: 24 (21 at 100 rounds, 3 at 30)
+per-bound level (bounds split): 0.00104, 4000 resamples; runs per model: 500
+real-noise source: docs/modernisation/perf/paired/2026-10-05-01d5bdf47f-vs-01d5bdf47f-aa.rounds.jsonl
+
+## real
+A/A runs failed: 15/500 = 0.030 (95% CI 0.018 to 0.049)
+uniform slowdown 1.05: cases failed 0.041, runs with any case failed 0.626, runs with every case failed 0.000
+uniform slowdown 1.08: cases failed 0.176, runs with any case failed 0.992, runs with every case failed 0.000
+uniform slowdown 1.10: cases failed 0.393, runs with any case failed 1.000, runs with every case failed 0.000
+uniform slowdown 1.12: cases failed 0.636, runs with any case failed 1.000, runs with every case failed 0.000
+uniform slowdown 1.15: cases failed 0.865, runs with any case failed 1.000, runs with every case failed 0.018
+uniform slowdown 1.20: cases failed 0.984, runs with any case failed 1.000, runs with every case failed 0.680
+uniform slowdown 1.25: cases failed 0.999, runs with any case failed 1.000, runs with every case failed 0.970
+median detects 1.108, 95th percentile 1.176
+
+## stalls-10
+A/A runs failed: 18/500 = 0.036 (95% CI 0.023 to 0.056)
+uniform slowdown 1.05: cases failed 0.036, runs with any case failed 0.584, runs with every case failed 0.000
+uniform slowdown 1.08: cases failed 0.170, runs with any case failed 0.982, runs with every case failed 0.000
+uniform slowdown 1.10: cases failed 0.350, runs with any case failed 1.000, runs with every case failed 0.000
+uniform slowdown 1.12: cases failed 0.552, runs with any case failed 1.000, runs with every case failed 0.000
+uniform slowdown 1.15: cases failed 0.793, runs with any case failed 1.000, runs with every case failed 0.000
+uniform slowdown 1.20: cases failed 0.935, runs with any case failed 1.000, runs with every case failed 0.116
+uniform slowdown 1.25: cases failed 0.971, runs with any case failed 1.000, runs with every case failed 0.450
+median detects 1.115, 95th percentile 1.216
+
+## stalls-25
+A/A runs failed: 33/500 = 0.066 (95% CI 0.047 to 0.091)
+uniform slowdown 1.05: cases failed 0.012, runs with any case failed 0.242, runs with every case failed 0.000
+uniform slowdown 1.08: cases failed 0.029, runs with any case failed 0.532, runs with every case failed 0.000
+uniform slowdown 1.10: cases failed 0.051, runs with any case failed 0.732, runs with every case failed 0.000
+uniform slowdown 1.12: cases failed 0.081, runs with any case failed 0.880, runs with every case failed 0.000
+uniform slowdown 1.15: cases failed 0.144, runs with any case failed 0.972, runs with every case failed 0.000
+uniform slowdown 1.20: cases failed 0.299, runs with any case failed 1.000, runs with every case failed 0.000
+uniform slowdown 1.25: cases failed 0.491, runs with any case failed 1.000, runs with every case failed 0.000
+median detects 1.253, 95th percentile 1.543

@@ -242,6 +242,11 @@ C-5 (session and JWT format, owned by backend). Old: a render token was a plain 
   - the strict run on CPython 3.12 with `playwright==1.63.0` (command in the request) found the `clip` dict mismatch, fixed with `FloatRect`, then gave no issues in 10 files;
   - in-image browser tests: 28 passed;
   - ruff: clean.
+- 2026-10-05 backend-8 R2-6 (reviewer 6): two pin tests through a real page load. With `load_page`, `FakeRenderer.post` loads the dashboard page with the minted token from a cookie jar, as the browser does, so the test app's real `signal_handlers.on_identity_loaded` and `_install_token_needs` decide. The test app's dashboard page now answers 403 unless the identity can view the dashboard. `test_a_render_whose_policy_is_unchanged_loads_the_page` checks for page 200 and content. `test_a_policy_change_while_the_render_is_queued_fails_the_page_load` widens north's policy between the request and the page load, and checks for page 403 and route 500. Trap: Werkzeug 0.16's test client drops a `Cookie` header in favour of its jar, which made the first version see an anonymous user. check:
+  - both tests pass;
+  - with the pin check in `_install_token_needs` disabled as a mutant, the policy-change test fails (page 200);
+  - `uv run --locked pytest tests/web`: 331 passed, 1 xfailed;
+  - ruff: clean.
 
 ## Evidence
 

@@ -3,13 +3,21 @@
 `FakeRenderer` stands in for the service; nothing leaves the process.
 """
 
+import dataclasses
 import logging
 from urllib.parse import parse_qs, urlsplit
 
 import pytest
 import requests
 
-from render_fakes import DASHBOARD_SLUG, SENDER, USERS, FakeRenderResponse
+from render_fakes import (
+    DASHBOARD_SLUG,
+    SENDER,
+    USERS,
+    VIEW_DASHBOARD,
+    FakeRenderResponse,
+    _policy,
+)
 from web.server.redis import thumbnail_storage_service
 from web.server.routes.views import page_renderer
 from web.server.routes.views.dashboard import get_email_attachments
@@ -215,6 +223,42 @@ def test_restricted_viewer_render_carries_their_policy(client, renderer):
         south.claims['policy'],
         viewer.claims['policy'],
     )
+
+
+# The policy pin through a real page load: the fake renderer loads the dashboard
+# page with the minted token, so `on_identity_loaded` and `_install_token_needs`
+# decide, as they do for the browser (review round 1, finding 6).
+
+
+def test_a_render_whose_policy_is_unchanged_loads_the_page(client, renderer):
+    renderer.load_page = True
+
+    response = client.get(f'/dashboard/{SLUG}/pdf', headers=as_user(NORTH))
+
+    assert renderer.page_statuses == [200]
+    assert response.status_code == 200
+    assert response.data == f'render-as:{NORTH}'.encode()
+
+
+def test_a_policy_change_while_the_render_is_queued_fails_the_page_load(
+    client, renderer, monkeypatch
+):
+    def widen_norths_policy():
+        monkeypatch.setitem(
+            USERS,
+            NORTH,
+            dataclasses.replace(
+                USERS[NORTH], provides=frozenset({VIEW_DASHBOARD, _policy()})
+            ),
+        )
+
+    renderer.load_page = True
+    renderer.before_page_load = widen_norths_policy
+
+    response = client.get(f'/dashboard/{SLUG}/pdf', headers=as_user(NORTH))
+
+    assert renderer.page_statuses == [403]
+    assert response.status_code == 500
 
 
 def test_emailed_render_resolves_the_recipients_own_policy(app, renderer):

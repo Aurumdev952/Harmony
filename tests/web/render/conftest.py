@@ -26,7 +26,13 @@ from flask_jwt_extended import (
 )
 from flask_login import LoginManager, current_user
 from flask_potion import Api
-from flask_principal import AnonymousIdentity, Identity, Principal, identity_loaded
+from flask_principal import (
+    AnonymousIdentity,
+    Identity,
+    Permission,
+    Principal,
+    identity_loaded,
+)
 
 from config.loader import import_configuration_module
 from render_fakes import (
@@ -95,9 +101,13 @@ def fixture_app() -> Flask:
         elif PUBLIC_ACCESS['enabled']:
             identity.provides.add(VIEW_DASHBOARD)
 
-    # The renderer builds the page URL with url_for('dashboard.grid_dashboard').
+    # The renderer builds the page URL from 'dashboard.grid_dashboard'. The page
+    # answers only to a viewer of the dashboard, as the app's own does, so a
+    # render whose token grants nothing fails.
     def grid_dashboard(locale=None, name=None):
-        return ''
+        if not Permission(VIEW_DASHBOARD).can():
+            return 'forbidden', 403
+        return 'dashboard'
 
     dashboard_page = Blueprint('dashboard', __name__)
     dashboard_page.add_url_rule('/dashboard/<name>', 'grid_dashboard', grid_dashboard)

@@ -2,7 +2,8 @@
 service."""
 
 from dataclasses import dataclass, field
-from typing import Dict, FrozenSet, List, Optional, Tuple
+from typing import Callable, Dict, FrozenSet, List, Optional, Tuple
+from urllib.parse import urlsplit
 
 import redis
 import requests
@@ -181,6 +182,11 @@ class FakeRenderer:
     The body names the identity the minted `accessKey` token logs in as, so a
     test can tell whose data a render (and any cached copy of it) shows. Set
     `status_code` to make the renderer answer with an error.
+
+    With `load_page`, it loads the dashboard page with the token as the browser
+    would, through the app's real identity loading, and fails the render as
+    `page_failed` unless the page answers 200. `before_page_load` runs first,
+    for a change made while the render is queued.
     """
 
     RequestException = requests.RequestException
@@ -189,6 +195,9 @@ class FakeRenderer:
         self._app = app
         self.calls: List[RenderCall] = []
         self.status_code = 200
+        self.load_page = False
+        self.before_page_load: Optional[Callable[[], None]] = None
+        self.page_statuses: List[int] = []
 
     def post(self, url, json=None, timeout=None, stream=False):
         params = dict(json or {})
@@ -211,6 +220,19 @@ class FakeRenderer:
         self.calls.append(
             RenderCall(url, params, identity, claims, timeout, live, lifetime)
         )
+        if self.load_page:
+            if self.before_page_load is not None:
+                self.before_page_load()
+            page = urlsplit(params['url'])
+            browser = self._app.test_client()
+            # The test client replaces a Cookie header with its own jar.
+            browser.set_cookie('localhost', 'accessKey', token)
+            response = browser.get(f'{page.path}?{page.query}')
+            self.page_statuses.append(response.status_code)
+            if response.status_code != 200:
+                return FakeRenderResponse(
+                    b'{"error": "page_failed"}', 'application/json', status_code=502
+                )
         return FakeRenderResponse(
             f'render-as:{identity}'.encode(),
             CONTENT_TYPES.get(params.get('format'), 'application/octet-stream'),

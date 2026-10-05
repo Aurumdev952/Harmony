@@ -1,5 +1,9 @@
 '''Handle initialization and setup of the flask app and all its dependencies.'''
 
+# First, so logging is configured and warnings are captured before any other
+# import can print one.
+from log import LOG
+
 from datetime import datetime
 import queue
 from typing import Optional
@@ -10,7 +14,6 @@ from flask_jwt_extended import JWTManager
 from flask_potion import Api
 from flask_principal import Principal
 from werkzeug.serving import is_running_from_reloader
-from log import LOG
 from log.flask_request import install_request_logging
 
 from data.query.mock import generate_web_query_mock_data

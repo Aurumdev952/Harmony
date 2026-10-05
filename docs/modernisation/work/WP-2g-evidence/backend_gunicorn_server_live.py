@@ -3,8 +3,8 @@ for the baseline), with create_app stubbed by a tiny Flask app, so gunicorn's ow
 config, including logconfig_dict, is what the module sets.'''
 
 import runpy
-import tempfile
 import sys
+import tempfile
 import types
 
 
@@ -15,11 +15,8 @@ def create_app():
 
     from log.flask_request import install_request_logging
 
-    app = Flask(
-        'wp2g_backend_live',
-        root_path=tempfile.gettempdir(),
-        instance_path=tempfile.gettempdir(),
-    )
+    scratch = tempfile.gettempdir()
+    app = Flask('wp2g_backend_live', root_path=scratch, instance_path=scratch)
     install_request_logging(app)
 
     @app.route('/ping')

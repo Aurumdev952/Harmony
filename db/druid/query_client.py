@@ -6,10 +6,10 @@ import os
 from abc import ABC, abstractmethod
 from typing import Dict, Any
 
-import msgspec
 import requests
 
 from db.druid.errors import DruidQueryError
+from db.druid.json_stream import iter_json_array
 from log import LOG
 from util.druid import get_druid_request_params
 from web.server.util.error_links import get_error_background_link_msg
@@ -24,10 +24,6 @@ from web.server.util.error_links import get_error_background_link_msg
 # or staleness), so multiple unused sessions could potentially accumulate.
 # TODO: fix this type
 _SESSIONS: Dict[Any, Any] = {}
-
-# Reads a whole streamed response. Druid's longs stay exact Python ints (including
-# Long.MIN_VALUE) and its doubles become floats; it quotes NaN and the infinities.
-_decode_druid_json = msgspec.json.Decoder().decode
 
 
 def _get_session(druid_configuration):
@@ -166,7 +162,7 @@ class DruidQueryClient_(DruidQueryRunner):
                 if r.headers.get('Content-Encoding', '') == 'gzip'
                 else r.raw
             )
-            return _decode_druid_json(fp.read())
+            return iter_json_array(fp)
 
         ret = r.json()
         if LOG.level <= logging.DEBUG and os.getenv('LOG_DRUID_RESPONSES'):
@@ -234,7 +230,7 @@ class DruidQueryClient(DruidQueryRunner):
                 if r.headers.get('Content-Encoding', '') == 'gzip'
                 else r.raw
             )
-            return _decode_druid_json(fp.read())
+            return iter_json_array(fp)
         return r.json()
 
     @classmethod

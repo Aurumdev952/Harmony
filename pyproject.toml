@@ -68,8 +68,6 @@ dependencies = [
     "types-jsonschema==4.17.0.8",
     # 0.18 imports imp, gone in Python 3.12.
     "future==1.0.0",
-    # Parses Druid responses: C speed on 3.13, exact 64-bit longs (WP-3b, PERF-7).
-    "msgspec==0.21.1",
 ]
 
 [dependency-groups]

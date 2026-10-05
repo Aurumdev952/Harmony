@@ -1,4 +1,5 @@
-'''Streamed Druid responses parse exactly and fast on CPython 3.13 (WP-3b, PERF-7).
+'''Streamed Druid responses parse exactly, fast and row by row on CPython 3.13
+(WP-3b, PERF-7).
 
 Before WP-3b, streamed groupBy responses went through ijson-bigint's yajl C
 backend, which reads Druid's Long.MIN_VALUE exactly. That backend does not build
@@ -10,6 +11,7 @@ import json
 import math
 import os
 import time
+import tracemalloc
 from contextlib import contextmanager
 from io import BytesIO
 from pathlib import Path
@@ -24,6 +26,7 @@ os.environ.setdefault('DRUID_HOST', 'http://druid.invalid')
 os.environ.setdefault('DEFAULT_SECRET_KEY', 'tests-druid-placeholder-key')
 
 # pylint: disable=wrong-import-position
+from db.druid import json_stream
 from db.druid.config import construct_druid_configuration
 from db.druid.query_client import DruidQueryClient_, _get_session
 
@@ -65,21 +68,23 @@ EDGE_ROW = [
 
 
 class _Broker(BaseAdapter):
-    '''Answers every POST with `body`, gzip-encoded as Druid does for a streamed
-    request that accepts gzip.'''
+    '''Answers every POST with `wire`, the body as sent: gzip-encoded, as Druid
+    sends it to a streamed request that accepts gzip, unless `gzipped` is False.'''
 
-    def __init__(self, body):
+    def __init__(self, wire, gzipped):
         super().__init__()
-        self.body = body
+        self.wire = wire
+        self.gzipped = gzipped
 
     def send(self, request, stream=False, **kwargs):  # pylint: disable=arguments-differ
         assert stream and 'gzip' in request.headers['Accept-Encoding']
+        headers = {'Content-Type': 'application/json'}
+        if self.gzipped:
+            headers['Content-Encoding'] = 'gzip'
         response = Response()
         response.status_code = 200
-        response.headers = CaseInsensitiveDict(
-            {'Content-Type': 'application/json', 'Content-Encoding': 'gzip'}
-        )
-        response.raw = BytesIO(gzip.compress(self.body))
+        response.headers = CaseInsensitiveDict(headers)
+        response.raw = BytesIO(self.wire)
         response.request = request
         return response
 
@@ -88,20 +93,21 @@ class _Broker(BaseAdapter):
 
 
 @contextmanager
-def _client_answering(body):
+def _client_answering(wire, gzipped=True):
     configuration = construct_druid_configuration('http://druid.parse.invalid')
     session = _get_session(configuration)
     prefix = configuration.query_endpoint()
     original = session.adapters[prefix]
-    session.mount(prefix, _Broker(body))
+    session.mount(prefix, _Broker(wire, gzipped))
     try:
         yield DruidQueryClient_(configuration)
     finally:
         session.mount(prefix, original)
 
 
-def _stream(body):
-    with _client_answering(body) as client:
+def _stream(body, gzipped=True):
+    wire = gzip.compress(body) if gzipped else body
+    with _client_answering(wire, gzipped) as client:
         return list(client.run_raw_query({'queryType': 'groupBy'}, streaming=True))
 
 
@@ -145,15 +151,112 @@ def test_bodies_yajl_rejected_still_fail(body):
 
 
 def test_large_response_parses_fast():
-    # 100,000 array rows (13 MB). msgspec parses them in about 0.07 s; ijson's
+    # 100,000 array rows (13 MB). The client reads them in about 0.15 s; ijson's
     # pure-Python backend, which the 3.13 image would fall back to, in 1.2 s.
     row = (
         '[1709510400000, "Município de São Paulo", "15-49", "Pará", 292.19, null,'
         ' 16, 1234.5678, 0.0, 48, "NaN", -9223372036854775808]'
     )
-    body = ('[' + ','.join([row] * 100_000) + ']').encode()
-    start = time.perf_counter()
-    rows = _stream(body)
-    elapsed = time.perf_counter() - start
-    assert len(rows) == 100_000
+    wire = gzip.compress(('[' + ','.join([row] * 100_000) + ']').encode())
+    with _client_answering(wire) as client:
+        start = time.perf_counter()
+        count = sum(
+            1 for _ in client.run_raw_query({'queryType': 'groupBy'}, streaming=True)
+        )
+        elapsed = time.perf_counter() - start
+    assert count == 100_000
     assert elapsed < 0.5, f'{elapsed:.2f} s'
+
+
+@pytest.mark.parametrize('gzipped', [True, False], ids=['gzip', 'identity'])
+def test_identity_encoded_responses_parse_too(gzipped):
+    body = b'[[1709510400000, "Acre", 1.5], [1709510400000, "Par\xc3\xa1", null]]'
+    assert _stream(body, gzipped) == [
+        [1709510400000, 'Acre', 1.5],
+        [1709510400000, 'Pará', None],
+    ]
+
+
+def _peak_bytes_while_counting(wire):
+    with _client_answering(wire) as client:
+        tracemalloc.start()
+        try:
+            rows = client.run_raw_query({'queryType': 'groupBy'}, streaming=True)
+            count = sum(1 for _ in rows)
+            _, peak = tracemalloc.get_traced_memory()
+        finally:
+            tracemalloc.stop()
+    return count, peak
+
+
+def test_rows_stream_without_holding_the_body():
+    # 100,000 rows, 12 MB of JSON; decoding it whole holds over 60 MB.
+    row = (
+        '[1709510400000, "Município de São Paulo", "15-49", 292.19, null, 16,'
+        ' 1234.5678, -9223372036854775808, "NaN", 0.0, 48, "Pará"]'
+    ).encode()
+    count, peak = _peak_bytes_while_counting(
+        gzip.compress(b'[' + b','.join([row] * 100_000) + b']')
+    )
+    assert count == 100_000
+    assert peak < 8 * 1024 * 1024, f'{peak / 2**20:.1f} MiB'
+
+
+def test_highly_compressed_body_streams_without_inflating():
+    # 64 MiB of JSON whitespace gzips to about 64 KB.
+    wire = gzip.compress(b'[' + b' ' * (64 * 1024 * 1024) + b'[1]]', compresslevel=9)
+    count, peak = _peak_bytes_while_counting(wire)
+    assert count == 1
+    assert peak < 8 * 1024 * 1024, f'{peak / 2**20:.1f} MiB'
+
+
+class _Trickle:
+    '''A binary file that returns at most `size` bytes per read.'''
+
+    def __init__(self, data, size):
+        self.data = BytesIO(data)
+        self.size = size
+
+    def read(self, size=-1):
+        return self.data.read(self.size if size < 0 else min(size, self.size))
+
+
+def _golden_bodies():
+    for path in sorted(GOLDEN_CASES.glob('*/druid_response.json')):
+        for response in json.loads(path.read_text('utf-8')):
+            yield json.dumps(response, ensure_ascii=False).encode()
+
+
+@pytest.mark.parametrize('size', [1, 2, 3, 5, 7])
+def test_every_read_boundary_parses_the_same(monkeypatch, size):
+    # Small reads split numbers, escapes and multi-byte UTF-8 characters.
+    monkeypatch.setattr(json_stream, '_READ_BYTES', 1)
+    for body in [EDGE_BODY, *_golden_bodies()]:
+        parsed = list(json_stream.iter_json_array(_Trickle(body, size)))
+        assert _typed(parsed) == _typed(json.loads(body))
+
+
+@pytest.mark.parametrize(
+    'body, rows',
+    [(b'[]', []), (b' \n[ ]\r\n', []), (b'\t[ 1 ,\n[2] ]\n', [1, [2]])],
+    ids=['empty', 'empty-spaced', 'spaced'],
+)
+def test_array_framing(body, rows):
+    assert list(json_stream.iter_json_array(BytesIO(body))) == rows
+
+
+@pytest.mark.parametrize(
+    'body',
+    [b'{"error": "x"}', b'', b'[1] 2', b'[1,]', b'[1 2]', b'[1'],
+    ids=[
+        'object',
+        'empty-body',
+        'trailing-data',
+        'trailing-comma',
+        'missing-comma',
+        'unterminated',
+    ],
+)
+def test_anything_but_one_array_fails(body):
+    with pytest.raises(ValueError):
+        list(json_stream.iter_json_array(BytesIO(body)))

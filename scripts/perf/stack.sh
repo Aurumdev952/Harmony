@@ -5,7 +5,7 @@
 #   scripts/perf/stack.sh dataset   # generate the CSV, run process_csv and fill_dimension_data
 #   scripts/perf/stack.sh up        # build web, start Druid, index the dataset if Druid has none, start web
 #   scripts/perf/stack.sh index [--force]   # re-index, register the datasource with web, restart web
-#   scripts/perf/stack.sh ui        # build the production client and serve it on PERF_UI_PORT
+#   scripts/perf/stack.sh ui        # build the production client if it changed; serve it on PERF_UI_PORT
 #   scripts/perf/stack.sh reference <git ref>   # start that commit beside this checkout, for paired runs
 #   scripts/perf/stack.sh stop      # stop every container; keep volumes, scratch and secrets
 #   scripts/perf/stack.sh down      # stop everything, delete volumes, scratch and secrets

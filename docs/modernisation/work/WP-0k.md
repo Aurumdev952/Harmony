@@ -50,8 +50,10 @@ None planned. C-5 (the `accessKey` JWT) keeps its layout; only the value of `ide
 
 ## Log
 
+- 2026-10-05 backend-0k unit 1: nginx-proxy 1.11.6 does not forward the raw Host: `@` in Host is 400, unserved hosts 503, the upstream Host is the normalised `$host`; direct to gunicorn a forged Host or `SCRIPT_NAME` poisons the reset link. Check: `WP-0k-evidence/unit1-nginx-host/probe-before.md` (23 raw requests on the WP-2c stack plus nginx-proxy, links read from mailpit).
 ## Evidence
 
+- **Unit 1, nginx-proxy and the Host header:** `WP-0k-evidence/unit1-nginx-host/README.md`, with the overlay, the probes and their output.
 ## Verdicts
 
 | Role | Verdict | Notes |

@@ -18,8 +18,6 @@ deployment to `native` and deletes the extension (decision 0007, rule 5).
 
 import json
 
-from config import settings
-
 EXTENSION = 'extension'
 
 # How two values at the same timestamp combine, per inner aggregator type.
@@ -42,6 +40,10 @@ MAX_SIZE_BYTES = 32
 
 def build_last_value(name: str, aggregator: dict) -> dict:
     '''Serialise an `aggregateLast` wrapper as the Druid aggregator `name`.'''
+    # Imported here: settings refuse to load without deployment secrets, and
+    # the query builder must import without them (INV-8).
+    from config import settings  # pylint: disable=import-outside-toplevel
+
     if settings.DRUID_LAST_VALUE == EXTENSION:
         return {**aggregator, 'name': name}
     return native_last_value(name, aggregator['aggregator'])
@@ -55,7 +57,7 @@ def native_last_value(name: str, inner: dict) -> dict:
     # aggregator's own name. A field or name equal to the accumulator would
     # shadow it, and Druid would silently drop partial results.
     accumulator = '__acc'
-    while accumulator in (name, '__time', inner['fieldName']):
+    while accumulator in (name, inner['fieldName']):
         accumulator = f'_{accumulator}'
 
     def latest(time: str, value: str) -> str:

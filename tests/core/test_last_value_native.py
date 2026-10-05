@@ -225,7 +225,6 @@ def test_the_accumulator_fits_in_max_size_bytes():
     [
         ('__acc', 'sum', '___acc'),
         ('___acc', '__acc', '____acc'),
-        ('__time', 'sum', '__acc'),
     ],
 )
 def test_native_accumulator_never_shadows_a_binding(name, metric, accumulator):

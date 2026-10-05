@@ -313,7 +313,7 @@ None.
 - QA-1: the file on integration `3780c8c` gives `50 failed, 33 passed`.
 - CI pylint 2.17.4 over the 11 changed Python files under `tests/web/privilege_escalation` and `web/server`: 0 errors (38 convention, 5 warning, 4 refactor; `grants.py` has only the existing `duplicate-code` notes). black 22.6.0 `-S -t py39 --check` clean on `grants.py` and the test file.
 - WP-2b pure layer, suite from `mig/WP-2b-authz-suite` at `09a7581`, scratch copies of `3780c8c` and `e58c67a` built with `git archive`: `4675 passed, 580 skipped` on both; sorted `-rA` outcomes (4687 lines each) byte-identical.
-- Live layer not re-run: it creates principals with full sessions only, and unit 9 changes behaviour only for a narrowed admin token.
+- Live layer not re-run: unit 9 changes outcomes only for a token narrowed on an admin account. The render token is the only one issued, and it fails the route's `edit_user` gate.
 
 **This WP's tests** (`tests/web/privilege_escalation/`, command under "How to run the tests"):
 - this branch at `a23f729`: `81 passed`.

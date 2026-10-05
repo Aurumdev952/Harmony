@@ -1,7 +1,7 @@
 ---
 wp: "4a"
 title: "Settings and deployment loading"
-status: review
+status: ready
 owner_role: "core"
 instances:
   - name: "core-4a"
@@ -179,6 +179,7 @@ None. C-1 (`AppContext`) arrives in WP-4f and will hold `Settings` and `Deployme
   - **Real-tree probe.** This branch's `harmony/` was overlaid with WP-1h's `harmony/` from `mig/WP-1h-export-renderer-infra` (no `harmony/worker/__init__.py`), and the check reports `['harmony/worker']`. Overlaid from `mig/WP-1h-export-renderer` (which has it), the check reports `[]`.
   - **Nit:** the BE-2 row reads 3a, 4a, 4b, 4c, 4f, 5a, 8d, 8e.
   - check: Evidence, "After review round 3".
+- 2026-10-05 core-4a close-out on `f9ebec2`: QA and reviewer approved; security n/a. QA's two core lows were already fixed in `4f6ea28` (the fresh-interpreter web-framework test over `deployment_codes()` plus the template, and `template` refused by `load_deployment` and `import_configuration_module`). The two infra lows stay open as Requests. Status set to `ready`. check: Evidence, "Close-out".
 
 ### Recorded differences (INV-1, for reviewer acceptance)
 
@@ -270,6 +271,62 @@ All results are on head `9e9aab9` unless stated. The base for comparisons is `ea
 - **Golden:** `record.py --check` reports "85 cases, 0 fixture files would change".
 - **Lint and types:** mypy reports "no issues found in 520 source files"; `lint-imports` reports "1 kept, 0 broken"; the py38 syntax guard reports 857 files, 0 problems; ruff check and format pass on `tests/core`.
 - Only `tests/core/test_core_boundaries.py` and this file changed since `b1a723b`.
+
+### Close-out (head `f9ebec2`, no code change since `bd18a69`)
+
+- **CI suites** (`ci/pytest_suites.sh -q`): "all 8 suites passed". core 118, druid 1, druid_setup 79, golden 269, graphql 22, pipeline 129 + 1 skipped, toolchain 12, web 95.
+- **Golden:** `record.py --check` reports "85 cases, 0 fixture files would change".
+- **Lint and types:**
+  - `uv lock --check` is clean.
+  - mypy reports "no issues found in 520 source files".
+  - `lint-imports --no-cache` reports "1 kept, 0 broken".
+  - ruff check and format pass on `harmony`, `tests/core` and the changed `config` files.
+  - The py38 syntax guard on CPython 3.8.20, over CI's paths plus `harmony` and `tests/core`, reports 857 files, 0 problems.
+- **Gate:** before the status change, `task_gate.py WP-4a` reported only `status is "review", expected ready or done`.
+
+## PR summary
+
+**WP-4a: settings and deployment loading.** Settings and deployment loading move into `harmony/core/`, which imports no web framework. `config.settings`, `config.VALID_MODULES` and `config.loader` keep working and delegate to the new code.
+
+**Requirements**
+
+- **BE-1.** An import-linter contract forbids `flask`, `fastapi` and `starlette` under `harmony.core`, and `tests/core` runs it.
+  - The contract breaks on five injected leaks, including a transitive one.
+  - A fresh-interpreter test checks that loading each deployment and the template imports no web framework, because the contract cannot follow `importlib.import_module`.
+  - Every directory under `harmony/` that holds Python must be a regular package, because grimp skips namespace directories.
+  - mypy is strict on `harmony/core`.
+- **BE-2 (partial).** `harmony.core.settings.Settings` is a frozen pydantic-settings model, read from the environment only. `harmony.core.deployment.load_deployment(code)` loads `config/<code>/` once per process, and the Flask app, the golden harness and the scripts use it.
+  - The deployment modules do no network I/O at import. A sockets-disabled fresh-interpreter test checks this.
+  - The remaining environment reads are listed in "BE-2 status", each with its target WP. SPEC's BE-2 row reads 3a, 4a, 4b, 4c, 4f, 5a, 8d, 8e (decision 0008).
+- **SEC-3.** `load_settings()` refuses to start when a secret is unset, blank or a default, or when `DRUID_HOST` is missing. Secrets are `SecretStr` and do not appear in `repr`.
+- **INV-1** (every deployment keeps working):
+  - All 8 CI suites pass, and the infra lane passes (167).
+  - The web app factory's startup digest matches the base `ea33d9d`: 314 routes, the same renderer modules, locales and query-data digest. Only `zen_config_type` changes, from `module` to `Deployment`.
+  - QA built both images with `--no-cache`. On the CPython 3.8 web image, `harmony_demo` and `template` load, and the worker, app and gunicorn server import. Both pipeline venvs (PyPy 3.8 and CPython 3.9) import `config` and regenerate all 367 pipeline goldens byte-identical. Every default-secret variant is refused.
+  - A 1000-environment Hypothesis test compares the facade with a frozen copy of the legacy module. It passes, and it catches four seeded mutants.
+- **INV-2.** Golden: 269 passed, and `record.py --check` reports 0 drift after every unit. No query code changed.
+- **INV-3.** No authorisation code changed. `tests/web` (95 tests, including the JWT and render-route guards) passes unchanged.
+
+**Recorded differences.** All are in startup and logging. None changes a query result or an authorisation decision. The full text is under "Recorded differences".
+
+1. When `DRUID_HOST` is missing, startup raises `RuntimeError` before any warning. Before, it raised `KeyError` after four warnings.
+2. When `DEFAULT_SECRET_KEY` is refused and `DRUID_HOST` is missing, startup raises the same `RuntimeError` as before, with a second line naming `DRUID_HOST`.
+3. In `config/template/ui.py`, an unset `MAPBOX_ACCESS_TOKEN` is now `None` plus a warning, as in `harmony_demo`. Before, it raised `KeyError`.
+4. `import_configuration_module` returns a `Deployment`, whose fields are the same module objects as before.
+   - Unknown codes, empty codes and `template` raise `ValueError`. Before, they raised `ModuleNotFoundError`.
+   - A deployment with a missing module now fails at load, not at first use.
+5. The log records of the six optional settings name `setting` as their function, not `getenv`.
+6. Every process that imports `config` now imports pydantic. This costs about 118 ms on CPython 3.9 and about 290 ms on PyPy 3.8, once per process.
+
+**Deferred**
+
+- **infra.** Raise `typing_extensions` to 4.13.2 to clear the cryptography 47 `pip check` conflict, which was already on the base. Install the pp38 wheel through a bind mount, not `COPY --from`. Both are QA lows.
+- **backend (WP-1h).** Add `harmony/worker/__init__.py`. Until it exists, the namespace-package test blocks the WP-1h merge.
+- **lead.** Merging with WP-1h conflicts in `config/settings.py`. Keep this branch's file and drop `RENDERBOT_EMAIL` and `URLBOX_API_KEY`. A simulated merge passes the tests.
+- **Later WPs.**
+  - WP-4b, 4c and 4f take the remaining environment reads.
+  - WP-4f moves `current_app.zen_config` callers onto `AppContext.deployment` and deletes the `config.settings` facade.
+  - WP-3b removes the `pypy-wheels` stage.
 
 ## Verdicts
 

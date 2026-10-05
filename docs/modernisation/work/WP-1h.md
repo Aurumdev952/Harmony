@@ -247,6 +247,15 @@ C-5 (session and JWT format, owned by backend). Old: a render token was a plain 
   - with the pin check in `_install_token_needs` disabled as a mutant, the policy-change test fails (page 200);
   - `uv run --locked pytest tests/web`: 331 passed, 1 xfailed;
   - ruff: clean.
+- 2026-10-05 backend-8 R2-7 (reviewer 7, 8 and 10):
+  - **Failure codes in the web log.** A failed render's log line now names the renderer's error code, read from at most 1 KiB of its JSON body. Only a `[a-z_]{1,64}` code is logged; anything else logs `no error code`. A 200 with the wrong content type is logged as `not <expected type>` instead of "over the size limit".
+  - **Emailed renders.** `get_email_attachments` treats `RendersInFlight` as a failed render. A share has already sent its notifications by then, so it now sends the email without the attachment instead of answering 503.
+  - **Slot release.** `test_a_failed_render_frees_its_slot_for_the_next_request` runs at concurrency 1: a failing render, then a second request that must render. It passed on the current code. With the slot release moved out of `finally` as a mutant, it fails.
+
+  check:
+  - the 4 error-code cases, the content-type label and the emailed-render test failed, then passed;
+  - `uv run --locked pytest tests/web` plus the server tests: 360 passed, 1 xfailed;
+  - ruff and mypy: clean.
 
 ## Evidence
 

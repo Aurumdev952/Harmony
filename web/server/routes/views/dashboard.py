@@ -40,6 +40,7 @@ from web.server.routes.views.authorization import is_authorized
 from web.server.routes.views.feed import add_share_notification
 from web.server.routes.views.users import add_user_acl, get_current_user, try_get_user
 from web.server.routes.views.page_renderer import (
+    RendersInFlight,
     dashboard_page_args,
     deployment_dashboard_url,
     grid_dashboard_to_pdf,
@@ -392,6 +393,19 @@ class DashboardManager(AuthorizationResourceManager):
         ).first()
 
 
+def _render_for_email(render, locale, slug, auth_user_email, session_hash):
+    '''A render for an email, or None if it failed. A share has already sent
+    its notifications, so a sender with no free render slot gets a failed
+    render, as any other failure, rather than a 503.
+    '''
+    try:
+        return render(
+            locale, slug, auth_user_email=auth_user_email, session_hash=session_hash
+        )
+    except RendersInFlight:
+        return None
+
+
 def get_email_attachments(
     auth_user_email,
     slug,
@@ -403,11 +417,8 @@ def get_email_attachments(
     image_name = None
     locale, session_hash = dashboard_page_args(dashboard_url)
     if should_attach_pdf:
-        rendered_pdf = grid_dashboard_to_pdf(
-            locale,
-            slug,
-            auth_user_email=auth_user_email,
-            session_hash=session_hash,
+        rendered_pdf = _render_for_email(
+            grid_dashboard_to_pdf, locale, slug, auth_user_email, session_hash
         )
         if rendered_pdf is None:
             LOG.error(f'Failed to render dashboard: "{slug}" to PDF')
@@ -420,11 +431,8 @@ def get_email_attachments(
         )
 
     if should_embed_image:
-        rendered_image = grid_dashboard_to_image(
-            locale,
-            slug,
-            auth_user_email=auth_user_email,
-            session_hash=session_hash,
+        rendered_image = _render_for_email(
+            grid_dashboard_to_image, locale, slug, auth_user_email, session_hash
         )
         if rendered_image is None:
             LOG.error(f'Failed to render dashboard: "{slug}" to JPEG')

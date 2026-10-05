@@ -209,6 +209,47 @@ def test_a_failed_render_is_logged_without_the_token(
     assert 'eyJ' not in app_log.text
 
 
+@pytest.mark.parametrize(
+    'body, logged',
+    [
+        (b'{"error": "egress_blocked"}', 'egress_blocked'),
+        (b'{"error": "<script>"}', 'no error code'),
+        (b'not json', 'no error code'),
+        (b'{"error": "' + b'x' * 5000 + b'"}', 'no error code'),
+    ],
+    ids=['code', 'not-a-code', 'not-json', 'oversized'],
+)
+def test_a_renderer_failure_is_logged_with_its_error_code(
+    client, renderer, monkeypatch, app_log, body, logged
+):
+    _fail_with(
+        monkeypatch,
+        renderer,
+        _response(status=502, body=body, content_type='application/json'),
+    )
+
+    client.get(f'/dashboard/{SLUG}/pdf', headers=as_user(VIEWER))
+
+    [line] = [
+        r.getMessage() for r in app_log.records if 'Renderer failed' in r.getMessage()
+    ]
+    assert line.endswith(f'status 502, application/json, {logged}')
+    assert '<script>' not in line
+
+
+def test_a_render_with_the_wrong_content_type_is_logged_as_such(
+    client, renderer, monkeypatch, app_log
+):
+    _fail_with(monkeypatch, renderer, _response(content_type='text/html'))
+
+    client.get(f'/dashboard/{SLUG}/pdf', headers=as_user(VIEWER))
+
+    [line] = [
+        r.getMessage() for r in app_log.records if 'Renderer failed' in r.getMessage()
+    ]
+    assert line.endswith('status 200, text/html, not application/pdf')
+
+
 def test_restricted_viewer_render_carries_their_policy(client, renderer):
     _, north = render(client, renderer, f'/dashboard/{SLUG}/pdf', NORTH)
     _, north_2 = render(client, renderer, f'/dashboard/{SLUG}/pdf', NORTH_2)
@@ -381,13 +422,15 @@ def test_a_thumbnail_retrieve_beyond_the_limit_is_empty_and_not_cached(
 
 
 def test_an_emailed_render_counts_against_the_sender_not_the_recipient(app, renderer):
+    # A share sends its notifications first, so a render that cannot get the
+    # sender's slot fails like any other render instead of a 503 after them.
     _fill_render_slots(app, NORTH_ID)
 
     with app.test_request_context('/', headers=as_user(NORTH)):
         app.preprocess_request()
-        with pytest.raises(page_renderer.RendersInFlight):
-            get_email_attachments(VIEWER, SLUG, should_attach_pdf=True)
+        attachments = get_email_attachments(VIEWER, SLUG, should_attach_pdf=True)
 
+    assert attachments == (None, None)
     assert renderer.calls == []
 
 

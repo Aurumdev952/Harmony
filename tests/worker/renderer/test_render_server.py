@@ -304,3 +304,21 @@ def test_the_watchdog_gives_up_on_the_process_when_a_slot_is_stuck():
         release.set()
         server.shutdown()
         server.server_close()
+
+
+def test_a_failed_render_frees_its_slot_for_the_next_request():
+    outcomes = [PageFailed('dashboard page answered 500'), None]
+
+    def render(_spec, _settings):
+        outcome = outcomes.pop(0)
+        if outcome is not None:
+            raise outcome
+        return RenderOutput(content=b'second', blocked_hosts=())
+
+    with serving(render, concurrency=1) as port:
+        failed, _ = call(port, body=REQUEST)
+        second, data = call(port, body={**REQUEST, 'timeout_seconds': 1})
+
+    assert failed.status == 502
+    assert second.status == 200
+    assert data == b'second'

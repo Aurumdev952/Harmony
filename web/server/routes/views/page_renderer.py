@@ -4,6 +4,8 @@ The renderer's browser loads this app's own dashboard page over the internal
 network, signed in with a render token for the user the export is made as.
 '''
 
+import json
+import re
 import time
 from contextlib import contextmanager
 from dataclasses import dataclass
@@ -34,6 +36,9 @@ CONNECT_TIMEOUT_SECONDS = 5
 RESPONSE_MARGIN_SECONDS = 15
 RENDER_MAX_BYTES = 25 * 1024 * 1024
 READ_CHUNK_BYTES = 64 * 1024
+# A renderer error body is `{"error": "<code>"}`; only a code this shape is logged.
+ERROR_BODY_MAX_BYTES = 1024
+ERROR_CODE = re.compile(r'[a-z_]{1,64}')
 # The renderer runs few renders at once (RENDERER_CONCURRENCY, 2), so one
 # account's renders must not fill it and leave everyone else queueing until
 # their deadlines. Kept below the renderer's concurrency
@@ -185,12 +190,36 @@ def _read_capped(response) -> Optional[bytes]:
     return bytes(body)
 
 
+def _error_code(response, content_type: str) -> str:
+    '''The renderer\'s error code, read from at most ERROR_BODY_MAX_BYTES of
+    its JSON error body.'''
+    if content_type != 'application/json':
+        return 'no error code'
+    body = b''
+    for chunk in response.iter_content(ERROR_BODY_MAX_BYTES):
+        body += chunk
+        if len(body) > ERROR_BODY_MAX_BYTES:
+            return 'no error code'
+    try:
+        code = json.loads(body).get('error')
+    except (ValueError, AttributeError):
+        return 'no error code'
+    if isinstance(code, str) and ERROR_CODE.fullmatch(code):
+        return code
+    return 'no error code'
+
+
 def _checked(response, output_format: str, name: str) -> Optional[RenderedDashboard]:
     expected = CONTENT_TYPES[output_format]
     content_type = response.headers.get('Content-Type', '').split(';')[0].strip()
     content = None
-    if response.status_code == 200 and content_type == expected:
+    if response.status_code != 200:
+        failure = _error_code(response, content_type)
+    elif content_type != expected:
+        failure = f'not {expected}'
+    else:
         content = _read_capped(response)
+        failure = 'over the size limit'
     if content is None:
         LOG.error(
             'Renderer failed to render %s of dashboard %s: status %s, %s, %s',
@@ -198,7 +227,7 @@ def _checked(response, output_format: str, name: str) -> Optional[RenderedDashbo
             name,
             response.status_code,
             content_type,
-            'over the size limit' if response.status_code == 200 else 'not read',
+            failure,
         )
         return None
     LOG.info(

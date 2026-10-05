@@ -1,3 +1,4 @@
+import { expect } from '@playwright/test';
 import type { Locator, Page } from '@playwright/test';
 
 export const E2E_DASHBOARD = { slug: 'e2e-dashboard', title: 'E2E dashboard' };
@@ -111,8 +112,9 @@ export const PAGES: PageCase[] = [
     path: '/data-digest',
     lands: /^\/data-digest#tab=pipelineOverview$/,
     // The digest itself stays blank on this stack; the client-rendered
-    // navbar proves the page's bundles loaded and ran.
-    ready: page => page.getByRole('button', { name: 'Analyze' }),
+    // navbar proves the page's bundles loaded and ran. Its Dashboards entry
+    // stays in the bar at every width (Analyze folds into the menu at 390 px).
+    ready: page => page.getByText('Dashboards', { exact: true }).first(),
     knownErrors: [NO_OBJECT_STORAGE],
   },
   {
@@ -187,4 +189,16 @@ export function localeCases(locale: string): PageCase[] {
       lands: new RegExp(page.lands.source.replace(/^\^\\\//, `^\\/${locale}\\/`)),
     }),
   );
+}
+
+/**
+ * Opens a page and waits until it has rendered its own content and no
+ * loading spinner or placeholder (the grey pills a Suspense fallback draws)
+ * is left, so a check of the whole page (axe, a screenshot) sees it settled.
+ * `ready` only has to exist: at 390 px some of it sits off screen.
+ */
+export async function openSettled(page: Page, pageCase: PageCase): Promise<void> {
+  await page.goto(pageCase.path);
+  await expect(pageCase.ready(page)).toBeAttached();
+  await expect(page.locator('.zen-loading-spinner, .fallback-pill')).toHaveCount(0);
 }

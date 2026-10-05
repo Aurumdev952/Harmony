@@ -2,11 +2,17 @@ import { defineConfig, devices } from '@playwright/test';
 
 import { ADMIN_STATE, BASE_URL } from './support/env';
 
+const VISUAL_SPEC = /visual\.spec\.ts$/;
+const A11Y_SPEC = /a11y\.spec\.ts$/;
+// run.sh runs each project as its own invocation, in order (see projects
+// below), and each keeps its own results and report.
+const RUN = process.env.E2E_RUN ?? 'local';
+
 // Start through e2e/run.sh, which brings up the disposable stack and sets the
 // E2E_* variables that support/env.ts reads.
 export default defineConfig({
   testDir: './tests',
-  outputDir: './test-results',
+  outputDir: `./test-results/${RUN}`,
   globalSetup: './support/global-setup.ts',
   // The stack runs one gunicorn worker with two threads.
   workers: Number(process.env.E2E_WORKERS ?? 2),
@@ -14,8 +20,14 @@ export default defineConfig({
   retries: 0,
   forbidOnly: !!process.env.CI,
   timeout: 90_000,
-  expect: { timeout: 15_000 },
-  reporter: [['list'], ['html', { open: 'never', outputFolder: './report' }]],
+  expect: {
+    timeout: 15_000,
+    // The visual project's image renders the same pixels on every run, so the
+    // only slack is Playwright's per-pixel colour threshold; any pixel past
+    // it fails. (A project-level expect would replace this whole object.)
+    toHaveScreenshot: { maxDiffPixels: 0, threshold: 0.2 },
+  },
+  reporter: [['list'], ['html', { open: 'never', outputFolder: `./report/${RUN}` }]],
   use: {
     ...devices['Desktop Chrome'],
     baseURL: BASE_URL,
@@ -27,4 +39,18 @@ export default defineConfig({
     // Traces record typed text; specs that type a password turn them off.
     trace: 'retain-on-failure',
   },
+  projects: [
+    // The axe baseline counts nodes on the stack as seeded; the e2e project
+    // adds dashboards, users and sources, so run.sh runs this one before it.
+    { name: 'a11y', testMatch: A11Y_SPEC },
+    { name: 'e2e', testIgnore: [VISUAL_SPEC, A11Y_SPEC] },
+    {
+      // Pixels depend on the fonts and libraries of the machine that renders
+      // them, so run.sh runs this project in the pinned Playwright image only
+      // (tests/visual.spec.ts refuses to run anywhere else).
+      name: 'visual',
+      testMatch: VISUAL_SPEC,
+      snapshotPathTemplate: '{testDir}/../visual/{arg}{ext}',
+    },
+  ],
 });

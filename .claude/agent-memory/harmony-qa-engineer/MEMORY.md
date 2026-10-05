@@ -7,3 +7,4 @@
 - [Golden suite harness](golden-suite-harness.md) — offline bootstrap of the legacy query engine, hash-seed traps, mutation-check approach
 - [Golden contract vs layout](golden_contract_vs_layout.md) — goldens guarding a rewrite: store-level contract layer, typed round-trip test, consumed files are contract
 - [Tooling traps](tooling_traps.md) — lint gate scope post WP-2f, golden record --check, expected pipeline skip, ruff py39 with-format
+- [E2E harness traps](e2e_harness_traps.md) — visual in pinned image, a11y/visual before e2e, settle before axe, rootless DNS after reboot

@@ -5,7 +5,7 @@ import AxeBuilder from '@axe-core/playwright';
 
 import { SIGNED_OUT } from '../support/auth';
 import { expect, test } from '../support/fixtures';
-import { PAGES } from '../support/pages';
+import { PAGES, openSettled } from '../support/pages';
 
 // Today's serious and critical axe violations, per page and rule, as node
 // counts. FE-8 is met when WP-7c to 7e have driven this file to `{}`. Until
@@ -68,8 +68,7 @@ test.describe('axe baseline at 1440 px @a11y', () => {
         page,
       }) => {
         pageCase.knownErrors?.forEach(({ pattern, reason }) => appErrors.allow(pattern, reason));
-        await page.goto(pageCase.path);
-        await expect(pageCase.ready(page)).toBeVisible();
+        await openSettled(page, pageCase);
 
         const { violations } = await new AxeBuilder({ page }).analyze();
         const blocking = violations.filter(v => BLOCKING.has(v.impact ?? ''));

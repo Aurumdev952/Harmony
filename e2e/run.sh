@@ -2,9 +2,15 @@
 # Runs the Playwright suite against a disposable harmony_demo stack.
 #
 #   e2e/run.sh [playwright args]   build the client if needed, bring the stack
-#                                  up, run the suite, always take it down
+#                                  up, run the projects in order (visual,
+#                                  a11y, e2e), always take it down; with
+#                                  arguments (e.g. --grep @smoke) only a11y
+#                                  and e2e run, each passing if it has no
+#                                  matching test
 #   e2e/run.sh up | down           manage the stack for an iterating session;
 #                                  `up` prints the playwright command to run
+#   e2e/run.sh visual [args]       run the visual suite on a stack that is up
+#                                  (--update-snapshots rewrites e2e/visual/)
 #   e2e/run.sh build               rebuild the production client bundles
 #
 # The stack is WP-2c's tests/contract/stack (internal network, generated
@@ -12,6 +18,11 @@
 # deterministic broker and a stand-in for Urlbox (stack/compose.e2e.yaml),
 # plus one container that serves the production client build where Flask's
 # dev proxy expects webpack.
+#
+# The browser suite runs on this machine's Playwright. The visual suite runs
+# in the pinned Playwright image, because pixels depend on the fonts and
+# libraries that render them; its tag must match @playwright/test in
+# e2e/package.json.
 #
 # Concurrent runs need their own E2E_PROJECT and E2E_WEB_PORT.
 set -euo pipefail
@@ -26,6 +37,8 @@ STACK="${ROOT}/tests/contract/stack/stack.sh"
 ASSETS="${CONTRACT_PROJECT}-assets"
 # Same image and digest as the stack's druid-stub and forwarder.
 PYTHON_IMAGE="python:3.12-slim@sha256:f77ac9e44ae96ef2c90b8053ea08c31f8be030f824196b0ae4db6d462c84e51f"
+# mcr.microsoft.com/playwright:v1.56.1-noble
+PLAYWRIGHT_IMAGE="mcr.microsoft.com/playwright@sha256:f1e7e01021efd65dd1a2c56064be399f3e4de00fd021ac561325f2bfbb2b837a"
 
 build_client() {
   (cd "${ROOT}" && yarn build)
@@ -99,15 +112,49 @@ export_env() {
   export E2E_PROJECT="${CONTRACT_PROJECT}"
 }
 
+run_project() {
+  (cd "${ROOT}/e2e" && E2E_RUN="$1" node_modules/.bin/playwright test --project "$1" "${@:2}")
+}
+
+# The image's browser reaches the stack through the forwarder's network
+# namespace, as 127.0.0.1:5000. Under rootless Docker the container's root is
+# the calling user; elsewhere it runs as the caller, so the credentials file
+# keeps its owner.
+run_visual() {
+  local user=()
+  if ! docker info --format '{{.SecurityOptions}}' | grep -q rootless; then
+    user=(--user "$(id -u):$(id -g)")
+  fi
+  docker run --rm "${user[@]}" \
+    --network "container:$(container_of forward)" --shm-size 1g \
+    -v "${ROOT}/e2e:/e2e" \
+    -v "${E2E_CREDENTIALS_FILE}:/run/e2e/credentials.env:ro" \
+    -w /e2e \
+    -e HOME=/tmp \
+    -e E2E_RUN=visual \
+    -e E2E_BASE_URL=http://127.0.0.1:5000 \
+    -e E2E_USERNAME="${E2E_USERNAME}" \
+    -e E2E_PROJECT="${E2E_PROJECT}" \
+    -e E2E_CREDENTIALS_FILE=/run/e2e/credentials.env \
+    -e E2E_VISUAL_IMAGE="${PLAYWRIGHT_IMAGE}" \
+    "${PLAYWRIGHT_IMAGE}" node_modules/.bin/playwright test --project visual "$@"
+}
+
 case "${1:-}" in
   up)
     stack_up
     export_env
     echo "e2e: stack up. From e2e/, run:"
-    echo "  E2E_BASE_URL=${E2E_BASE_URL} E2E_USERNAME=${E2E_USERNAME} E2E_PROJECT=${E2E_PROJECT} E2E_CREDENTIALS_FILE=${E2E_CREDENTIALS_FILE} node_modules/.bin/playwright test"
+    echo "  E2E_BASE_URL=${E2E_BASE_URL} E2E_USERNAME=${E2E_USERNAME} E2E_PROJECT=${E2E_PROJECT} E2E_CREDENTIALS_FILE=${E2E_CREDENTIALS_FILE} node_modules/.bin/playwright test --project a11y --project e2e"
+    echo "and for the visual suite: e2e/run.sh visual"
     ;;
   down)
     stack_down
+    ;;
+  visual)
+    ensure_playwright
+    export_env
+    run_visual "${@:2}"
     ;;
   build)
     build_client
@@ -117,7 +164,17 @@ case "${1:-}" in
     trap stack_down EXIT
     stack_up
     export_env
-    cd "${ROOT}/e2e"
-    node_modules/.bin/playwright test "$@"
+    # Visual and a11y go first: both expect the stack as seeded, before the
+    # e2e project adds dashboards, users, sources and views.
+    status=0
+    if [[ $# -gt 0 ]]; then
+      run_project a11y --pass-with-no-tests "$@" || status=$?
+      run_project e2e --pass-with-no-tests "$@" || status=$?
+    else
+      run_visual || status=$?
+      run_project a11y || status=$?
+      run_project e2e || status=$?
+    fi
+    exit "${status}"
     ;;
 esac

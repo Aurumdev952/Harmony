@@ -20,7 +20,7 @@ export const PROJECT = process.env.E2E_PROJECT ?? 'harmony-wp2e-e2e';
 export function adminPassword(): string {
   const file = required('E2E_CREDENTIALS_FILE');
   const { mode, uid } = statSync(file);
-  if ((mode & 0o077) !== 0 || uid !== os.userInfo().uid) {
+  if ((mode & 0o077) !== 0 || uid !== process.getuid?.()) {
     throw new Error(`${file} must be owned by you with mode 600`);
   }
   const match = /^CONTRACT_PASSWORD=([0-9a-f]{64})$/m.exec(readFileSync(file, 'utf8'));

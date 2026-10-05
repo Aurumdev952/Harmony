@@ -150,10 +150,11 @@ def bound(variable, ports):
 
 MIDDLEMANAGER_PORTS = [('middlemanager', p) for p in (8091, *range(8100, 8106))]
 
-# Druid has no authenticator configured, and JavaScript is enabled until
-# WP-8a. Single mode publishes only what web and the pipeline call (coordinator
-# for indexing, broker and router for queries). Cluster mode binds each host's
-# ports to that host's private address, because the other hosts call them.
+# Druid has no authenticator configured (JavaScript is disabled since WP-8a,
+# see test_every_druid_service_disables_javascript). Single mode publishes only
+# what web and the pipeline call (coordinator for indexing, broker and router
+# for queries). Cluster mode binds each host's ports to that host's private
+# address, because the other hosts call them.
 EXPECTED_PORTS = {
     'single/docker-compose.yml': bound(
         'DRUID_BIND_ADDRESS',
@@ -204,6 +205,22 @@ def test_refuses_to_render_without_bind_address(tmp_path, setup):
     result = render(tmp_path, setup, env={variable: ''})
     assert result.returncode != 0
     assert f'required variable {variable}' in result.stderr
+
+
+@needs_docker
+@pytest.mark.parametrize('setup', SETUPS, ids=setup_id)
+def test_every_druid_service_disables_javascript(tmp_path, setup):
+    # SEC-8. A service is a Druid one when it carries druid_* settings.
+    services = config(tmp_path, setup)['services']
+    druid = {
+        name: service.get('environment') or {}
+        for name, service in services.items()
+        if any(key.startswith('druid_') for key in service.get('environment') or {})
+    }
+    assert druid
+    assert {
+        name: env.get('druid_javascript_enabled') for name, env in druid.items()
+    } == dict.fromkeys(druid, 'false')
 
 
 PINNED_IMAGE = re.compile(r'[\w./-]+:(?!latest@)[\w.-]*\d[\w.-]*@sha256:[0-9a-f]{64}')

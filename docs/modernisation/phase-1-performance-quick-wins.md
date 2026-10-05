@@ -72,7 +72,7 @@ Back to [overview](overview.md). Evidence: [02-architecture-deep-dive.md](02-arc
 ## 1h. Self-hosted export rendering
 
 - **Changes.**
-  - Replace urlbox (`web/server/routes/views/page_renderer.py`) with a Celery task that drives headless Chromium through Playwright against the existing screenshot route.
+  - Replace urlbox (`web/server/routes/views/page_renderer.py`) with a sandboxed renderer sidecar that drives headless Chromium through Playwright against the existing screenshot route; the Celery task that queues the job arrives with WP-5f (decision 0009).
   - Replace the fixed 10-second delay with a "tiles loaded" signal the screenshot app already knows how to produce.
   - Scope the render JWT to the dashboard being rendered instead of `query_needs: ["*"]`.
 - **Data structure.** `RenderJob = {dashboard_id, format: pdf|png, viewport, requested_by, status}`.

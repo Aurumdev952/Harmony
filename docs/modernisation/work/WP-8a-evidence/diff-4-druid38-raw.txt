@@ -1,0 +1,51 @@
+## calc_last_value
+- error: 1 differing values
+    error: null -> "AssertionError: calc_last_value: HTTP 500\n<!DOCTYPE HTML PUBLIC \"-//W3C//DTD HTML 3.2 Final//EN\">\n<title>500 Internal Server Error</title>\n<h1>Internal Se
+- druid_query: 1 differing values
+    druid_query: [{"aggregations": [{"aggregator": {"aggregator": {"fieldName": "sum", "name": "yellow_fever_cases", "type": "doubleSum"}, "name": "yellow_fever_cases", "type":  -> null
+- druid_response: 1 differing values
+    druid_response: [[[1704067200000, "Acre", 82.0, 298], [1704067200000, "Par\u00e1", 26.0, 196], [1704067200000, "Roraima", 46.0, 202], [1706745600000, "Acre", 134.0, 274], [1706 -> null
+- body: 1 differing values
+    body: {"data": [{"StateName": "Acre", "timestamp": "2024-01-01", "yellow_fever_cases": 82.0}, {"StateName": "Par\u00e1", "timestamp": "2024-01-01", "yellow_fever_case -> null
+## dq_data_quality
+- druid_response: 166 differing values
+    druid_response[0][3][1]: null -> ""
+    druid_response[0][3][2]: null -> ""
+    druid_response[0][3][3]: null -> ""
+    druid_response[0][7][1]: null -> ""
+- body: 1 differing values
+    body.dataQuality.: "<absent>" -> {"dimensions": {"StateName": ""}, "geo": {"lat": "", "lng": ""}, "indicatorCharacteristics": {"ageScore": 1.0, "completenessTrendIsUp": false, "endIntervalTimes
+## dq_outliers_box_plot
+- druid_response: 13 differing values
+    druid_response[0][0][2]: null -> ""
+    druid_response[0][7][2]: null -> ""
+    druid_response[0][14][2]: null -> ""
+    druid_response[0][26][2]: null -> ""
+- body: 16 differing values
+    body.data.length: 6 -> 7
+    body.data[0].dimensions.MunicipalityName: "Alto Alegre" -> ""
+    body.data[0].dimensions.StateName: "Roraima" -> "Acre"
+    body.data[1].dimensions.MunicipalityName: "Bel\u00e9m" -> "Alto Alegre"
+## dq_outliers_table
+- druid_response: 13 differing values
+    druid_response[0][0][2]: null -> ""
+    druid_response[0][7][2]: null -> ""
+    druid_response[0][14][2]: null -> ""
+    druid_response[0][26][2]: null -> ""
+## group_dimension_include_null
+- druid_response: 1 differing values
+    druid_response[0][0][1]: null -> ""
+- body: 1 differing values
+    body.data[0].MunicipalityName: null -> ""
+## table_disaggregated
+- druid_response: 38 differing values
+    druid_response[0][0][3]: null -> ""
+    druid_response[0][10][3]: null -> ""
+    druid_response[0][16][2]: null -> ""
+    druid_response[0][16][3]: null -> ""
+- body: 38 differing values
+    body.data[0].MunicipalityName: null -> ""
+    body.data[10].MunicipalityName: null -> ""
+    body.data[16].MunicipalityName: null -> ""
+    body.data[16].StateName: null -> ""
+6 cases differ between /tmp/wp8a/out/legacy and /tmp/wp8a/out/druid38-raw

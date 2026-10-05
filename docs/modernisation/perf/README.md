@@ -39,9 +39,9 @@ All commands run from your worktree. Paired mode needs at least 20 rounds per si
    scripts/perf/stack.sh up                      # Druid, web (this checkout) and its data; no re-index if the volumes exist
    scripts/perf/stack.sh ui                      # the production client; rebuilt only when a client input changed
    ```
-2. **Start the reference and the run.**
+2. **Start the reference and the run.** The reference is your WP's base, `git merge-base HEAD mig/integration` (decision 0011), which `stack.sh reference` picks when given no commit. Never use `main`: it is the pre-migration tree, hundreds of commits behind integration, so a run against it would charge your WP with the cost or gain of every WP merged since. The report says when the reference is not that merge base.
    ```bash
-   scripts/perf/stack.sh reference "$(git merge-base HEAD main)"   # the old code, beside yours
+   scripts/perf/stack.sh reference               # the old code, beside yours: git merge-base HEAD mig/integration
    npm ci --ignore-scripts --prefix scripts/perf # Playwright 1.56.1, once
    eval "$(scripts/perf/stack.sh env)"           # the isolation guard refuses eval: export these lines from a script
    uv run --no-project --with requests python scripts/perf/baseline.py --label WP-<id> \

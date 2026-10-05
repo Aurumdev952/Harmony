@@ -6,7 +6,8 @@
 #   scripts/perf/stack.sh up        # build web, start Druid, index the dataset if Druid has none, start web
 #   scripts/perf/stack.sh index [--force]   # re-index, register the datasource with web, restart web
 #   scripts/perf/stack.sh ui        # build the production client if it changed; serve it on PERF_UI_PORT
-#   scripts/perf/stack.sh reference <git ref>   # start that commit beside this checkout, for paired runs
+#   scripts/perf/stack.sh reference [<git ref>] # start that commit beside this checkout, for paired runs;
+#                                               # default: git merge-base HEAD mig/integration, the WP's base
 #   scripts/perf/stack.sh stop      # stop every container; keep volumes, scratch and secrets
 #   scripts/perf/stack.sh down      # stop everything, delete volumes, scratch and secrets
 #   scripts/perf/stack.sh env       # what baseline.py and dashboards.mjs read
@@ -374,8 +375,14 @@ client_unchanged_since() {
 # Redis, for baseline.py's paired mode: web-reference on PERF_REFERENCE_WEB_PORT
 # and ui-reference on PERF_REFERENCE_UI_PORT. The migrations are this
 # checkout's (web-init), so a reference must run on the schema they leave.
+# The default is the WP's base on mig/integration (decision 0011), never main:
+# main is the pre-migration tree, and a run against it would charge the WP
+# with every merged WP's cost or gain.
 reference() {
-  local ref="${1:?usage: stack.sh reference <git ref>}" sha src="${PERF_REFERENCE_DIR}/src"
+  local ref="${1:-}" sha src="${PERF_REFERENCE_DIR}/src"
+  if [[ -z "${ref}" ]]; then
+    ref="$(git -C "${ROOT}" merge-base HEAD mig/integration)"
+  fi
   sha="$(git -C "${ROOT}" rev-parse --verify "${ref}^{commit}")"
   load_secrets
   use_built_image
@@ -454,7 +461,7 @@ case "${1:-}" in
     esac
     ;;
   *)
-    echo "usage: $0 dataset|up|index|ui|reference <ref>|stop|down|env|config druid|web|logs druid|web [service]" >&2
+    echo "usage: $0 dataset|up|index|ui|reference [<ref>]|stop|down|env|config druid|web|logs druid|web [service]" >&2
     exit 2
     ;;
 esac

@@ -32,9 +32,16 @@ A/A run that is what the run could see; a passing run's claim is only as
 strong as its largest `detects`.
 
     scripts/perf/stack.sh up && scripts/perf/stack.sh ui
-    scripts/perf/stack.sh reference main
+    scripts/perf/stack.sh reference    # git merge-base HEAD mig/integration
     eval "$(scripts/perf/stack.sh env)"
     uv run --no-project --with requests python scripts/perf/baseline.py --label WP-1b
+
+The reference is the WP's base, the merge base with mig/integration (decision
+0011): that is the code the WP's change lands on. `main` is the pre-migration
+tree, hundreds of commits behind, so a run against it would charge the WP
+with every merged WP's cost or gain. A phase-exit run uses the phase's start
+commit on integration instead; the report says when the reference is not the
+merge base.
 
 It writes under docs/modernisation/perf/paired/, named
 <date>-<reference sha>-vs-<candidate sha>[-<label>]: `.reference.jsonl` and
@@ -109,6 +116,8 @@ BOOTSTRAP_RESAMPLES = 4000
 # A/A case fails its bound two to three times as often as the level says.
 MIN_PAIRED_ROUNDS = 20
 REQUEST_LOG_SETTLE_SECONDS = 0.05
+# A WP's reference is its merge base with this branch (decision 0011).
+BASE_BRANCH = 'mig/integration'
 
 # Golden cases replayed, covering every query endpoint the frontend calls. The
 # policy cases are left out: they need a second, policy-restricted account.
@@ -783,9 +792,28 @@ def method_lines(meta: dict[str, Any]) -> list[str]:
         )
     if 'pairing' in method:
         lines.append(f'- Pairing: {method["pairing"]}')
+    if 'reference_sha' in meta and meta.get('integration_merge_base'):
+        lines.append(reference_line(meta))
     if 'dataset' in meta:
         lines.append(f'- Dataset: {meta["dataset"]}')
     return lines
+
+
+def reference_line(meta: dict[str, Any]) -> str:
+    base = meta['integration_merge_base']
+    if meta['reference_sha'] == base:
+        return f"- Reference: the WP's base (merge base with {BASE_BRANCH})"
+    return (
+        f'- Reference: not the merge base with {BASE_BRANCH} (`{base}`); '
+        'only a phase-exit run, against the phase start, uses another commit'
+    )
+
+
+def integration_merge_base() -> str | None:
+    try:
+        return git('merge-base', 'HEAD', BASE_BRANCH)
+    except subprocess.CalledProcessError:
+        return None
 
 
 def sample_table(samples: list[PerfSample]) -> list[str]:
@@ -910,6 +938,7 @@ def run(args: argparse.Namespace) -> int:
     if args.mode == 'paired':
         meta['reference_sha'] = require_env('PERF_REFERENCE_SHA')
         meta['candidate_sha'] = meta.pop('git_sha')
+        meta['integration_merge_base'] = integration_merge_base()
         meta['method']['pairing'] = (
             'reference and candidate apps on one host against one Druid; each '
             'round sends the case to both, reference first in even rounds and '

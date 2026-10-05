@@ -556,3 +556,16 @@ def test_paired_mode_refuses_fewer_than_twenty_rounds(flag):
         baseline.parse_args([flag, '19'])
     assert baseline.parse_args([flag, '20']).mode == 'paired'
     assert baseline.parse_args(['--committed', flag, '5']).mode == 'committed'
+
+
+def test_the_report_says_whether_the_reference_is_the_wps_base():
+    # Decision 0011: the reference is `git merge-base HEAD mig/integration`;
+    # only a phase-exit run uses another commit (the phase's start).
+    meta = _paired_meta()
+    meta['integration_merge_base'] = 'a' * 40
+    text = '\n'.join(baseline.method_lines(meta))
+    assert "the WP's base (merge base with mig/integration)" in text
+    meta['integration_merge_base'] = 'c' * 40
+    text = '\n'.join(baseline.method_lines(meta))
+    assert f'not the merge base with mig/integration (`{"c" * 40}`)' in text
+

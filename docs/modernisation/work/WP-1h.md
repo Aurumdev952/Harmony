@@ -6,6 +6,10 @@ owner_role: "backend"
 instances:
   - name: "backend-8"
     files:
+      - harmony/worker/__init__.py
+      - pyproject.toml
+      - tests/worker/test_renderer_web_drift.py
+      - tests/web/render/test_render_slots.py
       - web/server/routes/views/page_renderer.py
       - web/server/routes/page_renderer.py
       - web/server/security/render_tokens.py
@@ -28,11 +32,11 @@ instances:
       - tests/worker/renderer/**
       - docs/modernisation/work/WP-1h.md
       - docs/modernisation/work/WP-1h-evidence/**
-  - name: "core"
+  - name: "core-1"
     files:
       - config/settings.py
       - tests/core/test_settings_render.py
-  - name: "infra"
+  - name: "infra-1"
     files:
       - .github/workflows/renderer.yml
       - Makefile
@@ -77,7 +81,7 @@ Phase 1 section 1h; 03-target-architecture (render path); decision 0004. Builds 
   - It carries a `render` claim holding a random id that is registered in `app.cache` for the render's lifetime and deleted when the renderer returns. `login_from_request` refuses a render token whose id is no longer live. The token is therefore usable for exactly one render: short-lived (deadline + 15 s) and single-use per render.
   - The browser needs it for every request the page makes, so "single use" means one render, not one HTTP request.
 - **Deferred to WP-5f:** moving renders to a Celery `exports` queue with `RenderJob` rows and `202 {job_id}` (phase 1h data structure; WP-0i carried risk 4). That changes the client contract (download links, `ThumbnailStorageService`), so it lands with the FastAPI export port and frontend-platform. The sidecar API is the same one a Celery task would call.
-- **INV-7:** the renderer replaces the urlbox SaaS, which 03-target-architecture counts as a service that leaves the stack, so the count stays the same. Flagged for the reviewer.
+- **INV-7 (decision 0009):** urlbox was never a container, so `renderer` and `render-egress` are two more long-running services. Decision 0009 (`docs/modernisation/decisions/0009-wp-1h-renderer-services-and-inv-7.md`, pending human ratification) keeps the renderer a separate service. Chromium must not share an image with the database credentials and secrets. The renderer counts against Hasura, which WP-5c retires. `render-egress` is time-boxed to WP-7g, whose definition of done removes it. Until WP-5c the stack is one service over INV-7.
 
 ## Renderer threat model
 
@@ -108,7 +112,7 @@ Residual risks:
 - Rootful Docker hosts that confine containers with AppArmor and restrict unprivileged user namespaces (such as Ubuntu 24.04 with `kernel.apparmor_restrict_unprivileged_userns=1`) are untested. If the sandbox cannot start there, Chromium refuses to launch and renders fail with a 500. They never fall back to `--no-sandbox`, so the failure is safe but visible.
 - No Mapbox map has been rendered end to end: that needs a deployment's Mapbox access token. The style, tile, cookie and fast-failure paths are proven in the browser tests against a local map origin, and the network path to `api.mapbox.com` by the unit 8c container check.
 - The egress proxy trusts DNS for the allowed map hosts. A poisoned resolver could point `api.mapbox.com` at an internal address the proxy can reach; it would still only carry what Chromium sends to a map origin, which never includes the cookie.
-- INV-7: `render-egress` is one more service. It runs from the renderer image, so there is no new image. Flagged for the reviewer.
+- INV-7: `render-egress` is one more service, from the renderer image (no new image), time-boxed to WP-7g by decision 0009.
 - The C-5 note for WP-5a: the renderer reaches only `RENDER_WEB_ORIGIN` (Flask directly). Once the dashboard page calls FastAPI routes behind nginx, that origin must become an internal router that serves both apps (interrogate, Opus).
 - DNS rebinding of the origin host is out of scope: `web` resolves through Docker's embedded DNS on the internal network.
 - A caller whose API token narrows their account's query policy gets no export: the render fails closed, a 500 for `/pdf` and `/jpeg` and an empty thumbnail. With urlbox they got a render under the wider account policy. Flagged for the reviewer.
@@ -126,7 +130,7 @@ Residual risks:
 8. `pstack:interrogate` on the token and the renderer, then deslop, then review. Check: findings addressed; status `review`.
    - 8a: carry WP-0i's open items into the threat model. 8b: merge the WP-0i head and pass the integration lint gate. 8c: the panel's findings: maps through an egress proxy, digit parsing, and the per-account render cap.
 
-Round 2 (backend-1h-d; reviewer round 1, QA and security lows; decision 0009 settles the INV-7 finding). Each unit starts with a failing test:
+Round 2 (backend-8; reviewer round 1, QA and security lows; decision 0009 settles the INV-7 finding). Each unit starts with a failing test:
 
 9. R2-1 (reviewer 1): only blocked or failed fetch and XHR requests start the fail-fast clock; frames, images, fonts, stylesheets and WebSockets do not. Check: an in-image browser test with a blocked iframe, image, font and stylesheet, and a ready signal after the grace period.
 10. R2-2 (reviewer 2): each render runs in a child process whose whole process tree is killed at deadline plus clean-up grace; `/healthz` fails and the process exits when a slot is held past that. Check: an in-image test with a frozen Chromium, and host tests for the watchdog.
@@ -136,6 +140,41 @@ Round 2 (backend-1h-d; reviewer round 1, QA and security lows; decision 0009 set
 14. R2-6 (reviewer 6): two pin tests through a real page load. Check: web tests.
 15. R2-7 (reviewer 7, 8, 10): failure codes in the web log, slot release after a failure at concurrency 1, and `RendersInFlight` in emailed renders. Check: web and host tests.
 16. R2-8 (reviewer 11 to 13, QA medium, info): records, the WP-1h authz overlay, the range drift test and trailing-dot hosts. Check: drift test and the full gate.
+
+## Hand-offs
+
+### Phase-1 verification
+
+The phase-1 1h verification asks for PDF and PNG exports of three reference dashboards to match urlbox's output visually. That comparison cannot run: agents may not call urlbox (no account and no key, and the WP's rule is never to contact it), and there is no recorded urlbox output to compare against. It is replaced by the Compose evidence in `WP-1h-evidence/unit-6-end-to-end.md`: real PDF, JPEG and PNG renders through the Flask routes on the WP-2c stack, with page counts, pixel sizes and byte sizes recorded, and QA's own full-stack run recorded in the QA verdict. Visual parity with the in-app "Download as image" and the redesign's snapshots belong to WP-2e and WP-7g.
+
+### WP-7g (maps)
+
+- **Map origins.** `RENDERER_MAP_ORIGINS` (default `https://api.mapbox.com`) lists the origins the page may fetch, only through `render-egress`, which allows the same list (`EGRESS_ALLOWED_ORIGINS`). With self-hosted MapLibre tiles, the tile origin is either the dashboard origin (no entry needed) or another internal host. In either case, no map origin may be on the dashboard's host; the renderer refuses to start with one. Decision 0009 retires `render-egress` in WP-7g.
+- **Telemetry ignore list.** `RENDERER_IGNORED_BLOCKED_HOSTS` (default `events.mapbox.com`) names hosts whose refusal never starts the fail-fast clock. MapLibre sends no telemetry, so WP-7g empties it.
+- **Ready signal.** The renderer waits for `#dashboard-load-success`, which `useSignalDashboardLoadState` adds once every tile has loaded. For maps it waits on `waitForMapboxMapLoad` (`web/client/components/common/SharingUtil/waitForMapboxMapLoad.js`), which reaches into react-map-gl's React internals (`__reactInternalInstance`) to find the Mapbox GL map. That breaks with React 19 and MapLibre, so WP-7g must replace it with a supported load event (for example MapLibre's `idle`) before the map port lands. Otherwise every map export waits out the full deadline or fails as `page_failed`. Since R2-1, only fetch and XHR start the fail-fast clock, which matches how MapLibre loads styles, tiles, glyphs and sprites.
+- **Blocked hosts.** Each render's log line lists `blocked_hosts`, which is the inventory of what map pages still try to reach.
+
+### Security carries for WP-5f, WP-5d and infra (sec-1h at abda42c, verbatim)
+
+#### What WP-5f and the Celery move must carry
+
+- **FastAPI auth dependency (C-5):**
+  - refuse a token whose `render` id is not live in the shared cache, never from a memoised result;
+  - compute the account's policy digest before narrowing, and grant nothing if it differs from the token's `policy` claim;
+  - narrow a render principal to `view_resource` on one dashboard;
+  - treat render principals as read-only: no unsafe methods, sharing, API-token minting or GraphQL, and no view counting;
+  - keep HS256 pinned and treat a bad or expired signature as anonymous.
+- **Celery jobs:**
+  - capture the policy digest at request time and store it on the `RenderJob`; it must equal the thumbnail cache key;
+  - mint the token inside the worker immediately before calling the renderer, never in task arguments, the broker or the result backend (Celery logs task arguments);
+  - key the cap on `requested_by` with an atomic `SET NX EX`, releasing it when the job finishes or expires;
+  - keep the cap below `RENDERER_CONCURRENCY`;
+  - bind `job_id` downloads to the requester and re-check view permission; make job ids unguessable and results expiring;
+  - keep the 25 MiB and content-type checks in the worker's renderer client;
+  - keep emailed renders counted against the sender, and give any scheduled report an explicit requester.
+- **Origins:** `RENDER_WEB_ORIGIN` stays configuration-only. Once dashboards call FastAPI, it must point at an internal router on the `render` network, updated together with `RENDERER_ALLOWED_ORIGIN`, and never at the public URL.
+- **WP-5d:** decide how narrowed scoped tokens render; that will be an authorisation-outcome change for the human. Port the creation email to `DEPLOYMENT_BASE_URL` (`dashboard_api_models.py:1104`).
+- **Infra (SEC-9):** deployments still use the renderer image by tag (`:latest`), the same as web.
 
 ## Contract changes
 
@@ -153,10 +192,11 @@ C-5 (session and JWT format, owned by backend). Old: a render token was a plain 
 - [ ] human: render a dashboard with a map tile on a staging deployment once `render-egress` is deployed. Agents have no Mapbox access token, so the real Mapbox path is proven only up to the TLS session (unit 8c). Blocks nothing in code.
 - [ ] infra: type-check the renderer against Playwright's real types in CI (reviewer round 1, finding 5). The project lane now runs `harmony/worker` under strict per-module flags, with `playwright.*` as a missing import. Suggested: in `ci/tools313/pyproject.toml` add `playwright==1.63.0` to the lane's dependencies (the Python package only; no browsers are needed to type-check), and add `harmony/worker` to its strict `files`. The command that passes today is `uv run --no-project -p 3.12 --with playwright==1.63.0 --with mypy==1.3.0 mypy --config-file /dev/null --strict --explicit-package-bases --python-version 3.12 harmony/worker`. This blocks nothing in WP-1h.
 - [ ] infra: give `renderer` a restart policy outside prod too (for example `restart: unless-stopped` in `docker-compose.yaml`). Since R2-2, the renderer exits with status 70 when a render slot is stuck past its deadline plus two clean-up grace periods, and only prod's `restart: always` brings it back. This blocks nothing in WP-1h.
+- [ ] qa (qa-2b): when WP-1h merges, apply `WP-1h-evidence/test_render_routes.wp1h.py` as `tests/authz/test_render_routes.py` in place of WP-0i's flipped overlay (QA round 1, medium). WP-0i's overlay pins the urlbox fake, the exact pre-WP-1h claims and a `DEPLOYMENT_BASE_URL` render URL, so `tests/authz` goes red once WP-2b and the flip land. This version is QA's own scratch adaptation (`/tmp/qa1h2-ev/test_render_routes.wp1h-adapted.py`) with only the header docstring refreshed. It changes the fake to `requests.post`, accepts the two C-5 claims (`render`, `policy`) and expects `RENDER_WEB_ORIGIN`. Every status and identity expectation is unchanged. Run at the round-2 head over WP-2b's suite (39b3a64): the 18 render cases passed, and the whole no-server layer gave 4681 passed and 583 skipped (the live-stack layer), the same totals as QA's run at abda42c. This blocks nothing in WP-1h.
 
 ## Follow-ups (recorded, not done here)
 
-- Interrogate (Opus): the web side keeps its own copies of the sidecar's ranges (`WIDTHS`, `HEIGHTS`, `PDF_PAGE_SIZES`, `CONTENT_TYPES`). It could import them from `harmony.worker.renderer.spec`. `RENDER_WEB_ORIGIN` and `RENDERER_ALLOWED_ORIGIN` could come from one Compose variable (infra).
+- Interrogate (Opus), corrected by review round 1 (finding 12): the web side keeps its own copies of the sidecar's ranges (`WIDTHS`, `HEIGHTS`, `PDF_PAGE_SIZES`, `CONTENT_TYPES`). Importing them from `harmony.worker.renderer.spec` would break the web image, which runs Python 3.8. The renderer package uses 3.9+ syntax at runtime (`tuple[str, str, int]` at `egress.py:9`, builtin generics in dataclass fields). So the copies stay until WP-3b moves web to 3.13, and `tests/worker/test_renderer_web_drift.py` (host lane) fails when they drift. `RENDER_WEB_ORIGIN` and `RENDERER_ALLOWED_ORIGIN` could come from one Compose variable (infra).
 - Interrogate (Opus): move `render_token_query_needs` and `query_policy_fingerprint` into `render_tokens.py` so `render_token` derives its own pin from `current_user` and callers cannot mint an unpinned self-render. Today that would be a circular import with `signal_handlers`.
 - Interrogate (Opus): the end-to-end run rendered as the contract admin, whose digest is the constant `superuser`. A non-admin viewer with a query policy and a query tile should be rendered on the stack. The digest equality for restricted users is covered by unit tests through the real `_install_token_needs`.
 
@@ -256,6 +296,19 @@ C-5 (session and JWT format, owned by backend). Old: a render token was a plain 
   - the 4 error-code cases, the content-type label and the emailed-render test failed, then passed;
   - `uv run --locked pytest tests/web` plus the server tests: 360 passed, 1 xfailed;
   - ruff and mypy: clean.
+- 2026-10-05 backend-8 (recorded in round 2, reviewer 11): abda42c made `harmony.worker` a regular package (`harmony/worker/__init__.py`), because import-linter (grimp) does not descend into namespace subdirectories, so WP-4a's BE-1 contract could not see `harmony/worker`. The file is now claimed under backend-8. check, at the time: QA's abda42c run (verdict row).
+- 2026-10-05 backend-8 R2-8 (reviewer 11 to 13, QA medium and info, security carry list):
+  - **Instances.** Renamed to `core-1` and `infra-1`. backend-8 now claims `harmony/worker/__init__.py`, `pyproject.toml` (mypy), `tests/worker/test_renderer_web_drift.py` and `tests/web/render/test_render_slots.py`.
+  - **Ranges follow-up.** Corrected: importing the ranges from `spec.py` would break the Python 3.8 web image, so the copies stay until WP-3b. `test_the_web_app_asks_only_for_what_the_renderer_accepts` (host lane) pins widths, heights, page sizes, content types, defaults, the timeout and the byte cap.
+  - **Trailing-dot hosts.** `__main__._host` drops a trailing dot, so `https://web.` and `http://WEB.:80` are refused as map origins on the dashboard's host, as is `https://web` under an allowed origin of `http://web.:5000`.
+  - **Comment and decision.** Fixed the stale urlbox comment in `dashboard.py`. The WP now cites decision 0009 for INV-7.
+  - **Hand-offs section.** Records the phase-1 visual-match verification as replaced by the Compose evidence, the WP-7g hand-off (map origins, the telemetry ignore list, and the `waitForMapboxMapLoad` ready signal) and security's carry list verbatim.
+  - **QA overlay.** `WP-1h-evidence/test_render_routes.wp1h.py` is QA's adaptation of the WP-0i overlay, with a qa-2b request to apply it.
+
+  check:
+  - the two trailing-dot map-origin cases failed, then all 11 settings tests passed;
+  - drift tests: 2 passed;
+  - the overlay over WP-2b's suite (39b3a64) at this head: 18 render cases passed; the no-server layer 4681 passed and 583 skipped, the same as QA's run at abda42c.
 
 ## Evidence
 

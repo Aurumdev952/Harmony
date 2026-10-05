@@ -50,7 +50,10 @@ CONTENT_TYPES = {'pdf': 'application/pdf', 'png': 'image/png', 'jpeg': 'image/jp
 
 DEFAULT_WIDTH = 1280
 DEFAULT_HEIGHT = 1024
-# The ranges the renderer service accepts (harmony/worker/renderer/spec.py).
+# The ranges the renderer service accepts (harmony/worker/renderer/spec.py),
+# copied because this app's image runs Python 3.8, which cannot import the
+# renderer package, until WP-3b. tests/worker/test_renderer_web_drift.py fails
+# when they drift.
 WIDTHS = range(320, 3841)
 HEIGHTS = range(240, 4321)
 PDF_PAGE_SIZES = ('A3', 'A4', 'A5', 'Legal', 'Letter', 'Tabloid')

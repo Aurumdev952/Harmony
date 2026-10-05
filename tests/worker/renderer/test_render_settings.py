@@ -66,7 +66,14 @@ def test_a_map_origin_that_is_not_a_bare_origin_stops_the_service(monkeypatch):
 
 
 @pytest.mark.parametrize(
-    'map_origin', ['http://web:8000', 'https://web', 'https://WEB:5443']
+    'map_origin',
+    [
+        'http://web:8000',
+        'https://web',
+        'https://WEB:5443',
+        'https://web.',
+        'http://WEB.:80',
+    ],
 )
 def test_a_map_origin_on_the_dashboards_host_stops_the_service(monkeypatch, map_origin):
     # Cookies are scoped to a host, not a port, so Chromium sends the render
@@ -75,6 +82,16 @@ def test_a_map_origin_on_the_dashboards_host_stops_the_service(monkeypatch, map_
     monkeypatch.setenv('RENDERER_EGRESS_PROXY', 'http://render-egress:3128')
     monkeypatch.setenv('RENDERER_ALLOWED_ORIGIN', 'http://web:5000')
     monkeypatch.setenv('RENDERER_MAP_ORIGINS', f'https://api.mapbox.com,{map_origin}')
+
+    with pytest.raises(ValueError, match='dashboard'):
+        settings_from_env()
+
+
+def test_a_trailing_dot_on_the_dashboard_host_does_not_hide_a_map_origin(monkeypatch):
+    # `web.` and `web` name the same host (QA round 1, info).
+    monkeypatch.setenv('RENDERER_EGRESS_PROXY', 'http://render-egress:3128')
+    monkeypatch.setenv('RENDERER_ALLOWED_ORIGIN', 'http://web.:5000')
+    monkeypatch.setenv('RENDERER_MAP_ORIGINS', 'https://web')
 
     with pytest.raises(ValueError, match='dashboard'):
         settings_from_env()

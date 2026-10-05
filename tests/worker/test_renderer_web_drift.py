@@ -17,6 +17,7 @@ os.environ.setdefault('DRUID_HOST', 'http://druid.invalid')
 os.environ.setdefault('ZEN_ENV', 'harmony_demo')
 
 # pylint: disable=wrong-import-position
+from harmony.worker.renderer import server, spec  # noqa: E402
 from harmony.worker.renderer.__main__ import settings_from_env  # noqa: E402
 from web.server.routes.views import page_renderer  # noqa: E402
 
@@ -40,3 +41,21 @@ def test_one_account_cannot_fill_the_renderer(monkeypatch):
 
     assert 1 <= cap < settings_from_env().concurrency
     assert cap < _compose_default_concurrency()
+
+
+def test_the_web_app_asks_only_for_what_the_renderer_accepts(monkeypatch):
+    # The web app falls back to its defaults for an arg outside these, so a
+    # copy that drifts wider sends requests the renderer refuses with a 400.
+    monkeypatch.delenv('RENDERER_MAX_TIMEOUT_SECONDS', raising=False)
+    monkeypatch.delenv('RENDERER_MAX_BYTES', raising=False)
+    renderer = settings_from_env()
+
+    assert page_renderer.WIDTHS == spec.WIDTHS
+    assert page_renderer.HEIGHTS == spec.HEIGHTS
+    assert page_renderer.PDF_PAGE_SIZES == spec.PDF_PAGE_SIZES
+    assert page_renderer.CONTENT_TYPES == server.CONTENT_TYPES
+    assert set(page_renderer.CONTENT_TYPES) == set(spec.FORMATS)
+    assert page_renderer.DEFAULT_WIDTH in spec.WIDTHS
+    assert page_renderer.DEFAULT_HEIGHT in spec.HEIGHTS
+    assert page_renderer.RENDER_TIMEOUT_SECONDS <= renderer.max_timeout_seconds
+    assert page_renderer.RENDER_MAX_BYTES == renderer.max_bytes

@@ -15,6 +15,12 @@ STUCK_EXIT_STATUS = 70
 LOG = logging.getLogger('harmony.worker.renderer')
 
 
+def _host(url: str) -> str:
+    '''The URL's host, lower case and without a trailing dot: `WEB.` and `web`
+    are one host.'''
+    return (urlsplit(url).hostname or '').rstrip('.')
+
+
 def settings_from_env() -> RendererSettings:
     egress_proxy = os.environ.get('RENDERER_EGRESS_PROXY') or None
     map_origins = parse_origins(
@@ -28,9 +34,9 @@ def settings_from_env() -> RendererSettings:
         )
         map_origins = ()
     allowed_origin = os.environ.get('RENDERER_ALLOWED_ORIGIN', 'http://web:5000')
-    dashboard_host = urlsplit(allowed_origin).hostname
+    dashboard_host = _host(allowed_origin)
     for map_origin in map_origins:
-        if urlsplit(map_origin).hostname == dashboard_host:
+        if _host(map_origin) == dashboard_host:
             # The render token's cookie is scoped to the dashboard's host, not
             # its port, so Chromium would send it here; over https the egress
             # proxy cannot strip it from inside the tunnel.

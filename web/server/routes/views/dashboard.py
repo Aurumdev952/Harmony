@@ -560,7 +560,8 @@ def share_dashboard_via_email(
         ):
             # When user exists but is unregistered on the platform, send email
             # but do not generate dashboard/pdf attachments
-            # NOTE: This prevents urlbox JWT from triggering identifies events
+            # A pending user has not signed up, so no render token is minted
+            # as them.
             kwargs['should_attach_pdf'] = False
             kwargs['should_embed_image'] = False
             send_email(

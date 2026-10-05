@@ -23,7 +23,7 @@ security_review: false
 
 # WP-2e: Frontend unit and end-to-end harness
 
-qa-5 claimed this WP. Its session was lost when the host rebooted, and qa-5r took over on the same branch on 2026-10-04 with the untracked unit-harness start. qa-5r's session was lost in turn after unit 2; qa-5s took over on 2026-10-05 with its uncommitted unit-3 start (page table, AQT helpers, dashboard seed).
+qa-5 claimed this WP. Its session was lost when the host rebooted, and qa-5r took over on the same branch on 2026-10-04 with the untracked unit-harness start. qa-5r's session was lost in turn after unit 2; qa-5s took over on 2026-10-05 with its uncommitted unit-3 start (page table, AQT helpers, dashboard seed). qa-5s's session was lost after unit 3; qa-5t took over the same day with its uncommitted unit-4 start (`e2e/a11y/baseline.json`, `e2e/tests/a11y.spec.ts`).
 
 ## Plan
 
@@ -68,6 +68,8 @@ None of these block WP-2e.
 
 - 2026-10-05 qa-5s: merged `mig/WP-2c-api-contract-recordings` (b6e49b8) again, with no conflicts. Copied qa-5r's uncommitted unit-3 start from its worktree.
 - 2026-10-05 qa-5s unit 3 (23da27f): the @smoke suite, 75 tests. Two stack changes made it possible. First, `e2e/stack/compose.e2e.yaml`, layered through a new `CONTRACT_OVERLAYS` hook in `stack.sh`, turns the offline mock off. The production Druid client then queries `e2e/stack/druid_broker.py`, which serves `tests/golden/synth.py` over HTTP. The mock had no subtotals or time-format columns, so hierarchy, sunburst, pie and number-trend 500ed on it, and its values were random. Second, `renderer.py` stands in for Urlbox, and the overlay adds a tmpfs for uploads. synth gained `extra_fields` and `dense` options; `tests/golden/record.py --check` reports 0 of 85 cases changed and `pytest tests/golden` passes (269). `seed.sql` repairs the contract stack's unpublished field: its `{"type": "SUM"}` calculation is a shape the pipeline never writes, and Indicator Setup throws on it. Check: `e2e/run.sh --grep @smoke` 75/75 twice on fresh stacks; `tsc --noEmit` strict, shellcheck on `e2e/run.sh`, and ruff check and format on `e2e/stack` and `tests/golden` are clean. The two shellcheck notes left in `stack.sh` (SC2174, SC2016) predate this WP.
+- 2026-10-05 qa-5t: merged `mig/WP-2c-api-contract-recordings` (2c8928a) again, with no conflicts. Copied qa-5s's uncommitted unit-4 start from its worktree.
+- 2026-10-05 qa-5t unit 4: the @a11y axe baseline, 21 tests. axe runs on each of the 20 pages in the URL table at 1440 px. `e2e/a11y/baseline.json` records the serious and critical violations per page and rule as node counts. A new rule or a higher count fails with the rule, its help text and the offending selectors. A lower count fails with "shrink its entry". A 21st test fails when the baseline names a page that is not in the table. `E2E_A11Y_UPDATE=1` rewrites only the pages that ran. Check: green on the stack, and a regenerated baseline is byte-identical; a mutated baseline turns 3 tests red; `tsc --noEmit` strict is clean.
 
 ## Evidence
 
@@ -92,6 +94,11 @@ None of these block WP-2e.
   - `upload.spec.ts` (1): CSV upload, mapping, review and complete, ending with the source queued.
   - `login.spec.ts` (4): unchanged.
 - Faults the fixture catches that this unit does not hide: each allowance names its reason, and every one maps to a request above. These are Mapbox telemetry (maps), Jodit's cdnjs loads (text tile), and the data digest's missing object storage (WP-2c deferral).
+- Unit 4: `e2e/run.sh up`, then `playwright test --grep @a11y`: 21 passed in 26.1 s, and with `--repeat-each=3` 63 passed in 52.0 s. One earlier run, before the repeat, printed `20 passed` as its last line; its full log was not kept, so a failure in it cannot be ruled out, and no later run reproduced one. A full `E2E_A11Y_UPDATE=1` run, and one limited to login and forgot-password, both rewrite `baseline.json` byte for byte (`cmp`). Mutation check: removing `login.button-name`, raising `admin-roles.color-contrast` from 94 to 95 and adding a `retired-page` entry turned exactly three tests red (`/tmp/wp2e-a11y-mutant.log` on the build host):
+  - login: `new violations on /login`, `button-name: 0 -> 1 nodes`, target `.zen-dropdown-button__main-btn`;
+  - admin-roles: `improved; shrink its entry`, `color-contrast: 95 -> 94 nodes`;
+  - the page-table test: `retired-page`.
+  The baseline holds 20 pages and 252 nodes, 184 of them `color-contrast` (on 19 pages). `html-has-lang` and `meta-viewport` occur on every page: `web/server/templates/layout.html` has `<html>` with no `lang`, and its viewport sets `maximum-scale=1.0, user-scalable=no`, which blocks zoom (WP-7c to 7e).
 
 ## Verdicts
 

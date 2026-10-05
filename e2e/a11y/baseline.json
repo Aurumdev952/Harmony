@@ -1,0 +1,121 @@
+{
+  "admin": {
+    "aria-command-name": 1,
+    "color-contrast": 1,
+    "html-has-lang": 1,
+    "meta-viewport": 1
+  },
+  "admin-groups": {
+    "color-contrast": 1,
+    "html-has-lang": 1,
+    "meta-viewport": 1
+  },
+  "admin-roles": {
+    "color-contrast": 94,
+    "html-has-lang": 1,
+    "meta-viewport": 1
+  },
+  "admin-site-configuration": {
+    "aria-toggle-field-name": 1,
+    "color-contrast": 12,
+    "html-has-lang": 1,
+    "label": 1,
+    "meta-viewport": 1
+  },
+  "advanced-query": {
+    "aria-command-name": 3,
+    "aria-input-field-name": 1,
+    "color-contrast": 25,
+    "html-has-lang": 1,
+    "meta-viewport": 1,
+    "scrollable-region-focusable": 1
+  },
+  "alerts": {
+    "color-contrast": 2,
+    "html-has-lang": 1,
+    "link-in-text-block": 2,
+    "meta-viewport": 1
+  },
+  "dashboard": {
+    "aria-toggle-field-name": 1,
+    "color-contrast": 3,
+    "html-has-lang": 1,
+    "meta-viewport": 1
+  },
+  "data-catalog": {
+    "aria-required-children": 1,
+    "button-name": 1,
+    "color-contrast": 3,
+    "html-has-lang": 1,
+    "meta-viewport": 1
+  },
+  "data-digest": {
+    "color-contrast": 1,
+    "html-has-lang": 1,
+    "meta-viewport": 1
+  },
+  "data-quality": {
+    "color-contrast": 2,
+    "html-has-lang": 1,
+    "meta-viewport": 1
+  },
+  "data-status": {
+    "color-contrast": 5,
+    "html-has-lang": 1,
+    "meta-viewport": 1
+  },
+  "data-upload": {
+    "color-contrast": 1,
+    "html-has-lang": 1,
+    "meta-viewport": 1
+  },
+  "forgot-password": {
+    "button-name": 1,
+    "color-contrast": 1,
+    "html-has-lang": 1,
+    "meta-viewport": 1
+  },
+  "home": {
+    "aria-command-name": 1,
+    "color-contrast": 2,
+    "html-has-lang": 1,
+    "meta-viewport": 1
+  },
+  "indicator-setup": {
+    "aria-required-parent": 1,
+    "color-contrast": 1,
+    "html-has-lang": 1,
+    "label": 3,
+    "meta-viewport": 1
+  },
+  "login": {
+    "button-name": 1,
+    "color-contrast": 1,
+    "html-has-lang": 1,
+    "meta-viewport": 1
+  },
+  "not-found": {
+    "color-contrast": 2,
+    "html-has-lang": 1,
+    "link-in-text-block": 2,
+    "meta-viewport": 1
+  },
+  "overview": {
+    "aria-command-name": 1,
+    "color-contrast": 2,
+    "html-has-lang": 1,
+    "meta-viewport": 1
+  },
+  "simple-query": {
+    "aria-command-name": 3,
+    "aria-input-field-name": 1,
+    "color-contrast": 25,
+    "html-has-lang": 1,
+    "meta-viewport": 1,
+    "scrollable-region-focusable": 1
+  },
+  "unauthorized": {
+    "html-has-lang": 1,
+    "meta-viewport": 1
+  }
+}

@@ -3,12 +3,14 @@ pipeline: every record goes to a single stream handler on the root logger.
 
 Environment:
     LOG_FORMAT  `json` (one JSON object per line) or `text` (for people). Unset means
-                `json` when ZEN_PROD is set and `text` otherwise. The images do not
-                set ZEN_PROD; the Compose files set LOG_FORMAT for each service.
+                `json` when ZEN_PROD is set and `text` otherwise. The web image
+                (which also runs the worker) sets ZEN_PROD; the pipeline image does
+                not. The Compose files set LOG_FORMAT for each service anyway.
     LOG_STREAM  `stdout` or `stderr`, default `stderr`. Pipeline steps read other
                 scripts' stdout (`SOURCES=($(generate_pipeline_sources.py ...))`), so
                 only long-running services, whose stdout carries no data, use stdout.
-    LOG_LEVEL   Root level, default INFO.
+    LOG_LEVEL   Root level, default INFO. The old production config logged
+                ZenysisLogger at DEBUG; set LOG_LEVEL=DEBUG to get those lines.
     ZEN_ENV     Written as `deployment` on JSON lines.
 
 Every line passes through `redact` first. That is a backstop for secrets that reach

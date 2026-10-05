@@ -20,8 +20,11 @@ instances:
       - "docker/web/scripts/initialize_new_container.sh"
       - "docker/web/scripts/run_web_gunicorn.sh"
       - "tests/infra/test_web_scripts_log_json.py"
+      - "docs/modernisation/work/WP-2g-evidence/worker_quiet_live.py"
+      - "docs/modernisation/work/WP-2g-evidence/worker_quiet_live.txt"
       - "docs/modernisation/work/WP-2g.md"
-  # Resumed by infra-7 after the host reboot; same branch, same files.
+  # Resumed by infra-7 after the host reboot, and by infra-8 for the rework after
+  # review; same branch, same files.
   - name: "backend-1"
     files:
       - "web/gunicorn_server.py"
@@ -68,11 +71,11 @@ Constraints found while reading the code:
 - `log/log.py` imports `web.server.environment` only to read `ZEN_PROD`. The new code reads the environment itself, so `log` no longer depends on `web`.
 - Every Flask request already gets a `uuid4` request id and user id in `initialize_request_logger` (`web/server/security/signal_handlers.py`), but the old format string never printed them.
 - Celery hijacks the root logger unless a `setup_logging` receiver is connected. Gunicorn only writes access lines when an access log or `logconfig_dict` is configured; today neither is, so production has no gunicorn access lines at all.
-- `nginxproxy/nginx-proxy` (1.11.6, as pinned by WP-0b) takes `LOG_FORMAT` and `LOG_FORMAT_ESCAPE` from the environment. It does not forward `X-Request-ID`, and deployments run Compose against a remote `DOCKER_HOST`, so a repo-relative `conf.d` bind mount would not exist on the host. nginx therefore logs the app's id from the response header (`$upstream_http_x_request_id`) instead of setting one.
+- `nginxproxy/nginx-proxy` (1.11.6, as pinned by WP-0b) takes `LOG_FORMAT` and `LOG_FORMAT_ESCAPE` from the environment. It passes a client's `X-Request-ID` through unchanged and sets none of its own (QA saw this on 1.11.6; this plan first said it did not forward the header), and deployments run Compose against a remote `DOCKER_HOST`, so a repo-relative `conf.d` bind mount would not exist on the host. nginx therefore logs the app's id from the response header (`$upstream_http_x_request_id`) instead of setting one.
 
 Design:
 - **One configuration** in `log/config.py`, applied by `configure_logging()` when `log` is imported. One stream handler on the root logger, so the app, Celery, gunicorn, werkzeug and libraries share it. `ZenysisLogger` propagates to it. The rotating files under `/data/output` go.
-- **Format** from `LOG_FORMAT` (`json` or `text`). Unset means `json` when `ZEN_PROD` is set and `text` otherwise. No image sets `ZEN_PROD` (only `yarn prod-server` does), so Compose sets `LOG_FORMAT` per service. Level from `LOG_LEVEL`, default `INFO`.
+- **Format** from `LOG_FORMAT` (`json` or `text`). Unset means `json` when `ZEN_PROD` is set and `text` otherwise. `docker/web/Dockerfile_web` sets `ZEN_PROD`, so web and worker default to `json` anyway; the pipeline image does not set it. Compose sets `LOG_FORMAT` per service all the same, so no service depends on that default. Level from `LOG_LEVEL`, default `INFO`. The old production config logged `ZenysisLogger` at DEBUG into `/data/output/zenysis.log`, so production `LOG.debug` lines are now dropped; `LOG_LEVEL=DEBUG` brings them back.
 - **Stream** from `LOG_STREAM` (`stdout` or `stderr`), default `stderr` as today. Pipeline steps capture other scripts' stdout (`SOURCES=($(generate_pipeline_sources.py ...))` in `pipeline/*/process/run/90_shared/*`) and `config.settings` logs warnings at import, so logging to stdout by default would put log lines into those arrays (INV-1). Compose sets `LOG_STREAM=stdout` for web and worker, whose stdout carries no data; that is where BE-8 applies. Docker collects both streams, so `docker compose logs` shows pipeline lines either way.
 - **JSON keys:** `timestamp` (ISO 8601, UTC, milliseconds), `level`, `logger`, `message`, `source`, `deployment` (`ZEN_ENV`), `request_id` and `user_id` when bound, `task` and `task_id` inside a Celery task, `exc_info` when there is an exception, `http` on access lines.
 - **Context** in `contextvars` (`log/context.py`): it follows threads started inside a request only when copied, and it is per greenlet under gevent (greenlet 3 keeps a context per greenlet).
@@ -90,6 +93,7 @@ Units:
 4. Gunicorn logconfig and access shape. Tests in `tests/web/test_gunicorn_logging.py`. Check: a live gunicorn gevent run with concurrent requests; every access line carries its own request id.
 5. Compose `LOG_FORMAT` for web, worker and pipeline (`text` in the dev overlay), the nginx `LOG_FORMAT`, and the browser-share JSON reader. Check: `docker compose config` diff shows only the logging variables, a throwaway nginx proxies to a stub and writes a JSON line carrying the upstream's id, and the browser-share tests pass.
 6. Requests for the backend and core wiring, then review.
+7. Rework after the reviewer's and QA's verdicts (2026-10-05), one commit each: redaction linear in hostile input, with timed tests in both formats; `mig/integration` merged and infra's files pass the CI gates; the redaction gaps (quoted values, header tuples, bare Basic, the chained chunk-size `ValueError`, cookies, `stack_info`); the worker's plain-text banner; stale text; deferrals routed as Requests. Check: the full CI gate set on the merged tree.
 
 ## Contract changes
 
@@ -107,6 +111,9 @@ Follow-ups from core's Alembic work (core-1 observations). None blocks WP-2g:
 - [x] backend: `web/server/app_base.py` triggers one SQLAlchemy warning before `log` is imported, so it prints as plain text and is the only non-JSON line at web startup. Import `log` first in `app_base.py`, or move the import that triggers the warning after it, so `logging.captureWarnings` routes it.
 - [x] backend (core-2 observation, same cause; done in backend-3, `log` is the first import in both files): `web/server/app.py` imports `flask_potion` (line 10) before `log` (line 13). In an environment where `flask_potion` has no bytecode yet (a fresh `uv sync`, which does not compile it), compiling `flask_potion/utils.py:25` writes a plain-text `SyntaxWarning: "is not" with a literal` to stderr before `logging.captureWarnings` is on. `tests/web/test_alembic_logging.py` then fails when it is the first thing run in a fresh venv (reproduced by deleting `flask_potion/__pycache__`). CI passes only because earlier suites compile it first. Import `log` before any third-party import in `app.py` and `app_base.py`; proof: the alembic test passes after deleting `.venv/lib/python3.9/site-packages/flask_potion/__pycache__`.
 - [ ] infra, route to WP-3b (core-2 observation): images built with `uv sync` set `UV_COMPILE_BYTECODE=1` (pip compiles by default, uv does not), so the first container start does not compile third-party modules at import and print their compile-time `SyntaxWarning`s. Proof: a fresh container's first start shows no non-JSON line in `docker compose logs web`.
+- [ ] qa: in `tests/golden/harness.py:71-72`, drop the `ZEN_PROD` refusal. Its reason, "log config would write to /data/output", no longer holds: WP-2g removed the rotating files, and `ZEN_PROD` now only picks the JSON format when `LOG_FORMAT` is unset. (does not block WP-2g)
+- [ ] infra, route to WP-5a (nginx side): keep Flask-User reset and confirm tokens out of nginx access lines. The JSON format logs `$uri` (no query string), and these links carry the token in the path. Redacting it needs an http-level `map`, which nginx-proxy takes only from a `conf.d` file on the host or a custom image. Until then nginx lines carry those tokens, as the old `vhost` format did, which also logged every query string.
+- [ ] infra, route to WP-5a (nginx side): nginx chooses the request id, with `proxy_set_header X-Request-ID $request_id`, so a client cannot pick it. Interim decision (2026-10-05): the app keeps a well-formed client `X-Request-ID` (1 to 128 of `A-Za-z0-9._:-`) and replaces a malformed one. The id only correlates log lines; it grants nothing and authorises nothing. A client that reuses an id can only make its own lines share it, which can confuse a log search. That is accepted until nginx sets the id.
 
 ## Log
 
@@ -140,7 +147,7 @@ Each link below is cited with its check in the Log above.
 
 Environments: the host env is `uv sync` on 3.9, run with `--with 'gunicorn[gevent]==20.0.4' --with 'setuptools<70'` for gunicorn. The 3.8 web env is `uv venv --seed --python 3.8`, then the venv's own `pip install -r requirements.txt -r requirements-web.txt 'pytest<8.4' freezegun`. `requirements-dev.txt` does not install on 3.8, and a hook blocks `uv pip`. The browser-share tests run on `uvx --python 3.13 --with pytest==8.4.2`.
 
-Deferrals: OpenTelemetry traces and `/metrics` go with FastAPI in WP-5a (BE-8's other half), and the liveness and readiness endpoints too, since they live under `/api/v3`. Flask-User tokens in nginx `$uri` go to WP-5a/5h (see unit 5).
+Deferrals: OpenTelemetry traces and `/metrics` go with FastAPI in WP-5a (BE-8's other half), and the liveness and readiness endpoints too, since they live under `/api/v3`. Flask-User tokens in nginx `$uri` and nginx setting `X-Request-ID` go to the nginx side of WP-5a, under Requests. The `log_json` shell function stays copied in the three web scripts: they live in two image directories (`/zenysis/docker/` and `/zenysis/`), so one sourced file needs a new `COPY` in `Dockerfile_web`, which WP-3b is rewriting; `tests/infra/test_web_scripts_log_json.py` checks every copy.
 
 ## Verdicts
 

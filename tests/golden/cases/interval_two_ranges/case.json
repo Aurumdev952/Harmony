@@ -1,0 +1,5 @@
+{
+  "description": "OR of two disjoint intervals: two query intervals.",
+  "endpoint": "bar_graph",
+  "policy": null
+}

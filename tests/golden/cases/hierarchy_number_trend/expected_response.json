@@ -1,0 +1,38 @@
+{
+  "levels": [
+    "timestamp"
+  ],
+  "root": {
+    "children": [
+      {
+        "children": [],
+        "dimension": "timestamp",
+        "metrics": {
+          "yellow_fever_cases": null
+        },
+        "name": "2024-01-01"
+      },
+      {
+        "children": [],
+        "dimension": "timestamp",
+        "metrics": {
+          "yellow_fever_cases": 126.0
+        },
+        "name": "2024-02-01"
+      },
+      {
+        "children": [],
+        "dimension": "timestamp",
+        "metrics": {
+          "yellow_fever_cases": null
+        },
+        "name": "2024-03-01"
+      }
+    ],
+    "dimension": "",
+    "metrics": {
+      "yellow_fever_cases": null
+    },
+    "name": "Overall"
+  }
+}

@@ -1,0 +1,16 @@
+{
+  "description": "Data quality table for a user restricted to Pará.",
+  "endpoint": "data_quality_table",
+  "policy": {
+    "query_policies": [
+      {
+        "dimension": "StateName",
+        "dimension_value": "Pará"
+      },
+      {
+        "dimension": "source",
+        "dimension_value": null
+      }
+    ]
+  }
+}

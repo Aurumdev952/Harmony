@@ -1,0 +1,1 @@
+AssertionError: All output rows must have a date! Input row: {"key": {"StateName": "Northvale", "MunicipalityName": "Ashford"}, "data": {"demo_a": 1}, "Real_Date": "", "source": "handmade"}

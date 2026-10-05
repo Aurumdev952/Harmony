@@ -1,6 +1,6 @@
 import related
 
-from pydruid.utils.filters import Dimension as DimensionFilter
+from pydruid.utils.filters import Filter
 
 from data.query.models.category import Category
 from db.druid.util import EmptyFilter
@@ -42,4 +42,4 @@ class GroupingDimension:
     def to_druid_filter(self):
         if self.include_null:
             return EmptyFilter()
-        return DimensionFilter(self.dimension) != ''
+        return ~Filter(dimension=self.dimension, value=None)

@@ -1,0 +1,39 @@
+{
+  "fields": [
+    {
+      "id": "yellow_fever_cases",
+      "calculation": {
+        "type": "WINDOW",
+        "filter": {
+          "type": "FIELD",
+          "fieldId": "yellow_fever_cases"
+        },
+        "operation": "average",
+        "size": 3
+      }
+    }
+  ],
+  "filter": {
+    "type": "AND",
+    "fields": [
+      {
+        "type": "INTERVAL",
+        "start": "2023-01-01",
+        "end": "2024-01-01"
+      }
+    ]
+  },
+  "groups": [
+    {
+      "granularity": "month",
+      "includeTotal": false
+    },
+    {
+      "dimension": "StateName",
+      "includeAll": false,
+      "includeNull": false,
+      "includeTotal": false
+    }
+  ],
+  "type": "GROUP_BY"
+}

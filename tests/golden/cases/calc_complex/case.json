@@ -1,0 +1,5 @@
+{
+  "description": "COMPLEX calculation backed by the deployment calculation for the indicator.",
+  "endpoint": "table",
+  "policy": null
+}

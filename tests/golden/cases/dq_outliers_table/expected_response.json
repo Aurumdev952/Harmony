@@ -1,0 +1,25 @@
+{
+  "data": [
+    {
+      "StateName": "Acre",
+      "num_outliers": 0,
+      "num_values": 20,
+      "percentage_outliers": 0.0
+    },
+    {
+      "StateName": "Pará",
+      "num_outliers": 0,
+      "num_values": 22,
+      "percentage_outliers": 0.0
+    },
+    {
+      "StateName": "Roraima",
+      "num_outliers": 0,
+      "num_values": 19,
+      "percentage_outliers": 0.0
+    }
+  ],
+  "dimensions": [
+    "StateName"
+  ]
+}

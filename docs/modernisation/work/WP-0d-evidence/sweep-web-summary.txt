@@ -1,0 +1,27 @@
+# WP-0d web-server import sweep (import_sweep.py over config data db log models util web)
+# docker run --rm --network none -e ZEN_ENV=harmony_demo -e DEFAULT_SECRET_KEY=<dummy> [-e DRUID_HOST=http://druid.invalid]
+
+## Run 1, without DRUID_HOST (units 4 and 5): modules that read DRUID_HOST at import stop before importing the rest
+base   (main):       759 modules, 631 OK, 70 stop at KeyError DRUID_HOST, 0 removed-package errors
+trim   (scratch):    752 modules, 625 OK, 69 stop at KeyError DRUID_HOST, 0 removed-package errors
+merged (branch):     752 modules, 625 OK, 69 stop at KeyError DRUID_HOST, 0 removed-package errors
+trim == merged byte for byte: True
+
+## Run 2, with DRUID_HOST=http://druid.invalid (review fix): every module gets past the settings read
+base   (main):       759 modules, 690 OK, 0 stop at KeyError DRUID_HOST, 0 removed-package errors
+merged (branch):     752 modules, 683 OK, 0 stop at KeyError DRUID_HOST, 0 removed-package errors
+
+## Run 2 diff, base -> merged (status of every other module is identical)
+--- base
++++ merged
+@@ -193 +192,0 @@
+-db.druid.indexing.legacy_task_builder	OK
+@@ -199 +197,0 @@
+-db.druid.indexing.scripts.run_indexing	OK
+@@ -468,4 +465,0 @@
+-web.server.graphql.filters	OK
+-web.server.graphql	OK
+-web.server.graphql.schema	OK
+-web.server.graphql.schemas	OK
+@@ -700 +693,0 @@
+-web.server.routes.graphql_api	OK

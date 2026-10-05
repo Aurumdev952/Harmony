@@ -1,7 +1,8 @@
 '''What Potion list endpoints return to each seeded role: the manager filters in
 web/server/potion/managers.py and the principal list filter. The user list
-showing all users (I1) and admins-via-group (H5, part of I1) are today's
-behaviour; owners I1 WP-5d, H5 WP-5d.'''
+showing all users (I1) is today's behaviour; owner WP-5d. Administrators through
+a group (H5, part of I1) are hidden from non-superusers since WP-0j (decision
+0010), as direct administrators are; that is pinned in test_account_handover.py.'''
 
 from __future__ import annotations
 

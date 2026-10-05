@@ -105,6 +105,9 @@ P95_REGRESSION_LIMIT = 0.10
 # One-sided error rate of a paired run's verdict, split across its cases.
 FAMILY_ALPHA = 0.05
 BOOTSTRAP_RESAMPLES = 4000
+# Below this, a bootstrap of p95 resamples little more than the maximum and an
+# A/A case fails its bound two to three times as often as the level says.
+MIN_PAIRED_ROUNDS = 20
 REQUEST_LOG_SETTLE_SECONDS = 0.05
 
 # Golden cases replayed, covering every query endpoint the frontend calls. The
@@ -324,6 +327,10 @@ def paired_result(
     the case, so a run's files always give the same verdict."""
     if len(reference_ms) != len(candidate_ms):
         raise ValueError(f'{case_id}: sides have different round counts')
+    if len(reference_ms) < MIN_PAIRED_ROUNDS:
+        raise ValueError(
+            f'{case_id}: a paired verdict needs at least {MIN_PAIRED_ROUNDS} rounds'
+        )
     n = len(reference_ms)
     per_round = [c / r for r, c in zip(reference_ms, candidate_ms)]
     reference_p95 = percentile(reference_ms, 0.95)
@@ -1011,6 +1018,15 @@ def parse_args(argv: list[str]) -> argparse.Namespace:
     )
     args = parser.parse_args(argv)
     args.mode = 'committed' if args.committed or args.compare is not None else 'paired'
+    if args.mode == 'paired':
+        for flag, value in (
+            ('--rounds', args.rounds),
+            ('--dashboard-rounds', args.dashboard_rounds),
+        ):
+            if value < MIN_PAIRED_ROUNDS:
+                parser.error(
+                    f'{flag}: a paired run needs at least {MIN_PAIRED_ROUNDS} rounds'
+                )
     return args
 
 

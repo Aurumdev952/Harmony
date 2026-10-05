@@ -419,7 +419,7 @@ def test_a_paired_run_writes_both_sides_and_fails_on_a_clear_regression(
 
 
 @given(
-    st.lists(st.floats(min_value=1, max_value=1e4), min_size=5, max_size=120),
+    st.lists(st.floats(min_value=1, max_value=1e4), min_size=20, max_size=120),
     st.floats(min_value=0.5, max_value=2),
 )
 def test_a_candidate_slower_by_a_constant_factor_fails_exactly_above_ten_percent(
@@ -434,7 +434,7 @@ def test_a_candidate_slower_by_a_constant_factor_fails_exactly_above_ten_percent
     assert result.regressed == (result.ratio > 1.10)
 
 
-@given(st.lists(st.floats(min_value=1, max_value=1e4), min_size=5, max_size=120))
+@given(st.lists(st.floats(min_value=1, max_value=1e4), min_size=20, max_size=120))
 def test_identical_sides_never_regress(ms):
     result = baseline.paired_result('c', ms, list(ms), 0.05, resamples=50)
     assert result.ratio == 1 and not result.regressed
@@ -518,7 +518,7 @@ def test_a_tail_regression_fails_on_p95_even_when_the_typical_request_is_unchang
 
 
 @given(
-    st.lists(st.tuples(st.floats(1, 1e4), st.floats(1, 1e4)), min_size=5, max_size=60),
+    st.lists(st.tuples(st.floats(1, 1e4), st.floats(1, 1e4)), min_size=20, max_size=60),
     st.floats(min_value=0.5, max_value=3),
 )
 def test_detects_is_the_smallest_uniform_slowdown_the_run_would_fail(pairs, factor):
@@ -539,3 +539,20 @@ def test_paired_is_the_default_and_compare_selects_the_committed_baseline():
     assert baseline.parse_args(['--committed']).mode == 'committed'
     committed = baseline.parse_args(['--compare'])
     assert (committed.mode, committed.compare) == ('committed', '')
+
+
+def test_a_paired_verdict_needs_twenty_rounds():
+    # Below about 20 pairs a bootstrap of p95 resamples little more than the
+    # maximum, and an A/A case fails two to three times as often as its level.
+    ms = [float(v) for v in range(1, 20)]
+    with pytest.raises(ValueError, match='at least 20 rounds'):
+        baseline.paired_result('c', ms, ms, 0.05)
+    baseline.paired_result('c', ms + [20.0], ms + [20.0], 0.05)
+
+
+@pytest.mark.parametrize('flag', ['--rounds', '--dashboard-rounds'])
+def test_paired_mode_refuses_fewer_than_twenty_rounds(flag):
+    with pytest.raises(SystemExit):
+        baseline.parse_args([flag, '19'])
+    assert baseline.parse_args([flag, '20']).mode == 'paired'
+    assert baseline.parse_args(['--committed', flag, '5']).mode == 'committed'

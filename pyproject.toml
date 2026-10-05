@@ -148,6 +148,8 @@ dev = [
     "testfixtures==6.17.1",
     "alchemy-mock==0.4.3",
     "factory-boy==3.2.0",
+    # BE-1: harmony.core imports no web framework (tests/core runs it).
+    "import-linter==2.5.2",
 ]
 
 [tool.uv]
@@ -272,6 +274,18 @@ module = [
     "boto3.*",
 ]
 ignore_missing_imports = true
+
+[tool.importlinter]
+# The legacy packages are in the graph so an import that reaches a web framework
+# through them breaks the contract too.
+root_packages = ["harmony.core", "config", "data", "db", "log", "models", "util", "web"]
+include_external_packages = true
+
+[[tool.importlinter.contracts]]
+name = "BE-1: harmony.core imports no web framework"
+type = "forbidden"
+source_modules = ["harmony.core"]
+forbidden_modules = ["flask", "fastapi", "starlette"]
 
 [tool.pytest.ini_options]
 pythonpath = ["."]

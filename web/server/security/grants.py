@@ -291,14 +291,15 @@ def _verify_holds_all_grants_of(user: User, action: str, description: str) -> No
             if role.id not in held_role_ids
         }
     )
+    # sqlmypy types an untyped `relationship` as one object.
     groups = [
         (group.id, group.name)
-        for group in user.groups
+        for group in user.groups  # type: ignore[attr-defined]
         if group.id not in member_group_ids
     ]
     acls = [
         (acl.resource_role.name, acl.resource_id)
-        for acl in user.acls
+        for acl in user.acls  # type: ignore[attr-defined]
         if not _holds_acl(user, acl, account_needs)
     ]
     if roles or groups or acls:
@@ -313,8 +314,11 @@ def _holds_acl(user: User, acl: UserAcl, account_needs: set[Need]) -> bool:
     '''Whether the caller's account holds what `acl` allows, on that resource
     or on every resource of its type.
     '''
-    # pylint: disable=protected-access
+    # `User` gains the web mixin at import time, out of mypy's sight.
+    needs = user._build_acl_needs(  # type: ignore[attr-defined]
+        acl.resource_role.permissions, acl.resource
+    )
     return all(
         need in account_needs or ItemNeed(need.method, None, need.type) in account_needs
-        for need in user._build_acl_needs(acl.resource_role.permissions, acl.resource)
+        for need in needs
     )

@@ -11,8 +11,9 @@ on:
 
 permissions: {}
 
-# A new push to a PR cancels the run still going for the previous one. Runs on
-# main are grouped by ref and never cancelled, so every commit there gets a result.
+# A new push to a PR cancels the run still going for the previous one. A run on
+# main is never cancelled once it starts. GitHub keeps only one pending run per
+# group, though, so of several quick pushes to main the middle ones are skipped.
 concurrency:
   group: integration-${{ github.event.pull_request.number || github.ref }}
   cancel-in-progress: ${{ github.event_name == 'pull_request' }}
@@ -52,6 +53,11 @@ jobs:
         env:
           RUFF_OUTPUT_FORMAT: github
         run: ci/lint_python.sh HEAD^1
+      - name: Python 3.8 syntax (web image)
+        # The web image still runs Python 3.8; this job runs 3.9, which accepts
+        # 3.9-only syntax. uv fetches the pinned CPython 3.8. WP-3b removes the step.
+        if: '!cancelled()'
+        run: uv run --no-project -p cpython-3.8.20 python ci/check_py38_syntax.py config data db log models graphql util web scripts tests/web
       - name: Mypy
         # Run it even if ruff fails, so we can see all the errors at once.
         if: '!cancelled()'

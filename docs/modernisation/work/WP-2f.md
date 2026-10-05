@@ -259,6 +259,12 @@ None of these blocks this WP.
     - shared: tests under `tests/web` and `tests/graphql`.
   - setup-uv's post step (cache save) was skipped because the job failed, so the uv cache fills only on a green run.
   - Lead's call: retarget PR #12 to `mig/integration`, where its own diff is lint-clean, or have the owners clean those files before `mig/integration` goes to `main` (Merge-order items, in-flight branches).
+- 2026-10-04 infra-2: the owners' lint cleanups reached `mig/integration` (`594ecfb`), and merging it here was a fast-forward. Local check before the push:
+  - `ci/lint_python.sh main` exits 0 (83 files lint-clean and formatted);
+  - `uv lock --check` passes, and mypy reports 517 files clean;
+  - `ci/pytest_suites.sh` passes all 8 suites; graphql has 22 tests now.
+
+  Pushed `594ecfb`. PR #12 run `37235394333` is green on all three jobs, and so is its re-run (attempt 2), which shows the 3.9 uv cache restoring (Evidence). Also recorded the reviewer's two observations on the push trigger (Decisions): GitHub keeps one pending run per concurrency group, and the push lint compares only `HEAD` with `HEAD^1`. The workflow comment that promised a result for every commit on `main` is corrected; actionlint still reports 0.
 
 ## Decisions
 
@@ -290,8 +296,8 @@ None of these blocks this WP.
   - ruff's formatter follows black 24, not black 22.6. Of the 655 files under `web/server`, `data`, `models` and `db` that black 22.6 accepts, ruff would reformat 239. Repo-wide, 283 files would change, mostly blank lines after docstrings and parenthesised right-hand sides. Hence the lead request for one format commit.
 - **`integration.yml` also runs on pushes to `main`** (INV-8, CI is green on `main`). On `pull_request` only, a PR that passed against an old base could merge and turn `main` red unseen, unless branch protection requires up-to-date branches, which is a human setting (Requests). The push run makes a red `main` visible either way:
   - the concurrency group falls back from the PR number to `github.ref`. Without that, every push run would share the group `integration-` and cancel the others;
-  - `cancel-in-progress` holds only for `pull_request`, so each commit on `main` gets its own result;
-  - on a push, `HEAD^1` with `fetch-depth: 2` is the previous `main` tip, for a merge commit and for a squash merge alike, so the changed-file lint and the JS lint check what landed. A direct push of several commits lints only the last one's diff, while the tree-wide checks and every suite still run; branch protection forbids such pushes anyway;
+  - `cancel-in-progress` holds only for `pull_request`, so a run on `main` is never cancelled once it starts. **Reviewer's observation:** GitHub keeps at most one pending run per concurrency group, even with `cancel-in-progress` off. A newer queued run replaces the pending one, so each commit on `main` gets its own result only when the pushes are spaced out. With quick merges, the middle commits are skipped. The newest commit is still checked, and it carries the earlier ones, so a red `main` still shows; but it is not pinned to the commit that broke it. The workflow comment says so, corrected at close;
+  - on a push, the lint compares `HEAD` with `HEAD^1` (`fetch-depth: 2`), which is the previous `main` tip for a merge commit and for a squash merge alike, so the changed-file lint and the JS lint check what landed. **Reviewer's observation:** a rebase-merge, or a direct push of several commits, lands several commits at once, and the lint then checks only the last one's diff. The tree-wide checks (E9, F63, F7, F82), mypy and every suite still run on the whole tree, and the PR run already linted the full change against its base. Linting `github.event.before..HEAD` would close the gap but needs a deeper fetch; it is left for a follow-up if rebase-merge is ever enabled. Squash or merge commits keep the push lint exact;
   - permissions stay `contents: read`, and no step reads event text, so there is nothing new to inject. Push events on `main` carry only trusted code.
 
   Tested statically: actionlint 0, zizmor 0, and the WP-0f policy re-created from WP-0f's Evidence (the `/tmp` copy did not survive the reboot) passes. actionlint flags `cancel-in-progress: ${{ github.event_name }}` as "type of expression must be bool", so it type-checks the new expression. The first run on `main` after merge is the runtime proof.
@@ -377,16 +383,21 @@ These ran after merging `mig/integration` at `2988d85`. `git ls-files .playwrigh
   - WP-0f policy script: `policy OK`;
   - zizmor 1.30.1 `--offline`: "No findings to report". Its 12 suppressed items are pedantic-persona notes: 6 anonymous definitions, 4 undocumented permissions, and 2 concurrency-limit notes on the push-only image workflows (`web.yml`, `pipeline.yml`);
   - `check-jsonschema --builtin-schema vendor.dependabot`: ok.
-- **GitHub run** (PR #12, run `37234169035`; Log, 2026-10-04):
-  - cold `uv sync --locked` took 97 s on the runner (about 4.5 minutes locally);
-  - the python-313 job took 22 s.
+- **GitHub runs on PR #12** (Log, 2026-10-04):
 
-  Still not verified:
-  - that `setup-uv` restores the cache. It saves only after a green job;
+  | Run | Head | Result | 3.9 job | Cold `uv sync` | uv cache (3.9) |
+  |---|---|---|---|---|---|
+  | `37234169035` | `de2e660` | red, Ruff on other WPs' files | 2m46s | 97 s | not saved (job failed) |
+  | `37235394333` attempt 1 | `594ecfb` | **green**, all 3 jobs | 2m56s | 99 s | miss, then saved (`…-app39`) |
+  | `37235394333` attempt 2 | `594ecfb` | **green**, all 3 jobs | 1m18s | 1 s | hit, restored within 8 s of "Set up uv" |
+
+  - the python-313 job takes 17 to 22 s; its `tools313` cache hit from the first run on;
+  - JS lint's `node_modules` cache hit in every run;
+  - in each green run, mypy reports 517 files clean and `ci/pytest_suites.sh` reports "all 8 suites passed". The 3.13 job's strict mypy is clean.
+
+  Still not verified, because both need a merge to the default branch:
   - the push-to-`main` run;
   - Dependabot.
-
-  The last two need a merge to the default branch.
 
 ## Verdicts
 

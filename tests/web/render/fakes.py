@@ -7,6 +7,7 @@ from flask import Flask
 from flask_jwt_extended import decode_token
 from flask_principal import ItemNeed
 from jwt import PyJWTError
+from requests import Request
 
 from models.python.permissions import DimensionFilter, QueryNeed
 from web.server.security.permissions import SUPERUSER_NEED
@@ -149,11 +150,12 @@ class RenderCall:
 
 
 class FakeRenderResponse:
-    status_code = 200
-
-    def __init__(self, body: bytes) -> None:
+    def __init__(
+        self, body: bytes, url: str = 'https://renderer.invalid/', status_code=200
+    ) -> None:
         self.content = body
-        self.url = 'https://renderer.invalid/'
+        self.url = url
+        self.status_code = status_code
 
     def iter_content(self, chunk_size=2048) -> Iterator[bytes]:
         yield self.content
@@ -163,12 +165,15 @@ class FakeRenderer:
     """Replaces the `requests` module the renderer calls urlbox with.
 
     The body names the identity the minted `accessKey` token logs in as, so a
-    test can tell whose data a render (and any cached copy of it) shows.
+    test can tell whose data a render (and any cached copy of it) shows. The
+    response's `url` is the one requests would report: it carries the urlbox API
+    key and the minted token.
     """
 
     def __init__(self, app: Flask) -> None:
         self._app = app
         self.calls: List[RenderCall] = []
+        self.status_code = 200
 
     def get(self, url, params=None, stream=False, timeout=None):
         params = dict(params or {})
@@ -184,4 +189,8 @@ class FakeRenderer:
             identity = decoded.get('identity')
             claims = decoded.get('user_claims', {})
         self.calls.append(RenderCall(url, params, identity, claims))
-        return FakeRenderResponse(f'render-as:{identity}'.encode())
+        return FakeRenderResponse(
+            f'render-as:{identity}'.encode(),
+            url=Request('GET', url, params=params).prepare().url,
+            status_code=self.status_code,
+        )

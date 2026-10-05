@@ -19,11 +19,15 @@ export type PageCase = {
   knownErrors?: KnownError[];
 };
 
+// The digest API's 500 rejects APIService's promise with a ZenHTTPError that
+// nothing catches. Its message is the class's minified name, `l`, so a
+// change to the bundle that renames it fails here, loudly, rather than this
+// allowance swallowing other uncaught errors.
 const NO_OBJECT_STORAGE: KnownError = {
-  pattern: /HTTP 500 GET .*\/api2\/data_digest\/|page error: /,
+  pattern: /^(HTTP 500 GET http:\/\/[^/]+\/api2\/data_digest\/.*|page error: l)$/,
   reason:
     'the disposable stack has no object storage, so the data digest API ' +
-    'fails (WP-2c deferral; infra request for minio in the stack)',
+    'fails and its rejection goes uncaught (WP-2c deferral; infra request for minio in the stack)',
 };
 
 /**

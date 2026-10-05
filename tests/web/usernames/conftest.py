@@ -45,14 +45,14 @@ for _module in (
     importlib.import_module(f'models.alchemy.{_module}')
 
 
-@pytest.fixture(name='app')
-def fixture_app(tmp_path):
+def build_app(database_uri):
+    """The app and its Flask-SQLAlchemy handle, with no tables."""
     here = os.path.dirname(__file__)
     app = Flask('tests.web.usernames', root_path=here, instance_path=here)
     app.config.update(
         TESTING=True,
         SECRET_KEY='tests-web-placeholder-session-key',
-        SQLALCHEMY_DATABASE_URI=f'sqlite:///{tmp_path}/users.db',
+        SQLALCHEMY_DATABASE_URI=database_uri,
         SQLALCHEMY_TRACK_MODIFICATIONS=False,
         JWT_SECRET_KEY='tests-web-placeholder-jwt-key',
         JWT_TOKEN_LOCATION=['headers', 'cookies'],
@@ -72,6 +72,13 @@ def fixture_app(tmp_path):
     with app.app_context():
         initialize_user_manager(app, db)
         install_login_manager_signal_handlers(app, app.login_manager)
+    return app, db
+
+
+@pytest.fixture(name='app')
+def fixture_app(tmp_path):
+    app, db = build_app(f'sqlite:///{tmp_path}/users.db')
+    with app.app_context():
         _create_users(db, app.user_manager.hash_password(PASSWORD))
     return app
 

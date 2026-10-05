@@ -1,5 +1,4 @@
 import itertools
-from datetime import datetime, timezone
 from typing import Optional
 from logging import LoggerAdapter
 from uuid import uuid4
@@ -22,10 +21,14 @@ from flask_principal import (
     identity_loaded,
 )
 from jwt import ExpiredSignatureError, InvalidSignatureError
+from sqlalchemy import DateTime
+from sqlalchemy.ext.compiler import compiles
+from sqlalchemy.sql.expression import FunctionElement
 from werkzeug.exceptions import BadRequest
 
 from log import LOG
 from models.alchemy.api_token import APIToken
+from models.alchemy.user import User
 from models.python.permissions import DimensionFilter, QueryNeed
 from web.server.data.data_access import get_db_adapter
 from web.server.routes.views.authentication import try_authenticate_user
@@ -298,19 +301,46 @@ def api_token_user_id(token_id: str) -> Optional[int]:
     return token.user_id if token and not token.is_revoked else None
 
 
+class database_time_from_epoch(FunctionElement):  # pylint: disable=invalid-name
+    '''Epoch seconds as a naive timestamp on the clock `current_timestamp()`
+    writes `user.created` with: the session time zone on Postgres, UTC on
+    SQLite.'''
+
+    type = DateTime()
+    name = 'database_time_from_epoch'
+
+
+@compiles(database_time_from_epoch, 'postgresql')
+def _postgres_time_from_epoch(element, compiler, **kwargs):
+    return f'CAST(to_timestamp({compiler.process(element.clauses, **kwargs)}) AS TIMESTAMP)'
+
+
+@compiles(database_time_from_epoch, 'sqlite')
+def _sqlite_time_from_epoch(element, compiler, **kwargs):
+    return f"datetime({compiler.process(element.clauses, **kwargs)}, 'unixepoch')"
+
+
 def issued_before_account(user, issued_at: Optional[int]) -> bool:
     '''Whether a token issued at `issued_at` (its `iat`) predates `user`'s
     account, so it was issued to an earlier account with the same username.
 
-    `iat` has whole seconds, so `created` is compared to the second. An account
-    with no `created` (older than the column) is given the benefit of the doubt.
+    The database compares, so `iat` and `created` are on one clock whatever
+    its time zone. `iat` has whole seconds, so a token issued in the second the
+    account was created is accepted. An account with no `created` (older than
+    the column, added in 2019) matches nothing and keeps accepting the token.
     '''
-    if user.created is None:
-        return False
     if issued_at is None:
         return True
-    issued = datetime.fromtimestamp(issued_at, timezone.utc).replace(tzinfo=None)
-    return issued < user.created.replace(microsecond=0)
+    issued_too_early = (
+        get_db_adapter()
+        .session.query(User.id)
+        .filter(
+            User.id == user.id,
+            User.created >= database_time_from_epoch(issued_at + 1),
+        )
+        .first()
+    )
+    return issued_too_early is not None
 
 
 def install_login_manager_signal_handlers(app, login_manager):

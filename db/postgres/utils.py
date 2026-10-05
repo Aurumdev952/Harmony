@@ -149,6 +149,16 @@ def _fetch_column(cursor, query: str, *params) -> list:
     return [row[0] for row in cursor.fetchall()]
 
 
+# Migration 2b730c14f514's trigger, which sets last_modified to now() on every UPDATE
+# of a catalogue table. The self-serve validator compares last_modified across
+# instances, so an import keeps the archive's value.
+_LAST_MODIFIED_TRIGGER = sql.Identifier('update_last_modified')
+
+# pg_trigger.tgenabled states in which the trigger fires in an ordinary session, and
+# the clause that restores each.
+_FIRING_TRIGGER_STATES = {'O': sql.SQL('ENABLE'), 'A': sql.SQL('ENABLE ALWAYS')}
+
+
 @dataclass(frozen=True)
 class _StagedTable:
     '''One table of an archive, COPYed into a temporary table of the same shape.'''
@@ -162,6 +172,8 @@ class _StagedTable:
     primary_key: list[str]
     # Whether any foreign key, from any table, references this table.
     referenced: bool
+    # The clause that re-enables the last_modified trigger, if the trigger fires.
+    last_modified_trigger: sql.Composable | None
 
     @classmethod
     def stage(cls, cursor, name: str, csv_file: str, delimiter: str):
@@ -210,21 +222,71 @@ class _StagedTable:
                     regclass,
                 )
             ),
+            last_modified_trigger=next(
+                (
+                    _FIRING_TRIGGER_STATES[state]
+                    for state in _fetch_column(
+                        cursor,
+                        'SELECT tgenabled FROM pg_trigger WHERE tgrelid = %s::regclass'
+                        ' AND tgname = %s AND NOT tgisinternal',
+                        regclass,
+                        _LAST_MODIFIED_TRIGGER.string,
+                    )
+                    if state in _FIRING_TRIGGER_STATES
+                ),
+                None,
+            ),
         )
+
+    def disable_last_modified_trigger(self, cursor):
+        '''Keeps the archive's last_modified on the rows the upsert updates in place.
+        This needs ownership of the table. The change is transactional, so a failed
+        import leaves the trigger as it was.'''
+        if self.last_modified_trigger is not None:
+            cursor.execute(
+                sql.SQL('ALTER TABLE {} DISABLE TRIGGER {}').format(
+                    self.table, _LAST_MODIFIED_TRIGGER
+                )
+            )
+
+    def restore_last_modified_trigger(self, cursor):
+        '''Postgres refuses this while the table has deferred trigger events
+        pending. No catalogue table has a deferrable constraint.'''
+        if self.last_modified_trigger is not None:
+            cursor.execute(
+                sql.SQL('ALTER TABLE {} {} TRIGGER {}').format(
+                    self.table, self.last_modified_trigger, _LAST_MODIFIED_TRIGGER
+                )
+            )
 
     def empty(self, cursor):
         cursor.execute(sql.SQL('DELETE FROM {}').format(self.table))
 
     def insert(self, cursor):
         '''Inserts the staged rows. A staged row whose primary key the table already
-        holds updates that row in place, so rows referencing it are untouched.'''
-        updates = [column for column in self.columns if column not in self.primary_key]
+        holds updates that row in place, so rows referencing it are untouched, and
+        only if a column's text differs, so an unchanged row is not rewritten.'''
+        updates = [
+            sql.Identifier(column)
+            for column in self.columns
+            if column not in self.primary_key
+        ]
         on_conflict = (
-            sql.SQL('DO UPDATE SET {}').format(
-                sql.SQL(', ').join(
-                    sql.SQL('{0} = EXCLUDED.{0}').format(sql.Identifier(column))
-                    for column in updates
-                )
+            sql.SQL(
+                'DO UPDATE SET {assignments} WHERE ROW({current})'
+                ' IS DISTINCT FROM ROW({incoming})'
+            ).format(
+                assignments=sql.SQL(', ').join(
+                    sql.SQL('{0} = EXCLUDED.{0}').format(column) for column in updates
+                ),
+                # As text, because json has no equality operator and the text is
+                # what the export wrote.
+                current=sql.SQL(', ').join(
+                    sql.SQL('t.{}::text').format(column) for column in updates
+                ),
+                incoming=sql.SQL(', ').join(
+                    sql.SQL('EXCLUDED.{}::text').format(column) for column in updates
+                ),
             )
             if updates
             else sql.SQL('DO NOTHING')
@@ -232,7 +294,7 @@ class _StagedTable:
         columns = sql.SQL(', ').join(map(sql.Identifier, self.columns))
         cursor.execute(
             sql.SQL(
-                'INSERT INTO {table} ({columns}) SELECT {columns} FROM {staging}'
+                'INSERT INTO {table} AS t ({columns}) SELECT {columns} FROM {staging}'
                 ' ON CONFLICT ({key}) {on_conflict}'
             ).format(
                 table=self.table,
@@ -282,19 +344,24 @@ class _StagedTable:
         back.'''
         if 'id' not in self.columns:
             return
-        cursor.execute("SELECT pg_get_serial_sequence(%s, 'id')", (self.regclass,))
-        (sequence,) = cursor.fetchone()
-        if sequence is None:
+        cursor.execute(
+            'SELECT c.oid::integer, n.nspname, c.relname FROM pg_class c'
+            ' JOIN pg_namespace n ON n.oid = c.relnamespace'
+            " WHERE c.oid = pg_get_serial_sequence(%s, 'id')::regclass",
+            (self.regclass,),
+        )
+        row = cursor.fetchone()
+        if row is None:
             return
-        # pg_get_serial_sequence returns the sequence's quoted, qualified name.
+        oid, schema, name = row
         cursor.execute(
             sql.SQL(
-                'SELECT setval(%s::regclass, GREATEST('
+                'SELECT setval(%s::oid::regclass, GREATEST('
                 '(SELECT CASE WHEN is_called THEN last_value ELSE last_value - 1 END'
                 ' FROM {sequence}),'
                 ' (SELECT coalesce(max(id), 0) FROM {table})) + 1, false)'
-            ).format(sequence=sql.SQL(sequence), table=self.table),
-            (sequence,),
+            ).format(sequence=sql.Identifier(schema, name), table=self.table),
+            (oid,),
         )
 
 
@@ -316,6 +383,11 @@ def import_data_into_table(
     a row the archive removed. A table that nothing references is emptied and
     reloaded, because rows with the same id may hold different values on the two
     instances and collide with the table's other unique constraints.
+
+    Every imported row carries the archive's values, last_modified included. The
+    upsert skips the rows the archive leaves unchanged, and runs with the catalogue's
+    update_last_modified trigger disabled, which needs ownership of the tables.
+    Reloaded tables take no UPDATE, so their trigger stays on.
 
     Args:
         sql_connection_string: Postgres database connection string.
@@ -354,6 +426,8 @@ def import_data_into_table(
             referenced = [table for table in staged if table.referenced]
             leaves = [table for table in staged if not table.referenced]
 
+            for table in referenced:
+                table.disable_last_modified_trigger(cursor)
             for table in leaves:
                 table.empty(cursor)
             for table in referenced:
@@ -361,6 +435,8 @@ def import_data_into_table(
                 table.insert(cursor)
             for table in reversed(referenced):
                 table.delete_rows_not_staged(cursor)
+            for table in referenced:
+                table.restore_last_modified_trigger(cursor)
             for table in leaves:
                 LOG.info('Importing table: %s', table.name)
                 table.insert(cursor)

@@ -9,9 +9,12 @@ does not carry them.
 
 from __future__ import annotations
 
+import importlib.util
 import os
 import zipfile
 from collections.abc import Iterator
+from pathlib import Path
+from types import SimpleNamespace
 
 import psycopg2
 from psycopg2 import sql
@@ -41,6 +44,14 @@ DEPENDENT_TABLES = (
     "hierarchical_dimension_metadata",
     "non_hierarchical_dimension",
     "source_config",
+)
+
+# The catalogue's update_last_modified triggers, which stamp last_modified with now()
+# on every UPDATE. The self-serve validator compares last_modified across instances.
+LAST_MODIFIED_MIGRATION = (
+    Path(__file__).resolve().parents[2]
+    / "web/server/migrations/versions"
+    / "2b730c14f514_add_data_catalog_tables_sql_trigger.py"
 )
 
 SEED = """
@@ -94,9 +105,20 @@ def fixture_database(postgres_database: str) -> Iterator[str]:
             "CREATE TABLE alembic_version (version_num varchar(32) PRIMARY KEY);"
             "INSERT INTO alembic_version VALUES ('test');"
         )
+        _upgrade(LAST_MODIFIED_MIGRATION, cursor)
         cursor.execute(SEED)
     conn.close()
     yield postgres_database
+
+
+def _upgrade(migration: Path, cursor) -> None:
+    """Runs a migration's upgrade() with its op.execute going to `cursor`."""
+    spec = importlib.util.spec_from_file_location(migration.stem, migration)
+    assert spec and spec.loader
+    module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)
+    module.op = SimpleNamespace(execute=cursor.execute)
+    module.upgrade()
 
 
 def _rows(url: str, table: str) -> list[tuple]:
@@ -109,6 +131,30 @@ def _rows(url: str, table: str) -> list[tuple]:
 
 def _snapshot(url: str, tables: tuple[str, ...] | list[str]) -> dict[str, list[tuple]]:
     return {table: _rows(url, table) for table in tables}
+
+
+def _row_versions(url: str, table: str) -> dict[str, str]:
+    """Each row's xmin by id. An UPDATE writes a new row version, even of equal
+    values."""
+    with psycopg2.connect(url) as conn, conn.cursor() as cursor:
+        cursor.execute(
+            sql.SQL("SELECT id, xmin::text FROM {}").format(sql.Identifier(table))
+        )
+        versions = dict(cursor.fetchall())
+    conn.close()
+    return versions
+
+
+def _last_modified_triggers(url: str) -> dict[str, str]:
+    """pg_trigger.tgenabled of each update_last_modified trigger, by table."""
+    with psycopg2.connect(url) as conn, conn.cursor() as cursor:
+        cursor.execute(
+            "SELECT tgrelid::regclass::text, tgenabled FROM pg_trigger"
+            " WHERE tgname = 'update_last_modified'"
+        )
+        states = dict(cursor.fetchall())
+    conn.close()
+    return states
 
 
 def _execute(url: str, statement: str) -> None:
@@ -157,6 +203,26 @@ def test_reimporting_an_unchanged_export_keeps_rows_in_tables_it_does_not_carry(
 
     assert _snapshot(database, DEPENDENT_TABLES) == before
     assert _snapshot(database, IMPORTED_TABLES) == catalogue
+
+
+def test_an_import_keeps_the_archives_last_modified_and_skips_unchanged_rows(
+    database, tmp_path
+):
+    archive = _export(database, str(tmp_path / "export.zip"))
+    exported = _rows(database, "category")
+    _execute(database, "UPDATE category SET name = 'Renamed' WHERE id = 'cat_a'")
+    renamed = _rows(database, "category")
+    assert len([row for row in renamed if row not in exported]) == 1
+    versions = _row_versions(database, "category")
+
+    _import(database, archive)
+
+    assert _rows(database, "category") == exported
+    after = _row_versions(database, "category")
+    assert after["cat_a"] != versions["cat_a"]
+    del after["cat_a"], versions["cat_a"]
+    assert after == versions, "rows the archive leaves unchanged are not rewritten"
+    assert _last_modified_triggers(database) == dict.fromkeys(IMPORTED_TABLES, "O")
 
 
 def test_an_import_makes_the_catalogue_tables_match_the_export(database, tmp_path):
@@ -209,6 +275,7 @@ def test_a_failed_import_changes_nothing(database, tmp_path):
         _import(database, archive)
 
     assert _snapshot(database, [*IMPORTED_TABLES, *DEPENDENT_TABLES]) == before
+    assert _last_modified_triggers(database) == dict.fromkeys(IMPORTED_TABLES, "O")
 
 
 def test_a_dependent_of_a_row_the_export_carries_survives_its_old_parents_removal(
@@ -247,6 +314,25 @@ def test_a_failed_import_leaves_id_sequences_ahead_of_the_rows(database, tmp_pat
 
     with pytest.raises(psycopg2.IntegrityError):
         _import(database, archive)
+
+    _execute(
+        database,
+        "INSERT INTO field_dimension_mapping (field_id, dimension_id)"
+        " VALUES ('f2', 'District')",
+    )
+
+
+def test_an_import_moves_id_sequences_past_the_imported_rows(database, tmp_path):
+    archive = _export(database, str(tmp_path / "export.zip"))
+    # A fresh instance's sequence, under a name that needs quoting.
+    _execute(
+        database,
+        "ALTER SEQUENCE field_dimension_mapping_id_seq"
+        ' RENAME TO "fdm ""id"" seq";'
+        "SELECT setval('\"fdm \"\"id\"\" seq\"', 1, false);",
+    )
+
+    _import(database, archive)
 
     _execute(
         database,

@@ -252,6 +252,27 @@ def test_session_minted_before_wp0k_for_a_case_only_pair_signs_in_nobody(stack):
         )
 
 
+def test_session_minted_before_wp0k_naming_a_pattern_of_two_accounts_signs_in_nobody(
+    stack,
+):
+    '''WP-0k INV-3 row T-5, the pattern case (5283c7b). Before WP-0k sign-in
+    matched the typed string as an ILIKE pattern, so typing `legacy_pattern@`
+    with the password of `legacy.pattern@` made a session naming
+    `legacy_pattern@`. With a `legacy_pattern@` account also present:
+    Before WP-0k: that session signed in `legacy.pattern@`, the first match.
+    After: the pattern matches two accounts, so nobody; a session naming
+    `legacy.pattern@`, which matches one, signs it in.'''
+    older = stack.create_account(
+        f'legacy.pattern@{USER_DOMAIN}', secrets.token_urlsafe(18)
+    )
+    stack.create_account(f'legacy_pattern@{USER_DOMAIN}', secrets.token_urlsafe(18))
+
+    typed = bearer(_pre_wp0k_session(f'legacy_pattern@{USER_DOMAIN}'))
+    assert stack.signed_in_as(typed) == 'login'
+    exact = bearer(_pre_wp0k_session(f'legacy.pattern@{USER_DOMAIN}'))
+    assert stack.signed_in_as(exact) == older
+
+
 def test_session_minted_before_wp0k_never_signs_in_a_pending_account(stack):
     '''WP-0k INV-3 row T-6. The only account equal to the session's username
     is a pending invitation.

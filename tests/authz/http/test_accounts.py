@@ -200,6 +200,46 @@ def test_a_role_grant_keyed_by_a_look_alike_username_reaches_nobody(stack):
     assert _name('grantee_dot') not in holders
 
 
+def test_a_role_grant_reaches_the_spelling_it_names_even_when_pending(stack):
+    '''WP-0k INV-3 row U-1, role assignment by username (49face8). A grant
+    to `Grant.Named@`, a pending invitation, beside a registered
+    `grant.named@` (written first).
+    Before WP-0k: ILIKE with `first()` gave the registered `grant.named@` the
+    role.
+    After: the account named by its exact spelling gets it, whatever its
+    status; `grant.named@` holds nothing.'''
+    registered = stack.create_account(_name('grant.named'), _password())
+    shell = stack.create_account(_name('grant-named-source'), _password())
+    stack.rewrite_account(registered, _name('grant.named'))
+    stack.rewrite_account(shell, _name('Grant.Named'), PENDING)
+    dashboard = stack.create_dashboard('grant_named')
+    resource = dashboard['resource']
+
+    response = stack.request(
+        stack.admin,
+        'POST',
+        f'{resource}/roles',
+        {
+            'userRoles': {
+                dashboard['authorUsername']: ['dashboard_admin'],
+                _name('Grant.Named'): ['dashboard_viewer'],
+            },
+            'groupRoles': {},
+            'sitewideResourceAcl': {
+                'registeredResourceRole': '',
+                'unregisteredResourceRole': '',
+            },
+        },
+    )
+
+    assert response.status_code == 204, response.text[:300]
+    holders = stack.admin_json('GET', f'{resource}/roles')['userRoles']
+    assert holders == {
+        dashboard['authorUsername']: ['dashboard_admin'],
+        _name('Grant.Named'): ['dashboard_viewer'],
+    }
+
+
 def test_a_look_alike_rename_by_patch_signs_in_only_the_renamed_account(stack):
     '''WP-0k INV-3 row U-5, unit 9 (WP-0j security C1). An admin renames an
     account to `patch_alike@`, which pattern-matches the older `patch.alike@`.
@@ -377,6 +417,42 @@ def test_registering_a_pending_account_signs_in_that_account(stack):
     assert response.status_code == 200, response.text[:300]
     assert _status_id(stack, shell) == '1'
     assert stack.signed_in_as(session) == shell
+
+
+def test_a_spent_invitation_registers_nobody(stack):
+    '''WP-0k (73fe97e): an invitation registers once. After an invitee
+    registers, the same invitation link is posted again.
+    Before WP-0k: 200; the token still matched the now active account, so
+    whoever held the link set its password again.
+    After: 400 `Invalid invitation link`; the password is unchanged.'''
+    shell = stack.create_account(_name('register-once-source'), _password())
+    invite = secrets.token_urlsafe(24)
+    stack.rewrite_account(shell, _name('register-once'), PENDING, invite)
+    _, first = _register(stack, _name('register-once'), invite, _password())
+    assert first.status_code == 200, first.text[:300]
+    registered = _account_row(stack, shell)
+
+    _, again = _register(stack, _name('register-once'), invite, _password())
+
+    assert again.status_code == 400, again.text[:300]
+    assert 'Invalid invitation link' in again.text
+    assert _account_row(stack, shell) == registered
+
+
+def test_activating_a_pending_case_twin_by_patch_is_refused(stack):
+    '''WP-0k (3e22301), with row U-5. An admin sets a pending
+    `Activate.Twin@` active beside a registered `activate.twin@`.
+    Before WP-0k: 200, and two registered accounts were equal ignoring case.
+    After: 400 `Another account has this username.`; the twin stays pending.'''
+    stack.create_account(_name('activate.twin'), _password())
+    shell = stack.create_account(_name('activate-twin-source'), _password())
+    stack.rewrite_account(shell, _name('Activate.Twin'), PENDING)
+
+    response = stack.patch_user(shell, status='active')
+
+    assert response.status_code == 400, response.text[:300]
+    assert TAKEN_USERNAME in response.text
+    assert _status_id(stack, shell) == str(PENDING)
 
 
 def test_registering_a_pending_case_twin_of_a_registered_account_is_refused(stack):

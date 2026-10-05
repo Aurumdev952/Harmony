@@ -320,6 +320,9 @@ C-5 (session and JWT format, owned by backend). Old: a render token was a plain 
   - the head image as a service: `/healthz` 200, uid 1001, `CapEff` 0. The images were deleted afterwards.
 
   `task_gate.py WP-1h` fails as expected on status `review` and the reviewer's round-1 verdict. It also lists WP-0i's files (`scripts/create_bot_accounts.sh`, `web/server/app.py`, `web/server/configuration/bots.py`, `web/server/api/thumbnail_storage_models.py`, `web/server/routes/views/query_policy.py`, `tests/web/test_redis_password.py`, `tests/web/render/test_dashboard_lookup.py`), which came in with the WP-0i merge and are claimed in WP-0i.md. They drop out once WP-0i merges first, which WP-1h depends on. Status stays `review`, and security asked to re-check the cap, slot and clean-up code.
+- 2026-10-06 backend-8 R2-9: security approved round 2 at 20e5c0e (sec-1h; the lead records the cell) and left two non-blocking notes.
+  - **Note 1, fixed.** After a late answer, `run_isolated` could wait one more grace period for the child to exit. That pushed the slot release to the watchdog's stuck threshold of deadline + 2 × grace. The wait for the child to exit is now bounded by the time left before deadline + grace, so the watchdog keeps a full grace period of margin. check: `test_a_late_answer_still_frees_the_slot_by_the_deadline_plus_grace` (an answer at 2.6 s of a 3.0 s limit, then a child that cannot exit) failed, then passed. `tests/worker` on the host: 150 passed, 1 skipped. The in-image suite on a fresh head image under full hardening: 176 passed, 0 skipped; the images were deleted afterwards. ruff and mypy are clean.
+  - **Note 2, for the reviewer.** An uncached thumbnail retrieve holds a web worker for up to 10 s while it waits for the slot. The web app runs gunicorn's gevent workers, so that wait is a cooperative sleep, not a held OS thread. It is an availability cost only.
 
 ## Evidence
 

@@ -10,6 +10,7 @@ the child's process group would miss it.
 import multiprocessing
 import os
 import signal
+import time
 from multiprocessing.connection import Connection
 from pathlib import Path
 from typing import Callable, Union
@@ -102,12 +103,14 @@ def run_isolated(
     child.start()
     sender.close()
     limit = spec.timeout_seconds + settings.cleanup_grace_seconds
+    give_up_at = time.monotonic() + limit
     outcome: Union[RenderOutput, RenderError]
     try:
         if receiver.poll(limit):
             outcome = receiver.recv()
-            # The browser is closed; this only waits for the interpreter to exit.
-            child.join(settings.cleanup_grace_seconds)
+            # The browser is closed; this only waits for the interpreter to
+            # exit, and never past the limit, so the slot is free by then.
+            child.join(max(give_up_at - time.monotonic(), 0))
         else:
             outcome = RenderTimeout(f'no render within {spec.timeout_seconds:.0f}s')
     except EOFError:

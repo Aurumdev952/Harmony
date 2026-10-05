@@ -8,6 +8,7 @@ import os
 import signal
 import subprocess
 import sys
+import threading
 import time
 from pathlib import Path
 
@@ -20,6 +21,7 @@ from harmony.worker.renderer.spec import RenderSpec, Viewport
 
 TOKEN = 'eyJhbGciOiJIUzI1NiJ9.eyJpZGVudGl0eSI6InRlc3QifQ.c2lnbmF0dXJl'
 PID_FILE = 'RENDER_ISOLATION_TEST_PID_FILE'
+ANSWER_AT = 'RENDER_ISOLATION_TEST_ANSWER_AT'
 
 
 def _settings(**overrides: float) -> RendererSettings:
@@ -138,3 +140,29 @@ def test_an_overrun_kills_the_child_and_everything_it_started(tmp_path, monkeypa
     finally:
         if _is_running(helper):
             os.kill(helper, signal.SIGKILL)
+
+
+def answers_late_and_lingers(
+    spec: RenderSpec, settings: RendererSettings
+) -> RenderOutput:
+    # Answers just inside the limit, then cannot exit: interpreter shutdown
+    # waits for this non-daemon thread.
+    threading.Thread(target=time.sleep, args=(600,)).start()
+    time.sleep(max(float(os.environ[ANSWER_AT]) - time.monotonic(), 0))
+    return RenderOutput(content=b'late', blocked_hosts=())
+
+
+def test_a_late_answer_still_frees_the_slot_by_the_deadline_plus_grace(monkeypatch):
+    # Found in security re-check: waiting a further grace for the child to exit
+    # after a late answer reached the watchdog's stuck threshold.
+    started = time.monotonic()
+    monkeypatch.setenv(ANSWER_AT, str(started + 2.6))
+
+    output = run_isolated(
+        answers_late_and_lingers,
+        _spec(timeout_seconds=2.0),
+        _settings(cleanup_grace_seconds=1.0),
+    )
+
+    assert output.content == b'late'
+    assert time.monotonic() - started < 3.0 + 0.3

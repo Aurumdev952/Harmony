@@ -11,3 +11,4 @@
 - [Post-WP-2f tooling](post_wp2f_tooling.md) — tests/web on plain uv py3.9, lint-gate and noqa traps, guard workarounds, graphql stub
 - [Render token traps](render_token_traps.md) — WP-1h: internal vs public origin, one fingerprint, render-token cache keys in tests, lint on old branches
 - [Absolute URLs and script root](absolute_urls_and_script_root.md) — Host and SCRIPT_NAME are caller-controlled; build token URLs from url_map on the configured origin
+- [Renderer round-2 traps](renderer_round2_traps.md) — WP-1h: render isolation and tree kill, Werkzeug cookie jar, atomic SET NX EX, mypy strict flags, docker builds

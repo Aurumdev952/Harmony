@@ -1,0 +1,28 @@
+p95 of 2026-10-05-5b5a93d190-run1.jsonl against 2026-10-05-5b5a93d190-run2.jsonl (limit +10%):
+| case | base p95 ms | new p95 ms | change | verdict |
+|---|---:|---:|---:|---|
+| bar_graph_sum_by_state_month | 77.4 | 299.6 | +287.1% | REGRESSED |
+| bar_graph_box_plot | 102.8 | 243.0 | +136.4% | REGRESSED |
+| bar_graph_histogram | 76.7 | 265.6 | +246.3% | REGRESSED |
+| group_granularity_day | 477.8 | 1327.3 | +177.8% | REGRESSED |
+| line_graph_time_by_state | 102.4 | 370.3 | +261.6% | REGRESSED |
+| line_graph_bump_chart_quarter | 78.7 | 216.1 | +174.6% | REGRESSED |
+| line_graph_heat_tiles_week | 100.9 | 284.1 | +181.6% | REGRESSED |
+| table_by_state_sex_with_total | 57.9 | 144.1 | +148.9% | REGRESSED |
+| group_two_totals | 148.2 | 327.1 | +120.7% | REGRESSED |
+| calc_formula | 49.6 | 124.3 | +150.6% | REGRESSED |
+| calc_count_distinct_by_state | 56.3 | 138.4 | +145.8% | REGRESSED |
+| table_disaggregated | 798.8 | 2470.5 | +209.3% | REGRESSED |
+| map_by_municipality | 69.3 | 183.8 | +165.2% | REGRESSED |
+| map_by_state_month | 134.6 | 426.1 | +216.6% | REGRESSED |
+| hierarchy_expando_tree | 105.2 | 240.1 | +128.2% | REGRESSED |
+| hierarchy_sunburst | 121.1 | 452.7 | +273.8% | REGRESSED |
+| dq_data_quality | 788.5 | 1617.1 | +105.1% | REGRESSED |
+| dq_data_quality_table | 211.8 | 138.3 | -34.7% | ok |
+| dq_field_reporting_stats | 72.8 | 44.7 | -38.6% | ok |
+| dq_outliers_line_graph | 459.7 | 478.8 | +4.2% | ok |
+| dq_reporting_completeness_line_graph | 435.2 | 384.2 | -11.7% | ok |
+| perf-heavy-4 | 3411.7 | 2269.0 | -33.5% | ok |
+| perf-mixed-6 | 1377.2 | 807.4 | -41.4% | ok |
+| perf-wide-12 | 2836.4 | 1708.2 | -39.8% | ok |
+FAIL: bar_graph_sum_by_state_month, bar_graph_box_plot, bar_graph_histogram, group_granularity_day, line_graph_time_by_state, line_graph_bump_chart_quarter, line_graph_heat_tiles_week, table_by_state_sex_with_total, group_two_totals, calc_formula, calc_count_distinct_by_state, table_disaggregated, map_by_municipality, map_by_state_month, hierarchy_expando_tree, hierarchy_sunburst, dq_data_quality

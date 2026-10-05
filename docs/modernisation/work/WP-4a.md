@@ -99,7 +99,7 @@ This WP moves `config.settings` and the core-owned deployment modules onto `harm
 
 **Exclusion rule (launchers and run context).** Some variables describe the process itself rather than configure the application: how to serve it (worker class, count, port, `SERVER_SOFTWARE`), which deployment a command-line launcher starts, and when and why a pipeline run started (`PIPELINE_START_TS`, `PIPELINE_CRONTAB`). Process launchers (`web/gunicorn_server.py`, `web/runserver.py`) and pipeline run scripts read these at start, before or instead of building settings. They stay outside `Settings`, and each goes when its launcher or runner is replaced (5a / 5h, and 8e). Anything the application reads at run time is not covered by this rule and has a target WP above.
 
-The lead sets SPEC's BE-2 row to 3a, 4a, 4b, 4c, 4f, 5a in decision 0008.
+The lead sets SPEC's BE-2 row to 3a, 4a, 4b, 4c, 4f, 5a, 8d, 8e in decision 0008.
 
 ## Contract changes
 
@@ -112,7 +112,7 @@ None. C-1 (`AppContext`) arrives in WP-4f and will hold `Settings` and `Deployme
 - [ ] lead: merging with WP-1h conflicts on the last lines of `config/settings.py`. WP-1h deletes `RENDERBOT_EMAIL` and `URLBOX_API_KEY`, and this WP changed the `DRUID_HOST` line above them. Resolve by keeping this branch's file without those two lines. `tests/core/test_settings_facade.py` passes either way, and WP-1h's `tests/core/test_settings_render.py` passes on the result (simulated, see Evidence).
 
 - [x] infra: in `docker/pipeline/Dockerfile`, put the removal note on the `pypy-wheels` stage's own comment: delete the stage, its `--find-links` use and the drift test when PyPy leaves the image (WP-3b, or WP-8d if first). In `tests/infra/test_dockerfiles.py`, make the drift test assert that the stage exists exactly while the Dockerfile creates `venv_pypy3`, so removing PyPy without removing the stage, or the reverse, fails. Reviewer finding (low); does not block review.
-- [x] lead: set SPEC's BE-2 row to 3a, 4a, 4b, 4c, 4f, 5a, so every WP in the BE-2 table carries it. Done by the lead in decision 0008 (landing on `mig/integration`).
+- [x] lead: set SPEC's BE-2 row to 3a, 4a, 4b, 4c, 4f, 5a, 8d, 8e, so every WP in the BE-2 table carries it. Done by the lead in decision 0008 (landing on `mig/integration`).
 - [ ] backend (WP-1h): add `harmony/worker/__init__.py` (and an `__init__.py` in every other directory under `harmony/worker` that holds Python) when WP-1h lands. `tests/core/test_core_boundaries.py::test_every_harmony_directory_is_a_regular_package` fails until it does, because grimp skips namespace directories and the BE-1 contract would not see them. The lead is asking WP-1h's builder. Blocks the WP-1h merge, not this WP.
 - [ ] infra (QA low, deferred): raise `typing_extensions` from 4.12.2 to 4.13.2 (the last release supporting 3.8) in the web and pipeline groups and requirements, to clear the existing `pip check` conflict with cryptography 47. Not caused by this WP; it does not block review.
 - [ ] infra (QA low, deferred): in `docker/pipeline/Dockerfile`, install the pp38 pydantic-core wheel through a `RUN --mount=type=bind,from=pypy-wheels,...` on the install step instead of `COPY --from=pypy-wheels`, so the wheel file does not stay in a runtime layer. Does not block review.
@@ -174,6 +174,11 @@ None. C-1 (`AppContext`) arrives in WP-4f and will hold `Settings` and `Deployme
     - `load_deployment` again refuses `template` (`ValueError`), and so does `import_configuration_module`, as before WP-4a; `load_template()` serves the phase check (`4f6ea28`, red first: 6 failed, then 22 passed).
     - `typing_extensions` 4.13.2 and the wheel bind mount are deferred to infra as Requests.
   - check: Evidence, "After review round 2".
+- 2026-10-05 core-4a review round 3 (reviewer changes-requested at `b1a723b`):
+  - **Namespace check widened** (`bd18a69`). `_namespace_directories` now requires an `__init__.py` in every directory from each `.py` file's parent up to `harmony/` itself. The round-2 check only looked at directories that hold `.py` files, so `harmony/worker` holding only `renderer/` passed. The companion tests are rebuilt as four cases: the real pre-fix layout (`harmony/worker/renderer/server.py` with only `renderer/__init__.py`) must report `harmony/worker`; a `.py` directly in `harmony/worker` is reported; a missing `harmony/__init__.py` is reported; and directories with no Python (static assets, `__pycache__`) are ignored. The first and third cases failed on the old predicate (2 failed, 2 passed), then 12 passed.
+  - **Real-tree probe.** This branch's `harmony/` was overlaid with WP-1h's `harmony/` from `mig/WP-1h-export-renderer-infra` (no `harmony/worker/__init__.py`), and the check reports `['harmony/worker']`. Overlaid from `mig/WP-1h-export-renderer` (which has it), the check reports `[]`.
+  - **Nit:** the BE-2 row reads 3a, 4a, 4b, 4c, 4f, 5a, 8d, 8e.
+  - check: Evidence, "After review round 3".
 
 ### Recorded differences (INV-1, for reviewer acceptance)
 
@@ -258,6 +263,13 @@ All results are on head `9e9aab9` unless stated. The base for comparisons is `ea
   - ruff check and format pass on `harmony` and `tests/core`.
 - **Startup digest:** the diff against `ea33d9d` is still only `zen_config_type`.
 - **Gate:** `task_gate.py WP-4a` reports only the status and the reviewer verdict. QA is approved.
+
+### After review round 3 (code head `bd18a69`)
+
+- **CI suites:** all 8 passed: core 118, druid 1, druid_setup 79, golden 269, graphql 22, pipeline 129 + 1 skipped, toolchain 12, web 95.
+- **Golden:** `record.py --check` reports "85 cases, 0 fixture files would change".
+- **Lint and types:** mypy reports "no issues found in 520 source files"; `lint-imports` reports "1 kept, 0 broken"; the py38 syntax guard reports 857 files, 0 problems; ruff check and format pass on `tests/core`.
+- Only `tests/core/test_core_boundaries.py` and this file changed since `b1a723b`.
 
 ## Verdicts
 

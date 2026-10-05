@@ -536,37 +536,83 @@ def test_a_token_of_an_account_that_is_no_longer_active_signs_in_nobody(
     assert stack.signed_in_as(session) == account
 
 
-@pytest.mark.xfail(
-    strict=True,
-    reason='WP-0k QA finding 2: 500 until the owner refuses it with a 4xx',
-)
-@pytest.mark.parametrize('status', ['inactive', 'pending'])
-def test_a_mailed_reset_link_of_an_account_no_longer_active_is_refused(stack, status):
-    '''A reset link mailed while the account was active, followed after it
-    was deactivated or set back to pending.
-    Before WP-0k: 200, the password changed.
-    WP-0k at 9037122: 500 (`get_user_by_id` returns no account that is not
-    active, and the route dereferences it). Intended: a 4xx, and the password
-    unchanged. Strict xfail until the owner's fix lands; then drop the mark.'''
-    username = _name(f'reset-link-{status}')
-    account = stack.create_account(username, _password())
-    response = stack.request(stack.admin, 'POST', f'{account}/reset_password')
+def _mailed_reset_token(stack, uri: str) -> str:
+    '''Has the admin mail `uri` a reset link; returns the link's token, which
+    the route stores on the account.'''
+    stack.sql(
+        'UPDATE "user" SET reset_password_token = \'\' WHERE id = :\'id\';',
+        id=_id(uri),
+    )
+    response = stack.request(stack.admin, 'POST', f'{uri}/reset_password')
     assert response.status_code < 300, response.text[:300]
-    token, password_hash = stack.sql(
-        'SELECT reset_password_token, password FROM "user" WHERE id = :\'id\';',
-        id=_id(account),
+    (token,) = stack.sql(
+        'SELECT reset_password_token FROM "user" WHERE id = :\'id\';', id=_id(uri)
     )[0]
     assert token
-    _set_status(stack, account, status)
+    return token
 
-    response = stack.request(
+
+def _complete_reset(stack, token: str, password: str):
+    return stack.request(
         new_session(),
         'POST',
         '/api2/authentication/reset_password',
-        {'token': token, 'password': _password()},
+        {'token': token, 'password': password},
     )
 
-    assert 400 <= response.status_code < 500, response.text[:300]
-    assert stack.sql(
-        'SELECT password FROM "user" WHERE id = :\'id\';', id=_id(account)
-    ) == [(password_hash,)]
+
+def test_a_mailed_reset_link_of_a_deactivated_account_is_refused(stack):
+    '''WP-0k (QA finding 2, fixed in 75f51d4). A reset link mailed while the
+    account was active, followed after it was deactivated.
+    Before WP-0k: 200; the password changed, so whoever held the link could
+    set it (and, before decision 0010, sign in).
+    After: 400 `invalid_reset_link`; nothing is written.'''
+    account = stack.create_account(_name('reset-link-deactivated'), _password())
+    token = _mailed_reset_token(stack, account)
+    _set_status(stack, account, 'inactive')
+    before = _account_row(stack, account)
+
+    response = _complete_reset(stack, token, _password())
+
+    assert response.status_code == 400, response.text[:300]
+    assert 'invalid_reset_link' in response.text
+    assert _account_row(stack, account) == before
+
+
+def test_a_pending_account_completing_a_mailed_reset_link_is_activated(stack):
+    '''WP-0k (75f51d4). An admin mails a reset link to an invitee, who
+    follows it instead of the invitation.
+    Before WP-0k: 200, the password set and the account left pending.
+    After: 200, and the account is active, as registering would make it; its
+    new password signs it in.'''
+    username, password = _name('reset-link-pending'), _password()
+    account = stack.create_account(username, _password())
+    stack.rewrite_account(account, username, PENDING)
+    token = _mailed_reset_token(stack, account)
+
+    response = _complete_reset(stack, token, password)
+
+    assert response.status_code == 200, response.text[:300]
+    assert _status_id(stack, account) == '1'
+    assert stack.signed_in_as(_login_token_session(stack, username, password)) == (
+        account
+    )
+
+
+def test_a_pending_twin_of_a_registered_account_cannot_complete_a_reset(stack):
+    '''WP-0k (75f51d4), with row U-7. A reset link mailed to a pending
+    `Reset.Pending.Twin@` beside a registered `reset.pending.twin@`.
+    Before WP-0k: 200, the pending twin got a password.
+    After: 400 `invalid_reset_link`; the twin stays pending and unchanged, as
+    its registration would be refused.'''
+    stack.create_account(_name('reset.pending.twin'), _password())
+    shell = stack.create_account(_name('reset-pending-twin-source'), _password())
+    stack.rewrite_account(shell, _name('Reset.Pending.Twin'), PENDING)
+    token = _mailed_reset_token(stack, shell)
+    before = _account_row(stack, shell)
+
+    response = _complete_reset(stack, token, _password())
+
+    assert response.status_code == 400, response.text[:300]
+    assert 'invalid_reset_link' in response.text
+    assert _account_row(stack, shell) == before

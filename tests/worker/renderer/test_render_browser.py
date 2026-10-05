@@ -5,6 +5,8 @@ evidence for the command); elsewhere it is skipped. Nothing leaves the container
 the origins are local servers and every other destination is `.invalid`.
 """
 
+import os
+import signal
 import socket
 import struct
 import threading
@@ -117,6 +119,20 @@ PAGES = {
         f".then(() => {{ localStorage.setItem('seen', 'yes'); {SIGNAL_READY} }});",
     ),
 }
+
+
+def _chromium_pids() -> list[int]:
+    """Every live Chromium process (zombies excluded)."""
+    pids = []
+    for proc in Path('/proc').glob('[0-9]*'):
+        try:
+            args = (proc / 'cmdline').read_bytes().split(b'\0')
+            state = (proc / 'stat').read_text().rsplit(')', 1)[1].split()[0]
+        except OSError:
+            continue
+        if args and b'chrom' in args[0] and state != 'Z':
+            pids.append(int(proc.name))
+    return pids
 
 
 def _chromium_flags() -> set[str]:
@@ -311,7 +327,8 @@ def test_the_proxy_fence_holds_even_if_the_request_guard_lets_everything_through
     origin, _, other = origins
     monkeypatch.setattr(browser, 'is_allowed', lambda *args, **kwargs: True)
 
-    render(_spec(origin, '/dashboard/egress'), _settings(origin))
+    # In this process, where the guard is patched out.
+    browser.render_in_process(_spec(origin, '/dashboard/egress'), _settings(origin))
 
     assert other.requests == []
     assert other.connections == 0
@@ -415,6 +432,53 @@ def test_a_page_that_never_signals_ready_times_out_on_the_deadline(origins):
         )
 
     assert time.monotonic() - started < 10
+
+
+def test_a_browser_that_stops_answering_is_killed_after_the_deadline(origins):
+    # Found in review: a hung Chromium kept `browser.close()` waiting forever, so
+    # the render never returned and its slot was never released.
+    origin, dashboard, _ = origins
+
+    def freeze_chromium_once_the_page_loads() -> None:
+        deadline = time.monotonic() + 20
+        while time.monotonic() < deadline:
+            if any(r['path'].startswith('/dashboard') for r in dashboard.requests):
+                time.sleep(0.5)
+                for pid in _chromium_pids():
+                    os.kill(pid, signal.SIGSTOP)
+                return
+            time.sleep(0.05)
+
+    outcome: list[BaseException] = []
+
+    def run() -> None:
+        try:
+            render(
+                _spec(origin, '/dashboard/never-ready', timeout_seconds=3.0),
+                _settings(origin, cleanup_grace_seconds=2.0),
+            )
+        except BaseException as error:  # noqa: BLE001
+            outcome.append(error)
+
+    freezer = threading.Thread(target=freeze_chromium_once_the_page_loads)
+    renderer = threading.Thread(target=run, daemon=True)
+    started = time.monotonic()
+    freezer.start()
+    renderer.start()
+    renderer.join(20)
+    elapsed = time.monotonic() - started
+    freezer.join()
+    try:
+        assert not renderer.is_alive(), 'the render never returned'
+        assert isinstance(outcome[0], RenderTimeout)
+        assert elapsed < 3.0 + 2.0 + 3.0
+        deadline = time.monotonic() + 3
+        while _chromium_pids() and time.monotonic() < deadline:
+            time.sleep(0.1)
+        assert _chromium_pids() == []
+    finally:
+        for pid in _chromium_pids():
+            os.kill(pid, signal.SIGKILL)
 
 
 def test_output_over_the_size_limit_is_refused(origins):
@@ -586,7 +650,8 @@ def test_the_egress_proxy_holds_even_if_the_request_guard_lets_everything_throug
     origin, settings, _, other = mapped
     monkeypatch.setattr(browser, 'is_allowed', lambda *args, **kwargs: True)
 
-    render(_spec(origin, '/dashboard/egress'), settings)
+    # In this process, where the guard is patched out.
+    browser.render_in_process(_spec(origin, '/dashboard/egress'), settings)
 
     assert other.requests == []
     assert other.connections == 0

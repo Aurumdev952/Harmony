@@ -13,6 +13,7 @@ def fixture_clean_env(monkeypatch):
         'RENDERER_MAP_ORIGINS',
         'RENDERER_BLOCKED_GRACE_SECONDS',
         'RENDERER_IGNORED_BLOCKED_HOSTS',
+        'RENDERER_CLEANUP_GRACE_SECONDS',
     ):
         monkeypatch.delenv(name, raising=False)
 
@@ -46,6 +47,14 @@ def test_map_origins_and_grace_are_configurable(monkeypatch):
     assert settings.map_origins == ('https://tiles.example.org:443',)
     assert settings.blocked_grace_seconds == 3.0
     assert settings.ignored_blocked_hosts == ()
+
+
+def test_a_render_gets_ten_seconds_past_its_deadline_to_clean_up(monkeypatch):
+    assert settings_from_env().cleanup_grace_seconds == 10.0
+
+    monkeypatch.setenv('RENDERER_CLEANUP_GRACE_SECONDS', '4')
+
+    assert settings_from_env().cleanup_grace_seconds == 4.0
 
 
 def test_a_map_origin_that_is_not_a_bare_origin_stops_the_service(monkeypatch):

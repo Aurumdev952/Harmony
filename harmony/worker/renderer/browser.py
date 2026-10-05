@@ -1,7 +1,7 @@
 '''Renders one dashboard page in a fresh headless Chromium (Playwright).
 
-Every render launches its own browser and closes it in `finally`, so no cookie,
-cache or storage outlives one user's render.
+Every render runs in its own process, launches its own browser and closes it in
+`finally`, so no cookie, cache or storage outlives one user's render.
 
 The page runs with the user's token and loads content the renderer does not
 control, so it is fenced three times (threat model in
@@ -45,6 +45,7 @@ from harmony.worker.renderer.errors import (
     PageFailed,
     RenderTimeout,
 )
+from harmony.worker.renderer.isolation import run_isolated
 from harmony.worker.renderer.server import RendererSettings, RenderOutput
 from harmony.worker.renderer.spec import RenderSpec
 
@@ -251,12 +252,25 @@ async def _render(spec: RenderSpec, settings: RendererSettings, blocked: set[str
             await browser.close()
 
 
-def render(spec: RenderSpec, settings: RendererSettings) -> RenderOutput:
+def _refuse_off_origin(spec: RenderSpec, settings: RendererSettings) -> None:
     requested = origin_of(spec.url)
     if requested is None or requested != origin_of(settings.allowed_origin):
         # parse_render_request refuses this already. It is checked again before
         # any browser starts, because the token must never go anywhere else.
         raise PageFailed('url is not on the allowed origin')
+
+
+def render(spec: RenderSpec, settings: RendererSettings) -> RenderOutput:
+    '''Renders in a child process that is killed, with the browser it started,
+    once it overruns the deadline plus `settings.cleanup_grace_seconds`. A
+    browser that will not close therefore cannot hold a render slot.
+    '''
+    _refuse_off_origin(spec, settings)
+    return run_isolated(render_in_process, spec, settings)
+
+
+def render_in_process(spec: RenderSpec, settings: RendererSettings) -> RenderOutput:
+    _refuse_off_origin(spec, settings)
     blocked: set[str] = set()
     try:
         content = asyncio.run(

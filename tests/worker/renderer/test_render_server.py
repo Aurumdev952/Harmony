@@ -17,7 +17,12 @@ from harmony.worker.renderer.errors import (
     PageFailed,
     RenderTimeout,
 )
-from harmony.worker.renderer.server import RendererSettings, RenderOutput, build_server
+from harmony.worker.renderer.server import (
+    RendererSettings,
+    RenderOutput,
+    build_server,
+    watch,
+)
 from harmony.worker.renderer.spec import RenderSpec
 
 ORIGIN = 'http://web:5000'
@@ -244,3 +249,58 @@ def test_renders_beyond_the_concurrency_limit_wait_and_then_give_up():
     assert response.status == 503
     assert json.loads(data)['error'] == 'busy'
     assert 0.9 <= waited < 5
+
+
+def _stuck_render(release: threading.Event) -> Callable:
+    def render(_spec, _settings):
+        # A render that outlives the child-process kill.
+        release.wait(30)
+        return RenderOutput(content=b'late', blocked_hosts=())
+
+    return render
+
+
+def test_a_slot_held_past_its_deadline_and_clean_up_fails_the_health_check():
+    release = threading.Event()
+    with serving(_stuck_render(release), cleanup_grace_seconds=0.2) as port:
+        before, _ = call(port, 'GET', '/healthz')
+        stuck = threading.Thread(
+            target=call,
+            args=(port,),
+            kwargs={'body': {**REQUEST, 'timeout_seconds': 1}},
+        )
+        stuck.start()
+        time.sleep(1.8)
+        after, data = call(port, 'GET', '/healthz')
+        release.set()
+        stuck.join()
+        recovered, _ = call(port, 'GET', '/healthz')
+
+    assert before.status == 200
+    assert after.status == 503
+    assert json.loads(data) == {'error': 'stuck'}
+    assert recovered.status == 200
+
+
+def test_the_watchdog_gives_up_on_the_process_when_a_slot_is_stuck():
+    release = threading.Event()
+    gave_up = threading.Event()
+    server = build_server(settings(cleanup_grace_seconds=0.2), _stuck_render(release))
+    threading.Thread(target=server.serve_forever, daemon=True).start()
+    threading.Thread(
+        target=watch, args=(server, gave_up.set), kwargs={'interval': 0.05}, daemon=True
+    ).start()
+    try:
+        port = server.server_address[1]
+        stuck = threading.Thread(
+            target=call,
+            args=(port,),
+            kwargs={'body': {**REQUEST, 'timeout_seconds': 1}},
+        )
+        stuck.start()
+        assert not gave_up.wait(1.2)
+        assert gave_up.wait(2)
+    finally:
+        release.set()
+        server.shutdown()
+        server.server_close()

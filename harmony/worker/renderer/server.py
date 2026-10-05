@@ -5,10 +5,13 @@ tested without Chromium.
 '''
 
 import dataclasses
+import itertools
 import json
 import logging
 import threading
 import time
+from collections.abc import Iterator
+from contextlib import contextmanager
 from dataclasses import dataclass
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from typing import Any, Callable, Optional
@@ -41,6 +44,9 @@ class RendererSettings:
     # does not start this.
     blocked_grace_seconds: float = 10.0
     ignored_blocked_hosts: tuple[str, ...] = ('events.mapbox.com',)
+    # How long a render may overrun its deadline while its browser closes. Its
+    # process and everything it started are killed after that.
+    cleanup_grace_seconds: float = 10.0
 
 
 @dataclass(frozen=True)
@@ -58,20 +64,68 @@ class Busy(RenderError):
     code = 'busy'
 
 
-def build_server(settings: RendererSettings, render: Render) -> ThreadingHTTPServer:
-    slots = threading.BoundedSemaphore(settings.concurrency)
+class Slots:
+    '''The render slots, and when each held one must be free again.
+
+    A render that overruns its deadline is killed after the clean-up grace
+    (`isolation.run_isolated`). A slot still held one more grace period later
+    means that kill failed, and only a restart can recover it.
+    '''
+
+    def __init__(self, count: int, cleanup_grace_seconds: float) -> None:
+        self._free = threading.BoundedSemaphore(count)
+        self._grace = cleanup_grace_seconds
+        self._lock = threading.Lock()
+        self._free_by: dict[int, float] = {}
+        self._ids = itertools.count()
+
+    @contextmanager
+    def hold(self, timeout_seconds: float) -> Iterator[float]:
+        '''Holds a slot for a render due within `timeout_seconds`, yielding the
+        time left once the slot is held. Raises Busy without a slot in time.
+        '''
+        deadline = time.monotonic() + timeout_seconds
+        if not self._free.acquire(timeout=timeout_seconds):
+            raise Busy('no render slot before the deadline')
+        slot = next(self._ids)
+        with self._lock:
+            self._free_by[slot] = deadline + 2 * self._grace
+        try:
+            yield max(deadline - time.monotonic(), 0.001)
+        finally:
+            with self._lock:
+                del self._free_by[slot]
+            self._free.release()
+
+    def stuck(self) -> bool:
+        now = time.monotonic()
+        with self._lock:
+            return any(free_by < now for free_by in self._free_by.values())
+
+
+class RendererServer(ThreadingHTTPServer):
+    slots: Slots
+
+
+def watch(
+    server: RendererServer, give_up: Callable[[], None], interval: float = 1.0
+) -> None:
+    '''Calls `give_up` once a render slot is stuck (see `Slots`). The service
+    exits there, so Docker restarts it and the stuck browser goes with it.'''
+    while not server.slots.stuck():
+        time.sleep(interval)
+    LOG.error(json.dumps({'event': 'stuck', 'error': 'a render slot was never freed'}))
+    give_up()
+
+
+def build_server(settings: RendererSettings, render: Render) -> RendererServer:
+    slots = Slots(settings.concurrency, settings.cleanup_grace_seconds)
 
     def run(spec: RenderSpec) -> RenderOutput:
-        deadline = time.monotonic() + spec.timeout_seconds
-        if not slots.acquire(timeout=spec.timeout_seconds):
-            raise Busy('no render slot before the deadline')
-        try:
-            remaining = max(deadline - time.monotonic(), 0.001)
+        with slots.hold(spec.timeout_seconds) as remaining:
             output = render(
                 dataclasses.replace(spec, timeout_seconds=remaining), settings
             )
-        finally:
-            slots.release()
         if len(output.content) > settings.max_bytes:
             raise OutputTooLarge(f'{len(output.content)} bytes')
         return output
@@ -82,7 +136,10 @@ def build_server(settings: RendererSettings, render: Render) -> ThreadingHTTPSer
 
         def do_GET(self) -> None:  # noqa: N802
             if self.path == '/healthz':
-                self._send(200, 'text/plain', b'ok')
+                if slots.stuck():
+                    self._send_error(503, 'stuck')
+                else:
+                    self._send(200, 'text/plain', b'ok')
             elif self.path == '/render':
                 self._send_error(405, 'method_not_allowed')
             else:
@@ -155,6 +212,7 @@ def build_server(settings: RendererSettings, render: Render) -> ThreadingHTTPSer
             return
 
     # Only reachable on the internal render network (Compose).
-    server = ThreadingHTTPServer(('0.0.0.0', settings.port), Handler)  # noqa: S104
+    server = RendererServer(('0.0.0.0', settings.port), Handler)  # noqa: S104
     server.daemon_threads = True
+    server.slots = slots
     return server

@@ -3,10 +3,14 @@
 import json
 import logging
 import os
+import threading
 from urllib.parse import urlsplit
 
 from harmony.worker.renderer.egress import parse_origins
-from harmony.worker.renderer.server import RendererSettings, build_server
+from harmony.worker.renderer.server import RendererSettings, build_server, watch
+
+# Exit status when a render slot is stuck; the restart policy brings it back.
+STUCK_EXIT_STATUS = 70
 
 LOG = logging.getLogger('harmony.worker.renderer')
 
@@ -52,6 +56,9 @@ def settings_from_env() -> RendererSettings:
             ).split(',')
             if host.strip()
         ),
+        cleanup_grace_seconds=float(
+            os.environ.get('RENDERER_CLEANUP_GRACE_SECONDS', '10')
+        ),
     )
 
 
@@ -73,6 +80,12 @@ def main() -> None:
             }
         )
     )
+    threading.Thread(
+        target=watch,
+        args=(server, lambda: os._exit(STUCK_EXIT_STATUS)),
+        name='watchdog',
+        daemon=True,
+    ).start()
     server.serve_forever()
 
 

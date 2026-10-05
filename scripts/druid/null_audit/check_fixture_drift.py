@@ -9,7 +9,8 @@ independently of the builder code that implements them:
 - N2: under each `not`, every `selector` or `in` leaf reached through `and`/`or`
   (not through a nested `not`) becomes `and(leaf, not(selector dim null))`,
   unless it tests for null or `''`; a leaf's extractionFn goes onto the null test.
-The posted queries are then compared with the rewritten ones as canonical
+Both rewrites leave fixtures that already carry the change alone, so the check
+holds before and after the fixtures are regenerated. The posted queries are then compared with the rewritten ones as canonical
 queries. Exits non-zero on any other difference or any body change.
 '''
 import sys
@@ -28,8 +29,30 @@ from tests.golden.harness import (
 )
 
 
+def _guard(leaf: dict) -> dict:
+    is_null = {'type': 'selector', 'dimension': leaf['dimension'], 'value': None}
+    if 'extractionFn' in leaf:
+        is_null['extractionFn'] = leaf['extractionFn']
+    return {'type': 'not', 'field': is_null}
+
+
+def _is_guarded(node: dict) -> bool:
+    fields = node.get('fields', [])
+    return (
+        node.get('type') == 'and'
+        and len(fields) == 2
+        and any(
+            other == _guard(leaf)
+            for leaf, other in (fields, fields[::-1])
+            if leaf.get('type') in ('selector', 'in')
+        )
+    )
+
+
 def _guard_leaves(node: dict) -> dict:
     kind = node.get('type')
+    if _is_guarded(node):
+        return node
     if kind in ('and', 'or'):
         return {**node, 'fields': [_guard_leaves(field) for field in node['fields']]}
     if kind == 'selector':
@@ -40,10 +63,7 @@ def _guard_leaves(node: dict) -> dict:
         return node
     if any(value in (None, '') for value in values):
         return node
-    is_null = {'type': 'selector', 'dimension': node['dimension'], 'value': None}
-    if 'extractionFn' in node:
-        is_null['extractionFn'] = node['extractionFn']
-    return {'type': 'and', 'fields': [node, {'type': 'not', 'field': is_null}]}
+    return {'type': 'and', 'fields': [node, _guard(node)]}
 
 
 def accepted_rewrite(node: Any) -> Any:

@@ -3,6 +3,7 @@ import hashlib
 import json
 import time
 
+from cachelib import FileSystemCache
 from flask import current_app
 from flask_user import current_user
 
@@ -40,6 +41,15 @@ def render_thumbnail(dashboard):
     return base64.b64encode(response.content).decode()
 
 
+def _keeps_expired_entries(cache):
+    '''FileSystemCache leaves an expired entry on disk, so `get` misses it while
+    `add` still fails until it is deleted. Redis drops it: there, a miss after a
+    failed `add` means the holder has just released its claim, and another
+    caller may already hold a new one that must not be deleted.
+    '''
+    return isinstance(getattr(cache, 'cache', cache), FileSystemCache)
+
+
 def retrieve_item(dashboard):
     '''Returns the current user's thumbnail of the dashboard, rendering it as
     them when no user with the same query policy has one cached.
@@ -53,8 +63,7 @@ def retrieve_item(dashboard):
             return value
         if time.monotonic() >= deadline:
             return ''
-        if value is None:
-            # FileSystemCache keeps an expired entry: `get` misses but `add` fails.
+        if value is None and _keeps_expired_entries(cache):
             cache.delete(storage_key)
         time.sleep(1)
 

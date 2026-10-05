@@ -59,6 +59,7 @@ Units, in order. Each line names the change and the check that ends it.
    Check: the tests pass here and the new ones fail on integration; a mutation pass over every guard; CI pylint and black on the changed files; WP-2b pure layer identical and live layer differing only in the pinned escalations.
 9. Rework after security round 2 (`dc65f70`): `member_groups_from_uris` excludes admin-holding groups for a non-superuser identity, as `GroupResourceManager` does, failing test first. Check: the new narrowed-token case fails on `a615058` and passes here; WP suite, WP-2b pure layer.
 10. Rework after the round-2 verdicts (reviewer, qa): merge `mig/integration` and pass WP-2f's CI gates on the merged tree (suite moved to `tests/privilege_escalation` so it runs in its own process; mypy and ruff findings), pin the two surviving guards, remove the dead `QueryNeed` filter, and correct the evidence. Check: `ci/lint_python.sh`, `uv run --locked mypy` and `ci/pytest_suites.sh` pass on the merged head; mutation of each new pin's guard fails its test; WP-2b pure layer identical.
+11. Rework after the reviewer's round 3: merge `mig/integration` (ruff targets py38) and restore the 3.8-compatible `with` in `RoleResource.update_users`. Check: the three CI gates on the merge, `py_compile` on CPython 3.8, and the WP suite on the 3.8 web env.
 
 ### How each escalation works (unit 1)
 
@@ -264,6 +265,14 @@ Three reviewers ran: opus (A), fable (B), and sonnet (C; it reported to the lead
 | Static-check evidence cites pylint and black | qa (low) | Replaced for this round by ruff and mypy through the CI scripts; the unit 6 and unit 8 static checks are marked as pre-WP-2f. |
 | Unit 8 log date | reviewer (nit) | 2026-10-05. |
 
+## Rework after the round-3 review (unit 11)
+
+| Finding | From | Closure |
+|---|---|---|
+| INV-1: `98e77fc`'s `ruff format` (then targeting py39) turned the chained `with` in `RoleResource.update_users` into a parenthesised `with` with an `as` clause, which CPython 3.8 (the web image) rejects, so `create_app` could not import `RoleResource` | reviewer (high) | Merged `mig/integration` at `e86d91a` (ruff targets py38) as `741fc11`, restored the integration form of the statement. No other parenthesised `with` in the WP's diff. Every changed Python file compiles on CPython 3.8, and the WP suite passes on the 3.8.20 web env (Evidence). The file at `98e77fc` fails `py_compile` on 3.8 with `SyntaxError: invalid syntax`. |
+| Gates on the current integration merge and one CPython 3.8 run in evidence | reviewer (low) | Evidence, unit 11. |
+| Memory note saying 3.8 no longer matters after WP-2f | reviewer (low) | Corrected in `post_wp2f_tooling.md` and `legacy-flask-test-and-lint-env.md`: production stays on 3.8 until WP-3b. |
+
 ## Findings for the lead
 
 Outside this WP's scope. Each needs its own decision.
@@ -317,8 +326,16 @@ None.
 - 2026-10-05 backend-7 unit 8 (resumed from backend-6's uncommitted rework after the host reboot): F1, one superuser definition on every grant path including the role and group managers, generic 403 bodies, the reviewer's guard and type fixes, INV-3 rows 4-6, 9, 12-19. Commits `e1d065b`, `a23f729`. Check: 81 passed here; the same file against integration `3780c8c` gives `49 failed, 32 passed`. Mutation pass killed every guard but one (recorded). CI pylint has no errors and black 22.6.0 is clean on the changed files. WP-2b pure layer identical. Live layer: integration 575 passed; this branch 569 passed, and the 6 failures are exactly the pinned escalations.
 - 2026-10-05 backend-8 unit 9: `member_groups_from_uris` admin-group exclusion after security round 2, commit `e58c67a`; H5 pointed at WP-0j (decision 0005). Check: the new narrowed-token case failed first (200); 83 passed here; the file on integration `3780c8c` gives `50 failed, 33 passed`; CI pylint no errors and black 22.6.0 clean on the WP's 11 changed Python files; WP-2b pure layer (`09a7581`) `4675 passed, 580 skipped` on both, outcomes byte-identical.
 - 2026-10-05 backend-8 unit 10: merged `mig/integration` (`1697a7a`), suite moved to `tests/privilege_escalation`, mypy and ruff fixes, two guards pinned, dead `QueryNeed` filter removed, evidence corrected; commits `df01179`, `98e77fc`, `044a457`. Check: `ci/lint_python.sh mig/integration` and `uv run --locked mypy` pass; `ci/pytest_suites.sh` all 9 suites pass (86 here); the file on integration `1697a7a` gives `50 failed, 36 passed`; the new pins kill their guards; WP-2b pure layer byte-identical.
+- 2026-10-05 backend-8 unit 11: merged `mig/integration` `e86d91a` (`741fc11`), restored the 3.8-compatible `with` in `RoleResource.update_users`, corrected the 3.8 memory note. Check: `ci/lint_python.sh`, mypy and `ci/pytest_suites.sh` pass on the merge; `py_compile` on CPython 3.8 of the 11 changed files passes; WP suite on CPython 3.8.20 `86 passed`.
 
 ## Evidence
+
+**Unit 11 (merge with integration `e86d91a`):**
+- `ci/lint_python.sh mig/integration` (ruff now targets py38): `All checks passed!`, `11 files already formatted`.
+- `uv run --locked mypy`: `Success: no issues found in 518 source files`.
+- `ci/pytest_suites.sh`: `all 9 suites passed`. `tests/core` 25, `tests/druid` 1, `tests/druid_setup` 79, `tests/golden` 269, `tests/graphql` 22, `tests/pipeline` 129 (1 skipped), `tests/privilege_escalation` 86, `tests/toolchain` 12, `tests/web` 95.
+- **CPython 3.8** (`/tmp/wp2g-be3-py38`, Python 3.8.20, the web image's version): `python -m pytest tests/privilege_escalation` gives `86 passed`. `py_compile` of the 11 changed Python files on 3.8 passes; the same on `98e77fc`'s `permission_api_models.py` gives `SyntaxError: invalid syntax`.
+- No code change since unit 10 other than the restored statement, so the unit 10 pure-layer result stands.
 
 **Unit 10 (merged head `044a457`; code at `98e77fc`):**
 - `ci/lint_python.sh mig/integration` (the 11 Python files this WP changes): `All checks passed!`, `11 files already formatted`.

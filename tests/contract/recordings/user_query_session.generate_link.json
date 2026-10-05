@@ -1,0 +1,11 @@
+{
+  "content_type": "application/json",
+  "headers": [],
+  "id": "user_query_session.generate_link",
+  "pinned": {},
+  "response_schema": {
+    "type": "string"
+  },
+  "route": "POST /api2/user_query_session/generate_link",
+  "status": 200
+}

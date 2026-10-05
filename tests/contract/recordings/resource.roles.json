@@ -1,0 +1,51 @@
+{
+  "content_type": "application/json",
+  "headers": [],
+  "id": "resource.roles",
+  "pinned": {},
+  "response_schema": {
+    "properties": {
+      "groupRoles": {
+        "additionalProperties": {
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        },
+        "type": "object"
+      },
+      "sitewideResourceAcl": {
+        "properties": {
+          "registeredResourceRole": {
+            "type": "string"
+          },
+          "unregisteredResourceRole": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "registeredResourceRole",
+          "unregisteredResourceRole"
+        ],
+        "type": "object"
+      },
+      "userRoles": {
+        "additionalProperties": {
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        },
+        "type": "object"
+      }
+    },
+    "required": [
+      "groupRoles",
+      "sitewideResourceAcl",
+      "userRoles"
+    ],
+    "type": "object"
+  },
+  "route": "GET /api2/resource/<id>/roles",
+  "status": 200
+}

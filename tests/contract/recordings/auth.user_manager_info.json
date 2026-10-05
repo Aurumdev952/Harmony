@@ -1,0 +1,35 @@
+{
+  "content_type": "application/json",
+  "headers": [],
+  "id": "auth.user_manager_info",
+  "pinned": {},
+  "response_schema": {
+    "properties": {
+      "enableChangePassword": {
+        "type": "boolean"
+      },
+      "enableChangeUsername": {
+        "type": "boolean"
+      },
+      "enableEmail": {
+        "type": "boolean"
+      },
+      "enableRetypePassword": {
+        "type": "boolean"
+      },
+      "enableUsername": {
+        "type": "boolean"
+      }
+    },
+    "required": [
+      "enableChangePassword",
+      "enableChangeUsername",
+      "enableEmail",
+      "enableRetypePassword",
+      "enableUsername"
+    ],
+    "type": "object"
+  },
+  "route": "GET /api2/authentication/user_manager_info",
+  "status": 200
+}

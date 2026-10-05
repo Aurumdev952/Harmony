@@ -1,0 +1,5 @@
+{
+  "description": "Stored dimension values that write a missing value as '': a municipality with no state (AND with StateName ''), an IN holding '', and the negated geo value. '' is posted as null.",
+  "endpoint": "table",
+  "policy": null
+}

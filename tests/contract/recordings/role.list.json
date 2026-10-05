@@ -1,0 +1,137 @@
+{
+  "content_type": "application/json",
+  "headers": [
+    "link",
+    "x-total-count"
+  ],
+  "id": "role.list",
+  "pinned": {
+    "/[]/name": [
+      "_default_role",
+      "admin",
+      "alert_admin",
+      "alert_creator",
+      "alert_editor",
+      "alert_viewer",
+      "dashboard_admin",
+      "dashboard_editor",
+      "dashboard_viewer",
+      "data_catalog_viewer",
+      "data_upload_admin",
+      "data_uploader_f193e47caa08",
+      "directory_reader",
+      "entity_matching_viewer",
+      "field_setup_viewer",
+      "group_admin",
+      "group_moderator",
+      "manager",
+      "query_analyst",
+      "query_runner",
+      "role_administrator",
+      "role_moderator",
+      "user_admin",
+      "user_moderator"
+    ]
+  },
+  "response_schema": {
+    "items": {
+      "properties": {
+        "$uri": {
+          "type": "string",
+          "x-format": "api-uri"
+        },
+        "alertResourceRoleName": {
+          "type": "string"
+        },
+        "dashboardResourceRoleName": {
+          "type": "string"
+        },
+        "dataExport": {
+          "type": "boolean"
+        },
+        "label": {
+          "type": "string"
+        },
+        "name": {
+          "type": "string"
+        },
+        "permissions": {
+          "items": {
+            "properties": {
+              "id": {
+                "type": "integer"
+              },
+              "permission": {
+                "type": "string"
+              },
+              "resource_type_id": {
+                "type": "integer"
+              }
+            },
+            "required": [
+              "id",
+              "permission",
+              "resource_type_id"
+            ],
+            "type": "object"
+          },
+          "type": "array"
+        },
+        "queryPolicies": {
+          "items": {
+            "properties": {
+              "$uri": {
+                "type": "string",
+                "x-format": "api-uri"
+              },
+              "dimension": {
+                "type": "string"
+              },
+              "dimensionValue": {
+                "type": "null"
+              },
+              "queryPolicyTypeId": {
+                "type": "integer"
+              },
+              "resource": {
+                "type": "string",
+                "x-format": "api-uri"
+              }
+            },
+            "required": [
+              "$uri",
+              "dimension",
+              "dimensionValue",
+              "queryPolicyTypeId",
+              "resource"
+            ],
+            "type": "object"
+          },
+          "type": "array"
+        },
+        "usernames": {
+          "items": {
+            "type": "string",
+            "x-format": "email"
+          },
+          "type": "array"
+        }
+      },
+      "required": [
+        "$uri",
+        "alertResourceRoleName",
+        "dashboardResourceRoleName",
+        "dataExport",
+        "label",
+        "name",
+        "permissions",
+        "queryPolicies",
+        "usernames"
+      ],
+      "type": "object"
+    },
+    "type": "array"
+  },
+  "route": "GET /api2/role",
+  "status": 200
+}

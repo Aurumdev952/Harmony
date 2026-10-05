@@ -4,7 +4,6 @@
 # This allows us to import from config directly.
 # for example: from config.general import NATION_NAME
 # and NOT: from config.et.general import NATION_NAME
-import glob
 import importlib
 import importlib.abc
 import importlib.machinery
@@ -13,15 +12,9 @@ import sys
 from types import ModuleType
 from typing import Optional, Sequence
 
-# Initialize the set of valid config modules to be the subdirectories of the
-# config/ directory.
-VALID_MODULES = sorted(
-    {
-        os.path.basename(os.path.dirname(path))
-        for path in glob.glob(os.path.join(os.path.dirname(__file__), '*/general.py'))
-        if '/template/general.py' not in path
-    }
-)
+from harmony.core.deployment import deployment_codes
+
+VALID_MODULES = list(deployment_codes())
 
 # Config modules we never want to handle importing for
 _MODULE_WHITELIST = frozenset(

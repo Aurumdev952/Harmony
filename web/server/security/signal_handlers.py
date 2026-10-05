@@ -1,6 +1,5 @@
 import itertools
 from logging import LoggerAdapter
-from uuid import uuid4
 
 from flask import g, request, request_started, session, current_app
 from flask_jwt_extended import (
@@ -22,6 +21,7 @@ from jwt import ExpiredSignatureError, InvalidSignatureError
 from werkzeug.exceptions import BadRequest
 
 from log import LOG
+from log.context import current_request_id, new_request_id
 from models.alchemy.api_token import APIToken
 from models.alchemy.user import User
 from models.python.permissions import DimensionFilter, QueryNeed
@@ -33,6 +33,10 @@ from web.server.routes.views.authorization import (
 )
 from web.server.security.permissions import SuperUserPermission
 from web.server.util.util import get_user_string, get_remote_ip_address
+
+# Dashboard render tokens keep whatever query policy the account they are issued
+# for holds.
+RENDER_TOKEN_QUERY_NEEDS = ['*']
 
 
 def register_for_signals(app, principals):
@@ -53,8 +57,8 @@ def initialize_request_logger(app, **kwargs):
     messages associated with a specific request by a user.
     '''
 
-    # Generate a unique Request ID
-    request_id = uuid4()
+    # The id the request id middleware bound, which the response header also carries.
+    request_id = current_request_id() or new_request_id()
     username = ''
     user_id = -1
     ip_address = get_remote_ip_address()
@@ -66,7 +70,7 @@ def initialize_request_logger(app, **kwargs):
     log_fields = {
         'username': username,
         'ip_address': ip_address,
-        'request_id': str(request_id),
+        'request_id': request_id,
         'user_id': user_id,
     }
 
@@ -160,6 +164,13 @@ def _compute_token_query_needs(token_query_needs):
             result.add(intersection)
 
     return result
+
+
+def render_token_query_needs():
+    '''The query needs a `query_needs: ['*']` token issued to the current user
+    resolves to: the policy a dashboard render made as that user runs under.
+    '''
+    return _compute_token_query_needs(RENDER_TOKEN_QUERY_NEEDS)
 
 
 def _compute_token_provides(claims):

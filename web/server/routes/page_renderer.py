@@ -1,19 +1,21 @@
 from flask import Blueprint, Response, stream_with_context
 from flask_user import current_user
 
-from models.alchemy.dashboard import Dashboard
-from web.server.data.data_access import Transaction
-from web.server.routes.views.authorization import AuthorizedOperation
+from web.server.routes.views.authentication import authentication_required
+from web.server.routes.views.dashboard import get_viewable_dashboard
 from web.server.routes.views.page_renderer import (
     grid_dashboard_to_pdf,
     grid_dashboard_to_thumbnail,
     grid_dashboard_to_image,
 )
-from web.server.security.permissions import is_public_dashboard_user
 
 FULL_DASHBOARD_CONTENT = 'application/pdf'
 THUMBNAIL_CONTENT = 'image/png'
 JPEG_CONTENT = 'image/jpeg'
+
+# Every render is made as the signed-in caller, so public access never opens
+# these routes to anonymous visitors.
+render_route = authentication_required(is_api_request=True, force_authentication=True)
 
 
 def response_wrapper(render_response, content_type):
@@ -32,52 +34,42 @@ def response_wrapper(render_response, content_type):
     )
 
 
-def get_resource_id_from_name(name):
-    with Transaction() as transaction:
-        dashboard = transaction.find_all_by_fields(Dashboard, {'slug': name})
-        return dashboard.first().resource_id
-
-
 class PageRendererRouter:
+    @render_route
     def grid_dashboard_to_pdf(self, locale=None, name=None, session_hash=''):
-        resource_id = get_resource_id_from_name(name)
-        with AuthorizedOperation('view_resource', 'dashboard', resource_id):
-            response = (
-                grid_dashboard_to_pdf(
-                    locale,
-                    name,
-                    session_hash=session_hash,
-                )
-                if is_public_dashboard_user()
-                else grid_dashboard_to_pdf(
-                    locale,
-                    name,
-                    auth_user_email=current_user.username,
-                    session_hash=session_hash,
-                )
-            )
-            return response_wrapper(
-                response,
-                FULL_DASHBOARD_CONTENT,
-            )
-
-    def grid_dashboard_to_thumbnail(self, locale=None, name=None):
+        dashboard = get_viewable_dashboard(name)
         return response_wrapper(
-            grid_dashboard_to_thumbnail(locale, name), THUMBNAIL_CONTENT
+            grid_dashboard_to_pdf(
+                locale,
+                dashboard.slug,
+                auth_user_email=current_user.username,
+                session_hash=session_hash,
+            ),
+            FULL_DASHBOARD_CONTENT,
         )
 
+    @render_route
+    def grid_dashboard_to_thumbnail(self, locale=None, name=None):
+        dashboard = get_viewable_dashboard(name)
+        return response_wrapper(
+            grid_dashboard_to_thumbnail(
+                locale, dashboard.slug, auth_user_email=current_user.username
+            ),
+            THUMBNAIL_CONTENT,
+        )
+
+    @render_route
     def grid_dashboard_to_image(self, locale=None, name=None, session_hash=''):
-        resource_id = get_resource_id_from_name(name)
-        with AuthorizedOperation('view_resource', 'dashboard', resource_id):
-            return response_wrapper(
-                grid_dashboard_to_image(
-                    locale,
-                    name,
-                    auth_user_email=current_user.username,
-                    session_hash=session_hash,
-                ),
-                JPEG_CONTENT,
-            )
+        dashboard = get_viewable_dashboard(name)
+        return response_wrapper(
+            grid_dashboard_to_image(
+                locale,
+                dashboard.slug,
+                auth_user_email=current_user.username,
+                session_hash=session_hash,
+            ),
+            JPEG_CONTENT,
+        )
 
     def generate_blueprint(self):
         render_page = Blueprint('render_page', __name__, template_folder='templates')

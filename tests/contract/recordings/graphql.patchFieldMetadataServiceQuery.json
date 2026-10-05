@@ -1,0 +1,213 @@
+{
+  "content_type": "text/html",
+  "headers": [],
+  "id": "graphql.patchFieldMetadataServiceQuery",
+  "pinned": {},
+  "response_schema": {
+    "properties": {
+      "data": {
+        "properties": {
+          "categoryConnection": {
+            "properties": {
+              "edges": {
+                "items": {
+                  "properties": {
+                    "node": {
+                      "properties": {
+                        "id": {
+                          "type": "string"
+                        },
+                        "name": {
+                          "type": "string"
+                        },
+                        "parent": {
+                          "properties": {
+                            "id": {
+                              "type": "string"
+                            }
+                          },
+                          "required": [
+                            "id"
+                          ],
+                          "type": [
+                            "null",
+                            "object"
+                          ]
+                        }
+                      },
+                      "required": [
+                        "id",
+                        "name",
+                        "parent"
+                      ],
+                      "type": "object"
+                    }
+                  },
+                  "required": [
+                    "node"
+                  ],
+                  "type": "object"
+                },
+                "type": "array"
+              }
+            },
+            "required": [
+              "edges"
+            ],
+            "type": "object"
+          },
+          "fieldConnection": {
+            "properties": {
+              "edges": {
+                "items": {
+                  "properties": {
+                    "node": {
+                      "properties": {
+                        "calculation": {
+                          "properties": {
+                            "type": {
+                              "type": "string"
+                            }
+                          },
+                          "required": [
+                            "type"
+                          ],
+                          "type": "object"
+                        },
+                        "description": {
+                          "type": "string"
+                        },
+                        "fieldCategoryMappings": {
+                          "items": {
+                            "properties": {
+                              "category": {
+                                "properties": {
+                                  "id": {
+                                    "type": "string"
+                                  },
+                                  "name": {
+                                    "type": "string"
+                                  }
+                                },
+                                "required": [
+                                  "id",
+                                  "name"
+                                ],
+                                "type": "object"
+                              },
+                              "id": {
+                                "type": "string"
+                              }
+                            },
+                            "required": [
+                              "category",
+                              "id"
+                            ],
+                            "type": "object"
+                          },
+                          "type": "array"
+                        },
+                        "fieldDimensionMappings": {
+                          "items": {
+                            "properties": {
+                              "dimension": {
+                                "properties": {
+                                  "id": {
+                                    "type": "string"
+                                  },
+                                  "name": {
+                                    "type": "string"
+                                  }
+                                },
+                                "required": [
+                                  "id",
+                                  "name"
+                                ],
+                                "type": "object"
+                              },
+                              "id": {
+                                "type": "string"
+                              }
+                            },
+                            "required": [
+                              "dimension",
+                              "id"
+                            ],
+                            "type": "object"
+                          },
+                          "type": "array"
+                        },
+                        "fieldPipelineDatasourceMappings": {
+                          "items": {
+                            "properties": {
+                              "id": {
+                                "type": "string"
+                              },
+                              "pipelineDatasource": {
+                                "properties": {
+                                  "id": {
+                                    "type": "string"
+                                  },
+                                  "name": {
+                                    "type": "string"
+                                  }
+                                },
+                                "required": [
+                                  "id",
+                                  "name"
+                                ],
+                                "type": "object"
+                              }
+                            },
+                            "required": [
+                              "id",
+                              "pipelineDatasource"
+                            ],
+                            "type": "object"
+                          },
+                          "type": "array"
+                        },
+                        "id": {
+                          "type": "string"
+                        }
+                      },
+                      "required": [
+                        "calculation",
+                        "description",
+                        "fieldCategoryMappings",
+                        "fieldDimensionMappings",
+                        "fieldPipelineDatasourceMappings",
+                        "id"
+                      ],
+                      "type": "object"
+                    }
+                  },
+                  "required": [
+                    "node"
+                  ],
+                  "type": "object"
+                },
+                "type": "array"
+              }
+            },
+            "required": [
+              "edges"
+            ],
+            "type": "object"
+          }
+        },
+        "required": [
+          "categoryConnection",
+          "fieldConnection"
+        ],
+        "type": "object"
+      }
+    },
+    "required": [
+      "data"
+    ],
+    "type": "object"
+  },
+  "route": "POST /api/graphql",
+  "status": 200
+}

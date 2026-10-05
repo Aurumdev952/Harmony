@@ -1,0 +1,81 @@
+{
+  "content_type": "application/json",
+  "headers": [
+    "link",
+    "x-total-count"
+  ],
+  "id": "resource.list.dashboards",
+  "pinned": {
+    "/[]/resourceType": [
+      "DASHBOARD"
+    ]
+  },
+  "response_schema": {
+    "items": {
+      "properties": {
+        "$uri": {
+          "type": "string",
+          "x-format": "api-uri"
+        },
+        "groups": {
+          "items": {
+            "properties": {
+              "name": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "name"
+            ],
+            "type": "object"
+          },
+          "type": "array"
+        },
+        "label": {
+          "type": "string"
+        },
+        "name": {
+          "type": "string"
+        },
+        "resourceType": {
+          "type": "string"
+        },
+        "users": {
+          "items": {
+            "properties": {
+              "firstName": {
+                "type": "string"
+              },
+              "lastName": {
+                "type": "string"
+              },
+              "username": {
+                "type": "string",
+                "x-format": "email"
+              }
+            },
+            "required": [
+              "firstName",
+              "lastName",
+              "username"
+            ],
+            "type": "object"
+          },
+          "type": "array"
+        }
+      },
+      "required": [
+        "$uri",
+        "groups",
+        "label",
+        "name",
+        "resourceType",
+        "users"
+      ],
+      "type": "object"
+    },
+    "type": "array"
+  },
+  "route": "GET /api2/resource",
+  "status": 200
+}

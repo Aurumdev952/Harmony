@@ -1,0 +1,10 @@
+{
+  "content_type": "text/html",
+  "headers": [],
+  "id": "client.login_attempt",
+  "non_empty": true,
+  "pinned": {},
+  "response_schema": null,
+  "route": "POST /authentication/login",
+  "status": 405
+}

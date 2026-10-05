@@ -1,5 +1,9 @@
 '''Handle initialization and setup of the flask app and all its dependencies.'''
 
+# First, so logging is configured and warnings are captured before any other
+# import can print one.
+from log import LOG
+
 from datetime import datetime
 import queue
 from typing import Optional
@@ -10,7 +14,7 @@ from flask_jwt_extended import JWTManager
 from flask_potion import Api
 from flask_principal import Principal
 from werkzeug.serving import is_running_from_reloader
-from log import LOG
+from log.flask_request import install_request_logging
 
 from data.query.mock import generate_web_query_mock_data
 from models.alchemy.query import DruidDatasource
@@ -29,6 +33,7 @@ from web.server.database.setup import (
 )
 from web.server.errors.error_handlers import register_for_error_events
 from web.server.migrations.util import RevisionStatus
+from web.server.routes.views.page_renderer import deployment_origin
 from web.server.routes.views.query_policy import AuthorizedQueryClient
 from web.server.security.signal_handlers import register_for_signals
 from web.server.util.template_renderer import (
@@ -206,6 +211,7 @@ def _create_app_internal(
         # prevent errors from being thrown during server start.
         # Refuses to start on an unusable JWT key, so it runs before slow setup.
         initialize_jwt_manager(app)
+        validate_deployment_base_url(app)
         # NOTE: Initializing database seed values before app setup
         # so that if new database values are added, app setup won't error.
         initialize_database_seed_values(flask_config.SQLALCHEMY_DATABASE_URI)
@@ -304,6 +310,11 @@ def initialize_jwt_manager(app):
     JWTManager(app)
 
 
+def validate_deployment_base_url(app):
+    # Renders send minted tokens, and emails send links, to this origin.
+    deployment_origin(app.zen_config.general.DEPLOYMENT_BASE_URL)
+
+
 def create_app(
     flask_config: Optional[FlaskConfiguration] = None,
     instance_config: Optional[dict] = None,
@@ -326,4 +337,6 @@ def create_app(
     app = _create_app_internal(
         flask_config, instance_config, skip_db_check, force_druid_db_update
     )
+    # Last, so the request id middleware wraps every other wsgi_app wrapper.
+    install_request_logging(app)
     return app

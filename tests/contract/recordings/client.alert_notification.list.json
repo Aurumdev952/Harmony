@@ -1,0 +1,110 @@
+{
+  "content_type": "application/json",
+  "headers": [
+    "link",
+    "x-total-count"
+  ],
+  "id": "client.alert_notification.list",
+  "pinned": {},
+  "response_schema": {
+    "items": {
+      "properties": {
+        "$uri": {
+          "type": "string",
+          "x-format": "api-uri"
+        },
+        "alertDefinition": {
+          "properties": {
+            "$ref": {
+              "type": "string",
+              "x-format": "api-uri"
+            }
+          },
+          "required": [
+            "$ref"
+          ],
+          "type": "object"
+        },
+        "checks": {
+          "items": {
+            "properties": {
+              "operation": {
+                "type": "string"
+              },
+              "threshold": {
+                "type": "integer"
+              },
+              "type": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "operation",
+              "threshold",
+              "type"
+            ],
+            "type": "object"
+          },
+          "type": "array"
+        },
+        "comparedVal": {
+          "type": "string"
+        },
+        "dimensionInfo": {
+          "properties": {
+            "StateName": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "StateName"
+          ],
+          "type": "object"
+        },
+        "dimensionName": {
+          "type": "string"
+        },
+        "fieldNames": {
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        },
+        "generationDate": {
+          "type": "string",
+          "x-format": "date"
+        },
+        "queryInterval": {
+          "type": "string"
+        },
+        "reportedVal": {
+          "type": "string"
+        },
+        "timeGranularity": {
+          "type": "string"
+        },
+        "title": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "$uri",
+        "alertDefinition",
+        "checks",
+        "comparedVal",
+        "dimensionInfo",
+        "dimensionName",
+        "fieldNames",
+        "generationDate",
+        "queryInterval",
+        "reportedVal",
+        "timeGranularity",
+        "title"
+      ],
+      "type": "object"
+    },
+    "type": "array"
+  },
+  "route": "GET /api2/alert_notifications",
+  "status": 200
+}

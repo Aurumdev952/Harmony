@@ -1,0 +1,121 @@
+{
+  "content_type": "text/html",
+  "headers": [],
+  "id": "graphql.FieldAboutPanelQuery.seeded_field",
+  "pinned": {},
+  "response_schema": {
+    "properties": {
+      "data": {
+        "properties": {
+          "node": {
+            "properties": {
+              "__typename": {
+                "type": "string"
+              },
+              "description": {
+                "type": "string"
+              },
+              "fieldCategoryMappings": {
+                "items": {
+                  "properties": {
+                    "category": {
+                      "properties": {
+                        "id": {
+                          "type": "string"
+                        },
+                        "name": {
+                          "type": "string"
+                        }
+                      },
+                      "required": [
+                        "id",
+                        "name"
+                      ],
+                      "type": "object"
+                    },
+                    "id": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "category",
+                    "id"
+                  ],
+                  "type": "object"
+                },
+                "type": "array"
+              },
+              "fieldPipelineDatasourceMappings": {
+                "items": {
+                  "properties": {
+                    "id": {
+                      "type": "string"
+                    },
+                    "pipelineDatasource": {
+                      "properties": {
+                        "id": {
+                          "type": "string"
+                        },
+                        "name": {
+                          "type": "string"
+                        }
+                      },
+                      "required": [
+                        "id",
+                        "name"
+                      ],
+                      "type": "object"
+                    }
+                  },
+                  "required": [
+                    "id",
+                    "pipelineDatasource"
+                  ],
+                  "type": "object"
+                },
+                "type": "array"
+              },
+              "id": {
+                "type": "string"
+              },
+              "name": {
+                "type": "string"
+              },
+              "serializedCalculation": {
+                "properties": {
+                  "type": {
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "type"
+                ],
+                "type": "object"
+              }
+            },
+            "required": [
+              "__typename",
+              "description",
+              "fieldCategoryMappings",
+              "fieldPipelineDatasourceMappings",
+              "id",
+              "name",
+              "serializedCalculation"
+            ],
+            "type": "object"
+          }
+        },
+        "required": [
+          "node"
+        ],
+        "type": "object"
+      }
+    },
+    "required": [
+      "data"
+    ],
+    "type": "object"
+  },
+  "route": "POST /api/graphql",
+  "status": 200
+}

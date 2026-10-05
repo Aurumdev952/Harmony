@@ -41,8 +41,9 @@ services:
       # Map source code to host so that we can edit files and see changes immediately.
       - .:/app
       # Don't map venv and node modules to host. We need to use the container version.
-      - web_venv:/app/venv
-      - web_venv_pypy3:/app/venv_pypy3
+      # The volume name carries the interpreter: a volume filled by an older image would
+      # keep shadowing the image's venv.
+      - web_venv_cp313:/app/venv
       - web_node_modules:/app/node_modules
       # Map minio config folder
       - ${MC_CONFIG_PATH}:/root/.mc
@@ -76,8 +77,7 @@ services:
       # Map source code to host so that we can edit files and see changes immediately.
       - .:/app
       # Don't map venv and node modules to host. We need to use the container version.
-      - web_venv:/app/venv
-      - web_venv_pypy3:/app/venv_pypy3
+      - web_venv_cp313:/app/venv
       - web_node_modules:/app/node_modules
       - ./druid_shared:/home/share
       # Map minio config folder
@@ -109,6 +109,5 @@ services:
 volumes:
   pgdata-volume:
   redis-volume:
-  web_venv:
-  web_venv_pypy3:
+  web_venv_cp313:
   web_node_modules:

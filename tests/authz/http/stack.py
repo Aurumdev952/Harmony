@@ -86,9 +86,13 @@ def outcome(response: requests.Response) -> str:
 
 
 def new_session() -> requests.Session:
-    '''A session that retries idempotent requests whose pooled keep-alive
-    connection the server closed between requests.'''
+    '''A session that opens a connection per request. A pooled keep-alive
+    connection can be closed by gunicorn just as the next request goes out;
+    idempotent requests were retried, but a POST failed with
+    RemoteDisconnected (seen once creating a user), so nothing is pooled. The
+    retry stays for refused connects.'''
     session = requests.Session()
+    session.headers['Connection'] = 'close'
     retry = Retry(total=3, connect=3, read=3, status=0, backoff_factor=0.2)
     session.mount('http://', HTTPAdapter(max_retries=retry))
     session.mount('https://', HTTPAdapter(max_retries=retry))

@@ -273,7 +273,9 @@ def test_login_attempts_log_no_secret(bare_flask_app, log_lines):
     @app.route('/api/login', methods=['POST'])
     def login():
         LOG.info('login form received')
-        return login_user('login_successful', 'analyst@example.org')
+        # login_user takes the account since WP-0k.
+        account = SimpleNamespace(id=1, username='analyst@example.org')
+        return login_user('login_successful', account)
 
     client = app.test_client()
     password = SENTINELS['password']

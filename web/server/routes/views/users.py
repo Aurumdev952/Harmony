@@ -23,7 +23,7 @@ from web.server.data.data_access import (
 from web.server.errors import UserAlreadyInvited
 from web.server.routes.views.core import try_get_role_and_resource
 from web.server.routes.views.invite import send_invite_emails
-from web.server.security.usernames import find_user_by_username
+from web.server.security.usernames import find_named_account
 from web.server.util.util import get_user_string, Success
 from web.server.potion.signals import after_user_role_change, before_user_role_change
 
@@ -76,7 +76,7 @@ APITokenType = TypedDict('APITokenType', {'$uri': str, 'is_revoked': bool, 'id':
 
 
 def try_get_user(username: str, session: 'Optional[Session]' = None) -> Optional[User]:
-    return find_user_by_username(username, session)
+    return find_named_account(username, session)
 
 
 def try_get_user_acl(
@@ -557,7 +557,7 @@ def invite_users(invitees: List[Invitee]) -> List[User]:
 def get_anonymous_user() -> User:
     '''Fetch anonymous user. Create if it doesn't already exist.'''
     with Transaction() as transaction:
-        maybe_anon_user = find_user_by_username(
+        maybe_anon_user = find_named_account(
             UNREGISTERED_USER_USERNAME, transaction.run_raw()
         )
         if maybe_anon_user:

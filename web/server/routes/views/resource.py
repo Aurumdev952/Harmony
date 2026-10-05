@@ -18,7 +18,7 @@ from web.server.routes.views.users import (
 )
 
 from web.server.potion.signals import after_roles_update, before_roles_update
-from web.server.security.usernames import find_user_by_username
+from web.server.security.usernames import find_named_account
 
 
 def get_resource_by_type_and_name(resource_type, resource_name):
@@ -109,7 +109,7 @@ def _update_user_roles(resource, user_roles, session, add_roles=True):
         return undefined_users
 
     for username, roles in list(user_roles.items()):
-        user = find_user_by_username(username, session)
+        user = find_named_account(username, session)
 
         if not user:
             undefined_users.add(username)

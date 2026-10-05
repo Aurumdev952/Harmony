@@ -8,6 +8,7 @@ roles and query policy.
 """
 
 import pytest
+import sqlalchemy
 from flask import current_app
 from flask_jwt_extended import decode_token
 from flask_login import current_user
@@ -48,6 +49,12 @@ LOOKUPS = [
     ('Dup.Shell@moh.gov.rw', 10),
     ('DUP.SHELL@moh.gov.rw', 10),
 ]
+# Where a target lookup differs from sign-in's: `dup.shell@` is spelled exactly
+# by the pending account 11, and `DUP.SHELL@` equals both 10 and 11.
+TARGET_OVERRIDES = {
+    'dup.shell@moh.gov.rw': 11,
+    'DUP.SHELL@moh.gov.rw': None,
+}
 CASES = pytest.mark.parametrize(
     'sent, expected_id', LOOKUPS, ids=[c[0] for c in LOOKUPS]
 )
@@ -102,10 +109,36 @@ def test_flask_user_lookup_matches_exactly(app, request_ctx, sent, expected_id):
     assert (user.id if user else None) == expected_id
 
 
-@CASES
-def test_role_assignment_lookup_matches_exactly(app, request_ctx, sent, expected_id):
+# A caller naming a target (role and group membership, transfers, role
+# assignment by username) means the exact spelling, whatever its status; else
+# the one account equal to it ignoring case; else nobody. Sign-in's
+# preference for active accounts does not apply.
+TARGET_LOOKUPS = [
+    (sent, TARGET_OVERRIDES.get(sent, expected_id)) for sent, expected_id in LOOKUPS
+]
+
+
+@pytest.mark.parametrize(
+    'sent, expected_id', TARGET_LOOKUPS, ids=[c[0] for c in TARGET_LOOKUPS]
+)
+def test_a_named_target_is_the_exact_spelling_whatever_its_status(
+    app, request_ctx, sent, expected_id
+):
     user = users.try_get_user(sent)
     assert (user.id if user else None) == expected_id
+
+
+def test_a_named_target_is_not_the_active_twin_of_a_deactivated_account(
+    app, request_ctx
+):
+    with app.app_context():
+        engine = app.extensions['sqlalchemy'].db.engine
+        with engine.begin() as connection:
+            connection.execute(
+                sqlalchemy.text('UPDATE "user" SET status_id = 2 WHERE id = 6')
+            )
+
+    assert users.try_get_user('ann@moh.gov.rw').id == 6
 
 
 @pytest.mark.parametrize(

@@ -47,6 +47,23 @@ def find_user_by_username(
     return None
 
 
+def find_named_account(
+    username: Optional[str], session: Optional[Session] = None
+) -> Optional[User]:
+    '''The account a caller names as a target (role or group membership,
+    transfers, role assignment): the exact spelling, whatever its status; else
+    the one account equal to it ignoring case; else None. Sign-in's preference
+    for active accounts would pick a twin the caller did not name.
+    '''
+    if not username:
+        return None
+    candidates = _equal_ignoring_case(username, session)
+    exact = [user for user in candidates if user.username == username]
+    if exact:
+        return exact[0]
+    return candidates[0] if len(candidates) == 1 else None
+
+
 def find_legacy_token_account(
     username: Optional[str], session: Optional[Session] = None
 ) -> Optional[User]:

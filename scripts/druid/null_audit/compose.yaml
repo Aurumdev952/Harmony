@@ -28,7 +28,7 @@ x-druid: &druid
 
 services:
   extensions:
-    image: alpine:3.22.2
+    image: alpine:3.22.2@sha256:4b7ce07002c69e8f3d704a9c5d6fd3053be500b7f1c69fc0d80990c2ad8dd412
     volumes:
       - zen_extensions:/ext
       - deep_storage:/druid-deep
@@ -48,12 +48,12 @@ services:
       SHA256: cfc5910193b63e87c6455a761eaf6513deb57d0ffc267244f41e9298dd21545a
 
   zookeeper:
-    image: zookeeper:3.8.4
+    image: zookeeper:3.8.4@sha256:20d3c93ebda093d0c90911493396975e0e04523af225d8053d42bab781f9ca48
     environment:
       ZOO_MY_ID: "1"
 
   postgres:
-    image: postgres:17.11-bookworm
+    image: postgres:17.11-bookworm@sha256:639ab7ceb90e13123085b741fb31ef493fba25463002f6da665352e7b534b652
     environment:
       POSTGRES_USER: druid
       POSTGRES_DB: druid

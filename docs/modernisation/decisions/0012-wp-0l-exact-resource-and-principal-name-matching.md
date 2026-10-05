@@ -8,9 +8,10 @@ Decision 0006 (WP-0k) removed `ILIKE` username matching from login, registration
 
 | Path | Where | Outcome | Rating |
 |---|---|---|---|
-| A. Sharing re-finds the resource by its own name | `permission_api_models.py:201` → `resource.py:128,168` → `users.py:338`, `groups.py:172` → `core.py:61` | the route checks `update_users` on the resource in the URL but stores the ACL on whatever row the name lookup returns; dashboard names are slugified with `_`, so sharing `a_b` can grant view, edit, share or delete on `axb`, which the caller has no rights on; WP-0h's grant-subset check is not on this route | Medium (High if the pinned test shows the wrong row returned) |
+| A. Sharing re-finds the resource by its own name | `permission_api_models.py:201` → `resource.py:128,168` → `users.py:338`, `groups.py:172` → `core.py:61` | the route checks `update_users` on the resource in the URL but stores the ACL on whatever row the name lookup returns; dashboard names are slugified with `_`, so sharing `a_b` can grant view, edit, share or delete on `axb`, which the caller has no rights on; WP-0h's grant-subset check is not on this route | High (the WP-0l pins at `bf75d1c` show the wrong row returned before the fix) |
 | B. Removing a share uses user and group names as patterns | `resource.py:112,145,152` | the removal can hit a different principal and leave the intended one with access | Medium |
 | D. Group and role membership by username | `users.py:76-82` via `groups.py:250,268`, `resource.py:287` | a look-alike account joins the group or role and inherits its roles and query policy | Medium |
+| H. Creation and transfer make the owner admin by re-finding the resource by name | `dashboard.py:265` (`make_author_dashboard_administrator`), `database/alerts.py:38`, `alerts.py:95` | any holder of `create_resource` on dashboard chooses the slug; with slug `a_b` while `axb` exists, the author's `dashboard_admin` ACL landed on `axb` (view, edit, delete, re-share) and the author got no admin on their own dashboard; no grant check was ever on this path; pinned by `test_creating_a_dashboard_makes_its_author_admin_of_that_dashboard`, which failed before the fix | High for dashboards; Low for alerts (names are slugified UUIDs) |
 | C. ACL grants on group and user update | `grants.py:151` → `core.py:47,61` | escalation stopped by WP-0h; the 403 message repeats the matched resource's real name, so a pattern reveals names of dashboards the caller cannot list | Low |
 | E. Ownership transfer by username | `dashboard.py:286`, `alerts.py:115` | transfer to or from a look-alike account | Low |
 | F, G. Configuration keys; command-line scripts | `settings.py:140`, `druid_context.py:130`, `scripts/create_user.py` | fixed keys or operator-only | Low |
@@ -29,6 +30,8 @@ Found while tracing, to be confirmed by a test before they count as findings: `g
 3. **Ownership.** `web/server/data/data_access.py` is core's; the one-line change there is a core request inside WP-0l, or core claims it as a supporting instance.
 
 ## Consequences
+
+- **Amended 2026-10-06 after the WP-0l build:** row H added and row A raised to High on reproduced evidence. The fix does not move admin ACLs already stored on the wrong dashboard, including ones from innocent name matches in the past; whether to run a read-only audit per deployment (dashboards whose author lacks `dashboard_admin`; `dashboard_admin` ACLs on dashboards whose names match another's with `_` as a wildcard) is the human's call because it touches production data. INV-3 row: creating a dashboard or alert, or transferring an alert, makes the author or new owner admin of exactly that resource.
 
 - SPEC section 5 gains the 0l row; phase 0 closes after 0j, 0k and 0l merge together.
 - Security reviews the fix branch; the rating moves from code reading to live evidence there.

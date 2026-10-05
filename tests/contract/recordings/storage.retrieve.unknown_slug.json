@@ -5,31 +5,19 @@
   "pinned": {},
   "response_schema": {
     "properties": {
-      "data": {
-        "properties": {
-          "code": {
-            "type": "string"
-          },
-          "message": {
-            "type": "string"
-          }
-        },
-        "required": [
-          "code",
-          "message"
-        ],
-        "type": "object"
+      "message": {
+        "type": "string"
       },
-      "success": {
-        "type": "boolean"
+      "status": {
+        "type": "integer"
       }
     },
     "required": [
-      "data",
-      "success"
+      "message",
+      "status"
     ],
     "type": "object"
   },
   "route": "GET /api2/storage/retrieve",
-  "status": 500
+  "status": 404
 }

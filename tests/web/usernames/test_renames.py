@@ -117,16 +117,24 @@ def test_a_look_alike_rename_by_patch_signs_in_only_the_renamed_account(
     app, request_ctx, user_api, monkeypatch
 ):
     """`PATCH /api2/user/<id>` writes the username through Potion's manager;
-    the steps after it need tables this app does not have."""
+    the steps around it need tables this app does not have. WP-0j's steps are
+    stubbed too, so the test also runs on the WP-0j merge."""
     for step in (
         'update_user_acls',
         'update_user_groups',
         'update_user_api_tokens',
         'invalidate_user_identity_cache',
+        'verify_may_rename',
+        'held_roles_from_uris',
+        'member_groups_from_uris',
+        'verify_acl_grants',
+        'replace_user_acls',
     ):
-        monkeypatch.setattr(user_api, step, lambda *args: None)
+        monkeypatch.setattr(user_api, step, lambda *args, **kwargs: None, raising=False)
     monkeypatch.setattr(
-        user_api, 'build_user_updates', lambda obj: {'username': obj['username']}
+        user_api,
+        'build_user_updates',
+        lambda obj, *_roles: {'username': obj['username']},
     )
 
     def update(user, updates):
@@ -135,11 +143,13 @@ def test_a_look_alike_rename_by_patch_signs_in_only_the_renamed_account(
         app.extensions['sqlalchemy'].db.session.commit()
         return user
 
-    resource = SimpleNamespace(manager=SimpleNamespace(update=update))
+    manager = SimpleNamespace(update=update, can_update_item=lambda user: True)
     with app.app_context():
         db_user = User.query.get(6)
         user_api.UserResource.update_user.view_func(
-            resource, db_user, {'username': LOOK_ALIKE}
+            SimpleNamespace(manager=manager),
+            db_user,
+            {'username': LOOK_ALIKE, 'roles': []},
         )
 
     assert _username(app, 6) == LOOK_ALIKE

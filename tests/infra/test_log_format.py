@@ -150,6 +150,8 @@ _SECRETS = [
     ('Cookie: theme=dark; sid=s3cr3t', 's3cr3t'),
     ('set accessKey=abc123; Path=/', 'abc123'),
     ('redirect with session=abc123&next=/', 'abc123'),
+    ('remember_token=rem123; Path=/', 'rem123'),
+    ('csrf_access_token=csrf123&next=/', 'csrf123'),
     ("kwargs {'email_host_password': 'hunter2', 'port': 25}", 'hunter2'),
     ('JWT_SECRET_KEY=hunter2hunter2', 'hunter2hunter2'),
     ('GET /user/register?token=InviteTok.abc&next=/', 'InviteTok.abc'),

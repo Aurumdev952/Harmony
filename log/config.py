@@ -108,12 +108,10 @@ _REDACTIONS: Tuple[
         ),
         r'\1' + REDACTED,
     ),
-    (
-        re.compile(
-            r'\b(accessKey|session|remember_token|csrf_access_token)=[^;\s&"\']+'
-        ),
-        r'\1=' + REDACTED,
-    ),
+    # Flask's session cookie outside a Cookie header. The app's other cookies
+    # (accessKey, remember_token, csrf_access_token) name a key or token, so the
+    # key pattern above already redacts them.
+    (re.compile(r'\bsession=[^;\s&"\']+'), 'session=' + REDACTED),
     (
         re.compile(r'(?i)\b(bearer\s+)(?!\[REDACTED\])[A-Za-z0-9._~+/=-]+'),
         r'\1' + REDACTED,

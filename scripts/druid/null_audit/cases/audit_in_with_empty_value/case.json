@@ -1,0 +1,5 @@
+{
+  "description": "StateName IN [Acre, ''] as a stored filter value (qa's shape for N1c): Acre plus rows with no state.",
+  "endpoint": "table",
+  "policy": null
+}

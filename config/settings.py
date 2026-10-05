@@ -48,5 +48,15 @@ HASURA_HOST = setting('HASURA_HOST')
 
 DRUID_HOST = get_settings().DRUID_HOST
 
+# How LAST_VALUE is posted (WP-8a, N3): 'extension' (the aggregateLast extension,
+# Druid 0.23 with legacy nulls only) or 'native' (Druid's expression aggregator).
+# WP-8b makes native the only form and removes this setting (decision 0007, rule 5).
+DRUID_LAST_VALUE = os.environ.get('HARMONY_DRUID_LAST_VALUE') or 'extension'
+if DRUID_LAST_VALUE not in ('extension', 'native'):
+    raise ValueError(
+        "HARMONY_DRUID_LAST_VALUE must be 'extension' or 'native', "
+        f'not {DRUID_LAST_VALUE!r}'
+    )
+
 RENDERBOT_EMAIL = getenv('RENDERBOT_EMAIL', None)
 URLBOX_API_KEY = getenv('URLBOX_API_KEY', None)

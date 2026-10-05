@@ -1,6 +1,6 @@
 ---
 name: tooling-traps
-description: Commands that work for core checks in Harmony: multi-Python test runs, black vs ruff format, mypy flags, WP-2d pipeline suite in a scratch copy
+description: Commands that work for core checks in Harmony: multi-Python test runs, black vs ruff format, mypy flags, WP-2d pipeline suite in a scratch copy, linting with integration ruff config, proving golden cases qa owns
 metadata:
   type: reference
 ---
@@ -18,3 +18,5 @@ Shell-guard and `python3` workarounds are in [[worktree-shell-guard]].
 - Blocking network in a test subprocess: patch `socket.socket.connect`, `connect_ex` and `sendto`, plus `socket.create_connection` and `socket.getaddrinfo`. Replacing `socket.socket` itself breaks `import ssl`, which subclasses it; pydantic-settings pulls `ssl` in through asyncio.
 - import-linter (dev only, needs Python >= 3.9) prints ANSI colours even when piped, so strip `\x1b\[[0-9;]*m` before asserting. With only `harmony.core` as root package, legacy packages are opaque leaves. List them in `root_packages` to catch transitive imports (872 files take 0.4 s).
 - pydantic-core 2.27.2 (pydantic 2.10.6) has PyPy 3.9 wheels but no PyPy 3.8 wheel. A local `uv run -p pypy3.8 --with pydantic...` passes anyway, because uv compiles the sdist with the host's Rust; the pipeline image cannot do that, so infra added a `pypy-wheels` build stage (removal item for WP-3b). Prove wheel availability with `--no-build`, never with a plain install.
+- Linting a WP branch cut before integration's ruff config: `ci/lint_python.sh` applies the full rule set (`E4,E7,E9,F,S`, format with quote-style preserve) to every changed `.py` file. Export integration's `pyproject.toml` with `git show <integration>:pyproject.toml`, rsync the worktree to /tmp, drop the file in, and run `uvx ruff@<pin> check|format` there (the old venv has no ruff). Then copy the formatted files back. Even a one-line comment edit pulls a whole legacy file into that set, with all its old F401/S101 findings, so leave untouched files out of the diff.
+- Golden cases (`tests/golden/cases/**`) are qa's. To prove a new case, record it in the /tmp copy (`record.py <case>`) and hand qa the `case.json` and `request.json` through the WP Requests section.

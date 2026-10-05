@@ -1,0 +1,150 @@
+## calc_last_value
+- error: 1 differing values
+    error: null -> "AssertionError: calc_last_value: HTTP 500\n<!DOCTYPE HTML PUBLIC \"-//W3C//DTD HTML 3.2 Final//EN\">\n<title>500 Internal Server Error</title>\n<h1>Internal Se
+- druid_query: 1 differing values
+    druid_query: [{"aggregations": [{"aggregator": {"aggregator": {"fieldName": "sum", "name": "yellow_fever_cases", "type": "doubleSum"}, "name": "yellow_fever_cases", "type":  -> null
+- druid_response: 1 differing values
+    druid_response: [[[1704067200000, "Acre", 82.0, 298], [1704067200000, "Par\u00e1", 26.0, 196], [1704067200000, "Roraima", 46.0, 202], [1706745600000, "Acre", 134.0, 274], [1706 -> null
+- body: 1 differing values
+    body: {"data": [{"StateName": "Acre", "timestamp": "2024-01-01", "yellow_fever_cases": 82.0}, {"StateName": "Par\u00e1", "timestamp": "2024-01-01", "yellow_fever_case -> null
+## dq_data_quality
+- druid_response: 166 differing values
+    druid_response[0][3][1]: null -> ""
+    druid_response[0][3][2]: null -> ""
+    druid_response[0][3][3]: null -> ""
+    druid_response[0][7][1]: null -> ""
+- body: 1 differing values
+    body.dataQuality.: "<absent>" -> {"dimensions": {"StateName": ""}, "geo": {"lat": "", "lng": ""}, "indicatorCharacteristics": {"ageScore": 1.0, "completenessTrendIsUp": false, "endIntervalTimes
+## dq_outliers_box_plot
+- druid_response: 13 differing values
+    druid_response[0][0][2]: null -> ""
+    druid_response[0][7][2]: null -> ""
+    druid_response[0][14][2]: null -> ""
+    druid_response[0][26][2]: null -> ""
+- body: 16 differing values
+    body.data.length: 6 -> 7
+    body.data[0].dimensions.MunicipalityName: "Alto Alegre" -> ""
+    body.data[0].dimensions.StateName: "Roraima" -> "Acre"
+    body.data[1].dimensions.MunicipalityName: "Bel\u00e9m" -> "Alto Alegre"
+## dq_outliers_table
+- druid_response: 13 differing values
+    druid_response[0][0][2]: null -> ""
+    druid_response[0][7][2]: null -> ""
+    druid_response[0][14][2]: null -> ""
+    druid_response[0][26][2]: null -> ""
+## filter_nested
+- druid_response: 17 differing values
+    druid_response[0].length: 5 -> 8
+    druid_response[0][0][1]: "50+" -> null
+    druid_response[0][0][2]: 2180.0 -> 245.0
+    druid_response[0][0][3]: 404 -> 41
+- body: 12 differing values
+    body.data.length: 5 -> 8
+    body.data[0].Age: "50+" -> null
+    body.data[0].yellow_fever_cases: 2180.0 -> 245.0
+    body.data[1].Age: "15-49" -> "50+"
+## filter_or
+- druid_response: 20 differing values
+    druid_response[0].length: 6 -> 9
+    druid_response[0][0][1]: "F" -> null
+    druid_response[0][0][2]: 2320.0 -> 120.0
+    druid_response[0][0][3]: 405 -> 17
+- body: 14 differing values
+    body.data.length: 6 -> 9
+    body.data[0].Sex: "F" -> null
+    body.data[0].yellow_fever_cases: 2320.0 -> 120.0
+    body.data[1].Sex: "M" -> "F"
+## group_dimension_include_null
+- druid_response: 1 differing values
+    druid_response[0][0][1]: null -> ""
+- body: 1 differing values
+    body.data[0].MunicipalityName: null -> ""
+## group_two_totals
+- druid_response: 65 differing values
+    druid_response[0].length: 16 -> 28
+    druid_response[0][0][1]: "F" -> null
+    druid_response[0][0][3]: 1395.0 -> 86.0
+    druid_response[0][0][4]: 209 -> 20
+- body: 51 differing values
+    body.data.length: 16 -> 28
+    body.data[0].Sex: "F" -> null
+    body.data[0].yellow_fever_cases: 1395.0 -> 86.0
+    body.data[1].Sex: "F" -> null
+## hierarchy_pie_by_sex
+- druid_response: 13 differing values
+    druid_response[0].length: 3 -> 4
+    druid_response[0][0][0]: "F" -> null
+    druid_response[0][0][1]: 6016.0 -> 709.0
+    druid_response[0][0][2]: 1009 -> 117
+- body: 9 differing values
+    body.root.children.length: 2 -> 3
+    body.root.children[0].metrics.yellow_fever_cases: 6016.0 -> 709.0
+    body.root.children[0].metrics.yellow_fever_cases__k2: 1009.0 -> 117.0
+    body.root.children[0].name: "F" -> null
+## hierarchy_sunburst
+- druid_response: 33 differing values
+    druid_response[0].length: 10 -> 13
+    druid_response[0][0][1]: "15-49" -> null
+    druid_response[0][0][2]: 2757.0 -> 245.0
+    druid_response[0][0][3]: 429 -> 41
+- body: 19 differing values
+    body.root.children[0].children.length: 2 -> 3
+    body.root.children[0].children[0].metrics.yellow_fever_cases: 2757.0 -> 245.0
+    body.root.children[0].children[0].name: "15-49" -> null
+    body.root.children[0].children[1].metrics.yellow_fever_cases: 2180.0 -> 2757.0
+## line_graph_heat_tiles_week
+- druid_response: 101 differing values
+    druid_response[0].length: 26 -> 39
+    druid_response[0][0][1]: "F" -> null
+    druid_response[0][0][2]: 363.0 -> 59.0
+    druid_response[0][0][3]: 59 -> 10
+- body: 87 differing values
+    body.data.length: 26 -> 39
+    body.data[0].dimensions.Sex: "F" -> null
+    body.data[0].key: "F" -> "null"
+    body.data[0].yellow_fever_cases: 363.0 -> 59.0
+## policy_hierarchy
+- druid_response: 13 differing values
+    druid_response[0].length: 4 -> 5
+    druid_response[0][0][1]: "F" -> null
+    druid_response[0][0][2]: 1769.0 -> 214.0
+    druid_response[0][0][3]: 289 -> 36
+- body: 7 differing values
+    body.root.children[0].children.length: 2 -> 3
+    body.root.children[0].children[0].metrics.yellow_fever_cases: 1769.0 -> 214.0
+    body.root.children[0].children[0].name: "F" -> null
+    body.root.children[0].children[1].metrics.yellow_fever_cases: 1638.0 -> 1769.0
+## policy_two_states
+- druid_response: 14 differing values
+    druid_response[0].length: 4 -> 6
+    druid_response[0][0][1]: "F" -> null
+    druid_response[0][0][2]: 1997.0 -> 179.0
+    druid_response[0][0][3]: 349 -> 30
+- body: 10 differing values
+    body.data.length: 4 -> 6
+    body.data[0].Sex: "F" -> null
+    body.data[0].yellow_fever_cases: 1997.0 -> 179.0
+    body.data[1].Sex: "M" -> "F"
+## table_by_state_sex_with_total
+- druid_response: 30 differing values
+    druid_response[0].length: 7 -> 10
+    druid_response[0][0][1]: "F" -> null
+    druid_response[0][0][2]: 2320.0 -> 206.0
+    druid_response[0][0][3]: 405 -> 37
+- body: 24 differing values
+    body.data.length: 7 -> 10
+    body.data[0].Sex: "F" -> null
+    body.data[0].yellow_fever_cases: 2320.0 -> 206.0
+    body.data[0].yellow_fever_cases__k2: 405.0 -> 37.0
+## table_disaggregated
+- druid_response: 709 differing values
+    druid_response[0].length: 167 -> 185
+    druid_response[0][0][1]: "15-49" -> null
+    druid_response[0][0][3]: null -> "Cruzeiro do Sul"
+    druid_response[0][0][4]: 8.0 -> 13.0
+- body: 605 differing values
+    body.data.length: 167 -> 185
+    body.data[0].Age: "15-49" -> null
+    body.data[0].MunicipalityName: null -> "Cruzeiro do Sul"
+    body.data[0].yellow_fever_cases: 8.0 -> 13.0
+15 cases differ between /tmp/wp8a/out/legacy and /tmp/wp8a/out/sqlnull

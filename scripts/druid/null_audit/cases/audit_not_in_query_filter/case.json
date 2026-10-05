@@ -1,0 +1,5 @@
+{
+  "description": "NOT Age IN [50+] as the query filter, on rows where Age is null for some.",
+  "endpoint": "table",
+  "policy": null
+}

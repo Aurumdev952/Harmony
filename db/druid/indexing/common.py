@@ -1,3 +1,4 @@
+import json
 import math
 import os
 from datetime import datetime
@@ -17,6 +18,26 @@ from util.connections.connection_manager import get_connection_values
 INDEX_URL = f'{DruidConfig.router_endpoint()}/druid/indexer/v1/task'
 
 
+def build_empty_to_null_transforms(dimensions: List[str]) -> List[dict]:
+    '''The pipeline writes `''` for a dimension a row lacks. Druid 0.23 with legacy
+    nulls stores `''` as null; with SQL-compatible nulls (the only mode from Druid 32)
+    `''` is a value of its own, which would split every "no value" group in two and
+    slip past the builder's null filters. Storing null keeps today's semantics.
+    `field` is multi-valued for zero rows and never empty, so it is left alone.
+    Names are quoted with JSON escapes, which Druid's expression grammar shares.
+    '''
+    return [
+        {
+            'type': 'expression',
+            'name': dimension,
+            'expression': f'if({json.dumps(dimension)} == \'\', null, '
+            f'{json.dumps(dimension)})',
+        }
+        for dimension in dimensions
+        if dimension != FIELD_NAME
+    ]
+
+
 def build_data_schema(
     datasource_name: str,
     start_date: datetime,
@@ -26,6 +47,7 @@ def build_data_schema(
     return {
         'dataSource': datasource_name,
         'dimensionsSpec': {'dimensions': dimensions},
+        'transformSpec': {'transforms': build_empty_to_null_transforms(DIMENSIONS)},
         'granularitySpec': {
             'intervals': [build_time_interval(start_date, end_date)],
             'queryGranularity': {'type': 'none'},

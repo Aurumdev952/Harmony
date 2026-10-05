@@ -6,3 +6,7 @@
 - [Tooling traps](tooling_traps.md) — multi-Python test runs, black vs ruff format, mypy flags, pipeline suite scratch runs, 3.13 wheel checks
 - [Config import hook](config_import_hook.md) — alias semantics, PathFinder precedence, __spec__ restore, lazy DATASOURCE, WP-4a loader
 - [Images copy explicit dirs](images_copy_explicit_dirs.md) — a new top-level package (harmony/) needs infra COPY lines or the images break
+- [Tooling traps](tooling_traps.md) — multi-Python test runs, black vs ruff format, mypy flags, integration lint in scratch, golden case trials, pipeline suite scratch runs, 3.13 wheel checks
+- [Config import hook](config_import_hook.md) — alias semantics, PathFinder precedence, __spec__ restore, lazy DATASOURCE
+- [Druid expression aggregator](druid_expression_aggregator.md) — traps replacing extensions with the native expression aggregator (0.23 and 38), LAST_VALUE N3
+- [Settings import boundary](settings_import_boundary.md) — no module-level config.settings import below query_builder; toolchain suite catches it, core suite does not

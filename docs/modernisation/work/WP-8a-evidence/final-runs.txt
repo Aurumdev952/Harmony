@@ -1,0 +1,76 @@
+== up legacy
+== index
+submitted index_parallel_harmony_demo_20260101_gpfofhok_2026-10-05T17:09:36.986Z
+harmony_demo_20260101 version 2026-10-05T17:09:37.049Z served: {'n': 9459, 'c': 9475}
+== replay head extension
+93 cases replayed into /tmp/wp8a/out/final/legacy-head-extension, 0 errors
+== replay head native
+93 cases replayed into /tmp/wp8a/out/final/legacy-head-native, 0 errors
+== replay integration
+93 cases replayed into /tmp/wp8a/out/final/legacy-integration, 0 errors
+== quoting
+wp8a_quoting version 2026-10-05T17:10:24.772Z served: {'n': 2, 'c': 0}
+'a"b\\c' and plain after the transform: [('kept', None), (None, 'x')]
+quoting exit=0
+== live LAST_VALUE (ports 58891, extension '58891')
+...........                                                              [100%]
+11 passed in 34.15s
+== down legacy
+== done legacy
+== up nojs
+== index
+submitted index_parallel_harmony_demo_20260101_hgfioano_2026-10-05T17:11:54.450Z
+harmony_demo_20260101 version 2026-10-05T17:11:54.534Z served: {'n': 9459, 'c': 9475}
+== replay head extension
+93 cases replayed into /tmp/wp8a/out/final/nojs-head-extension, 0 errors
+== replay head native
+93 cases replayed into /tmp/wp8a/out/final/nojs-head-native, 0 errors
+== replay integration
+93 cases replayed into /tmp/wp8a/out/final/nojs-integration, 0 errors
+== quoting
+wp8a_quoting version 2026-10-05T17:12:42.634Z served: {'n': 2, 'c': 0}
+'a"b\\c' and plain after the transform: [('kept', None), (None, 'x')]
+quoting exit=0
+== live LAST_VALUE (ports 58891, extension '58891')
+...........                                                              [100%]
+11 passed in 44.48s
+== down nojs
+== done nojs
+== up sqlnull
+== index
+submitted index_parallel_harmony_demo_20260101_emaodlja_2026-10-05T17:14:15.241Z
+harmony_demo_20260101 version 2026-10-05T17:14:15.326Z served: {'n': 9459, 'c': 9475}
+== replay head extension
+93 cases replayed into /tmp/wp8a/out/final/sqlnull-head-extension, 1 errors
+== replay head native
+93 cases replayed into /tmp/wp8a/out/final/sqlnull-head-native, 0 errors
+== replay integration
+93 cases replayed into /tmp/wp8a/out/final/sqlnull-integration, 1 errors
+== quoting
+wp8a_quoting version 2026-10-05T17:15:30.727Z served: {'n': 2, 'c': None}
+'a"b\\c' and plain after the transform: [('kept', None), (None, 'x')]
+quoting exit=0
+== live LAST_VALUE (ports 58892, extension '')
+......s....                                                              [100%]
+10 passed, 1 skipped in 24.62s
+== down sqlnull
+== done sqlnull
+== up druid38
+== index
+submitted index_parallel_harmony_demo_20260101_mehljbcd_2026-10-05T17:17:04.956Z
+harmony_demo_20260101 version 2026-10-05T17:17:05.333Z served: {'n': 9459, 'c': 9475}
+== replay head extension
+93 cases replayed into /tmp/wp8a/out/final/druid38-head-extension, 1 errors
+== replay head native
+93 cases replayed into /tmp/wp8a/out/final/druid38-head-native, 0 errors
+== replay integration
+93 cases replayed into /tmp/wp8a/out/final/druid38-integration, 1 errors
+== quoting
+wp8a_quoting version 2026-10-05T17:18:34.649Z served: {'n': 2, 'c': None}
+'a"b\\c' and plain after the transform: [('kept', None), (None, 'x')]
+quoting exit=0
+== live LAST_VALUE (ports 58893, extension '')
+......s....                                                              [100%]
+10 passed, 1 skipped in 31.30s
+== down druid38
+== done druid38

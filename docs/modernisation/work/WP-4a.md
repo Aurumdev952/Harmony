@@ -89,6 +89,7 @@ None. C-1 (`AppContext`) arrives in WP-4f and will hold `Settings` and `Deployme
   - `tests/infra` 164 passed (CPython 3.13 lane), `tests/toolchain` 9 passed, `uv lock --check` and `docker/export_requirements.py --check` clean, and ruff is clean on the test file.
   - **Not run:** a dev image build and `make up DEV=1` (the dev image installs the same files on CPython 3.9 and PyPy 3.9, which have wheels). QA's stack smoke covers the gunicorn path.
   - **Pre-existing, not caused by this WP:** the pipeline image has no `requirements-web.txt`, so `web.server.app` (and `flask_jwt_extended`) cannot be imported there. `web.server.app_base` can be.
+- 2026-10-05 core-4a: fast-forwarded to infra's `314496e`, then merged `mig/integration` at `1c8578e` (merge `a9a8436`): ruff now targets py38, plus decisions 0005/0006. The merge was clean; WP-1h is not on integration yet, so `config/settings.py` did not conflict. Invariant runs repeated on the merge (see Evidence, "After the infra and integration merge"). Status stays review.
 
 ### Recorded differences (INV-1, for reviewer acceptance)
 
@@ -108,6 +109,7 @@ No query result or authorisation decision changes: golden shows 0 drift, and no 
 
 - The phase file lists a `calendar` module for `Deployment`. There is none: calendar settings are `aggregation.CALENDAR_SETTINGS`.
 - `ZEN_ENV` stays a call-time read in `config/__init__.py` and in `config.loader`. The import hook runs before settings can load, and scripts import `config` without secrets. WP-4f should build `AppContext.deployment` from an explicit code.
+- **WP-3b removal item.** Remove the pipeline image's `pypy-wheels` build stage when the images move to CPython 3.13. That covers the Rust 1.83 base pinned by digest, maturin 1.8.1, the `--find-links` install of the pp38 pydantic-core wheel, and the version-drift test that ties the stage's `PYDANTIC_CORE_VERSION` to `uv.lock` (in `tests/infra/test_dockerfiles.py`). The stage exists only because pydantic-core 2.27.2 has no PyPy 3.8 wheel and Jammy's `pypy3` is 7.3.9 (Python 3.8). If PyPy goes first (WP-8d), it can go then.
 - `tests/authz` does not exist on this base (`mig/integration` at `8638861`). So INV-3 rests on two facts: no authorisation code changed, and `tests/web` (95 tests, including the JWT and render-route guards) passes unchanged.
 
 ## Evidence
@@ -123,7 +125,7 @@ All results are on head `9e9aab9` unless stated. The base for comparisons is `ea
   - `uv lock --check` clean.
 - **Image runtimes:**
   - **CPython 3.8 (web image).** With the image requirements (`requirements.txt` + `requirements-web.txt`, `typing_extensions` raised to 4.12.2, plus the two pydantic pins), `tests/core` gives 97 passed. `test_core_boundaries.py` was deselected because import-linter needs Python 3.9 or later (it is a dev tool only). This run covers the facade parity and the no-network deployment loads on 3.8.
-  - **PyPy 3.8 (pipeline image).** The full pipeline requirements do not build locally: the numpy 1.15.4 sdist needs `distutils.msvccompiler`, and the image builds it differently. Instead I ran `tests/core/test_core_settings.py` (45 passed) and a smoke that imports `log`, `config`, `config.settings` and `harmony.core.deployment` with `ZEN_ENV=harmony_demo`. Results: `VALID_MODULES == ['harmony_demo']`; the facade values and the six warnings are as before; the secret does not appear in `repr(get_settings())`; an unset `DEFAULT_SECRET_KEY` fails with the SEC-3 message.
+  - **PyPy 3.8 (pipeline image).** The full pipeline requirements do not build locally: the numpy 1.15.4 sdist needs `distutils.msvccompiler`, and the image builds it differently. Instead I ran `tests/core/test_core_settings.py` (45 passed) and a smoke that imports `log`, `config`, `config.settings` and `harmony.core.deployment` with `ZEN_ENV=harmony_demo`. Results: `VALID_MODULES == ['harmony_demo']`; the facade values and the six warnings are as before; the secret does not appear in `repr(get_settings())`; an unset `DEFAULT_SECRET_KEY` fails with the SEC-3 message. **Correction (infra):** pydantic-core 2.27.2 has no PyPy 3.8 wheel. These local PyPy 3.8 runs passed only because uv compiled the sdist with the host's Rust; the image cannot do that, so it needed the `pypy-wheels` stage infra added. Infra's in-image PyPy 3.8.13 smoke is the evidence for that runtime.
   - **PyPy 3.9 (the dev image's pipeline venv).** pydantic-core 2.27.2 installs from a wheel (`--no-build`), and `test_core_settings.py` gives 45 passed.
   - **CPython 3.13.** `test_core_settings.py` gives 45 passed.
 - **INV-1 web app factory.** Setup: `ZEN_ENV=harmony_demo`, dummy `DATABASE_URL`, `DRUID_HOST` and `DEFAULT_SECRET_KEY`, no services.
@@ -132,6 +134,13 @@ All results are on head `9e9aab9` unless stated. The base for comparisons is `ea
   - Not run: the gunicorn path, which needs Postgres and Druid. QA should include it in the `make up DEV=1` smoke run after the infra Dockerfile request lands.
 - **WP-1h merge simulated.** With `RENDERBOT_EMAIL` and `URLBOX_API_KEY` deleted from the facade, `tests/core/test_settings_facade.py` plus WP-1h's `tests/core/test_settings_render.py` gave 15 passed. The deletion was reverted afterwards.
 - **Not done here:** `tests/authz` is absent on this base, and there is no running stack.
+
+### After the infra and integration merge (merge `a9a8436`)
+
+- **CI suites** (`ci/pytest_suites.sh -q`): core 103, druid 1, druid_setup 79, golden 269, graphql 22, pipeline 129 + 1 skipped, toolchain 10 (gains integration's `test_ruff_target.py`), web 95. "all 8 suites passed". The infra lane (`uv run --project ci/tools313 --locked pytest tests/infra`) gives 164 passed.
+- **Golden:** `record.py --check` reports "85 cases, 0 fixture files would change".
+- **Lint and types:** `ruff check --select E9,F63,F7,F82 .` passes, and `ruff check` / `ruff format --check` pass on the WP's 15 changed Python files under the new py38 target. `mypy` reports "no issues found in 520 source files". `lint-imports --no-cache` reports "1 kept, 0 broken". `uv lock --check` is clean.
+- **Startup digest:** same script, same base tree. The diff against `ea33d9d` is still only `zen_config_type` (`module` before, `Deployment` after). Routes (314), renderer modules, locales and the query-data digest are identical.
 
 ## Verdicts
 

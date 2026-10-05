@@ -5,7 +5,8 @@
 # Runs as uid 1000, the user docker-compose.pipeline.yaml runs the pipeline as.
 # Usage: pipeline_in_image.sh <tree> <image> [pytest args]
 TREE="$1"; IMG="$2"; shift 2
-docker run --rm --user 1000:1000 \
+# DOCKER_RUN_EXTRA adds host-specific flags, e.g. --dns 1.1.1.1.
+docker run --rm --user 1000:1000 ${DOCKER_RUN_EXTRA:-} \
   -v "$TREE/tests":/zenysis/tests:ro \
   -v "${UV_BIN:?set UV_BIN to a static uv 0.12.23 binary}":/usr/local/bin/uv:ro \
   -e UV_CACHE_DIR=/tmp/uv-cache -e CI=true -e ZEN_ENV=harmony_demo \

@@ -10,6 +10,6 @@ docker run --rm --user 1000:1000 --network none --entrypoint "$PY" \
   -e DATABASE_URL=postgresql://u:p@127.0.0.1:1/x -e SQLALCHEMY_DATABASE_URI=postgresql://u:p@127.0.0.1:1/x \
   -e DEFAULT_SECRET_KEY=sweep-default-key-0123456789abcdef -e JWT_SECRET_KEY=sweep-jwt-key-fedcba9876543210 \
   -e PYTHONPATH=/zenysis -e ZEN_HOME=/zenysis -e R77_SRC_ROOT=/zenysis -e ZEN_OFFLINE=1 \
-  "$IMG" /sweep.py config data db log models util web pipeline scripts 2>/dev/null </dev/null \
+  "$IMG" /sweep.py config data db harmony log models util web pipeline scripts 2>/dev/null </dev/null \
   | grep -P '\t' | LC_ALL=C sort > "$OUT"
 cut -f2 "$OUT" | cut -c1-3 | sort | uniq -c

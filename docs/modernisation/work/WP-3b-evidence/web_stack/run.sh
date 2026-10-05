@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # WP-3b unit 3 runtime check: the web image as web and worker, with the prod overlay's
 # bind mounts pre-filled the way a root-run image left them on an existing host.
-# Usage: TAG=u3|base run.sh up | probe | down   (images local/wp3b-infra3/harmony-web:$TAG)
+# Usage: [NS=local/wp3b-infra3] TAG=u3|base run.sh up | probe | down   (images $NS/harmony-web:$TAG)
 set -uo pipefail
 S=$(cd "$(dirname "$0")" && pwd -P)
 TREE=$(cd "$S/../../../../.." && pwd -P)
@@ -12,7 +12,7 @@ P="wp3b-infra3-stack-$TAG"
 D="$WORK/data-$TAG"
 mkdir -p "$WORK"
 ENV_FILE="$WORK/stack-$TAG.env"
-sed -e "s|^STACK_DIR=.*|STACK_DIR=$S|" -e "s|^DOCKER_TAG=.*|DOCKER_TAG=$TAG|" -e "s|/tmp/wp3b/stack/data|$D|g" -e "s|/tmp/wp3b/stack/nginx_vhost|$WORK/nginx_vhost|" "$S/stack.env" > "$ENV_FILE"
+sed -e "s|^STACK_DIR=.*|STACK_DIR=$S|" -e "s|^DOCKER_TAG=.*|DOCKER_TAG=$TAG|" -e "s|^DOCKER_NAMESPACE=.*|DOCKER_NAMESPACE=${NS:-local/wp3b-infra3}|" -e "s|/tmp/wp3b/stack/data|$D|g" -e "s|/tmp/wp3b/stack/nginx_vhost|$WORK/nginx_vhost|" "$S/stack.env" > "$ENV_FILE"
 compose() {
   docker compose -p "$P" --project-directory "$TREE" --env-file "$ENV_FILE" \
     -f "$TREE/docker-compose.yaml" -f "$TREE/docker-compose.local.yaml" \

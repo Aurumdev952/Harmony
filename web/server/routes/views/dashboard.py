@@ -40,6 +40,7 @@ from web.server.routes.views.authorization import is_authorized
 from web.server.routes.views.feed import add_share_notification
 from web.server.routes.views.users import add_user_acl, get_current_user, try_get_user
 from web.server.routes.views.page_renderer import (
+    EMAIL_SLOT_WAIT_SECONDS,
     RendersInFlight,
     dashboard_page_args,
     deployment_dashboard_url,
@@ -394,13 +395,18 @@ class DashboardManager(AuthorizationResourceManager):
 
 
 def _render_for_email(render, locale, slug, auth_user_email, session_hash):
-    '''A render for an email, or None if it failed. A share has already sent
-    its notifications, so a sender with no free render slot gets a failed
-    render, as any other failure, rather than a 503.
+    '''A render for an email, or None if it failed. It waits a while for the
+    sender's render slot. A share has already sent its notifications, so a
+    sender whose slot stays busy gets a failed render, as any other failure,
+    rather than a 503.
     '''
     try:
         return render(
-            locale, slug, auth_user_email=auth_user_email, session_hash=session_hash
+            locale,
+            slug,
+            auth_user_email=auth_user_email,
+            session_hash=session_hash,
+            slot_wait_seconds=EMAIL_SLOT_WAIT_SECONDS,
         )
     except RendersInFlight:
         return None

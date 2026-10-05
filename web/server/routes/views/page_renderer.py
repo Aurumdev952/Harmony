@@ -45,6 +45,10 @@ ERROR_CODE = re.compile(r'[a-z_]{1,64}')
 # (tests/worker/test_renderer_web_drift.py).
 MAX_RENDERS_IN_FLIGHT_PER_ACCOUNT = 1
 SLOT_POLL_SECONDS = 0.5
+# An emailed render runs inside the sender's share request, after its
+# notifications went out, so it waits this long for the sender's slot (for
+# example behind their Overview thumbnails) before the email goes without it.
+EMAIL_SLOT_WAIT_SECONDS = 30
 
 CONTENT_TYPES = {'pdf': 'application/pdf', 'png': 'image/png', 'jpeg': 'image/jpeg'}
 
@@ -362,7 +366,13 @@ def render_dashboard(
 
 
 def grid_dashboard_to_pdf(
-    locale=None, name=None, *, auth_user_email, session_hash='', request_args=None
+    locale=None,
+    name=None,
+    *,
+    auth_user_email,
+    session_hash='',
+    request_args=None,
+    slot_wait_seconds=0,
 ):
     return render_dashboard(
         'pdf',
@@ -371,6 +381,7 @@ def grid_dashboard_to_pdf(
         locale=locale,
         session_hash=session_hash,
         request_args=request_args,
+        slot_wait_seconds=slot_wait_seconds,
     )
 
 
@@ -389,7 +400,13 @@ def grid_dashboard_to_thumbnail(
 
 
 def grid_dashboard_to_image(
-    locale=None, name=None, *, auth_user_email, session_hash='', request_args=None
+    locale=None,
+    name=None,
+    *,
+    auth_user_email,
+    session_hash='',
+    request_args=None,
+    slot_wait_seconds=0,
 ):
     return render_dashboard(
         'jpeg',
@@ -398,4 +415,5 @@ def grid_dashboard_to_image(
         locale=locale,
         session_hash=session_hash,
         request_args=request_args,
+        slot_wait_seconds=slot_wait_seconds,
     )

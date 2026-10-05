@@ -419,9 +419,18 @@ def test_a_thumbnail_retrieve_beyond_the_limit_is_empty_and_not_cached(
     assert not [key for key in app.cache.values if key.startswith('thumbnail:')]
 
 
-def test_an_emailed_render_counts_against_the_sender_not_the_recipient(app, renderer):
+def test_an_emailed_render_counts_against_the_sender_not_the_recipient(
+    app, renderer, monkeypatch
+):
     # A share sends its notifications first, so a render that cannot get the
-    # sender's slot fails like any other render instead of a 503 after them.
+    # sender's slot within its wait fails like any other render, not a 503.
+    clock = [0.0]
+    monkeypatch.setattr(page_renderer.time, 'monotonic', lambda: clock[0])
+    monkeypatch.setattr(
+        page_renderer.time,
+        'sleep',
+        lambda seconds: clock.__setitem__(0, clock[0] + seconds),
+    )
     _fill_render_slots(app, NORTH_ID)
 
     with app.test_request_context('/', headers=as_user(NORTH)):
@@ -430,6 +439,33 @@ def test_an_emailed_render_counts_against_the_sender_not_the_recipient(app, rend
 
     assert attachments == (None, None)
     assert renderer.calls == []
+    assert clock[0] >= page_renderer.EMAIL_SLOT_WAIT_SECONDS
+
+
+@pytest.mark.parametrize(
+    'attach', [{'should_attach_pdf': True}, {'should_embed_image': True}]
+)
+def test_an_emailed_render_waits_for_the_senders_slot(
+    app, renderer, monkeypatch, attach
+):
+    # Found in review round 2: with no wait, a share with an attachment mailed
+    # without it whenever the sender had any render running.
+    _fill_render_slots(app, NORTH_ID)
+    waits = []
+
+    def the_other_render_finishes(seconds):
+        waits.append(seconds)
+        app.cache.delete(f'render-in-flight:{NORTH_ID}:0')
+
+    monkeypatch.setattr(page_renderer.time, 'sleep', the_other_render_finishes)
+
+    with app.test_request_context('/', headers=as_user(NORTH)):
+        app.preprocess_request()
+        attachments, _ = get_email_attachments(VIEWER, SLUG, **attach)
+
+    assert len(waits) == 1
+    assert len(attachments) == 1
+    assert renderer.calls[-1].identity == VIEWER
 
 
 def test_one_accounts_renders_in_flight_do_not_hold_another(app, client, renderer):

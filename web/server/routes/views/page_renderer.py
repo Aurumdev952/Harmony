@@ -4,14 +4,15 @@ The renderer's browser loads this app's own dashboard page over the internal
 network, signed in with a render token for the user the export is made as.
 '''
 
+from contextlib import contextmanager, nullcontext
 from dataclasses import dataclass
-from typing import Mapping, Optional
+from typing import Iterator, Mapping, Optional
 from urllib.parse import urlparse
 
 import requests
 from flask import current_app, url_for
 from flask_user import current_user
-from werkzeug.exceptions import HTTPException
+from werkzeug.exceptions import HTTPException, ServiceUnavailable
 
 from config import settings
 from log import LOG
@@ -30,6 +31,9 @@ CONNECT_TIMEOUT_SECONDS = 5
 # The renderer answers by its deadline; the margin covers sending the bytes back.
 RESPONSE_MARGIN_SECONDS = 15
 RENDER_MAX_BYTES = 25 * 1024 * 1024
+# The renderer runs few renders at once, so one user's exports must not fill it
+# and leave everyone else queueing until their deadlines.
+MAX_EXPORTS_IN_FLIGHT_PER_USER = 2
 
 CONTENT_TYPES = {'pdf': 'application/pdf', 'png': 'image/png', 'jpeg': 'image/jpeg'}
 
@@ -39,6 +43,10 @@ DEFAULT_HEIGHT = 1024
 WIDTHS = range(320, 3841)
 HEIGHTS = range(240, 4321)
 PDF_PAGE_SIZES = ('A3', 'A4', 'A5', 'Legal', 'Letter', 'Tabloid')
+
+
+class ExportsInFlight(ServiceUnavailable):
+    description = 'Your other exports are still rendering. Try again shortly.'
 
 
 @dataclass(frozen=True)
@@ -149,6 +157,26 @@ def _checked(response, output_format: str, name: str) -> Optional[RenderedDashbo
     return RenderedDashboard(response.content, expected)
 
 
+@contextmanager
+def _export_slot(requester: str, ttl_seconds: int) -> Iterator[None]:
+    '''Holds one of the requester's export slots for the render, or raises 503.
+
+    A slot expires with the render deadline, so a worker that dies mid-render
+    cannot hold it.
+    '''
+    for slot in range(MAX_EXPORTS_IN_FLIGHT_PER_USER):
+        key = f'render-in-flight:{requester}:{slot}'
+        if current_app.cache.add(key, True, timeout=ttl_seconds):
+            break
+    else:
+        LOG.warning('Refused an export: its requester has no free export slot')
+        raise ExportsInFlight()
+    try:
+        yield
+    finally:
+        current_app.cache.delete(key)
+
+
 def render_dashboard(
     output_format: str,
     name: str,
@@ -176,9 +204,18 @@ def render_dashboard(
     }
     policy = query_policy_fingerprint() if _is_signed_in_as(auth_user_email) else None
     ttl_seconds = RENDER_TIMEOUT_SECONDS + RESPONSE_MARGIN_SECONDS
-    with render_token(
-        auth_user_email, resource_id, policy=policy, ttl_seconds=ttl_seconds
-    ) as token:
+    requester = (
+        current_user.username if current_user.is_authenticated else auth_user_email
+    )
+    # A thumbnail render is already one per dashboard and policy at a time
+    # (thumbnail_storage_service), and a cold Overview asks for several at once.
+    slot = nullcontext() if is_thumbnail else _export_slot(requester, ttl_seconds)
+    with (
+        slot,
+        render_token(
+            auth_user_email, resource_id, policy=policy, ttl_seconds=ttl_seconds
+        ) as token,
+    ):
         try:
             response = requests.post(
                 f'{RENDERER_URL}/render',

@@ -282,3 +282,80 @@ def test_thumbnail_ignores_request_args(client, renderer):
 
     assert call.params['viewport'] == {'width': 1280, 'height': 1024}
     assert call.params['full_page'] is False
+
+
+# One user's exports cannot fill the renderer's few slots (the rest of the
+# deployment would queue behind them until their deadlines).
+
+
+def _fill_export_slots(app, username):
+    for slot in range(page_renderer.MAX_EXPORTS_IN_FLIGHT_PER_USER):
+        app.cache.add(f'render-in-flight:{username}:{slot}', True)
+
+
+@pytest.mark.parametrize('route', [f'/dashboard/{SLUG}/pdf', f'/dashboard/{SLUG}/jpeg'])
+def test_an_export_beyond_the_users_in_flight_limit_is_a_503_without_a_render(
+    app, client, renderer, route
+):
+    _fill_export_slots(app, VIEWER)
+
+    response = client.get(route, headers=as_user(VIEWER))
+
+    assert response.status_code == 503
+    assert renderer.calls == []
+    assert not [key for key in app.cache.values if key.startswith('render-token:')]
+
+
+def test_one_users_exports_in_flight_do_not_hold_another_user(app, client, renderer):
+    _fill_export_slots(app, VIEWER)
+
+    response = client.get(f'/dashboard/{SLUG}/pdf', headers=as_user(NORTH))
+
+    assert response.status_code == 200
+    assert renderer.calls[-1].identity == NORTH
+
+
+def test_thumbnails_are_not_held_by_the_export_limit(app, client, renderer):
+    # A thumbnail render is already one per dashboard and policy at a time, and a
+    # cold Overview asks for several at once.
+    _fill_export_slots(app, VIEWER)
+
+    response = client.get(f'/dashboard/{SLUG}/png/thumbnail', headers=as_user(VIEWER))
+
+    assert response.status_code == 200
+
+
+@pytest.mark.parametrize(
+    'outcome',
+    [requests.ConnectionError('renderer unreachable'), _response(status=504), None],
+    ids=['unreachable', 'failed', 'rendered'],
+)
+def test_the_export_slot_is_released_when_the_render_returns(
+    app, client, renderer, monkeypatch, outcome
+):
+    if outcome is not None:
+        _fail_with(monkeypatch, renderer, outcome)
+
+    client.get(f'/dashboard/{SLUG}/pdf', headers=as_user(VIEWER))
+
+    assert not [key for key in app.cache.values if key.startswith('render-in-flight:')]
+
+
+def test_the_export_slot_is_held_only_for_the_render_deadline(
+    app, client, renderer, monkeypatch
+):
+    timeouts = {}
+    add = app.cache.add
+
+    def recording_add(key, value, timeout=None):
+        if key.startswith('render-in-flight:'):
+            timeouts[key] = timeout
+        return add(key, value, timeout)
+
+    monkeypatch.setattr(app.cache, 'add', recording_add)
+
+    client.get(f'/dashboard/{SLUG}/pdf', headers=as_user(VIEWER))
+
+    assert list(timeouts.values()) == [
+        page_renderer.RENDER_TIMEOUT_SECONDS + page_renderer.RESPONSE_MARGIN_SECONDS
+    ]

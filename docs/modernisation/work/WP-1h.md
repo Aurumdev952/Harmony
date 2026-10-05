@@ -43,6 +43,8 @@ instances:
       - docker/build.sh
       - docker/renderer/**
       - tests/infra/test_renderer.py
+      - ci/tools313/pyproject.toml
+      - ci/tools313/uv.lock
 branch: "mig/WP-1h-export-renderer"
 requirements: [SEC-7, SEC-9, SEC-10]
 contracts_consumed: []
@@ -134,8 +136,8 @@ C-5 (session and JWT format, owned by backend). Old: a render token was a plain 
 - [x] infra: also remove `RENDERBOT_EMAIL` from `docker-compose.yaml:143,178` and `.env.example:27` (the infra line above names only `URLBOX_API_KEY`; same as WP-0i's open infra request). No code reads either variable after the core change (blocks nothing). Done in `docker-compose.yaml`; for `.env.example` see the next line.
 - [ ] human: remove the `URLBOX_API_KEY` and `RENDERBOT_EMAIL` lines from `.env.example`. Settings deny agents any read or edit of that file, including `grep` and `sed` (blocks nothing).
 - [x] backend: in "Renderer threat model", change the Chromium row from "all capabilities dropped" to "all capabilities dropped except `SYS_CHROOT`", and add `init` to the resource-exhaustion row. Reasons and proof are in `WP-1h-evidence/infra-renderer-image.md` (blocks nothing).
-- [ ] infra: add the `render-egress` service, the `render-egress` network, and `RENDERER_EGRESS_PROXY` and `RENDERER_MAP_ORIGINS` on `renderer` (and `depends_on`), from `WP-1h-evidence/infra-request/compose.render-egress.yaml`, with a `tests/infra/test_renderer.py` check that `render-egress` is the only service on both `render` and a network with a route out. Without it the renderer starts with no map origins, and every dashboard with a map fails fast with `egress_blocked`: an INV-1 regression for map exports. So this blocks deploying WP-1h, not merging it. Verified by hand in `WP-1h-evidence/unit-8-maps-egress.md`.
-- [ ] infra: in `.github/workflows/renderer.yml`, run `pytest tests/worker/renderer` inside the image just built, on pull requests too, under `--network none`, the seccomp profile, `--cap-drop ALL --cap-add SYS_CHROOT --init --read-only --tmpfs /tmp` (the command is in `unit-8-maps-egress.md`). Today the browser tests (egress fence, sandbox flags, maps) are skipped in every CI suite because the uv 3.9 environment has no Playwright (interrogate, Opus). Blocks nothing.
+- [x] infra: add the `render-egress` service, the `render-egress` network, and `RENDERER_EGRESS_PROXY` and `RENDERER_MAP_ORIGINS` on `renderer` (and `depends_on`), from `WP-1h-evidence/infra-request/compose.render-egress.yaml`, with a `tests/infra/test_renderer.py` check that `render-egress` is the only service on both `render` and a network with a route out. Without it the renderer starts with no map origins, and every dashboard with a map fails fast with `egress_blocked`: an INV-1 regression for map exports. So this blocks deploying WP-1h, not merging it. Verified by hand in `WP-1h-evidence/unit-8-maps-egress.md`. Done in 0618f25; see the 2026-10-05 infra log line.
+- [x] infra: in `.github/workflows/renderer.yml`, run `pytest tests/worker/renderer` inside the image just built, on pull requests too, under `--network none`, the seccomp profile, `--cap-drop ALL --cap-add SYS_CHROOT --init --read-only --tmpfs /tmp` (the command is in `unit-8-maps-egress.md`). Today the browser tests (egress fence, sandbox flags, maps) are skipped in every CI suite because the uv 3.9 environment has no Playwright (interrogate, Opus). Blocks nothing. Done in f4c02e2; see the 2026-10-05 infra log line.
 - [ ] human: render a dashboard with a map tile on a staging deployment once `render-egress` is deployed. Agents have no Mapbox access token, so the real Mapbox path is proven only up to the TLS session (unit 8c). Blocks nothing in code.
 
 ## Follow-ups (recorded, not done here)
@@ -160,6 +162,22 @@ C-5 (session and JWT format, owned by backend). Old: a render token was a plain 
 - 2026-10-05 backend-8 unit 8b: merged the WP-0i head (76c31e2, which carries `mig/integration` with WP-2f) in 789c193. Six conflicts. Resolutions: renders keep `RENDER_WEB_ORIGIN`; emailed links take WP-0i's `deployment_dashboard_url` (`DEPLOYMENT_BASE_URL`); WP-0i's canonical digest moves into `signal_handlers.query_policy_fingerprint`, the single fingerprint used for both the cache key and the pin; WP-0i's urlbox failure and Host tests now drive the renderer client (a closed loopback port, the JWT prefix `eyJ` absent from logs, and `RENDER_WEB_ORIGIN` under a hostile Host). Then `ruff format` on the 20 WP-1h files (c1d22dc). check: `ci/lint_python.sh mig/integration` clean (ruff check, `ruff format --check` on the 40 changed files, and the whole-tree E9/F63/F7/F82); `uv run --locked mypy` no issues in 518 files; `uv run --locked pytest tests/web tests/worker/renderer tests/core tests/infra/test_renderer.py` 403 passed, 1 skipped (browser tests run in the image), 1 xfailed. The pre-existing `flask_migrate` failure is gone with the integration merge. The renderer modules compile on Python 3.12; the change to them is formatting only.
 - 2026-10-05 backend-8 unit 8c (interrogate: Opus, Fable and Sonnet; the lead made Sonnet's map finding an INV-1 blocker): `isascii() and isdecimal()` for render args and the sidecar's `Content-Length` (cfad3ab, test-first: `?width=²` was an unhandled 500, and `Content-Length: ²` dropped the connection without a response or log line). Every render now takes one of two slots keyed on the session's account id, and the answer is streamed and capped at 25 MiB (9330057, then 6a1a3e2). The security review found that 9330057 exempted thumbnails, and `/dashboard/<slug>/png/thumbnail` renders uncached on every call, so one account could fill the renderer through it. That commit's own `test_thumbnails_are_not_held_by_the_export_limit` asserted that this route rendered with the slots full. Now pdf, jpeg, `/png/thumbnail`, retrieve and email are all capped, with tests for each. Maps go through the allowlisting egress proxy with fast failure (934b293). check: `uv run --locked pytest tests/web` 278 passed, 1 xfailed; `tests/worker/renderer` 155 passed in the hardened image and 131 passed, 1 skipped on the host; the container egress probe; `ci/lint_python.sh mig/integration` and `uv run --locked mypy` clean. Evidence: `WP-1h-evidence/unit-8-maps-egress.md`.
 - 2026-10-05 backend-8: status review. Open: the infra `render-egress` request (blocks deployment) and the CI browser-test request, the human `.env.example` edit, and the human staging map render.
+- 2026-10-05 infra (supporting, branch `mig/WP-1h-export-renderer-infra-2` on bbc0d81). Unit 1 (0618f25) adds the `render-egress` service and network from the snippet, with five changes:
+  - `depends_on` uses `condition: service_started`, because only map exports need the proxy;
+  - `init: true`, because without it `docker stop` took 16 s against 0.3 s with it;
+  - `EGRESS_PROXY_PORT` is set explicitly;
+  - prod gets `restart: always`;
+  - the test asserts the request's intent, not its wording: web is also on `render` and on a network with a route out, so the test checks that the proxy is the only relay and its route out is a network of its own.
+
+  A local Compose run from inside the renderer: no direct route out (DNS fails; IPs give `ENETUNREACH`); `api.mapbox.com` gives a real 401 only through the proxy; example.com, `events.mapbox.com`, `169.254.169.254` and redis get 403. Through a real render, a map origin on the web host received no cookie. A control proxy showed Chromium sends it `accessKey` and the page's cookie, so render-egress is the layer that drops them. With the proxy stopped, a page without a map renders and a map page fails with `egress_blocked` in 10.9 s.
+
+  Unit 2 (f4c02e2): `docker/renderer/test_in_image.sh` with `Dockerfile.test` (hash-pinned pytest) runs `tests/worker/renderer` in the image just built, with no network and the renderer's hardening. It mounts only the tests, so the code under test is the image's own, and fails on any skip. `renderer.yml` runs it on renderer pull requests with `contents: read`, and before the push on `main`. Checks:
+  - `tests/infra/test_renderer.py`: 27 red on bbc0d81, then green;
+  - `tests/infra`: 216 passed, and 219 on a trial merge with `mig/integration`, including WP-0b's compose and Dockerfile tests;
+  - in-image run: 156 passed, 0 skipped;
+  - actionlint with shellcheck, zizmor (also with `--persona=auditor`), `docker build --check` and ruff: all clean.
+
+  Not shown: a GitHub run, which happens on push. See [infra-render-egress.md](WP-1h-evidence/infra-render-egress.md).
 
 ## Evidence
 
@@ -169,6 +187,7 @@ C-5 (session and JWT format, owned by backend). Old: a render token was a plain 
 - Infra request (renderer image and Compose service): [WP-1h-evidence/infra-renderer-image.md](WP-1h-evidence/infra-renderer-image.md)
 - Unit 6: [WP-1h-evidence/unit-6-end-to-end.md](WP-1h-evidence/unit-6-end-to-end.md), with outputs and harness in `WP-1h-evidence/e2e/`
 - Unit 8c (maps, egress proxy, fast failure, container egress probe): [WP-1h-evidence/unit-8-maps-egress.md](WP-1h-evidence/unit-8-maps-egress.md); infra request `WP-1h-evidence/infra-request/compose.render-egress.yaml`
+- Infra (render-egress service, runtime egress and cookie check, in-image renderer tests in CI): [WP-1h-evidence/infra-render-egress.md](WP-1h-evidence/infra-render-egress.md)
 
 ## Verdicts
 

@@ -1,9 +1,9 @@
 - [Compose testing traps](compose_testing_traps.md) — dummy env files, worktree Bash guard, host port clashes, anonymous volumes, redis-cli exit codes
 - [Upstream artifacts gone](upstream_artifacts_gone.md) — MinIO images gone, mc downloads 410; pinned GitHub release; R5 pending
 - [Hasura runtime facts](hasura_runtime_facts.md) — v2.45.8 status codes, image tools, dev-mode scope; required secret couples WP-0a and WP-0b compose fixtures
-- [CI tooling and Bash guards](ci_tooling_and_guards.md): actionlint and shellcheck install, action SHA lookup, worktree guard, Actions default shell
+- [CI tooling and Bash guards](ci_tooling_and_guards.md): actionlint, shellcheck, zizmor auditor, build --check ARG FROM, pyyaml on, SHA lookup, worktree guard
 - [WP-0f open items](wp_0f_open_items.md): Docker Hub path removal awaits the human; slash-tag bug for WP-3b; comma `--cache-from` is fine
 - [WP-2f toolchain](wp_2f_next.md): two uv lanes (3.9 app, 3.13 tools), generated requirements, ruff/pytest traps
 - [Infra tooling traps](infra_tooling_traps.md) — *.log gitignored, strict mypy via ci/tools313, scripts/ vs prod/ ownership, nginx-proxy logs, worktree git
 - [Image verification recipes](image_verification_recipes.md) — unique compose build names, sweep env/PYTHONPATH, overlays, PyPy: import-test wheels, gspread marker
-- [Renderer Chromium sandbox](renderer_chromium_sandbox.md) — cap_drop ALL breaks the sandbox (add SYS_CHROOT), init for zombies, .env.example denied, address pools
+- [Renderer Chromium sandbox](renderer_chromium_sandbox.md) — SYS_CHROOT, init for any Python PID 1, cookies reach same-host map origins, in-image tests, address pools

@@ -50,14 +50,15 @@ socket.socket.sendto = refuse
 socket.create_connection = refuse
 socket.getaddrinfo = refuse
 
-from harmony.core.deployment import load_deployment
+from harmony.core.deployment import load_deployment, load_template
 
 code, modules = sys.argv[1], json.loads(sys.argv[2])
-deployment = load_deployment(code)
+load = load_template if code == 'template' else lambda: load_deployment(code)
+deployment = load()
 legacy = __import__(f'config.{code}', fromlist=modules)
 print(json.dumps({
     'code': deployment.code,
-    'cached': load_deployment(code) is deployment,
+    'cached': load() is deployment,
     'modules': {name: getattr(deployment, name).__name__ for name in modules},
     'same_as_legacy': [
         name for name in modules if getattr(deployment, name) is getattr(legacy, name)
@@ -138,9 +139,10 @@ def test_loads_without_network_and_shares_module_objects(code):
     assert result['same_as_alias'] == (MODULES if code == 'harmony_demo' else [])
 
 
-@pytest.mark.parametrize(
-    'code', ['nope', '', '../config/harmony_demo', 'harmony_demo/..', '__pycache__']
-)
+REFUSED = ['nope', '', '../config/harmony_demo', 'harmony_demo/..', '__pycache__']
+
+
+@pytest.mark.parametrize('code', [*REFUSED, 'template'])
 def test_refuses_an_unknown_code(code):
     proc = _python(
         'import sys\n'
@@ -152,6 +154,41 @@ def test_refuses_an_unknown_code(code):
     assert proc.returncode != 0
     assert 'ValueError' in proc.stderr
     assert 'harmony_demo' in proc.stderr
+
+
+@pytest.mark.parametrize('code', ['template', *REFUSED])
+def test_legacy_loader_refuses_what_is_not_a_deployment(code):
+    # The legacy loader failed on these too (ModuleNotFoundError: 'template' was
+    # redirected to config.harmony_demo.template by the import hook).
+    proc = _python(
+        'import sys\n'
+        'from config.loader import import_configuration_module\n'
+        'import_configuration_module(sys.argv[1] or "nope")\n',
+        code,
+    )
+
+    assert proc.returncode != 0
+    assert 'ValueError' in proc.stderr
+
+
+WEB_FRAMEWORKS = ('flask', 'fastapi', 'starlette', 'werkzeug')
+
+
+@pytest.mark.parametrize('code', [*deployment_codes(), 'template'])
+def test_loading_a_deployment_imports_no_web_framework(code):
+    # The BE-1 contract cannot follow load_deployment's importlib.import_module,
+    # so this checks what a deployment actually pulls in, in a fresh interpreter.
+    load = 'load_template()' if code == 'template' else f'load_deployment({code!r})'
+    proc = _python(
+        'import json, sys\n'
+        'from harmony.core.deployment import load_deployment, load_template\n'
+        f'{load}\n'
+        'print(json.dumps(sorted({m.split(".")[0] for m in sys.modules})))\n'
+    )
+
+    assert proc.returncode == 0, proc.stderr
+    loaded = set(json.loads(proc.stdout.strip().splitlines()[-1]))
+    assert loaded.isdisjoint(WEB_FRAMEWORKS), sorted(loaded & set(WEB_FRAMEWORKS))
 
 
 def test_legacy_loader_returns_the_deployment():

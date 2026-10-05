@@ -54,12 +54,21 @@ def deployment_codes() -> Tuple[str, ...]:
 
 
 @functools.lru_cache(maxsize=None)
+def _load(code: str) -> Deployment:
+    modules = [importlib.import_module(f'config.{code}.{name}') for name in MODULES]
+    return Deployment(code, *modules)
+
+
 def load_deployment(code: str) -> Deployment:
-    '''Import `config/<code>/`. The template loads too, to prove it still does.'''
-    if code not in (*deployment_codes(), TEMPLATE):
+    '''Import `config/<code>/`, once per process.'''
+    if code not in deployment_codes():
         raise ValueError(
             f'No deployment {code!r} under config/. '
             f'Valid codes: {list(deployment_codes())}'
         )
-    modules = [importlib.import_module(f'config.{code}.{name}') for name in MODULES]
-    return Deployment(code, *modules)
+    return _load(code)
+
+
+def load_template() -> Deployment:
+    '''Import `config/template/`, to prove the scaffold new deployments copy loads.'''
+    return _load(TEMPLATE)

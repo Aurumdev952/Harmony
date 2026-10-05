@@ -40,11 +40,10 @@ from web.server.routes.views.authorization import is_authorized
 from web.server.routes.views.feed import add_share_notification
 from web.server.routes.views.users import add_user_acl, get_current_user, try_get_user
 from web.server.routes.views.page_renderer import (
-    deployment_dashboard_url,
     grid_dashboard_to_pdf,
     grid_dashboard_to_image,
 )
-from web.server.util.deployment_links import page_args
+from web.server.util.deployment_links import page_args, shared_page_url
 
 from web.server.util.util import get_user_string, get_dashboard_title
 
@@ -458,9 +457,10 @@ def send_email(
         should_embed_image (bool): Value to embed image in email
         is_scheduled_report (bool): Value to schedule a report
     '''
-    dashboard_url = kwargs.get('dashboard_url')
-    if not dashboard_url:
-        dashboard_url = deployment_dashboard_url(dashboard.slug)
+    # The caller's link contributes only its locale and session hash.
+    dashboard_url = shared_page_url(
+        kwargs.get('dashboard_url'), 'dashboard.grid_dashboard', name=dashboard.slug
+    )
 
     should_attach_pdf = kwargs.get('should_attach_pdf')
     should_embed_image = kwargs.get('should_embed_image')

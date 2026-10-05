@@ -13,4 +13,6 @@ Procedure that worked for WP-8a (76 cases, N1 `selector value null` and N2 `and(
 
 **Trap:** owner drift tools that apply the rewrite to fixtures (`scripts/druid/null_audit/check_fixture_drift.py`) are not idempotent. After regeneration they report "other differences" on the N2 cases and exit 1. This is expected. Report it to the owner and do not "fix" fixtures to satisfy it.
 
+**Proving a new case catches a fix's absence without editing production files** (hook-owned): run `git archive -o /tmp/x.tar <base>` alone, then extract it to /tmp, run `git show <fix> -- data db > fix.patch` and `patch -R -p1` in the scratch tree, and copy the new case in. Run with `UV_PROJECT_ENVIRONMENT=<worktree>/.venv uv run --frozen pytest tests/golden` so the scratch tree reuses the worktree's venv. Synth answers like legacy Druid, so for null-semantics fixes only `test_druid_queries` fails. The response tests stay green, and that is expected.
+
 **Why:** a regeneration changes what INV-2 compares against, so the evidence must show only the intended forms moved. **How to apply:** any WP that changes posted query text (8a, 8b, 4x). See [[golden-suite-harness]] and [[golden-verdict-mutants]].

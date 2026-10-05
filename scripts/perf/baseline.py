@@ -11,8 +11,14 @@ Paired mode, the default and the PERF-7 check. The stack runs two copies of
 the app against the same Druid: the reference (old code, `stack.sh reference
 <git ref>`) and the candidate (this checkout). Every case alternates between
 them request by request, the reference first in even rounds and the candidate
-first in odd ones, so both sides see the same host load. The run fails when a
-case's candidate p95 is more than 10% above its reference p95:
+first in odd ones, so both sides see the same host load. A case fails when its
+candidate p95 is more than 10% above its reference p95 and the candidate is
+slower beyond sampling noise: the lower bound of a paired bootstrap of the
+p95 ratio (rounds resampled as pairs) is above 1. The bound's one-sided
+level is 5% split across the cases, so an A/A run fails less than one time in
+twenty. A bare p95 ratio cannot be the test on a shared host: in an A/A run
+over 100 rounds, stalls that hit one request and not its pair moved single
+cases' p95 ratios to 1.28.
 
     scripts/perf/stack.sh up && scripts/perf/stack.sh ui
     scripts/perf/stack.sh reference main
@@ -21,10 +27,16 @@ case's candidate p95 is more than 10% above its reference p95:
 
 It writes under docs/modernisation/perf/paired/, named
 <date>-<reference sha>-vs-<candidate sha>[-<label>]: `.reference.jsonl` and
-`.candidate.jsonl` (one PerfSample per case), `.meta.json` (hardware, host load
-at start and end, versions, dataset, method) and `.md` (the paired ratios, then
-both sides' absolute numbers). The absolute numbers are evidence only: on a
-shared host they move with its load, and the ratio does not.
+`.candidate.jsonl` (one PerfSample per case), `.rounds.jsonl` (every timed
+request's latency, per case and side, in round order), `.meta.json` (hardware,
+host load at start and end, versions, dataset, method) and `.md` (the paired
+verdicts, then both sides' absolute numbers). The absolute numbers are
+evidence only: on a shared host they move with its load, and the ratio does
+not.
+
+Each request goes out on a new connection (`Connection: close`): while one side
+answers, the other side's idle keep-alive connection can pass gunicorn's 2 s
+keep-alive and be closed under the next request.
 
 Committed mode (`--committed`, or `--compare [BASE]`) measures the candidate
 alone and writes <date>-<git sha>[-<label>] `.jsonl`, `.meta.json` and `.md`
@@ -60,6 +72,7 @@ import json
 import math
 import os
 import platform
+import random
 import statistics
 import subprocess
 import sys
@@ -78,6 +91,9 @@ SIDES = ('reference', 'candidate')
 DATASET_START = '2023-01-01'
 DATASET_END = '2026-01-01'
 P95_REGRESSION_LIMIT = 0.10
+# One-sided error rate of a paired run's verdict, split across its cases.
+FAMILY_ALPHA = 0.05
+BOOTSTRAP_RESAMPLES = 4000
 REQUEST_LOG_SETTLE_SECONDS = 0.05
 
 # Golden cases replayed, covering every query endpoint the frontend calls. The
@@ -235,13 +251,86 @@ def summarise_dashboard(record: dict[str, Any]) -> PerfSample:
     )
 
 
-def dashboard_samples_by_side(lines: Iterable[str]) -> dict[str, list[PerfSample]]:
-    """Summarise dashboards.mjs output, one JSON line per dashboard and target."""
-    grouped: dict[str, list[PerfSample]] = {}
+@dataclasses.dataclass(frozen=True)
+class PairedResult:
+    """One case of a paired run: both sides' p95, their ratio, and the ratio's
+    lower confidence bound from a bootstrap over rounds."""
+
+    case_id: str
+    reference_p95: float
+    candidate_p95: float
+    ratio: float
+    lower: float
+
+    @property
+    def regressed(self) -> bool:
+        return self.ratio > 1 + P95_REGRESSION_LIMIT and self.lower > 1
+
+
+def paired_result(
+    case_id: str,
+    reference_ms: list[float],
+    candidate_ms: list[float],
+    alpha: float,
+    resamples: int = BOOTSTRAP_RESAMPLES,
+) -> PairedResult:
+    """Candidate p95 over reference p95, with the alpha quantile of that ratio
+    over `resamples` resamplings of the rounds. Rounds are resampled as pairs,
+    which keeps the load the two sides shared in a round together. Seeded by
+    the case, so a run's files always give the same verdict."""
+    if len(reference_ms) != len(candidate_ms):
+        raise ValueError(f'{case_id}: sides have different round counts')
+    n = len(reference_ms)
+    reference_p95 = percentile(reference_ms, 0.95)
+    candidate_p95 = percentile(candidate_ms, 0.95)
+    rng = random.Random(f'{case_id}:{n}')
+    ratios = []
+    for _ in range(resamples):
+        rounds = [rng.randrange(n) for _ in range(n)]
+        ratios.append(
+            percentile([candidate_ms[i] for i in rounds], 0.95)
+            / percentile([reference_ms[i] for i in rounds], 0.95)
+        )
+    return PairedResult(
+        case_id,
+        reference_p95,
+        candidate_p95,
+        candidate_p95 / reference_p95,
+        percentile(ratios, alpha),
+    )
+
+
+def paired_table(results: list[PairedResult]) -> str:
+    rows = [
+        '| case | reference p95 ms | candidate p95 ms | ratio | lower bound | verdict |',
+        '|---|---:|---:|---:|---:|---|',
+    ]
+    for r in results:
+        if r.regressed:
+            verdict = 'REGRESSED'
+        elif r.ratio > 1 + P95_REGRESSION_LIMIT:
+            verdict = 'over the limit, within noise'
+        else:
+            verdict = 'ok'
+        rows.append(
+            f'| {r.case_id} | {r.reference_p95:.1f} | {r.candidate_p95:.1f} '
+            f'| {r.ratio:.3f} | {r.lower:.3f} | {verdict} |'
+        )
+    return '\n'.join(rows)
+
+
+def dashboard_samples_by_side(
+    lines: Iterable[str],
+) -> dict[str, list[tuple[PerfSample, list[float]]]]:
+    """Summarise dashboards.mjs output, one JSON line per dashboard and target,
+    keeping each load's time in round order."""
+    grouped: dict[str, list[tuple[PerfSample, list[float]]]] = {}
     for line in lines:
         if line.strip():
             record = json.loads(line)
-            grouped.setdefault(record['target'], []).append(summarise_dashboard(record))
+            grouped.setdefault(record['target'], []).append(
+                (summarise_dashboard(record), record['latencies_ms'])
+            )
     return grouped
 
 
@@ -421,14 +510,15 @@ class Target:
 
 def measure_case(
     targets: list[Target], request_log, case_id, rounds, warmup
-) -> dict[str, PerfSample]:
-    """Time one case on every target, interleaved; return each side's sample.
+) -> dict[str, tuple[PerfSample, list[float]]]:
+    """Time one case on every target, interleaved; return each side's sample
+    and its latencies in round order.
 
     Requests run one at a time, so the broker's request-log lines since the
     last drain belong to the request just made, whichever side made it."""
     endpoint, body = load_case(case_id)
     payload = json.dumps(body)
-    headers = {'Content-Type': 'application/json'}
+    headers = {'Content-Type': 'application/json', 'Connection': 'close'}
     by_side = {t.side: t for t in targets}
 
     def request(side: str) -> tuple[float, int, tuple[float, int] | None]:
@@ -459,12 +549,15 @@ def measure_case(
 
     results = run_interleaved(tuple(by_side), rounds, warmup, request)
     return {
-        side: summarise(
-            case_id,
-            endpoint,
+        side: (
+            summarise(
+                case_id,
+                endpoint,
+                [ms for ms, _, _ in measured],
+                [size for _, size, _ in measured],
+                [d for _, _, d in measured if d is not None] if request_log else None,
+            ),
             [ms for ms, _, _ in measured],
-            [size for _, size, _ in measured],
-            [d for _, _, d in measured if d is not None] if request_log else None,
         )
         for side, measured in results.items()
     }
@@ -484,7 +577,7 @@ def http_json(url: str) -> Any:
 
 def measure_dashboards(
     targets: list[Target], slugs: list[str], rounds: int, warmup: int
-) -> dict[str, list[PerfSample]]:
+) -> dict[str, list[tuple[PerfSample, list[float]]]]:
     if not slugs:
         return {}
     command = [
@@ -655,18 +748,34 @@ def finish_paired(
     stem: Path,
     reference: list[PerfSample],
     candidate: list[PerfSample],
+    rounds: dict[str, tuple[list[float], list[float]]],
     meta: dict[str, Any],
 ) -> int:
-    """Write a paired run's files, print the ratio table, return the verdict."""
+    """Write a paired run's files, print the verdicts, return the exit code."""
+    alpha = FAMILY_ALPHA / len(rounds)
+    results = [
+        paired_result(case_id, reference_ms, candidate_ms, alpha)
+        for case_id, (reference_ms, candidate_ms) in rounds.items()
+    ]
     stem.parent.mkdir(parents=True, exist_ok=True)
     for side, samples in (('reference', reference), ('candidate', candidate)):
         Path(f'{stem}.{side}.jsonl').write_text(
             ''.join(json.dumps(dataclasses.asdict(s)) + '\n' for s in samples)
         )
+    Path(f'{stem}.rounds.jsonl').write_text(
+        ''.join(
+            json.dumps({'case_id': c, 'reference_ms': r, 'candidate_ms': n}) + '\n'
+            for c, (r, n) in rounds.items()
+        )
+    )
     Path(f'{stem}.meta.json').write_text(json.dumps(meta, indent=2) + '\n')
-    results = compare(reference, candidate)
-    table = comparison_table(results, 'reference', 'candidate')
-    limit = f'+{P95_REGRESSION_LIMIT:.0%}'
+    table = paired_table(results)
+    heading = (
+        f'Candidate p95 over reference p95; a case regresses when the ratio is '
+        f'over {1 + P95_REGRESSION_LIMIT:.2f} and its lower bound '
+        f'(one-sided {alpha:.2%}, paired bootstrap of {BOOTSTRAP_RESAMPLES} '
+        f'resamples) is over 1'
+    )
     Path(f'{stem}.md').write_text(
         '\n'.join(
             [
@@ -674,7 +783,9 @@ def finish_paired(
                 '',
                 *method_lines(meta),
                 '',
-                f'## Candidate p95 against reference p95 (limit {limit})',
+                '## Verdict',
+                '',
+                heading + '.',
                 '',
                 table,
                 '',
@@ -689,10 +800,15 @@ def finish_paired(
         )
         + '\n'
     )
-    print(f'wrote {stem}.{{reference,candidate}}.jsonl, .meta.json and .md')
-    print(f'candidate p95 against reference p95 (limit {limit}):')
+    print(f'wrote {stem}.{{reference,candidate,rounds}}.jsonl, .meta.json and .md')
+    print(heading + ':')
     print(table)
-    return verdict(results)
+    failed = [r.case_id for r in results if r.regressed]
+    if failed:
+        print(f'FAIL: {", ".join(failed)}')
+        return 1
+    print('OK: no case regressed')
+    return 0
 
 
 def run(args: argparse.Namespace) -> int:
@@ -721,8 +837,9 @@ def run(args: argparse.Namespace) -> int:
         meta['method']['pairing'] = (
             'reference and candidate apps on one host against one Druid; each '
             'round sends the case to both, reference first in even rounds and '
-            'candidate first in odd ones; the limit applies to candidate p95 '
-            'over reference p95'
+            'candidate first in odd ones; a case regresses when candidate p95 '
+            'over reference p95 is above 1.10 and its paired-bootstrap lower '
+            'bound is above 1; every request on a new connection'
         )
     if args.dataset:
         meta['dataset'] = args.dataset
@@ -739,8 +856,9 @@ def run(args: argparse.Namespace) -> int:
             'bytes': 'median of headers plus encoded bodies received before the last tile',
         }
     samples: dict[str, list[PerfSample]] = {t.side: [] for t in targets}
+    latencies: dict[str, dict[str, list[float]]] = {t.side: {} for t in targets}
     for name in names:
-        for side, sample in measure_case(
+        for side, (sample, measured) in measure_case(
             targets, request_log, name, args.rounds, args.warmup
         ).items():
             print(
@@ -749,17 +867,19 @@ def run(args: argparse.Namespace) -> int:
                 flush=True,
             )
             samples[side].append(sample)
+            latencies[side][name] = measured
     dashboards = measure_dashboards(
         targets, slugs, args.dashboard_rounds, args.dashboard_warmup
     )
     for side, side_samples in dashboards.items():
-        for sample in side_samples:
+        for sample, measured in side_samples:
             print(
                 f'{sample.case_id:40} {side:9} p50 {sample.p50_ms:8.1f}  p95 {sample.p95_ms:8.1f} ms  '
                 f'{sample.bytes:>9} B  (time to last tile)',
                 flush=True,
             )
-        samples[side].extend(side_samples)
+            samples[side].append(sample)
+            latencies[side][sample.case_id] = measured
     meta['host']['load_average_at_end'] = [round(x, 2) for x in os.getloadavg()]
     meta['finished_utc'] = dt.datetime.now(dt.timezone.utc).isoformat(
         timespec='seconds'
@@ -769,7 +889,13 @@ def run(args: argparse.Namespace) -> int:
         stem = paired_stem(
             args.out, date, meta['reference_sha'], meta['candidate_sha'], args.label
         )
-        return finish_paired(stem, samples['reference'], samples['candidate'], meta)
+        rounds = {
+            case: (measured, latencies['candidate'][case])
+            for case, measured in latencies['reference'].items()
+        }
+        return finish_paired(
+            stem, samples['reference'], samples['candidate'], rounds, meta
+        )
     label = f'-{args.label}' if args.label else ''
     stem = args.out / f'{date}-{meta["git_sha"][:10]}{label}'
     base = None

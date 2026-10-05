@@ -8,6 +8,7 @@ from __future__ import annotations
 
 import json
 import math
+import random
 import statistics
 from pathlib import Path
 
@@ -308,13 +309,13 @@ def test_warm_up_rounds_run_on_both_sides_and_are_dropped():
 
 @given(
     st.floats(min_value=1, max_value=1e4),
-    st.lists(st.floats(min_value=-0.1, max_value=0.1), min_size=2, max_size=400),
+    st.lists(st.floats(min_value=-0.09, max_value=0.09), min_size=2, max_size=400),
 )
-def test_an_a_a_run_passes_while_host_load_drifts_up_to_ten_percent_per_request(
+def test_an_a_a_run_passes_while_host_load_drifts_up_to_nine_percent_per_request(
     intrinsic_ms, steps
 ):
-    # Host load as a multiplier per request slot, changing by at most 10% from
-    # one request to the next: the two sides of a round see nearly the same
+    # Host load as a multiplier per request slot, changing by at most 9% from
+    # one request to the next (a 9% fall is a 1.099 ratio the other way): the two sides of a round see nearly the same
     # load, so identical code stays within the limit however far load wanders.
     load = [1.0]
     for step in steps:
@@ -350,7 +351,9 @@ def test_dashboard_lines_are_summarised_per_target():
     grouped = baseline.dashboard_samples_by_side(
         [line('reference', 100.0), line('candidate', 120.0), '']
     )
-    assert {side: [s.p95_ms for s in samples] for side, samples in grouped.items()} == {
+    assert {
+        side: [s.p95_ms for s, _ in samples] for side, samples in grouped.items()
+    } == {
         'reference': [100.0],
         'candidate': [120.0],
     }
@@ -380,20 +383,87 @@ def _paired_meta():
     }
 
 
-def test_a_paired_run_writes_both_sides_and_fails_on_the_ratio(tmp_path: Path, capsys):
+def test_a_paired_run_writes_both_sides_and_fails_on_a_clear_regression(
+    tmp_path: Path, capsys
+):
     stem = baseline.paired_stem(tmp_path, '2026-10-05', 'a' * 40, 'b' * 40, 'aa')
     assert stem == tmp_path / 'paired' / '2026-10-05-aaaaaaaaaa-vs-bbbbbbbbbb-aa'
-    reference = [sample('q', 100.0), sample('perf-mixed-6', 1000.0)]
-    within = [sample('q', 110.0), sample('perf-mixed-6', 900.0)]
-    assert baseline.finish_paired(stem, reference, within, _paired_meta()) == 0
+    ms = [float(v) for v in range(100, 121)]
+    reference = [sample('q', 119.0), sample('perf-mixed-6', 119.0)]
+    rounds = {'q': (ms, ms), 'perf-mixed-6': (ms, ms)}
+    assert (
+        baseline.finish_paired(stem, reference, reference, rounds, _paired_meta()) == 0
+    )
     assert baseline.read_samples(Path(f'{stem}.reference.jsonl')) == reference
-    assert baseline.read_samples(Path(f'{stem}.candidate.jsonl')) == within
+    assert baseline.read_samples(Path(f'{stem}.candidate.jsonl')) == reference
+    recorded = [
+        json.loads(line)
+        for line in Path(f'{stem}.rounds.jsonl').read_text().splitlines()
+    ]
+    assert recorded[0] == {'case_id': 'q', 'reference_ms': ms, 'candidate_ms': ms}
     text = Path(f'{stem}.md').read_text()
-    assert '| q | 100.0 | 110.0 | +10.0% | ok |' in text
+    assert '| q | 119.0 | 119.0 | 1.000 | 1.000 | ok |' in text
     assert 'load [40.0, 1, 1] at start, [20.0, 1, 1] at end' in text
-    slower = [sample('q', 100.0), sample('perf-mixed-6', 1101.0)]
-    assert baseline.finish_paired(stem, reference, slower, _paired_meta()) == 1
+    slower = {'q': (ms, ms), 'perf-mixed-6': (ms, [v * 1.2 for v in ms])}
+    assert (
+        baseline.finish_paired(stem, reference, reference, slower, _paired_meta()) == 1
+    )
     assert 'FAIL: perf-mixed-6' in capsys.readouterr().out
+
+
+@given(
+    st.lists(st.floats(min_value=1, max_value=1e4), min_size=5, max_size=120),
+    st.floats(min_value=0.5, max_value=2),
+)
+def test_a_candidate_slower_by_a_constant_factor_fails_exactly_above_ten_percent(
+    reference_ms, factor
+):
+    # Every resample of pairs scales by the same factor, so the bound equals it.
+    result = baseline.paired_result(
+        'c', reference_ms, [ms * factor for ms in reference_ms], 0.05, resamples=50
+    )
+    assert result.ratio == pytest.approx(factor)
+    assert result.lower == pytest.approx(factor)
+    assert result.regressed == (result.ratio > 1.10)
+
+
+@given(st.lists(st.floats(min_value=1, max_value=1e4), min_size=5, max_size=120))
+def test_identical_sides_never_regress(ms):
+    result = baseline.paired_result('c', ms, list(ms), 0.05, resamples=50)
+    assert result.ratio == 1 and not result.regressed
+
+
+def test_paired_result_is_deterministic():
+    reference = [float(v % 17 + 50) for v in range(100)]
+    candidate = [float(v % 13 + 50) for v in range(100)]
+    first = baseline.paired_result('c', reference, candidate, 0.002)
+    assert baseline.paired_result('c', reference, candidate, 0.002) == first
+
+
+def test_independent_stalls_trip_the_bare_p95_ratio_but_not_the_paired_verdict():
+    # An A/A run on a loaded host, simulated: both sides share each round's
+    # load, and one request in ten also stalls on its own for up to 3x. Taken
+    # bare, some cases' p95 ratios land over 1.10; the confidence bound keeps
+    # them from failing the run.
+    rng = random.Random(20261005)
+
+    def latency(load):
+        stall = rng.uniform(1, 3) if rng.random() < 0.1 else 1
+        return 50 * load * stall
+
+    bare_over, regressed = 0, 0
+    cases = 24
+    for case in range(cases):
+        reference, candidate = [], []
+        for _ in range(100):
+            load = rng.uniform(1, 3)
+            reference.append(latency(load))
+            candidate.append(latency(load))
+        result = baseline.paired_result(f'c{case}', reference, candidate, 0.05 / cases)
+        bare_over += result.ratio > 1.10
+        regressed += result.regressed
+    assert bare_over > 0
+    assert regressed == 0
 
 
 def test_paired_is_the_default_and_compare_selects_the_committed_baseline():

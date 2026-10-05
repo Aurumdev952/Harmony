@@ -214,8 +214,13 @@ def test_a_failed_render_is_logged_without_the_token(
         (b'{"error": "<script>"}', 'no error code'),
         (b'not json', 'no error code'),
         (b'{"error": "' + b'x' * 5000 + b'"}', 'no error code'),
+        # A valid code past the 1 KiB read cap is never read.
+        (
+            b'{"error": "egress_blocked", "pad": "' + b'x' * 5000 + b'"}',
+            'no error code',
+        ),
     ],
-    ids=['code', 'not-a-code', 'not-json', 'oversized'],
+    ids=['code', 'not-a-code', 'not-json', 'oversized', 'valid-code-past-the-cap'],
 )
 def test_a_renderer_failure_is_logged_with_its_error_code(
     client, renderer, monkeypatch, app_log, body, logged

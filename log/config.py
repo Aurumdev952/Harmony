@@ -123,7 +123,11 @@ _REDACTIONS: Tuple[
         _redact_basic_credentials,
     ),
     # A JWT's payload and signature; its header names only the algorithm.
-    (re.compile(r'\.eyJ[A-Za-z0-9_-]+\.[A-Za-z0-9_-]*'), '.' + REDACTED),
+    # After a dot (x.<jwt>) the match starts at the header, so allow a third part.
+    (
+        re.compile(r'\.eyJ[A-Za-z0-9_-]+\.[A-Za-z0-9_-]*(?:\.[A-Za-z0-9_-]*)?'),
+        '.' + REDACTED,
+    ),
     # Flask-User's reset and confirmation links carry the token in the path.
     (
         re.compile(r'(?i)(/(?:reset[-_]password|confirm[-_]email)/)[^\s/?"\']+'),

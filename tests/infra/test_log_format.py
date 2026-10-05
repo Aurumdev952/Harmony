@@ -144,6 +144,8 @@ _SECRETS = [
     # A JWT glued to a dash or underscore.
     ('id-eyJhbGciOiJIUzI1NiJ9.eyJzdWIiOiJ4In0.c2lnbmF0dXJl', 'eyJzdWIiOiJ4In0'),
     ('id_eyJhbGciOiJIUzI1NiJ9.eyJzdWIiOiJ4In0.c2lnbmF0dXJl', 'c2lnbmF0dXJl'),
+    # After a dot, the match starts at the header, so the signature is a third part.
+    ('x.eyJhbGciOiJIUzI1NiJ9.eyJzdWIiOiJ4In0.c2lnbmF0dXJl', 'c2lnbmF0dXJl'),
     ('Cookie: accessKey=abc123; session=def456', 'abc123'),
     ('Cookie: theme=dark; sid=s3cr3t', 's3cr3t'),
     ('set accessKey=abc123; Path=/', 'abc123'),

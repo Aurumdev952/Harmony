@@ -70,8 +70,9 @@ None of these block WP-2c; each comes from a finding below or from the review.
 - [x] backend or QA (WP-0a): record the 11 deferred Relay mutations. Done in unit 7: `stack/seed_catalog.py` seeds the rows they edit, and all 51 Relay operations are recorded. WP-0a's `replay_relay_operations.py` still carries its own variables. Whichever WP touches Relay next should make one of the two the source.
 - [x] backend: `POST /api2/user/<id>/generate_api_token` returns a token it does not store (F12). Either store it there, or document that the caller must save the user. A script that calls the route alone gets a token that never authenticates.
   - 2026-10-04 backend-2c: done at `48ff9a3`. The route stores the token. See "Backend support: F12 and F13".
-- [ ] core: `POST /api/import_self_serve` deletes rows in tables it does not import (F13). Fix it by upserting the export's rows and deleting only the rows the export lacks, in one transaction, with no `TRUNCATE ... CASCADE` (see F13). Then re-record `graphql.BatchPublishModalContentsQuery` and the unpublished-field cases.
+- [x] core: `POST /api/import_self_serve` deletes rows in tables it does not import (F13). Fix it by upserting the export's rows and deleting only the rows the export lacks, in one transaction, with no `TRUNCATE ... CASCADE` (see F13). Then re-record `graphql.BatchPublishModalContentsQuery` and the unpublished-field cases.
   - 2026-10-04 backend-2c: failing tests are in at `d23076f`. The fix is in `db/postgres/utils.py` (core), so a core instance applies it on `mig/WP-2c-api-contract-recordings-core`. Tick this line when that branch merges.
+  - 2026-10-04 core-2c: fixed at `d016bce` on `mig/WP-2c-api-contract-recordings-core`, which merges back through backend's branch. Ticked at the lead's request; the merge is still pending. Two defects in the proposed patch were fixed: delete-before-upsert cascaded into exported rows, and sequences were set before the import could still fail. See "F13: core review and fix".
   - 2026-10-04 qa-3: once that branch merges, QA re-records and drops the `empty connection` annotation from the BatchPublish row in `INVENTORY.md`. `test_catalogue` fails until both happen.
 
 ## Log
@@ -88,6 +89,7 @@ None of these block WP-2c; each comes from a finding below or from the review.
 - 2026-10-04 backend-2c (supporting, F13): failing tests `tests/db/test_import_data_into_table.py` (3 failed, 1 passed at `00e5047`) and the proposed core patch `WP-2c-evidence/F13-db-postgres-utils.patch` (4 passed with it); handed to core through the lead.
 - 2026-10-04 backend-2c (supporting, F12): `issue_api_token` stores the generated token and the route calls it, commit `48ff9a3`. Checks: the new `tests/web/test_api_token_issue.py` failed against the old behaviour (`check_token_validity` False) and passes, 2 of 2, including the admin app's later save and revoke. `tests/web` gives 70 passed, 1 failed; the failure is the existing `test_graphql_endpoint_removed` (`flask_migrate` is missing from the uv env, also at `00e5047`). The contract offline suite gives 51 passed, and the dry run reports 231 cases, 0 problems. Replay on a fresh stack: 231 passed, twice. The live F12 check passed. ruff and mypy on the changed files are clean. Stack down.
 - 2026-10-04 qa-3 unit 8: round-4 fixes S1-S9. Merged `mig/integration` (`cbaf776`) and backend's F12 branch (`fd187c8`); commits `f7e4895`, `24cc64c` and `ed1a07c`. Check: ruff clean; offline `57 passed`; dry run `234 cases, 0 problems`; two recordings on fresh stacks, identical; replay `291 passed` twice on each of two fresh stacks; one broken recording red; stack down. Status review.
+- 2026-10-04 core-2c (supporting, F13): reviewed backend's patch as owner and found two defects (a cascade into exported rows, and sequences rewound by a failed import), each shown by a new test that fails with the patch. Fix `d016bce`: one transaction; upsert referenced tables, then delete absent rows; empty and reload the leaves; count check; non-lowering sequences, set last. Merged backend's `8804af2`. Checks: `tests/db` 9 passed, 4 of 4 mutations killed, ruff and mypy clean on the changed files, golden 269 passed, perf old vs new recorded under "F13: core review and fix". `scripts/data_catalog/import_db_tables.py` (lead) needs no change.
 
 ## Review fixes
 
@@ -242,6 +244,54 @@ Branch `mig/WP-2c-api-contract-recordings-backend`, from `00e5047`.
   - After: the imported tables hold exactly the export's rows, as before. Dependent rows survive while the export carries the row they reference, and are deleted with it otherwise. A failed import changes nothing.
   - Rows are matched on primary keys. The catalogue's parents use string ids, which are stable across instances. `source_config` references `self_serve_source` by serial id, so on a cross-instance import a surviving `source_config` row follows whichever source holds that id in the export.
   - Known limit: a referenced table whose secondary unique value moves between two surviving rows (`dataprep_flow.recipe_id`) makes the import fail and roll back rather than succeed.
+
+### F13: core review and fix (core, `mig/WP-2c-api-contract-recordings-core`)
+
+Core reviewed the patch as owner and did not apply it as is. Two of its steps lose or corrupt data. The fix at `d016bce` keeps its staging, upsert and leaf-table ideas and changes the order.
+
+- **Defect 1 in the patch: deleting before upserting cascades into rows the export carries.** The patch deletes absent parent rows before upserting. At that point the target's rows still hold their old foreign keys. Say the export moves `cat_a` under `cat_new` and drops `cat_old`, while the target still has `cat_a` under `cat_old`. Deleting `cat_old` then cascades through `category.parent_id` to `cat_a`, and from there to `cat_a`'s unpublished-field mapping. The upsert puts `cat_a` back, but the mapping is gone. The same thing happens across tables when a `self_serve_source` row the export carries points at a `pipeline_datasource` the export drops: its `source_config` is lost. New test `test_a_dependent_of_a_row_the_export_carries_survives_its_old_parents_removal` fails with the patch (`unpublished_field_category_mapping` becomes `[]`).
+- **Defect 2 in the patch: a failed import can rewind id sequences.** The patch runs `setval` per table during the upserts. `setval` is not transactional, so a later failure rolls back the rows but not the sequence. The app's next insert then reuses a live id. New test `test_a_failed_import_leaves_id_sequences_ahead_of_the_rows` fails with the patch (`UniqueViolation ... Key (id)=(2) already exists`).
+- **Order in `d016bce`**, all in one transaction:
+  1. Check that the archive has every listed table, else `ImportTableDataError` before anything changes.
+  2. COPY each table into a `LIKE` staging table and `ANALYZE` it.
+  3. Empty the leaf tables. A leaf is a table that no foreign key references; the code reads this from `pg_constraint`.
+  4. Upsert the referenced tables, parents first (`INSERT ... SELECT ... ON CONFLICT (pk) DO UPDATE`). Every row the export carries now has its new foreign keys.
+  5. Delete the absent rows of the referenced tables, children first. A cascade reaches only rows that referenced a row the export removed.
+  6. Insert the leaves. A leaf row that references a parent the export dropped fails here with an FK `IntegrityError`, as it did before.
+  7. Check that each imported table holds exactly as many rows as its staging table. If an inconsistent archive drops a parent of a row it carries, step 5 cascades into an exported row; the check turns that into `ImportTableDataError` and a rollback.
+  8. Advance the id sequences, after every check has passed. The new value is `GREATEST(last value used, max(id)) + 1`, so a sequence never moves back. A rollback after this point, for example a failure at COMMIT, leaves sequences ahead of the rows, never behind.
+- **Identity sequences.** RESTART IDENTITY is gone and is not needed: step 8 moves each sequence past every id in its table. The non-lowering rule is a small change from before. The old code set the sequence to the export's `max(id) + 1`; now it never goes below what the target has already handed out. Ids are internal, so nothing user-visible changes. The dependent tables are not written, so their sequences are untouched.
+- **FK ordering.** Every foreign key into an imported table was listed from the SQLAlchemy metadata of all models. They all come from the imported tables themselves or from the 7 dependent tables, and all are `ON DELETE CASCADE`. The reviewer confirmed the cascades on a stack. Self-references (`category.parent_id`, `dimension_category.parent_id`, `field.copied_from_field_id`) are safe in one `INSERT ... SELECT`, because Postgres checks non-deferrable FKs at the end of each statement. The upsert relies on the caller's order (each table after the tables it references). `DATA_CATALOG_TABLE_NAMES` in `scripts/data_catalog/import_db_tables.py:27` already satisfies it: `category, dimension, dimension_category, field, pipeline_datasource, dataprep_flow, self_serve_source` among the referenced tables. That script needs no change.
+- **Why leaf tables are emptied.** Leaves are the four mapping tables, `dataprep_job` and `data_upload_file_summary`. They have serial ids that drift between instances, plus a unique pair, for example `(field_id, category_id)`. Upserting on `id` would collide with the pair held by another id (test 3). Nothing references a leaf, so emptying it can cascade nowhere and loses no identity worth keeping. If a future migration adds an FK into a mapping table, that table moves to the upsert path by itself. Mutation check: upserting the leaves instead of emptying them turns test 3 red.
+- **Export carries a table absent from the target, or lacks a listed table.** Only the listed tables are read, and extra archive members are ignored. A listed table missing from the archive raises `ImportTableDataError` naming it, before anything is written (`test_an_archive_missing_a_table_changes_nothing`). A listed table missing from the target database makes `CREATE TEMPORARY TABLE ... (LIKE ...)` raise `UndefinedTable` during staging, and the transaction rolls back. Before the fix, the same case failed after the earlier tables were already replaced.
+- **Performance** (scratch `postgres:15.2-alpine`, synthetic catalogue, `WP-2c-evidence/F13-perf.py`; old is `d23076f:db/postgres/utils.py`, before the fix):
+
+  | Catalogue | Old | New |
+  |---|---|---|
+  | 50k fields, 500k dimension mappings, 50k category and datasource mappings, 10k unpublished mappings | 14.1-16.8 s, empties the dependent tables | 17.9-32.7 s, dependents kept |
+  | 100k fields, 1M dimension mappings | 36.5 s, empties the dependent tables | 41.0-58.0 s, dependents kept |
+
+  The time goes to inserting `field_dimension_mapping`: FK and unique checks on every row, as with the old COPY, plus index entries left by the DELETE. `TRUNCATE` (without CASCADE) on the leaves would be faster. Inside the transaction, though, it holds an ACCESS EXCLUSIVE lock until commit, which blocks every web request that reads field mappings for the length of the import. With DELETE, readers keep the old catalogue until commit. The old code was worse here: it showed readers empty tables between each TRUNCATE and its COPY. Both sizes are well above a current deployment's catalogue and stay inside the route's 120 s subprocess timeout.
+- **Tests** (`tests/db/test_import_data_into_table.py`, `ZEN_ENV=harmony_demo uv run pytest tests/db -q`): 9 passed at `d016bce` and on the merge with backend's `8804af2`. The 5 new cases:
+  - the reparent case (defect 1);
+  - a failed import leaves sequences ahead (defect 2);
+  - a failure at COMMIT, injected with a deferred constraint trigger, leaves sequences ahead;
+  - an archive that drops the parent of a row it carries changes nothing;
+  - an archive missing a table changes nothing.
+- **Mutations** (`WP-2c-evidence/F13-mutate.py`), each killed:
+  - drop the count check: 1 red;
+  - delete before upsert: 2 red;
+  - let sequences move back: 1 red;
+  - upsert the leaves: 2 red.
+- **Other checks:** ruff clean on both changed files, and the 4 pre-existing `List`/`Optional` findings in `db/postgres/utils.py` are fixed. The module is not reformatted, because it predates ruff format. mypy (`uv run --with mypy --with sqlalchemy-stubs --with types-psycopg2 mypy --follow-imports=silent`) is clean on both files. Golden: 269 passed. `tests/authz` is not on this branch.
+- **Behaviour before and after** (INV-2; for the human acceptance list). This supersedes the patch's list above where they differ:
+  - Before: an import emptied the 7 dependent tables. A failed import, or one cut off part-way, left some catalogue tables replaced. Web readers saw empty catalogue tables while the import ran.
+  - After: the imported tables hold exactly the archive's rows, as before. A dependent row survives while the archive carries the row it references, even if that row's own parent changed. It goes, by ON DELETE CASCADE, only with a row the archive removes. A failed import changes nothing, and readers see the old catalogue until commit. Archives that are inconsistent or missing a table are refused. Id sequences never move back.
+  - Unchanged known limits: rows are matched on primary keys, so on a cross-instance import a surviving `source_config` row follows whichever `self_serve_source` holds its serial id. A `dataprep_flow.recipe_id` collision between surviving rows rolls the import back.
+- **Follow-ups, not done here (core unless noted):**
+  - `export_tables_to_zip` copies each table in its own autocommit transaction, so an export taken during edits can be inconsistent. The import now refuses such an archive. Exporting in one `REPEATABLE READ READ ONLY` transaction would stop producing them.
+  - COPY maps CSV columns by position. A target whose column order differs from the source (a schema built by `create_all` against one built by Alembic) would misload. This predates F13.
+  - Backend: when the import outlives the 120 s timeout, `communicate` raises, the `with Popen` block waits for the child anyway, and the route can return an error for an import that then commits.
 
 ### F12: fix
 

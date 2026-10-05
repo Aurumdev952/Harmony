@@ -17,7 +17,11 @@ import psycopg2
 import pytest
 import sqlalchemy as sa
 
-from db.postgres.utils import export_tables_to_zip, import_data_into_table
+from db.postgres.utils import (
+    ImportTableDataError,
+    export_tables_to_zip,
+    import_data_into_table,
+)
 from models.alchemy.base import Base
 from scripts.data_catalog.export_db_tables import (
     DATA_CATALOG_TABLE_NAMES as EXPORTED_TABLES,
@@ -201,6 +205,115 @@ def test_a_failed_import_changes_nothing(database, tmp_path):
     before = _snapshot(database, [*IMPORTED_TABLES, *DEPENDENT_TABLES])
 
     with pytest.raises(psycopg2.IntegrityError):
+        _import(database, archive)
+
+    assert _snapshot(database, [*IMPORTED_TABLES, *DEPENDENT_TABLES]) == before
+
+
+def test_a_dependent_of_a_row_the_export_carries_survives_its_old_parents_removal(
+    database, tmp_path
+):
+    # The export moves cat_a under cat_new and no longer carries cat_old. Removing
+    # cat_old must not cascade through the target's stale cat_a.parent_id into
+    # cat_a's unpublished-field mapping.
+    _execute(
+        database,
+        "INSERT INTO category (id, name, parent_id) VALUES"
+        " ('cat_new', 'New', 'root'), ('cat_old', 'Old', 'root');"
+        "UPDATE category SET parent_id = 'cat_new' WHERE id = 'cat_a';",
+    )
+    archive = _export(database, str(tmp_path / "export.zip"))
+    _rewrite_table(archive, "category", lambda line: ";cat_old;" not in line)
+    exported = [row for row in _rows(database, "category") if "cat_old" not in row]
+    _execute(database, "UPDATE category SET parent_id = 'cat_old' WHERE id = 'cat_a'")
+    dependents = _snapshot(database, DEPENDENT_TABLES)
+
+    _import(database, archive)
+
+    assert _rows(database, "category") == exported
+    assert _snapshot(database, DEPENDENT_TABLES) == dependents
+
+
+def test_a_failed_import_leaves_id_sequences_ahead_of_the_rows(database, tmp_path):
+    archive = _export(database, str(tmp_path / "export.zip"))
+    _rewrite_table(archive, "category", lambda line: ";cat_b;" not in line)
+    # Added after the export, this row holds the id the export's sequence hands out.
+    _execute(
+        database,
+        "INSERT INTO field_dimension_mapping (field_id, dimension_id)"
+        " VALUES ('f2', 'Region')",
+    )
+
+    with pytest.raises(psycopg2.IntegrityError):
+        _import(database, archive)
+
+    _execute(
+        database,
+        "INSERT INTO field_dimension_mapping (field_id, dimension_id)"
+        " VALUES ('f2', 'District')",
+    )
+
+
+def test_an_import_that_fails_at_commit_leaves_id_sequences_ahead_of_the_rows(
+    database, tmp_path
+):
+    archive = _export(database, str(tmp_path / "export.zip"))
+    _execute(
+        database,
+        "INSERT INTO field_dimension_mapping (field_id, dimension_id)"
+        " VALUES ('f2', 'Region');"
+        # setval is not transactional. A deferred trigger fails the import at COMMIT,
+        # after the import has set its sequences.
+        "CREATE FUNCTION fail_at_commit() RETURNS trigger LANGUAGE plpgsql AS"
+        " $$ BEGIN RAISE EXCEPTION 'fail at commit'; END $$;"
+        "CREATE CONSTRAINT TRIGGER fail_at_commit AFTER INSERT"
+        " ON field_dimension_mapping DEFERRABLE INITIALLY DEFERRED"
+        " FOR EACH ROW EXECUTE FUNCTION fail_at_commit();",
+    )
+
+    with pytest.raises(psycopg2.Error, match="fail at commit"):
+        _import(database, archive)
+
+    _execute(
+        database,
+        "DROP TRIGGER fail_at_commit ON field_dimension_mapping;"
+        "INSERT INTO field_dimension_mapping (field_id, dimension_id)"
+        " VALUES ('f2', 'District')",
+    )
+
+
+def test_an_export_that_drops_the_parent_of_a_row_it_carries_changes_nothing(
+    database, tmp_path
+):
+    _execute(
+        database,
+        "INSERT INTO category (id, name, parent_id) VALUES"
+        " ('orphan_parent', 'P', 'root'), ('orphan_child', 'C', 'orphan_parent');",
+    )
+    archive = _export(database, str(tmp_path / "export.zip"))
+    _rewrite_table(archive, "category", lambda line: ";orphan_parent;P;" not in line)
+    before = _snapshot(database, [*IMPORTED_TABLES, *DEPENDENT_TABLES])
+
+    with pytest.raises(ImportTableDataError, match="category"):
+        _import(database, archive)
+
+    assert _snapshot(database, [*IMPORTED_TABLES, *DEPENDENT_TABLES]) == before
+
+
+def test_an_archive_missing_a_table_changes_nothing(database, tmp_path):
+    archive = _export(database, str(tmp_path / "export.zip"))
+    with zipfile.ZipFile(archive) as source:
+        members = {
+            name: source.read(name)
+            for name in source.namelist()
+            if name != "field_category_mapping.csv.lz4"
+        }
+    with zipfile.ZipFile(archive, "w") as target:
+        for name, data in members.items():
+            target.writestr(name, data)
+    before = _snapshot(database, [*IMPORTED_TABLES, *DEPENDENT_TABLES])
+
+    with pytest.raises(ImportTableDataError, match="field_category_mapping"):
         _import(database, archive)
 
     assert _snapshot(database, [*IMPORTED_TABLES, *DEPENDENT_TABLES]) == before

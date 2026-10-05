@@ -1,0 +1,30 @@
+before | create a_b with axb present: author ACL | axb=[admin-2bac84@wp0l.invalid:dashboard_admin,creator-2bac84@wp0l.invalid:dashboard_admin] a_b=[]
+before | share a_b (admin, a.doe, a_doe) | 204 axb=[2bac84.doe@wp0l.invalid:dashboard_viewer,admin-2bac84@wp0l.invalid:dashboard_admin,creator-2bac84@wp0l.invalid:dashboard_admin] a_b=[]
+before | remove share of x_doe, keep x.doe | 204 axb=[2bac84.doe@wp0l.invalid:dashboard_viewer,admin-2bac84@wp0l.invalid:dashboard_admin,creator-2bac84@wp0l.invalid:dashboard_admin] a_b=[]
+before | share naming X_DOE (case only) | 204 a_b=[]
+before | group /users with x_member (only x.member exists) | 200 members=[2bac84.member@wp0l.invalid]
+before | group /users with X.MEMBER (case only) | 200 members=[2bac84.member@wp0l.invalid]
+before | share with PAIR-x (Pair-x and pair-x exist) | 204 groups=[]
+before | share with pair-x (exact spelling) | 204 groups=[]
+before | alert_admin on a dashboard: body names it | 404 named=True
+before | POST /api2/user/<id>/roles | 500
+before | PATCH /api2/user/<id>/roles non-empty | 500
+before | POST /api2/group/<id>/roles | 500
+before | alert transfer from x_member (only x.member exists) | 204
+before | alert transfer from an unknown user | 500
+before | dashboard transfer from x_member (x.member authors axb) | 204 author=admin-2bac84@wp0l.invalid
+after | create a_b with axb present: author ACL | axb=[admin-aaf751@wp0l.invalid:dashboard_admin] a_b=[creator-aaf751@wp0l.invalid:dashboard_admin]
+after | share a_b (admin, a.doe, a_doe) | 204 axb=[admin-aaf751@wp0l.invalid:dashboard_admin] a_b=[aaf751.doe@wp0l.invalid:dashboard_viewer,aaf751_doe@wp0l.invalid:dashboard_viewer,admin-aaf751@wp0l.invalid:dashboard_admin]
+after | remove share of x_doe, keep x.doe | 204 axb=[admin-aaf751@wp0l.invalid:dashboard_admin] a_b=[aaf751.doe@wp0l.invalid:dashboard_viewer,admin-aaf751@wp0l.invalid:dashboard_admin]
+after | share naming X_DOE (case only) | 204 a_b=[aaf751.doe@wp0l.invalid:dashboard_viewer,aaf751_doe@wp0l.invalid:dashboard_viewer,admin-aaf751@wp0l.invalid:dashboard_admin]
+after | group /users with x_member (only x.member exists) | 404 members=[]
+after | group /users with X.MEMBER (case only) | 200 members=[aaf751.member@wp0l.invalid]
+after | share with PAIR-x (Pair-x and pair-x exist) | 404 groups=[]
+after | share with pair-x (exact spelling) | 204 groups=[pair-aaf751:dashboard_viewer]
+after | alert_admin on a dashboard: body names it | 404 named=False
+after | POST /api2/user/<id>/roles | 400
+after | PATCH /api2/user/<id>/roles non-empty | 400
+after | POST /api2/group/<id>/roles | 400
+after | alert transfer from x_member (only x.member exists) | 404
+after | alert transfer from an unknown user | 404
+after | dashboard transfer from x_member (x.member authors axb) | 404 author=aaf751.member@wp0l.invalid

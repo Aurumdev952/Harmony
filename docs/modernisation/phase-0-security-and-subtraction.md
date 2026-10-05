@@ -117,3 +117,15 @@ Added by decision 0005 after the WP-0h security re-review confirmed H5 live.
   - A failing test first: `manager` + `user_admin` renaming an admin-through-group user gets 200 on the base and 403 on the branch with no row changed and no reset mail; the stubbed mailer receives nothing.
   - Equal-or-lesser targets still rename and reset as before.
   - The WP-2b pins for these routes flip in the same stack; the INV-3 row in decision 0005 is accepted by security and the human.
+
+## 0k. Build outgoing links from the configured origin; match usernames exactly
+
+Added by decision 0006 after the WP-0i round-2 reviews.
+
+- **Changes.**
+  - Reset, invite, access-granted, new-dashboard and share-by-email links are built from `DEPLOYMENT_BASE_URL` through WP-0i's helper; nothing reads the request Host or `SCRIPT_NAME`. `send_email` links to the dashboard's own page and ignores the caller's free-form URL.
+  - Login, registration and invitation look users up by exact `lower(username)`; the JWT identity is `user.username`.
+- **Verification.**
+  - Failing tests first: a forged Host (`attacker.invalid`, `real.org:@attacker.invalid`) and a forged `SCRIPT_NAME` on `forgot_password`, invite, access-granted and new-dashboard paths produce links on the configured origin; a look-alike username (`john_doe` for `john.doe`) no longer signs in as the other account.
+  - Unit 1 records whether nginx-proxy 1.11.6 forwards the raw Host on a local stack.
+  - The WP-2b pins flip in the same stack; the INV-3 rows are accepted by security and the human.

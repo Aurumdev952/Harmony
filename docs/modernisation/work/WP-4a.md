@@ -98,7 +98,7 @@ None. C-1 (`AppContext`) arrives in WP-4f and will hold `Settings` and `Deployme
 - [ ] lead: merging with WP-1h conflicts on the last lines of `config/settings.py`. WP-1h deletes `RENDERBOT_EMAIL` and `URLBOX_API_KEY`, and this WP changed the `DRUID_HOST` line above them. Resolve by keeping this branch's file without those two lines. `tests/core/test_settings_facade.py` passes either way, and WP-1h's `tests/core/test_settings_render.py` passes on the result (simulated, see Evidence).
 
 - [ ] infra: in `docker/pipeline/Dockerfile`, put the removal note on the `pypy-wheels` stage's own comment: delete the stage, its `--find-links` use and the drift test when PyPy leaves the image (WP-3b, or WP-8d if first). In `tests/infra/test_dockerfiles.py`, make the drift test assert that the stage exists exactly while the Dockerfile creates `venv_pypy3`, so removing PyPy without removing the stage, or the reverse, fails. Reviewer finding (low); does not block review.
-- [ ] lead: `task_gate.py` still reports `harmony/__init__.py (owner: lead)` under "files outside the owner role". Its `ROLES` pattern (`scripts/agents/task_gate.py:65`) has no `lead`, so the `lead-1` instance clears the SPEC 7.2 claim check but not the role check. Either add `lead` to the gate's roles or accept this line when closing.
+- [x] lead: `task_gate.py` reported `harmony/__init__.py (owner: lead)` as outside the owner role. This was resolved by integration `e86d91a` (the gate counts the lead role), merged here in `da48905`.
 
 ## Log
 
@@ -137,6 +137,9 @@ None. C-1 (`AppContext`) arrives in WP-4f and will hold `Settings` and `Deployme
   - **(7)** Request to infra for the Dockerfile comment and the drift-test tie to `venv_pypy3`.
   - **(8)** `test_refuses_a_missing_druid_host_without_exposing_the_key` pins the exact message and no `__cause__`/`__context__` for a real key plus a missing `DRUID_HOST` (`1f93aab`). Import cost recorded as difference 6.
   - check: Evidence, "After review round 1".
+- 2026-10-05 core-4a: merged `mig/integration` at `61db9f8` (merge `da48905`), which brings the lead role in `task_gate.py`/`ownership.py`, the CI py38 syntax guard and decision 0007. No conflicts.
+  - `task_gate.py WP-4a` now reports only the status and the qa and reviewer verdicts.
+  - check: 8 CI suites passed (core 104, druid 1, druid_setup 79, golden 269, graphql 22, pipeline 129 + 1 skipped, toolchain 12, web 95); infra lane 164 + 3 = 167 passed; `record.py --check` 0 drift; `ci/check_py38_syntax.py` over CI's paths plus `harmony` and `tests/core` checked 857 files with 0 problems; mypy clean (520); `lint-imports` 1 kept; `uv lock --check` clean.
 
 ### Recorded differences (INV-1, for reviewer acceptance)
 

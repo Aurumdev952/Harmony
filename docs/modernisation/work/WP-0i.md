@@ -1,18 +1,25 @@
 ---
 wp: "0i"
 title: "Guard the dashboard render and thumbnail routes"
-status: review
+status: blocked
 owner_role: "backend"
 instances:
+  - name: "lead-1"
+    files:
+      - scripts/create_bot_accounts.sh
   - name: "backend-7"
     files:
       - web/server/routes/page_renderer.py
       - web/server/routes/views/page_renderer.py
       - web/server/routes/views/dashboard.py
+      - web/server/routes/views/query_policy.py
+      - web/server/configuration/bots.py
+      - web/server/app.py
       - web/server/redis/thumbnail_storage_service.py
       - web/server/api/thumbnail_storage_models.py
       - web/server/security/signal_handlers.py
       - tests/web/render/**
+      - tests/web/test_redis_password.py
       - docs/modernisation/work/WP-0i.md
       - docs/modernisation/work/WP-0i-evidence/**
       - .claude/agent-memory/harmony-backend-engineer/**
@@ -24,6 +31,18 @@ security_review: true
 ---
 
 # WP-0i: Guard the dashboard render and thumbnail routes
+
+## Blocked: human acceptance of the INV-3 table (decision 0004)
+
+QA, reviewer and security have all approved (rounds 3 and 4, at `b5248bf`). INV-3 says authorisation decisions change only on purpose, in a security-reviewed WP, so this WP needs your explicit acceptance before it can be marked ready. The draft PR lists the same items.
+
+**Do you accept the "INV-3: who could do what, before and after" table below?** It includes these items, which need your attention:
+
+1. **Public PDF download is lost.** On deployments with public access, anonymous visitors now get 401 on `/pdf`; `/jpeg` already failed with a 500. The alternative is a follow-up that adds a dedicated non-admin public render account.
+2. **Existing render-bot accounts.** Deployments set up before this WP still have a `renderbot@zenysis.com` site-admin account, which nothing uses any more and which now shows in the Admin user list. Should those accounts be deactivated or demoted on each deployment?
+3. **`DEPLOYMENT_BASE_URL` per deployment.** Each deployment needs its real public https origin, with no path, userinfo, query or fragment. Otherwise the app refuses to start (INV-1 note).
+
+Answer by ticking the "human" requests below, or say what to change.
 
 Decision 0004, phase 0 section 0i. This WP closes three exposures:
 
@@ -40,7 +59,9 @@ SEC-7 is only partly met here. WP-1h owns the resource-scoped render token and t
 3. **Fix it.** Every render route requires a signed-in caller with `view_resource`. `/api2/storage/retrieve` renders as the caller and caches per (dashboard, query-policy digest). The design was attacked with `pstack:interrogate`; see the decision below. Check: unit 2 green. **Done.**
 4. **Retire the render bot.** No token is minted for it any more. The account itself is a carried risk, and its removal is requested. **Done.**
 5. **INV-3 table.** Before and after for every outcome change. **Done**; awaiting acceptance by security and the human.
-6. **WP-2b check.** Run the WP-2b pure layer against the fix in a scratch copy, and ask qa-2b to flip the N1 and N2 pins. **Done**; the request is open.
+6. **WP-2b check.** Run the WP-2b pure layer against the fix in a scratch copy, and ask qa-2b to flip the N1, N2 and N7 pins. **Done**; the request is open.
+7. **Round-2 rework.** The render and email origin comes from `DEPLOYMENT_BASE_URL`, urlbox failures are logged redacted, the digest is canonical, and the slug lookup uses equality ignoring case. Check: `tests/web` green the CI way. **Done** (`10175ed`, `4e05bcb`, `76c31e2`).
+8. **Round-3 rework.** Render URLs no longer include the request script root, `DEPLOYMENT_BASE_URL` is validated, and the Redis claim race is closed. The tests found missing in round 2 are added, and this file is brought up to date. Check: new tests red on `76c31e2` for the intended reason, `tests/web` green, lint gate clean, and the WP-2b pure layer run with the flipped file. **Done.**
 
 ## Findings (unit 1, `pstack:how`)
 
@@ -76,7 +97,12 @@ Three reviewers (Opus, Fable, Sonnet) attacked the first design before it was bu
 
 - **Email links were a second N7 channel** (3 of 3, critical).
   - `POST /api2/dashboard/<id>/share_via_email` takes a free-form `dashboardUrl`. urlbox loaded that URL with a token minted for each *recipient*.
-  - The renderer now never takes a URL. It always builds this app's own dashboard URL with `url_for`, and keeps only the locale and the `#h=` session hash from a client link (`dashboard_page_args`).
+  - The renderer now never takes a URL. It always builds this deployment's own dashboard URL with `deployment_dashboard_url`, and keeps only the locale and the `#h=` session hash from a client link (`dashboard_page_args`).
+  - That URL is `deployment_origin(DEPLOYMENT_BASE_URL)` plus a path built from the URL map (`current_app.url_map.bind('').build`). Neither part comes from the request.
+    - Round 1 used `url_for(..., _external=True)`, which takes the host from the request's `Host` header. The app sets no `SERVER_NAME`, `ProxyFix` or trusted hosts, so this was safe only behind nginx-proxy's unknown-host 503 (security round 1).
+    - Round 2 used the configured origin plus `url_for`. That still prefixed the request's script root, and gunicorn 20.0.4 copies a `SCRIPT_NAME` request header into the WSGI environ. With `SCRIPT_NAME: @attacker.invalid`, the token was minted for `https://<origin>@attacker.invalid/...` (reviewer and security round 2).
+  - `deployment_origin` accepts only a bare https origin: no userinfo, path, query or fragment, and a numeric port if any. The app refuses to start on any other value (`validate_deployment_base_url`, next to the JWT key check), and every render checks the origin again before it mints a token.
+  - The same origin is used for the link in an emailed dashboard when the client sends no `dashboardUrl`. A client-sent `dashboardUrl` is still mailed as the link (carried risk 10).
 - **Request args shaped a shared, cached thumbnail** (3 of 3): `width`, `delay`, `fail_if_selector_present` and `force`.
   - Thumbnails now ignore request args (`request_args={}`), and `force` is no longer overridable anywhere.
   - The old `request_args` bug, which assigned the whole dict to every param, is fixed.
@@ -86,9 +112,15 @@ Three reviewers (Opus, Fable, Sonnet) attacked the first design before it was bu
   - For header-auth (`X-Username`) callers, the request identity holds raw account needs. The render token re-derives them through `_compute_token_query_needs(['*'])`, which splits complex needs per dimension and drops non-authorisable dimensions.
   - The fingerprint now digests `render_token_query_needs()`: the same derivation, run on the request identity. Superusers digest to `"superuser"`.
   - The render token's `query_needs` and the fingerprint now share the constant `RENDER_TOKEN_QUERY_NEEDS`.
-- **Slugs are editable and reusable** (Fable; Opus and Sonnet flagged the key format). The key is `thumbnail:v2:<resource_id>:<sha256>`, and the lookup is case-insensitive like the dashboard page.
+- **Slugs are editable and reusable** (Fable; Opus and Sonnet flagged the key format). The key is `thumbnail:v2:<resource_id>:<sha256>`.
+  - The lookup is equality ignoring case (`lower(slug) = lower(:slug)`), not ILIKE, so `%` and `_` are not wildcards. Probing with `%` and `_` therefore no longer reveals slugs; a signed-in caller can still tell an existing slug (403) from a missing one (404), as on base and on the dashboard page itself. `get_dashboard` is shared, so the dashboard page (`routes/dashboard.py:30`) and the embedded query page (`embedded_query.py:121`) change the same way.
 - **PENDING could stick after a failure, and two callers could both claim a render** (3 of 3). The claim now uses `cache.add` (SETNX on Redis), and a `finally` deletes the claim unless a 200 render was stored.
-- **Secrets in logs** (Sonnet). On any non-200, urlbox failures logged `res.url`, which carries the urlbox API key and the minted JWT (INV-6). The log line now names only the format, the dashboard URL and the status.
+  - The claim loop gives up after `PENDING_STATE_TIMEOUT`.
+  - When `add` fails and `get` misses, the loop deletes the stale entry only on a FileSystemCache. That backend keeps expired entries on disk, so `add` keeps failing on them. On Redis the same miss means the holder has just released its claim, and another caller may already hold a new one, which a delete would destroy. Two renders could then run at once (round 2, fixed in round 3).
+- **Secrets in logs** (Sonnet). On any non-200, urlbox failures logged `res.url`, which carries the urlbox API key and the minted JWT (INV-6). The log line now names only the format, the dashboard path and the status.
+  - A `requests` exception, such as a refused connection, is caught and logged as one line naming the exception class only (security round 1).
+  - Tests cover a closed port and a 500 whose response URL carries the key and the token.
+- **The digest must not depend on set order** (QA and reviewer, round 1). It is taken over the sorted per-dimension maps the Druid filter is built from (`canonical_policy`). It is identical in fresh interpreters under different `PYTHONHASHSEED` values (test).
 
 ### Rejected
 
@@ -103,6 +135,25 @@ Three reviewers (Opus, Fable, Sonnet) attacked the first design before it was bu
 - Thumbnails always use the default locale.
 - Screenshot mode hides per-user chrome.
 - So nothing besides query policy varies between users who share a digest.
+
+## INV-1 note: renders and email links depend on `DEPLOYMENT_BASE_URL`
+
+- **No fallback.** Renders and emailed dashboard links use the configured `general.DEPLOYMENT_BASE_URL` only, never the request's `Host` or script root.
+  - A deployment whose value is stale renders the old host's page, and emails link to it. A moved domain, or a value copied from the template, is stale in this sense.
+  - The render fails if urlbox cannot load that host. If someone else controls the host, the minted token goes to them.
+- **Checked values in the repo.**
+  - `config/harmony_demo/general.py:19` is `https://harmony_demo.zenysis.com`. That is not the host the local or demo stack is served on, so renders from those stacks point at that host.
+  - `config/template/general.py:19` is a placeholder.
+  - Both pass the new startup check.
+- **Startup check.** Under gunicorn (or the reloader), the app now refuses to start when `DEPLOYMENT_BASE_URL` is not a bare https origin.
+  - It refuses plain http, userinfo, a path prefix, a query, a fragment and a non-numeric port.
+  - A deployment served over http, or under a path, must change its value before this ships. That is for the human, per deployment.
+- **Sharp edge** (security round 2, F4). A staging host that reuses a production config sends its render tokens and email links to production.
+  - With different JWT secrets, the renders fail, but the staging tokens still reach production's access logs.
+  - With the same secret, production data is rendered for a staging user.
+  - Staging must set its own `DEPLOYMENT_BASE_URL`.
+- **Ordering.** WP-0i must not ship ahead of WP-0b (security round 1).
+- **Carried to WP-1h.** The self-hosted renderer should take the same configured canonical origin from settings, or better, render without a public URL at all.
 
 ## INV-3: who could do what, before and after
 
@@ -126,17 +177,27 @@ Statuses are measured in-process, in `tests/web/render` and with the WP-2b princ
 | Anonymous (public access on, `Referer` set, unregistered role can view) | retrieve | **200: bot thumbnail** | 401, no render |
 | Any caller who may render | `?url=` or `?cookie=` on any render route or on retrieve | **minted token sent to the caller's URL**, or replaced by the caller's own | ignored |
 | Any caller who may render | `?force=false` | urlbox may answer from its own cache | ignored |
-| Anyone who can view the dashboard | `share_via_email` with `dashboardUrl` | **the token minted for each recipient (admins included) is sent to any URL** | renders always load this app's dashboard page; only the locale and `#h=` hash are taken from the link |
+| Any caller who may render | `width`, `delay`, `fail_if_selector_present` or any other render arg on `/png/thumbnail` or retrieve | **shaped the thumbnail that is cached and shared with other viewers for 14 days** | ignored (`request_args={}`); `/pdf` and `/jpeg` still accept the listed args |
+| Any caller who may render, reaching gunicorn directly | a spoofed `Host` header, or a `SCRIPT_NAME` header such as `@attacker.invalid` | **the render URL's host came from the request, so the minted token went to the caller's host** | ignored: always `DEPLOYMENT_BASE_URL` plus a path from the URL map |
+| Anyone who can view the dashboard | `share_via_email` with `dashboardUrl` | **the token minted for each recipient (admins included) is sent to any URL** | renders always load this deployment's dashboard page on `DEPLOYMENT_BASE_URL`; only the locale and `#h=` hash are taken from the link. The mailed link is still the client's `dashboardUrl` (carried risk 10). |
+| Signed in | retrieve, unknown `key` or no `key` | 500 (the handler dereferenced a missing dashboard) | 404, no render |
+| Anonymous | retrieve, unknown `key` or no `key` | 401; under public access with a `Referer`, 500 | 401 |
+| Signed in, with `view_resource` | retrieve or any render route, the slug in another case (`MALARIA-OVERVIEW`) | 500 (case-sensitive lookup) | 200, rendered as the caller (retrieve: from the caller's policy cache entry) |
+| Signed in, no `view_resource` | the same, slug in another case | 500 | 403, no render |
+| Anonymous | the same, slug in another case | 500 on every render route (the case-sensitive lookup fails before the check); retrieve as above | 401 |
+| Signed in | retrieve or any render route, a slug containing `%` or `_` that matches no slug exactly | 500 | 404 (or 403/200 when it equals a real slug ignoring case) |
+| Signed in | the dashboard page `/dashboard/<slug>` (`routes/dashboard.py:30`) or the embedded query page (`embedded_query.py:121`) with `%` or `_` in the slug | **ILIKE pattern: `/dashboard/malaria%` served the first matching dashboard, or the unauthorised redirect, which revealed that it exists** | 404 page unless the slug equals a real one ignoring case |
+| Admin | the Admin user list | `renderbot@zenysis.com` hidden (in `BOT_USERS`) | listed, so admins can see and deactivate the leftover site-admin account |
 | Embedded and screenshot modes | `/dashboard/<slug>?screenshot=1`, iframe mode | page flags on the dashboard page, which checks access itself | unchanged (these do not go through the render routes) |
 
 No other decision moved. The WP-2b pure layer is identical outside the render pins (see Evidence).
 
 ## Carried risks (for WP-1h unless noted)
 
-1. **The render bot account still exists as a site admin in deployments.**
-   - It is created by `scripts/create_bot_accounts.sh:5` (`-a`) and listed in `web/server/configuration/bots.py`.
-   - No server path mints a token for it any more (`grep RENDERBOT web` is empty), so it is now an unused admin login.
-   - Removing the creation line is requested below. Deactivating existing accounts is an operation on real data, so it is for the human.
+1. **Existing render-bot accounts, created by the old script, are still site admins in deployments.**
+   - The old `scripts/create_bot_accounts.sh` created `renderbot@zenysis.com` with `-a`. The lead removed that line on this branch (`e6a90bf`), so new stacks create no render bot. The remaining `--automation_user` line is pre-existing and stays a lead item.
+   - No server path mints a token for an existing account any more (`grep RENDERBOT web` is empty), so each one is an unused admin login. It now shows in the Admin user list.
+   - Deactivating or demoting those accounts is an operation on real data, so it is for the human (Questions).
 2. **Policy drift during a render.**
    - The digest is computed when the retrieve request arrives. The render token (`query_needs ['*']`) is re-resolved when urlbox loads the page, up to about 5 minutes later.
    - If an admin widens a user's policy inside that window, the wider render is cached under the old digest for 14 days.
@@ -153,8 +214,26 @@ No other decision moved. The WP-2b pure layer is identical outside the render pi
 6. **`share_via_email` with `useRecipientQueryPolicy=false`, or with a single thread,** renders as the sender and mails the result to every recipient. This is pre-existing product behaviour, flagged for security.
 7. **`_compute_token_query_needs` splits complex query needs per dimension**, for browsing sessions and renders alike. This is a pre-existing INV-2 concern, and this WP does not change it.
 8. **Legacy `thumbnail_<slug>` keys stay in Redis for up to 14 days.** New code never reads them, but a rollback would serve them again.
+9. **A token with narrowed `query_needs` digests the narrow policy, but its render runs over the whole account** (security F3).
+   - The caller's digest comes from the token's narrowed needs. The render token (`query_needs: ['*']`) is re-resolved against the whole account.
+   - No server path issues such a token today, so this is unreachable. It is pinned by a strict xfail (`test_narrowed_token_caller_digest_matches_their_render`).
+   - The cheap fix, for WP-1h or WP-5d: use a per-user key whenever the caller's token `query_needs` is not `['*']`.
+10. **`share_via_email` still mails the client's free-form `dashboardUrl` as the link** (security F5; QA and the reviewer noted it outside the diff).
+    - No token goes to it any more; renders ignore it.
+    - It is still a phishing channel from a trusted sender. Build the link from the slug with `deployment_dashboard_url`.
+    - Carried to WP-0k, which takes over request-derived links.
+11. **gunicorn 20.0.4 copies a `SCRIPT_NAME` request header into the WSGI environ.**
+    - The render paths no longer read the script root.
+    - Any other `url_for(_external=True)` or `request.script_root` use is still exposed to callers who reach gunicorn directly. nginx drops headers with underscores by default.
+    - Upgrade requested from infra (WP-3b).
+12. **A truncated urlbox body is cached for 14 days.** A 200 with a short body is stored as the thumbnail. WP-1h should check `Content-Length`, or the PNG signature and `IEND`, before caching.
+13. **The FileSystemCache backend** (development only) can still let two callers render at once: one caller's stale-entry delete can race another's claim. Redis, the production backend, has no delete on that path.
+14. **`response_wrapper` treats only a 500 from urlbox as a failure.** A 4xx error body would be streamed as `application/pdf` or `image/*`. This is pre-existing.
 
 ## Questions for the human
+
+- **Existing render-bot accounts.** Deployments set up before this WP have a `renderbot@zenysis.com` site-admin account, created by the old `scripts/create_bot_accounts.sh` (`-a`; the line is gone since `e6a90bf`). No code path signs in as it any more, and it now shows in the Admin user list. Should these existing accounts be deactivated, or demoted from site admin, on each deployment? That is an operation on production data.
+- **`DEPLOYMENT_BASE_URL` per deployment.** Before this ships, each deployment's value must be its real public https origin, or the app will not start (see the INV-1 note).
 
 - **Public PDF download.**
   - Decision 0004 requires an authenticated caller on every render route.
@@ -164,12 +243,26 @@ No other decision moved. The WP-2b pure layer is identical outside the render pi
 
 ## Contract changes
 
-None.
+These are WP-2c API contract recordings (`tests/contract`, owned by qa), not one of C-1 to C-11.
+
+- **`storage.retrieve.cached`** (`GET /api2/storage/retrieve?key=contract-dashboard`).
+  - Old: `seed_cache.py` writes `thumbnail_contract-dashboard` into Redis before any case runs. The case reads it and returns 200 with the seeded base64 PNG.
+  - New: the legacy key is never read. The key is now `thumbnail:v2:<resource_id>:<policy digest>`, and the digest depends on the caller. The case misses and renders through urlbox, which the stack cannot reach, then returns 200 with an empty string `""` and no `PENDING` marker. The recorded shape (`type: string`, status 200) still holds; the value changes.
+  - Migration for WP-2c: drop `seed_cache.py`, or stop relying on it. No PENDING stall is left to avoid. Rename or annotate the case as "miss with the renderer unreachable".
+- **`storage.retrieve.unknown_slug`** (`key=contract-no-such-dashboard`).
+  - Old: 500 (finding F11).
+  - New: 404, from werkzeug `NotFound` inside a Potion route, so the error body shape changes too. Re-record the body.
+- **Consumers.** qa-2c (the recordings and the replay). Frontend callers already treat an empty string as "no thumbnail" (`ThumbnailStorageService.js:25`, `Overview/index.jsx`).
+- **Acknowledgements.**
+  - [x] qa-2c: accepted both changes (qa-3, 2026-10-05, `WP-2c.md` on `mig/WP-2c-api-contract-recordings` at `bf08a36`). Whichever of WP-0i and WP-2c merges second re-records both cases, and replaces the start-up seed in `seed_cache.py` with a v2-key seed after `dashboard.create`.
 
 ## Requests
 
-- [ ] **qa (qa-2b): flip the N1 and N2 pins** in `tests/authz/test_render_routes.py` on this branch.
-  - A verified flipped version is at `docs/modernisation/work/WP-0i-evidence/test_render_routes.flipped.py`. It passes 15 of 15, and the full pure layer gives 4677 passed.
+- [ ] **qa (qa-2b): flip the N1, N2 and N7 pins** in `tests/authz/test_render_routes.py` on this branch.
+  - The front matter will need a qa instance (for example `qa-2b`) with `files: [tests/authz/test_render_routes.py]`, so that `task_gate` attributes that file to qa.
+  - The overlay is 3.8-safe: it uses `contextlib.ExitStack`, not a parenthesised `with`, and passes `ci/check_py38_syntax.py`.
+  - A verified flipped version is at `docs/modernisation/work/WP-0i-evidence/test_render_routes.flipped.py`. It passes 18 of 18. The full pure layer gives 4681 passed against 4675 on base, and the non-render outcomes are identical (Evidence).
+  - N7 is flipped, not dropped: `test_caller_chosen_url_does_not_receive_the_minted_render_token`. With `?url=https://attacker.invalid/steal&cookie=accessKey=planted` on `/png/thumbnail`, `/pdf` and retrieve, the urlbox call loads `<DEPLOYMENT_BASE_URL>/dashboard/<slug>?...`, and the token belongs to the caller.
   - The pin harness needs three changes:
     - patch `web.server.routes.views.dashboard.get_dashboard` instead of `Transaction` on `page_renderer` and `thumbnail_storage_models`;
     - give `_Cache` the `add` and `delete` methods;
@@ -183,10 +276,14 @@ None.
     - anonymous under public access gets 401.
   - This blocks review sign-off, not code.
 - [ ] **frontend-design: hide "Download" from unauthenticated visitors** in `DashboardShareButton.jsx:90`, as "Email" already is, because public visitors now get 401. Needed before merge if the human accepts the public-PDF change.
-- [ ] **lead:** remove the render-bot line from `scripts/create_bot_accounts.sh:5`, and decide whether to deactivate existing `renderbot@zenysis.com` admin accounts.
-- [ ] **core:** remove the unused `RENDERBOT_EMAIL` from `config/settings.py:27`.
-- [ ] **infra:** remove `RENDERBOT_EMAIL` from `docker-compose.yaml:136,171` and `.env.example:27`.
-- [ ] **human:** accept the INV-3 table, including the public-PDF row.
+- [x] **lead:** remove the render-bot line from `scripts/create_bot_accounts.sh:5`. Done on this branch (`e6a90bf`, instance `lead-1`). Whether to deactivate the existing accounts is a human question (above).
+- [x] **core:** remove the unused `RENDERBOT_EMAIL` from `config/settings.py:39`. This is done on WP-1h's core branch.
+- [ ] **infra:** remove `RENDERBOT_EMAIL` from `docker-compose.yaml:145` and `:179` (`:143` and `:178` on WP-1h's core branch).
+- [ ] **infra:** when WP-2b merges, add `tests/authz` to the path list of the 3.8 syntax guard (`ci/check_py38_syntax.py` in `.github/workflows/integration.yml`). The flipped overlay that qa-2b copies there is 3.8-safe today, but nothing would catch a regression.
+- [ ] **infra (WP-3b):** upgrade gunicorn from 20.0.4 (`uv.lock`), so that a `SCRIPT_NAME` request header no longer reaches the WSGI environ (carried risk 11). Not blocking: the render paths no longer read it.
+- [x] **qa (qa-2c):** acknowledge the two contract changes above (done at `bf08a36`). The `seed_cache.py` rework belongs to whichever of WP-0i and WP-2c merges second.
+- [ ] **human:** remove `RENDERBOT_EMAIL` from `.env.example` (a human item; agents do not read `.env*`).
+- [ ] **human:** accept the INV-3 table, including the public-PDF row, and answer the questions above.
 
 ## Log
 
@@ -197,32 +294,67 @@ None.
 - 2026-10-04 backend-7: moved the render tests to `tests/web/render` and merged `mig/integration` (`b42a7be`). Check: `uv run pytest tests/web` gave 135 passed and 1 failed. The failure is `test_graphql_endpoint_removed` (`ModuleNotFoundError: flask_migrate`), and it fails the same way on integration.
 - 2026-10-04 backend-7: the render tests now serve a `ThumbnailStorageResource` subclass, because other `tests/web` suites register the production class on their own `Api`. Check: on the web server's stack (Python 3.8, `requirements*.txt`, the same rewrite as `tests/authz/run.sh`), the whole `tests/web` tree gives 136 passed.
 - 2026-10-04 backend-7 units 5-6: the INV-3 table, and the WP-2b pure layer (`24e9e88`) in scratch copies. Check: base 4672 passed; the branch with today's pins 4662 passed plus 10 render-pin errors (they patch symbols this WP removed); the branch with flipped pins 4677 passed.
+- 2026-10-04 backend-7 round 2: the test app now runs without `SERVER_NAME` and adds a cookie login path through the real `signal_handlers.on_identity_loaded`; patches fail when their target is gone (`10175ed`). Check: lands with the next commit, whose expectations it serves.
+- 2026-10-04 backend-7 round 2: renders and email links use `DEPLOYMENT_BASE_URL`; `requests` failures are logged redacted; the claim loop is bounded; the digest is canonical; slug equality ignores case; renderbot leaves `BOT_USERS` (`4e05bcb`). Check: `tests/web` green the CI way, and the new tests fail on the round-1 head for their reasons.
+- 2026-10-04 backend-7 round 2: merged `mig/integration` `8638861` (`f2be31d`); made the flipped overlay pass the lint gate (`76c31e2`). Check: the lint gate is clean; QA measured 195 passed plus 1 strict xfail in `tests/web`.
+- 2026-10-05 backend-7 round 3: render and email URLs built from the URL map on a validated `DEPLOYMENT_BASE_URL`, checked at startup (`cb67bed`). Check: the 32 new origin tests fail on `76c31e2` (the hostile `SCRIPT_NAME` gives `https://harmony.tests.invalid@attacker.invalid/...`) and pass on the head.
+- 2026-10-05 backend-7 round 3: the Redis claim race is closed, and tests are added for thumbnail args, redaction of a 500, the hash seed and the bounded claim loop (`03acb20`). Check: each new test kills its mutant (dropping `request_args={}`, logging `res.url`, an unsorted canonical policy, no deadline, an unconditional delete). `tests/web` 237 passed plus 1 strict xfail; the lint gate is clean.
+- 2026-10-05 backend-7 round 3: flipped N7 in the WP-2b overlay, and brought this file up to date (INV-1 note, INV-3 rows, contract changes, risks, requests, evidence). Check: the WP-2b pure layer is 4681 passed with the overlay, 4675 on base, and 4663 plus 12 errors with today's pins; the non-render outcomes are identical to base.
+- 2026-10-05 backend-7 round-3 rework: merged `mig/integration` `61db9f8` (`fc3d8de`: py38 ruff target, 3.8 syntax guard, gate fix for lead-owned paths). Check: the 3.8 syntax guard passes 852 files.
+- 2026-10-05 backend-7 round-3 rework: the render fakes are now `render_fakes.py`, imported by basename. A new test checks that a gunicorn `create_app` refuses a hostile `DEPLOYMENT_BASE_URL` before any database access (`d5c3d23`). Check: tests/web gives 238 passed and 1 xfail on 3.9 (CI way) and on 3.8 (requirements*.txt). With a regular `tests` package placed after the repo on the 3.8 path, as a pip develop install of Flask-Potion does, the round-3 head fails collection (`flask_testing`) and this head passes. The startup test fails ("the database was touched") when `validate_deployment_base_url` is removed.
+- 2026-10-05 backend-7 round-3 rework: the overlay now uses `ExitStack` instead of a parenthesised `with`. Stale lead, render-bot and qa-2c items updated, with the evidence refreshed. Check: the old overlay fails the 3.8 guard at line 159 and the new one passes. The lint gate is clean. The WP-2b pure layer (`7933e17`) is 4681 passed with the overlay against 4675 on base, with identical non-render outcomes.
+- 2026-10-05 backend-7: QA, reviewer and security approved at `b5248bf`. The status is set to blocked on the human's acceptance of the INV-3 table (decision 0004). Also corrected the shadowing note (only a pip develop install shadows), requested the 3.8 guard for `tests/authz`, and pushed the branch with a draft PR. Check: `task_gate` reports only the status.
 
 ## Evidence
 
-- `docs/modernisation/work/WP-0i-evidence/tests-web-render.txt` lists the 67 passing cases by name.
-- **The whole `tests/web` tree on the production stack.** Python 3.8 with `requirements.txt` and `requirements-web.txt` (the `-e git+` lines are rewritten the way `tests/authz/run.sh` does it) gives 136 passed, 67 of them from `tests/web/render`. With the project's Python 3.9 env, `uv run pytest tests/web` gives 135 passed and 1 failed. The failure is `flask_migrate` missing from that env, and it fails the same way on integration.
-- **Red on base.**
-  - After unit 2, `uv run pytest tests/web/render` gave 43 failed and 18 passed against `0c604a3`.
-  - The final suite against the base code gave 48 failed and 19 passed. To run it, `web/server` was checked out at `0c604a3` in the worktree, then restored.
-  - The 19 that pass on base are behaviour that was already correct: anonymous pdf/jpeg get 401, viewers' pdf/jpeg render as themselves, retrieve refuses anonymous callers and outsiders, and an email with no link renders.
-- **WP-2b pure layer.** `tests/authz/run.sh`, Python 3.8 via uv, run in scratch copies under `/tmp/wp0i-authz` that were never committed.
+Round-3 rework head, after merging `mig/integration` `61db9f8`. Commands are run from the repo root.
+
+- **`tests/web`, run the CI way.** `uv run --locked pytest -m 'not stack' -- tests/web` (as `ci/pytest_suites.sh` does) gives 238 passed and 1 xfailed. The xfail is the strict pin for carried risk 9.
+  - `tests/web/render` alone gives 143 passed and 1 xfailed.
+  - `docs/modernisation/work/WP-0i-evidence/tests-web-render.txt` lists every case by name.
+- **`tests/web` on the web image's stack.** CPython 3.8.20 with `requirements.txt` and `requirements-web.txt`, using the WP-0c rewrite of the `-e git+` lines, gives 238 passed and 1 xfailed.
+  - That rewrite installs Flask-Potion from git, not as an editable checkout, so the checkout's `tests` package is not on the path. `uv --with-editable` does not expose it either. Only a pip develop install, which adds the checkout root to `sys.path`, does.
+  - To reproduce QA's environment, a regular `tests` package that imports `flask_testing` is put after the repo on `PYTHONPATH`.
+  - With it, the round-3 head (`cc01fa0`) fails collection with `ModuleNotFoundError: flask_testing`, and this head gives 238 passed and 1 xfailed.
+- **3.8 syntax.** `uv run --no-project -p cpython-3.8.20 python ci/check_py38_syntax.py config data db log models graphql util web scripts tests/web` gives 852 files checked and 0 problems.
+  - The same check on `WP-0i-evidence/` gives 0 problems.
+  - The previous overlay failed it at line 159: a parenthesised `with`.
+- **Fail before.**
+  - **Against `mig/integration` code.** The round-3 `tests/web/render` suite was run against the `mig/integration` tree (`1697a7a`) with `--continue-on-collection-errors`. It gave 126 failed, 5 passed and 1 collection error.
+    - The collection error is `test_thumbnail_policy_digest.py`: `query_policy_fingerprint` does not exist on base.
+    - 68 of the failures are `KeyError: 'sqlalchemy'`. The base handlers use `Transaction` and `find_one_by_fields` directly, and the harness does not fake those, so these failures do not test the defect.
+    - The rest fail on the defect itself: 401 or 500 where a refusal or a render is expected, the bot identity, the slug-only key, caller args reaching urlbox, an unredacted URL, a request-derived origin, and missing `deployment_origin`.
+    - Five cases pass on base: the three `test_slug_matches_in_any_case` cases, the anonymous retrieve refusal, and `test_render_with_an_unusable_configured_origin_makes_no_outbound_call`. The last passes only because base fails earlier.
+  - **Against the round-2 head `76c31e2`.** The 32 new origin tests fail there:
+    - 12 `SCRIPT_NAME` cases, because the render or link host is the attacker's;
+    - 20 that need `deployment_origin` or `validate_deployment_base_url`.
+    - The 8 hostile-`Host` tests pass there.
+  - **The claim-race test** fails on `76c31e2` code: the caller deleted the third caller's claim and rendered again.
+  - **Mutants.** Each new test fails under its mutant, and none hangs:
+    - dropping `request_args={}` from thumbnails fails 2 tests;
+    - logging `res.url` on a non-200 fails 3 tests;
+    - an unsorted `include` in `canonical_policy` fails the hash-seed test;
+    - removing the claim deadline makes the bounded-loop test fail with "the claim loop is spinning";
+    - removing `validate_deployment_base_url(app)` from `_create_app_internal` makes the gunicorn startup test fail with "the database was touched before the origin check".
+- **WP-2b pure layer.** `tests/authz/run.sh` from `mig/WP-2b-authz-suite` (`7933e17`; it changes nothing outside `tests/authz`) was run in scratch copies under `/tmp/wp0i-r3`, which were never committed.
 
   | Tree | Result |
   |---|---|
-  | `mig/integration` `b42a7be` + WP-2b `24e9e88` | 4672 passed, 575 skipped |
-  | branch `84a8f40` + WP-2b `24e9e88`, pins as they are today | 4662 passed, 575 skipped, 10 errors |
-  | branch `84a8f40` + WP-2b `24e9e88`, with `WP-0i-evidence/test_render_routes.flipped.py` | 4677 passed, 575 skipped |
+  | `mig/integration` `61db9f8` + WP-2b | 4675 passed, 580 skipped |
+  | this head + WP-2b, with `WP-0i-evidence/test_render_routes.flipped.py` | 4681 passed, 580 skipped. The 18 render cases include 3 flipped N7 cases. |
+  | round-3 head `03acb20` + WP-2b `09a7581`, with the pins as they are today | 4663 passed, 580 skipped, 12 errors. Each erroring pin patches `page_renderer.Transaction`, which this WP removed. |
 
-  All 10 errors are `AttributeError: ... page_renderer has no attribute 'Transaction'`: the pin harness patches the lookup this WP removed. Since 4662 + 10 = 4672, no other case moved.
-- **Lint.** `uvx ruff@0.6.9 check --select E,F,W,B --line-length 100` is clean on the touched modules and `tests/web/render`. The one pyflakes F841 in `views/dashboard.py:627` is already on base.
-- **Imports.** In a fresh interpreter, `web.server.security.signal_handlers` and `web.server.routes.views.page_renderer` each import first without a cycle, and `thumbnail_storage_models` imports cleanly.
-- **Not run: a live render.** urlbox is never called (decision 0004). Production already shows that a dashboard page renders under a caller token holding only `view_resource` on that dashboard: `/pdf`, `/jpeg` and email renders worked that way before this WP.
+  With `test_render_routes.py` deselected, the per-test outcome lists of base and head are byte-identical: 4663 passed.
+- **Lint.** `ci/lint_python.sh mig/integration` reports "All checks passed!" and "18 files already formatted". That covers ruff E4, E7, E9, F and S at the py38 target, plus `ruff format --check`, on every Python file this branch changes, including the flipped overlay.
+- **Imports.** `web.server.app` imports `deployment_origin` from `web.server.routes.views.page_renderer`. The startup tests import `web.server.app` in-process, and one of them runs `create_app` as gunicorn.
+- **Not run: a live render.** urlbox is never called (decision 0004).
+  - QA's round-3 live run on a fresh stack under gunicorn covered hostile `Host` and `SCRIPT_NAME` values. It also confirmed that a bad `DEPLOYMENT_BASE_URL` exits the container with code 1.
+  - In-process, the `SCRIPT_NAME` path is measured with `environ_overrides`. That is what gunicorn 20.0.4 produces from the header.
 
 ## Verdicts
 
 | Role | Verdict | Notes |
 |---|---|---|
-| qa | changes-requested | 2026-10-05 | 2026-10-05 qa-0i round 2 at 76c31e2: all seven round-1 code fixes hold and were checked by hand (tests/web 195 passed plus 1 strict xfail the CI way; lint gate clean on 17 files; new tests fail on base for the intended reasons; round-1 claim loop fails the expired-FileSystemCache test; live on the WP-2c stack with SERVER_NAME unset and Host attacker.invalid or real.org:@attacker.invalid every render and email link used the configured origin; urlbox on a closed port wrote one redacted line per route with no key, eyJ, accessKey or port; retrieve returned empty in 0.12 s with no Redis key; INV-3 rows held live incl. 404 for unknown, no, percent and underscore keys and 200 from cache for a differently cased key; expired entries rerender in about 1.1 s with real cachelib; digest identical across 14 hash seeds; WP-2b pure layer matches base on every non-render case and 4678 pass with the flipped file). Fix: (medium, blocks) WP file unchanged since round 1: log lines for 10175ed, 4e05bcb, 76c31e2, new evidence (the base run is now 86 failed, 4 passed, 1 collection error, 60 harness KeyError sqlalchemy, restate fail-before), correct design decision line 77, record the DEPLOYMENT_BASE_URL dependency as an INV-1 note; (medium) INV-3 rows missing (unknown or no key 500 to 404/401, differently cased key 500 to 200, LIKE patterns 404 on retrieve and render routes, thumbnail width delay fail_if_selector_present ignored, renderbot accounts now visible in Admin); (medium) Contract changes still None (storage.retrieve.cached now renders and returns empty since the legacy key is never read; unknown_slug 500 to 404; get qa-2c's acknowledgement) and the human list lacks the existing renderbot admin accounts; (low-medium) no test that thumbnails ignore caller args, mutant dropping request_args={} survives: add a retrieve test with width, delay and fail_if_selector_present asserting none reach urlbox; (low) hash-seed independence untested in-process, add a subprocess test under two seeds; (low) test_render_failures.py:133-142 hangs instead of failing under a no-deadline mutant, bound the loop; (low) flipped overlay lacks N7 (WP-2b f2e04ac pins it), add the flipped case and update the qa-2b request; (low) Redis claim deletion race between a failed add and get can allow two concurrent renders (note or restrict to FileSystemCache); (low, carry to WP-1h) a truncated urlbox body is cached for 14 days, check Content-Length or image signature. Outside the diff: Granted Access and New Dashboard emails build links from the request Host and the access email links a wrong slug; share_via_email sends the free-form dashboardUrl. |
-| reviewer | changes-requested | 2026-10-05 | 2026-10-05 rev-0i round 2 at 76c31e2: most round-1 findings fixed and each verified by reverting (render and email origin from DEPLOYMENT_BASE_URL with origin tests under hostile Host; claim loop bounded by PENDING_STATE_TIMEOUT with a real FileSystemCache test; RequestException caught and logged as one redacted line with a closed-port test; digest over the per-dimension maps stable across 25 hash seeds; slug lookup equal-ignoring-case; renderbot out of BOT_USERS; test nits fixed; integration 8638861 merged; CI-equivalent run green). Fix: (medium) page_renderer.py:74-75 joins the configured origin with url_for output which includes the request script root; gunicorn 20.0.4 copies a SCRIPT_NAME header into WSGI so SCRIPT_NAME @attacker.invalid yields a render URL whose host is attacker.invalid (confirmed for /pdf and retrieve; nginx drops underscore headers but direct gunicorn callers are exposed): build the path without the script root or require the final scheme and netloc to equal DEPLOYMENT_BASE_URL, with tests for a render route, retrieve and get_email_attachments; (medium) WP file unchanged since 9059571: Contract changes still None (add the retrieve changes and WP-2c's plan), INV-3 rows missing (unknown key 404/401, differently cased key 500 to 200, percent and underscore no longer wildcards which also changes routes/dashboard.py:30 and embedded_query.py:121, width and delay ignored, renderbot now visible in Admin), design decision still says url_for (document DEPLOYMENT_BASE_URL: no fallback, stale values, harmony_demo value; carry to WP-1h), carried risk for narrowed query_needs tokens, human question on existing renderbot admin accounts, stale request line numbers; (low, blocks the gate) files list omits query_policy.py, bots.py and test_redis_password.py; (low) log lines for the four rework commits missing and tests-web-render.txt stale (now 100 passed 1 xfailed); (low) flipped WP-2b overlay drops the N7 test instead of flipping it; (low) no redaction test for a non-200 urlbox response and FakeRenderResponse.url carries no secret. Outside the diff for security: invite.py:19, admin.py:29, permission_api_models.py:268, dashboard_api_models.py:1098 build links from the Host header; send_email still mails the free-form dashboardUrl. |
-| security | changes-requested | 2026-10-05 | 2026-10-05 sec-0i round 2 at 76c31e2: no High or Medium left in code; INV-6 closed (7 urlbox failure modes across 11 routes and email in both formats: head 91 of 91 clean, base 26 leaking); origin closed (22 Host, port, forwarding and prefix variants plus 10 hostile dashboardUrl values all render at the configured origin on head, and over TLS); digest sound (21 accounts, 3 sign-in channels, 2 configs, 7 hash seeds: equal digests imply equal filters, superuser digests to superuser, Druid filters byte-identical to base for 260 identities); INV-3 matrix of 880 requests per tree matches the table except the gaps below; semgrep offline (Trail of Bits and elttam) 0 on base and head. Fix: (F1, blocks, documentation) INV-3 rows for unknown key 500 to 404/401, differently cased slug on all render rules and retrieve (viewer 500 to 200 as the caller, no view_resource 500 to 403, anonymous 500 to 401), percent and underscore no longer wildcards on dashboard.py:30 and embedded_query.py:121, thumbnails and retrieve ignore every caller arg; design text still says url_for; carried risks F2 F3 F4; log and evidence stale. (F2, Low, fix now) page_renderer.py:74-75 url_for adds the request SCRIPT_NAME and gunicorn 20.0.4 copies a SCRIPT_NAME header into WSGI (measured through real gunicorn: token minted for https://origin@attacker.invalid/...), build the path with current_app.url_map.bind('').build as dashboard_page_args does, or require the final scheme and host to equal DEPLOYMENT_BASE_URL, tests with environ_overrides SCRIPT_NAME for a render route, retrieve and send_email; ask infra (WP-3b) to upgrade gunicorn. (F3, carried) narrowed query_needs tokens digest the narrow policy while the render token renders the whole account, unreachable today, strict xfail; cheap fix: per-user key when claims query_needs is not star. (F4, Low) validate DEPLOYMENT_BASE_URL at startup (https, no userinfo, path or query) and document the sharp edge (staging reusing a production config sends tokens to production). (F5, carried) send_email still mails the free-form dashboardUrl. Outside the diff for the lead: O1 Medium confirmed, JWT login resolves usernames with ILIKE and first() so john_doe signs in as john.doe (fix equality on lower(username) and user.username as the JWT identity); O2 High if reachable, reset link built from the request Host at admin.py:29 reachable anonymously via forgot_password, invite and access-email links likewise, exploitable only if nginx-proxy forwards the raw Host (verify on a local stack). Human must accept the INV-3 table incl. the public PDF loss. |
+| qa | approved | 2026-10-05 qa-0i round 4 at b5248bf: integration 61db9f8 already in the branch; no production file changed since e6a90bf so the round-3 live pass stands; lint gate whole-tree and 18 files clean; 3.8 guard 852 files 0 problems (round-3 overlay fails it, the ExitStack overlay passes); ci/pytest_suites.sh 8 suites green (web 238 plus 1 xfail); tests/web 238 on the 3.8 env with and without a shadowing tests package (round-3 head fails collection); WP-2b pure layer 4681 with the overlay, 4663 plus 12 errors with today's pins, all 5243 non-render outcomes identical to base; three mutants of the startup validation each fail the new gunicorn test; task_gate reports only status and verdicts; stale text and the INV-3 row corrected; qa-2c acknowledgement present in WP-2c at bf08a36. Info: the 3.8 syntax guard does not scan tests/authz or docs, add tests/authz when WP-2b merges (infra); a backend memory note overstates the editable-install shadowing (only a pip develop install shadows; uv --with-editable does not). |
+| reviewer | approved | 2026-10-05 rev-0i round 4 at b5248bf: all four round-3 items closed (ExitStack overlay passes the 3.8 guard and 18 of 18 on WP-2b 7933e17 with 4681 pure-layer passes; task_gate reports only status and verdicts with integration's gate fix in the branch; stale text fixed; the gunicorn create_app startup test fails under three mutants); lint gate whole-tree clean with 18 files formatted; 3.8 guard 852 files 0 problems; tests/web 238 passed 1 xfail on the CI lane in both orders and on CPython 3.8 with and without a real Flask-Potion tests package shadowing the namespace (round-3 head fails collection, this head passes). No findings. Merge waits on the qa verdict, the qa-2b flip of the overlay in tests/authz and the human's INV-3 acceptance incl. the public-PDF row. |
+| security | approved | 2026-10-05 sec-0i round 3 at e6a90bf: F2 closed (real gunicorn 20.0.4 with a raw SCRIPT_NAME header: 13 of 13 render at the configured origin on head, 9 of 13 leaked on the round-2 head; in-process 510 route and 600 email cases with 30 Host, forwarding and SCRIPT_NAME variants, 0 off-origin); F4 closed (43 hostile DEPLOYMENT_BASE_URL values refused incl. userinfo with escapes and newlines; the real gunicorn entry point exits 1 before binding on a bad value; odd accepted forms fail closed); INV-6 closed-port probe 13 of 13 clean in both formats; INV-3 matrix of 880 cases identical to round 2 and every base-to-head change matches a row after two documentation corrections applied by the lead (anonymous differently cased slug was 500 on every render route; the 403 vs 404 sentence narrowed to percent and underscore probing); claim deletion limited to FileSystemCache and Redis never deletes another caller's claim; semgrep F2 rule fires on round 2 and not on head; ownership clean bar the lead's own commit (claimed by a lead-1 instance). F3 and F5 carried as risks 9 and 10; O1 and O2 stay with WP-0k. Human must accept the INV-3 table incl. the public PDF loss before merge. |

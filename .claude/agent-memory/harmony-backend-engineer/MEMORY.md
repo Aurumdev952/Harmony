@@ -10,3 +10,4 @@
 - [Flask route tests in-process](flask-route-tests-in-process.md) — conftest double import, subclass Potion resources, AUTHORIZABLE_DIMENSIONS, urlbox recorder
 - [Post-WP-2f tooling](post_wp2f_tooling.md) — tests/web on plain uv py3.9, lint-gate and noqa traps, guard workarounds, graphql stub
 - [ruff format vs py3.8](ruff_format_py38_trap.md) — ruff format writes parenthesized `with` that the 3.8 web image rejects; nest them, parse under 3.8
+- [Absolute URLs and script root](absolute_urls_and_script_root.md) — Host and SCRIPT_NAME are caller-controlled; build token URLs from url_map on the configured origin

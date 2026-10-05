@@ -20,7 +20,7 @@ from flask_principal import Identity
 from pydruid.utils.filters import Filter
 
 from models.python.permissions import DimensionFilter, QueryNeed
-from tests.web.render.fakes import DASHBOARD_RESOURCE_ID, VIEW_DASHBOARD
+from render_fakes import DASHBOARD_RESOURCE_ID, VIEW_DASHBOARD
 from web.server.redis.thumbnail_storage_service import query_policy_fingerprint
 from web.server.routes.views.query_policy import caller_policy_filter, canonical_policy
 from web.server.security.permissions import SUPERUSER_NEED
@@ -198,7 +198,7 @@ def test_policies_that_render_differently_do_not_share_a_digest(
 _DIGESTS_IN_A_FRESH_INTERPRETER = """
 import json
 from flask import Flask
-from tests.web.render import test_thumbnail_policy_digest as digests
+import test_thumbnail_policy_digest as digests
 
 app = Flask('tests.web', root_path='.', instance_path='/tmp')
 app.zen_config = digests.POLICY_ZEN_CONFIG
@@ -210,7 +210,9 @@ print(json.dumps(sorted([list(key), value] for key, value in measured.items())))
 
 def _digests_under_hash_seed(seed: str) -> Dict[Tuple[str, str], str]:
     repo_root = Path(__file__).resolve().parents[3]
-    env = {**os.environ, 'PYTHONHASHSEED': seed, 'PYTHONPATH': str(repo_root)}
+    # This directory first: its modules import each other by basename.
+    path = os.pathsep.join([str(Path(__file__).parent), str(repo_root)])
+    env = {**os.environ, 'PYTHONHASHSEED': seed, 'PYTHONPATH': path}
     output = subprocess.run(
         [sys.executable, '-c', _DIGESTS_IN_A_FRESH_INTERPRETER],
         cwd=repo_root,

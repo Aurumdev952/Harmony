@@ -1,0 +1,58 @@
+diff --git a/tests/privilege_escalation/conftest.py b/tests/privilege_escalation/conftest.py
+index c9f3ae6..9589e75 100644
+--- a/tests/privilege_escalation/conftest.py
++++ b/tests/privilege_escalation/conftest.py
+@@ -287,7 +287,7 @@ def fixture_make_user(app):
+             client = app.test_client()
+             if browser:
+                 with app.test_request_context():
+-                    token = create_user_access_token(username)
++                    token = create_user_access_token(user)
+                 client.set_cookie('localhost', 'accessKey', token)
+             return Actor(id=user.id, username=username, client=client, browser=browser)
+ 
+diff --git a/tests/privilege_escalation/test_group_and_role_grants.py b/tests/privilege_escalation/test_group_and_role_grants.py
+index abaab7c..e534f1f 100644
+--- a/tests/privilege_escalation/test_group_and_role_grants.py
++++ b/tests/privilege_escalation/test_group_and_role_grants.py
+@@ -334,11 +334,12 @@ def _token_client(app, username: str, needs=None):
+     # pylint: disable=import-outside-toplevel
+     from flask_jwt_extended import create_access_token
+ 
++    from models.alchemy.user import User
+     from web.server.util.authentication import create_user_access_token
+ 
+     with app.test_request_context():
+         token = (
+-            create_user_access_token(username)
++            create_user_access_token(User.query.filter_by(username=username).one())
+             if needs is None
+             else create_access_token(
+                 identity=username, user_claims={'needs': needs, 'query_needs': []}
+diff --git a/tests/privilege_escalation/test_rename_and_reset.py b/tests/privilege_escalation/test_rename_and_reset.py
+index c8f3f29..fdc24ee 100644
+--- a/tests/privilege_escalation/test_rename_and_reset.py
++++ b/tests/privilege_escalation/test_rename_and_reset.py
+@@ -53,7 +53,7 @@ def fixture_mailer(app, monkeypatch):
+     )
+     # The harness does not register the login pages the link points at.
+     monkeypatch.setattr(
+-        'web.server.routes.views.admin.url_for',
++        'web.server.routes.views.admin.deployment_url',
+         lambda *_args, **_kwargs: 'http://harmony.invalid/user/reset-password',
+     )
+     return sent
+@@ -416,11 +416,12 @@ def _token_caller(app, username: str, needs=None):
+     # pylint: disable=import-outside-toplevel
+     from flask_jwt_extended import create_access_token
+ 
++    from models.alchemy.user import User
+     from web.server.util.authentication import create_user_access_token
+ 
+     with app.test_request_context():
+         token = (
+-            create_user_access_token(username)
++            create_user_access_token(User.query.filter_by(username=username).one())
+             if needs is None
+             else create_access_token(
+                 identity=username, user_claims={'needs': needs, 'query_needs': []}

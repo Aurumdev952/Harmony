@@ -83,14 +83,28 @@ def fixture_app(tmp_path):
     return app
 
 
+# The user table and the empty tables a user edit reads its grants from.
+TABLES = (
+    'user',
+    'role',
+    'user_roles',
+    'security_group',
+    'security_group_users',
+    'user_acl',
+)
+
+
 def _create_users(db, password_hash):
-    # Only the columns, so no foreign key needs the tables they point at.
-    columns = ', '.join(
-        '"id" INTEGER PRIMARY KEY' if column.name == 'id' else f'"{column.name}"'
-        for column in User.__table__.columns
-    )
     with db.engine.begin() as connection:
-        connection.execute(sqlalchemy.text(f'CREATE TABLE "user" ({columns})'))
+        for table in TABLES:
+            # Only the columns, so no foreign key needs the tables they point at.
+            columns = ', '.join(
+                '"id" INTEGER PRIMARY KEY'
+                if column.name == 'id'
+                else f'"{column.name}"'
+                for column in User.metadata.tables[table].columns
+            )
+            connection.execute(sqlalchemy.text(f'CREATE TABLE "{table}" ({columns})'))
         connection.execute(
             sqlalchemy.text(
                 'CREATE TABLE api_token (id PRIMARY KEY, user_id, is_revoked, '

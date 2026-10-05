@@ -6,3 +6,4 @@
 - [WP-2f toolchain](wp_2f_next.md): two uv lanes (3.9 app, 3.13 tools), generated requirements, ruff/pytest traps
 - [Infra tooling traps](infra_tooling_traps.md) — *.log gitignored, strict mypy via ci/tools313, scripts/ vs prod/ ownership, nginx-proxy logs, worktree git
 - [Image verification recipes](image_verification_recipes.md) — unique compose build names, sweep env/PYTHONPATH, overlays, PyPy: import-test wheels, gspread marker
+- [PyPy 3.8 Rust wheels](pypy38_rust_wheels.md) — pydantic-core has no pp38 wheel; pypy-wheels Rust builder stage; host cargo hides it locally

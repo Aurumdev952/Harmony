@@ -105,3 +105,27 @@ Added by decision 0004 after the WP-2b security review.
   - Anonymous and unauthorised requests to every render route get 401 or 403 and no outbound render call is made (mock the renderer; never call urlbox from tests).
   - A policy-restricted viewer never receives a thumbnail rendered with a wider policy.
   - The WP-2b pins for these routes flip from today's behaviour to the new one in the same stack.
+
+## 0j. Refuse username changes and password resets that reach a higher-privileged account
+
+Added by decision 0005 after the WP-0h security re-review confirmed H5 live.
+
+- **Changes.**
+  - `PATCH /api2/user/<id>` refuses a `username` change, and `POST /api2/user/<id>/reset_password` refuses the reset, when the caller is not a superuser and the target holds any grant the caller does not (roles direct or through a group, group memberships, ACLs, query policies, data export; administrator by any path). Refusals are 403, write nothing and leave an audit line.
+  - Optional, with security: `UserResourceManager` hides users who are administrators through a group from non-superusers, as it already hides direct administrators.
+- **Verification.**
+  - A failing test first: `manager` + `user_admin` renaming an admin-through-group user gets 200 on the base and 403 on the branch with no row changed and no reset mail; the stubbed mailer receives nothing.
+  - Equal-or-lesser targets still rename and reset as before.
+  - The WP-2b pins for these routes flip in the same stack; the INV-3 row in decision 0005 is accepted by security and the human.
+
+## 0k. Build outgoing links from the configured origin; match usernames exactly
+
+Added by decision 0006 after the WP-0i round-2 reviews.
+
+- **Changes.**
+  - Reset, invite, access-granted, new-dashboard and share-by-email links are built from `DEPLOYMENT_BASE_URL` through WP-0i's helper; nothing reads the request Host or `SCRIPT_NAME`. `send_email` links to the dashboard's own page and ignores the caller's free-form URL.
+  - Login, registration and invitation look users up by exact `lower(username)`; the JWT identity is `user.username`.
+- **Verification.**
+  - Failing tests first: a forged Host (`attacker.invalid`, `real.org:@attacker.invalid`) and a forged `SCRIPT_NAME` on `forgot_password`, invite, access-granted and new-dashboard paths produce links on the configured origin; a look-alike username (`john_doe` for `john.doe`) no longer signs in as the other account.
+  - Unit 1 records whether nginx-proxy 1.11.6 forwards the raw Host on a local stack.
+  - The WP-2b pins flip in the same stack; the INV-3 rows are accepted by security and the human.

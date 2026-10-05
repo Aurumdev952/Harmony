@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from contextlib import ExitStack
 from types import SimpleNamespace
 from unittest import mock
 
@@ -112,7 +113,7 @@ def fixture_request_field_info(bare_flask_app, druid):
         provides = set()
         if district:
             provides.add(QueryNeed([DimensionFilter('district', [district])]))
-        with (
+        contexts = (
             app.test_request_context(f'/api/field/{field_ids}'),
             mock.patch(
                 'web.server.routes.views.query_policy.SuperUserPermission',
@@ -134,7 +135,10 @@ def fixture_request_field_info(bare_flask_app, druid):
                 'web.server.routes.views.authentication.get_configuration',
                 return_value=False,
             ),
-        ):
+        )
+        with ExitStack() as stack:
+            for context in contexts:
+                stack.enter_context(context)
             g.identity = SimpleNamespace(provides=provides)
             response = ApiRouter(None, None).api_field_info(field_ids)
             return response.get_json()['data']

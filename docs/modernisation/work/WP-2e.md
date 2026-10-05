@@ -12,6 +12,8 @@ instances:
       - "package.json"
       - "yarn.lock"
       - "docs/modernisation/work/WP-2e.md"
+      - "tests/golden/synth.py"
+      - "tests/contract/stack/stack.sh"
 branch: "mig/WP-2e-frontend-harness"
 requirements: [QA-3, QA-4, FE-8, FE-9, INV-1, INV-5]
 contracts_consumed: [C-5]
@@ -21,7 +23,7 @@ security_review: false
 
 # WP-2e: Frontend unit and end-to-end harness
 
-qa-5 claimed this WP. Its session was lost when the host rebooted, and qa-5r took over on the same branch on 2026-10-04 with the untracked unit-harness start.
+qa-5 claimed this WP. Its session was lost when the host rebooted, and qa-5r took over on the same branch on 2026-10-04 with the untracked unit-harness start. qa-5r's session was lost in turn after unit 2; qa-5s took over on 2026-10-05 with its uncommitted unit-3 start (page table, AQT helpers, dashboard seed).
 
 ## Plan
 
@@ -50,6 +52,11 @@ None of these block WP-2e.
 
 - [ ] frontend-platform (WP-6a): `ZenClient.request` uses `$.getJSON` with no error callback, so on a 4xx or 5xx its promise never settles and callers hang (`web/client/util/ZenClient.js:41-56`, the TODO at line 44). `tests/frontend/unit/zenClient.test.js` holds a `test.todo('rejects on an HTTP error')`; turn it into a test when the fetch rewrite lands.
 - [ ] frontend-platform: `APIToken.deserialize` parses the calendar dates `created` and `revoked` as UTC midnight and then converts them to local time (`web/client/services/models/APIToken.js:44-45`). West of UTC, `serialize` sends back the previous day. Repro: `TZ=America/New_York`, deserialize `{created: '2026-10-04', ...}` then serialize, and you get `'2026-10-03'`. Expected: the same date. The unit suite pins `TZ=UTC` until this is fixed. Then drop the pin and run the suite in a western zone as the failing-first test.
+- [ ] frontend-platform: the dashboard text tile's Jodit editor fetches `js-beautify` and `ace` from `cdnjs.cloudflare.com` when it opens (Jodit's default source-mode config, `TextEditView/JoditEditor.jsx`). Offline or behind a strict CSP both loads fail and throw uncaught `Event` errors. Repro: `e2e/tests/dashboard.spec.ts` "a text tile added in the editor", with the `EDITOR_CDN` allowance removed. Expected: no request leaves the deployment. Drop the allowance when fixed.
+- [ ] security, backend (WP-5c): `POST /api2/authentication/forgot_password` answers 400 "This user account does not exist" for an unknown address, while the page's success message ("If there is an account associated with the provided email address...") implies it does not reveal that (`USER_SHOW_USERNAME_EMAIL_DOES_NOT_EXIST = True`, `web/server/configuration/flask.py`). That is account enumeration. Repro: signed out, `/user/forgot-password`, enter `nobody@harmony.invalid`. The smoke suite asserts nothing about unknown addresses until the intended behaviour is decided.
+- [ ] backend (WP-5h): `grid_dashboard_urlbox_renderer` catches the builtin `ConnectionError`, not `requests.exceptions.ConnectionError`, so an unreachable renderer turns a PDF or JPEG download into an unhandled 500 (`web/server/routes/views/page_renderer.py:138-148`). Repro: on the contract stack (no egress), Share > Download > PDF. The self-hosted renderer should fail with a handled error.
+- [ ] backend: invite, reset and share e-mails on harmony_demo end "email us at None ( None )", and the reset mail links `mailto:None`: the support address is unset and the templates print it anyway. Repro: any mail in the e2e stack's mailpit.
+- [ ] visualization (WP-7g): every map load sends Mapbox GL telemetry (`events.mapbox.com/events/v2`) and a billing session (`api.mapbox.com/map-sessions/v1`). The suite blocks both and allows them by name in `e2e/support/map.ts`; remove the allowance with the MapLibre move.
 - [ ] infra (WP-2f): run `yarn test` on every PR (Node 18.17 today, about 7 s), and run `e2e/run.sh` in the job that can start Docker, publishing `e2e/report/` as an artifact.
 
 ## Log
@@ -58,6 +65,9 @@ None of these block WP-2e.
 - 2026-10-04 qa-5r unit 1: Vitest unit harness, with 7 files and 339 tests plus 1 todo. Check: `yarn test` passes on Node 24 and in `node:18.17 --network none`; `eslint --max-warnings 0 tests/frontend` is clean; `tests/frontend/mutants.sh` reports 0 surviving mutants out of 5.
 - 2026-10-04 qa-5r: merged `mig/WP-2c-api-contract-recordings` (fa72fe0) for `tests/contract/stack`.
 - 2026-10-04 qa-5r unit 2: Playwright harness in `e2e/` on the contract stack, with a client-build sidecar, Data Catalog seed, error and external-request guard, and login specs. Check: `e2e/run.sh --grep @login` runs 4 tests, all passing, on a fresh stack, and teardown leaves 0 containers and no credentials file; `yarn --cwd e2e typecheck`, shellcheck and ruff are clean.
+
+- 2026-10-05 qa-5s: merged `mig/WP-2c-api-contract-recordings` (b6e49b8) again, with no conflicts. Copied qa-5r's uncommitted unit-3 start from its worktree.
+- 2026-10-05 qa-5s unit 3 (23da27f): the @smoke suite, 75 tests. Two stack changes made it possible. First, `e2e/stack/compose.e2e.yaml`, layered through a new `CONTRACT_OVERLAYS` hook in `stack.sh`, turns the offline mock off. The production Druid client then queries `e2e/stack/druid_broker.py`, which serves `tests/golden/synth.py` over HTTP. The mock had no subtotals or time-format columns, so hierarchy, sunburst, pie and number-trend 500ed on it, and its values were random. Second, `renderer.py` stands in for Urlbox, and the overlay adds a tmpfs for uploads. synth gained `extra_fields` and `dense` options; `tests/golden/record.py --check` reports 0 of 85 cases changed and `pytest tests/golden` passes (269). `seed.sql` repairs the contract stack's unpublished field: its `{"type": "SUM"}` calculation is a shape the pipeline never writes, and Indicator Setup throws on it. Check: `e2e/run.sh --grep @smoke` 75/75 twice on fresh stacks; `tsc --noEmit` strict, shellcheck on `e2e/run.sh`, and ruff check and format on `e2e/stack` and `tests/golden` are clean. The two shellcheck notes left in `stack.sh` (SC2174, SC2016) predate this WP.
 
 ## Evidence
 
@@ -73,6 +83,15 @@ None of these block WP-2e.
 
   Under `TZ=America/New_York` two APIToken tests fail, with the dates off by one day. That is the second request above.
 - Unit 2: `e2e/run.sh --grep @login --reporter=line` was run from `down`, so the stack was rebuilt from scratch. Every secret was regenerated, and the catalog and sidecar came up. The 4 login tests passed in 8.1 s. Afterwards `docker ps -a --filter label=com.docker.compose.project=harmony-wp2e-e2e` lists 0 containers and the credentials file is gone. The tests check four things: a signed-out redirect to `/login`, a UI sign-in that lands on `/overview` with an `HttpOnly` `accessKey` cookie, a wrong password that shows "Incorrect username and/or password." and sets no cookie, and a sign-out after which `/overview` redirects to `/login` again.
+
+- Unit 3: `e2e/run.sh --grep @smoke --reporter=line` from `down`, run twice. Both runs: 75 passed in 2.7 min, exit 0. Afterwards 0 containers carry the project label and no credentials file is left (logs `/tmp/wp2e-smoke-run1.log`, `/tmp/wp2e-smoke-run2.log` on the build host). The suite covers:
+  - `pages.spec.ts` (46): every page in the URL table under its legacy URL, the same pages under `/en/`, `/fr`, `/pt` and `/am` overviews rendered in that language, and a Data Catalog field URL loaded directly (FE-9, INV-5).
+  - `visualizations.spec.ts` (20): every type the picker offers. Each test asserts a 200 from that type's query endpoint and a drawn element (a broker state or month label, data marks, or the primary number), and that no "No data" appears.
+  - `dashboard.spec.ts` (6): a query from Analyze onto a new dashboard, then opened from the overview; a text tile saved and still there after reload; the share link; share by e-mail, checked in mailpit; and PDF and JPEG downloads, checked by magic bytes. The renderer refuses unless the minted cookie opens the dashboard.
+  - `account.spec.ts` (2): an admin invite, then registration from the e-mailed link; forgot password, then reset from the e-mailed link, after which the old password fails and the new one works.
+  - `upload.spec.ts` (1): CSV upload, mapping, review and complete, ending with the source queued.
+  - `login.spec.ts` (4): unchanged.
+- Faults the fixture catches that this unit does not hide: each allowance names its reason, and every one maps to a request above. These are Mapbox telemetry (maps), Jodit's cdnjs loads (text tile), and the data digest's missing object storage (WP-2c deferral).
 
 ## Verdicts
 

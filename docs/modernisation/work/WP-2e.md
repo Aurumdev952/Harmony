@@ -114,6 +114,7 @@ None of these block WP-2e.
   - `e2e/run.sh e2e` passes 77 (76 plus the guard spec).
 - 2026-10-06 qa-5t round 2, unit 12 (QA gate finding 4): the present-mode case is now the last of the serial dashboard flow. A failure there can no longer skip the share and export cases. Check: with the present case broken on purpose (`Add Content` expected 5 times), `--grep @dashboard` gives 1 failed and 6 passed, with nothing skipped (`/tmp/wp2e-present-mutant.log`). Restored, the full e2e project passes 77.
 - 2026-10-06 qa-5t round 2, unit 13 (QA gate findings 6 and 7): recorded the unit-test location deviation (`tests/frontend/unit/` instead of `web/client/**/*.test.ts`) and the one-host limit of visual determinism, as a deferral tied to the CI job. Unit 3's `pages.spec.ts` count was corrected to 42 in unit 8.
+- 2026-10-06 qa-5t round 2 closing check at 0448800: `yarn e2e` from a `git archive` of the head passed visual 71, a11y 26 and e2e 77. The client-edit proof, strict tsc, shellcheck, ruff, ESLint, the 3.8 guard and task_gate are in the evidence. Status stays review.
 
 ## Evidence
 
@@ -153,6 +154,13 @@ None of these block WP-2e.
   - Deliberately broken case (phase 2 exit check): in that checkout `PageRouter.data_status` (`web/server/routes/index.py`) raises `RuntimeError`. `yarn e2e` then fails with 3 visual cases (data-status at 390, 1024 and 1440), 1 a11y case (data-status) and 2 e2e cases (`/data-status` and `/en/data-status` open). Every other case passes, the exit code is 1, and no container or credentials file is left (`/tmp/wp2e-broken-run.log`).
   - Static checks at the head: `tsc --noEmit` (strict) on `e2e/` is clean; shellcheck 0.11 on `e2e/run.sh` is clean; `ruff check` and `ruff format --check` on `e2e/stack` and `tests/golden` are clean; `eslint --max-warnings 0 tests/frontend` is clean. The repository's ESLint config (babel-eslint and Flow, `.js` and `.jsx` only, which is all CI lints) does not apply to the TypeScript in `e2e/`, so strict tsc is the gate there.
 - Round 2, unit 1: `e2e/visual/page-login-1440.png` with every pixel whose channels all lie in 0x28-0x48 raised by 0x33 (450 pixels; the text colour is #313234). At threshold 0.2: `1 passed` (`/tmp/wp2e-grey-at-0.2.log`). At 0.05: `1 failed`, `323 pixels (ratio 0.01 of all image pixels) are different` (`/tmp/wp2e-grey-at-0.05.log`). The snapshot was restored, and `run.sh visual` passed 80 at 0.05 on a fresh stack (`/tmp/wp2e-visual-0.05.log`).
+- Round 2, closing check, from a `git archive` of 0448800 into an empty directory (no node_modules, no build, no e2e packages), with `yarn e2e` (`/tmp/wp2e-r2-clean-run.log`):
+  - The client was built in the Node 18.17 image ("client sources changed since the last build (or no build)"; install 212 s, webpack 174 s).
+  - visual 71 passed, a11y 26 passed, e2e 77 passed, exit 0, 1193 s in total.
+  - Afterwards: 0 containers with the project label, nothing for the project in `/run/user/1000` (neither credentials nor admin state), and no admin state in `/tmp`.
+  - Client-edit proof (reviewer finding 2) in that checkout. `e2e/run.sh client` said "client build matches its sources". After `invalid_login_credentials` in `web/client/components/Authentication/i18n.js` was changed to end in "(stamp check)", the next `client` printed "client sources changed ...; building" and rebuilt (141 s), `commons.bundle.js` then held the new text, and a third `client` said the build matches again (`/tmp/wp2e-r2-client-edit.log`).
+  - Static checks at the head: strict `tsc --noEmit` on `e2e/` with TypeScript 6.0.3 is clean; shellcheck 0.11 on `e2e/run.sh` is clean; ruff check and format are clean on `e2e/stack` and `tests/golden`; `eslint --max-warnings 0 tests/frontend` is clean; the 3.8 guard reports 8 files and 0 problems in `tests/golden` and `e2e/stack`; `pytest tests/golden` passes 269.
+  - `task_gate.py WP-2e` reports only the status (review) and the two changes-requested verdicts awaiting re-check, and no ownership problems.
 
 ## Verdicts
 

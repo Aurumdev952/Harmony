@@ -188,6 +188,18 @@ def test_a_body_without_a_length_is_refused():
     assert response.status in (411, 413)
 
 
+def test_a_length_in_non_ascii_digits_is_refused_and_logged(caplog):
+    caplog.set_level(logging.INFO, logger='harmony.worker.renderer')
+    with serving(png) as port:
+        # '²' passes str.isdigit but not int().
+        response, data = call(port, raw=b'{}', headers={'Content-Length': '\u00b2'})
+
+    assert response.status == 411
+    assert json.loads(data) == {'error': 'length_required'}
+    [line] = [r.getMessage() for r in caplog.records if '"render"' in r.getMessage()]
+    assert json.loads(line)['status'] == 411
+
+
 @pytest.mark.parametrize(
     'method, path, status',
     [

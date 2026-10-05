@@ -95,7 +95,7 @@ def build_server(settings: RendererSettings, render: Render) -> ThreadingHTTPSer
 
         def _render(self, entry: dict):
             length = self.headers.get('Content-Length')
-            if length is None or not length.isdigit():
+            if length is None or not (length.isascii() and length.isdecimal()):
                 self.close_connection = True
                 return self._error(411, 'length_required', entry)
             if int(length) > MAX_BODY_BYTES:

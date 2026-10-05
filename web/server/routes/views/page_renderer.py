@@ -89,7 +89,10 @@ def _page_url(locale, name, output_format, session_hash, is_thumbnail):
 
 def _int_arg(args: Mapping[str, str], name: str, allowed: range, default: int) -> int:
     value = args.get(name, '')
-    return int(value) if value.isdigit() and int(value) in allowed else default
+    # isdigit() alone accepts digits such as '²' that int() rejects.
+    if not (value.isascii() and value.isdecimal()):
+        return default
+    return int(value) if int(value) in allowed else default
 
 
 def _flag_arg(args: Mapping[str, str], name: str, default: bool) -> bool:

@@ -258,6 +258,8 @@ def test_supported_request_args_shape_the_render(client, renderer):
     [
         'width=99999&height=-1',
         'width=abc&height=1e9',
+        # Unicode digits: str.isdigit accepts them, int() does not.
+        'width=%C2%B2&height=%D9%A3%D9%A3%D9%A3',
         'pdf_page_size=../../etc&pdf_orientation=sideways',
         'delay=60000&wait_timeout=999999&url=https://attacker.invalid/',
     ],

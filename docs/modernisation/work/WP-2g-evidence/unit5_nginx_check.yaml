@@ -1,0 +1,32 @@
+# Throwaway check for WP-2g unit 5: the production nginx service, as defined in
+# docker-compose.yaml, proxying to a stub upstream that returns an X-Request-ID.
+# Run through unit5_nginx_check.sh; it binds only to 127.0.0.1.
+name: wp2g-nginx-check
+
+services:
+  nginx:
+    extends:
+      file: ../../../../docker-compose.yaml
+      service: nginx
+    ports: !override
+      - 127.0.0.1:18080:80
+    volumes: !override
+      - ${DOCKER_SOCKET:?set DOCKER_SOCKET to the local daemon socket}:/tmp/docker.sock:ro
+  upstream:
+    image: python:3.12-slim
+    environment:
+      VIRTUAL_HOST: wp2g.check.invalid
+      VIRTUAL_PORT: '8000'
+    command:
+      - python
+      - -c
+      - |
+        from http.server import BaseHTTPRequestHandler, HTTPServer
+        class H(BaseHTTPRequestHandler):
+            def do_GET(self):
+                self.send_response(200)
+                self.send_header('X-Request-ID', 'upstream-' + self.path.split('?')[0].strip('/'))
+                self.send_header('Content-Length', '2')
+                self.end_headers()
+                self.wfile.write(b'ok')
+        HTTPServer(('0.0.0.0', 8000), H).serve_forever()

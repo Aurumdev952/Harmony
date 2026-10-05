@@ -1,0 +1,5 @@
+{
+  "description": "TABLE with no groups: a single row, served as a timeseries query.",
+  "endpoint": "table",
+  "policy": null
+}

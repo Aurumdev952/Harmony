@@ -1,0 +1,83 @@
+name: Renderer Image
+
+on:
+    # Manual trigger on branches, like the web image, to save GitHub minutes.
+    workflow_dispatch:
+    push:
+      branches:
+        - main
+    # The browser tests (egress fence, sandbox, maps) need the image's Chromium,
+    # so a pull request that touches the renderer builds the image and tests in it.
+    pull_request:
+      paths:
+        - harmony/worker/renderer/**
+        - tests/worker/renderer/**
+        - docker/renderer/**
+        - pyproject.toml
+        - .github/workflows/renderer.yml
+
+permissions: {}
+
+concurrency:
+    group: renderer-${{ github.ref }}
+    cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+jobs:
+    # Pull requests build and test only, with a read-only token.
+    test-renderer-image:
+        name: Test the renderer image
+        if: github.event_name == 'pull_request'
+        runs-on: ubuntu-24.04
+        permissions:
+            contents: read
+        steps:
+            - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+              with:
+                persist-credentials: false
+            - name: Build the renderer image
+              run: docker build --platform linux/amd64 -t harmony-renderer:test -f docker/renderer/Dockerfile .
+            - name: Run the renderer tests inside the image
+              run: docker/renderer/test_in_image.sh harmony-renderer:test -ra
+
+    build-renderer-image:
+        name: Build, test and push the renderer image
+        if: github.event_name != 'pull_request'
+        runs-on: ubuntu-24.04
+        permissions:
+            contents: read
+            packages: write # push the image to ghcr.io
+        steps:
+            - id: image
+              env:
+                REPO_OWNER: ${{ github.repository_owner }}
+                REPO_NAME: ${{ github.event.repository.name }}
+                REF: ${{ github.ref_name }}
+              run: |
+                # Branch names such as mig/WP-1h-... are not valid image tags.
+                TAG=$(printf '%s' "$REF" | tr -c 'A-Za-z0-9_.-' '-' | cut -c1-128)
+                echo "name=ghcr.io/${REPO_OWNER,,}/${REPO_NAME,,}-renderer" >> "$GITHUB_OUTPUT"
+                echo "tag=$TAG" >> "$GITHUB_OUTPUT"
+            - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+              with:
+                persist-credentials: false
+            - name: Login to GitHub Container Registry
+              uses: docker/login-action@dbcb813823bdd20940b903addbd779551569679f # v4.6.0
+              with:
+                registry: ghcr.io
+                username: ${{ github.actor }}
+                password: ${{ secrets.GITHUB_TOKEN }}
+            - name: Build the renderer image
+              env:
+                IMAGE: ${{ steps.image.outputs.name }}
+                TAG: ${{ steps.image.outputs.tag }}
+              run: docker build --platform linux/amd64 -t "$IMAGE:$TAG" -f docker/renderer/Dockerfile --cache-from "$IMAGE:main,$IMAGE:$TAG" --build-arg BUILDKIT_INLINE_CACHE=1 .
+            - name: Run the renderer tests inside the image
+              env:
+                IMAGE: ${{ steps.image.outputs.name }}
+                TAG: ${{ steps.image.outputs.tag }}
+              run: docker/renderer/test_in_image.sh "$IMAGE:$TAG" -ra
+            - name: Push the renderer image
+              env:
+                IMAGE: ${{ steps.image.outputs.name }}
+                TAG: ${{ steps.image.outputs.tag }}
+              run: docker push "$IMAGE:$TAG"

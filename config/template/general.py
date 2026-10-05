@@ -25,4 +25,4 @@ PROJECT_MANAGER_IDS = []
 SUPPORT_EMAIL = settings.SUPPORT_EMAIL
 
 # The alias for object storage
-OBJECT_STORAGE_ALIAS = settings.getenv('OBJECT_STORAGE_ALIAS')
+OBJECT_STORAGE_ALIAS = settings.setting('OBJECT_STORAGE_ALIAS')

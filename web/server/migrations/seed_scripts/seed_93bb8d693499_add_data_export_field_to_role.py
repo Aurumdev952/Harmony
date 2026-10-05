@@ -9,10 +9,10 @@ from sqlalchemy.orm import relationship, backref
 
 from config.druid_base import DEFAULT_DRUID_INTERVAL
 from config.filters import AUTHORIZABLE_DIMENSIONS
-from config.general import DEPLOYMENT_NAME
 from db.druid.errors import MissingDatasourceException
 from db.druid.query_builder import GroupByQueryBuilder
 from db.druid.query_client import DruidQueryClient
+from log import LOG
 from web.server.data.data_access import Transaction
 from web.server.query.util import COUNT_CALCULATION
 
@@ -39,12 +39,13 @@ def get_distinct_values_for_dimension(dimension_name):
             intervals=DEFAULT_DRUID_INTERVAL,
             calculation=COUNT_CALCULATION,
         )
+        # pydruid overloads != to build a "not null" filter; `is not` would not.
         # pylint: disable=C0121
-        base_query.query_filter &= Dimension(dimension_name) != None
+        base_query.query_filter &= Dimension(dimension_name) != None  # noqa: E711
         query_result = DruidQueryClient.run_query(base_query)
         return [item['event'][dimension_name] for item in query_result.result]
     except MissingDatasourceException:
-        print('ERROR: No datasource for this deployment')
+        LOG.warning('No datasource for this deployment')
         return []
 
 
@@ -101,13 +102,13 @@ def seed_dimension_query_policies_via_druid(
 
     for distinct_dimension_value in distinct_dimension_values:
         if distinct_dimension_value in existing_policy_names:
-            print(f'"{distinct_dimension_value}" is an existing policy.')
+            LOG.info('"%s" is an existing policy.', distinct_dimension_value)
             continue
 
         add_single_policy(
             transaction, query_policy_enum, dimension_name, distinct_dimension_value
         )
-        print(f'Created query policy for {distinct_dimension_value}')
+        LOG.info('Created query policy for %s', distinct_dimension_value)
 
     # Populate the all case as well. We can check for existence by searching for
     # a query policy that has allValues populated
@@ -127,14 +128,14 @@ def seed_dimension_query_policies_via_druid(
             # Update this to new name
             all_dimension_policy.name = all_values_name
             transaction.add_or_update(all_dimension_policy)
-            print(f'Updated {all_values_name} policy for {dimension_name}')
+            LOG.info('Updated %s policy for %s', all_values_name, dimension_name)
         else:
-            print(f'{all_values_name} policy already exists for {dimension_name}')
+            LOG.info('%s policy already exists for %s', all_values_name, dimension_name)
     else:
         add_single_all_policy(
             transaction, query_policy_enum, dimension_name, all_values_name
         )
-        print(f'Created query policy for {all_values_name}')
+        LOG.info('Created query policy for %s', all_values_name)
 
 
 # pylint: disable=C0103

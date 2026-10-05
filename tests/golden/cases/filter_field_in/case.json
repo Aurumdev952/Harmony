@@ -1,0 +1,5 @@
+{
+  "description": "FIELD_IN query filter on the field dimension.",
+  "endpoint": "table",
+  "policy": null
+}

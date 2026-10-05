@@ -1,0 +1,16 @@
+{
+  "cases": [
+    {
+      "id": "auth.sign_out",
+      "route": "GET /user/sign-out",
+      "session": "admin-sign-out",
+      "cookies": true
+    },
+    {
+      "id": "auth.sign_out.session_is_gone",
+      "route": "GET /api2/dashboard",
+      "session": "admin-sign-out",
+      "note": "The accessKey cookie is deleted, so the same session is now anonymous."
+    }
+  ]
+}

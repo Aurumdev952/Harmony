@@ -1,0 +1,77 @@
+{
+  "content_type": "application/json",
+  "headers": [],
+  "id": "query.outliers_line_graph",
+  "pinned": {},
+  "response_schema": {
+    "properties": {
+      "data": {
+        "items": {
+          "properties": {
+            "dimensions": {
+              "properties": {
+                "StateName": {
+                  "type": "string"
+                }
+              },
+              "required": [
+                "StateName"
+              ],
+              "type": "object"
+            },
+            "extreme_lower_bound": {
+              "type": "number"
+            },
+            "extreme_upper_bound": {
+              "type": "number"
+            },
+            "key": {
+              "type": "string"
+            },
+            "mean": {
+              "type": "number"
+            },
+            "timestamp": {
+              "type": "string",
+              "x-format": "date"
+            },
+            "yellow_fever_cases": {
+              "type": "number"
+            }
+          },
+          "required": [
+            "dimensions",
+            "extreme_lower_bound",
+            "extreme_upper_bound",
+            "key",
+            "mean",
+            "timestamp",
+            "yellow_fever_cases"
+          ],
+          "type": "object"
+        },
+        "type": "array"
+      },
+      "dates": {
+        "items": {
+          "type": "string",
+          "x-format": "date"
+        },
+        "type": "array"
+      },
+      "totals": {
+        "properties": {},
+        "required": [],
+        "type": "object"
+      }
+    },
+    "required": [
+      "data",
+      "dates",
+      "totals"
+    ],
+    "type": "object"
+  },
+  "route": "POST /api2/query/outliers_line_graph",
+  "status": 200
+}

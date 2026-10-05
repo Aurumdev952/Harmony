@@ -1,0 +1,15 @@
+{
+  "data": [
+    {
+      "dimensions": {
+        "StateName": "Acre"
+      },
+      "metrics": {
+        "yellow_fever_cases": 330.42
+      }
+    }
+  ],
+  "dimensions": [
+    "StateName"
+  ]
+}

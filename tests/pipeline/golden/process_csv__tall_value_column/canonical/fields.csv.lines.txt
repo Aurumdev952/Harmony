@@ -1,0 +1,3 @@
+demo_bed_nets
+demo_malaria_positive
+demo_malaria_tested

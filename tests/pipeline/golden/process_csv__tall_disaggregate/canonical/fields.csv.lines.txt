@@ -1,0 +1,9 @@
+demo_bed_nets
+demo_malaria_positive
+demo_malaria_positive_f_30
+demo_malaria_positive_m_41
+demo_malaria_positive_m_5
+demo_malaria_tested
+demo_nao
+demo_referrals
+demo_sim

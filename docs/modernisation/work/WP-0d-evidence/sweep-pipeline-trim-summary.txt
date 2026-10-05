@@ -1,0 +1,10 @@
+# WP-0d pipeline import sweep, trimmed CPython-only scratch image (no base image: main pipeline build is broken)
+# /zenysis/venv/bin/python import_sweep.py pipeline data util db config models log, --network none, dummy env incl. DRUID_HOST
+398 modules, 393 OK, 0 stop at KeyError DRUID_HOST, 0 removed-package errors
+
+## every non-OK module
+config.harmony_demo.database	ERR ConnectionError: HTTPConnectionPool(host='druid.invalid', port=8081): Max retries exceeded with url: /druid/coordinator/v1/metadata/datasources (Caused by NewConnectionError('<u
+config.template.database	ERR ConnectionError: HTTPConnectionPool(host='druid.invalid', port=8081): Max retries exceeded with url: /druid/coordinator/v1/metadata/datasources (Caused by NewConnectionError('<u
+data.pydruid_query.pydruid_query	ERR ConnectionError: HTTPConnectionPool(host='druid.invalid', port=8081): Max retries exceeded with url: /druid/coordinator/v1/metadata/datasources (Caused by NewConnectionError('<u
+data.query.models.query_selections	ERR InvalidRequestError: When initializing mapper mapped class User->user, expression 'Dashboard' failed to locate a name ('Dashboard'). If this is a class name, consider adding this re
+data.validation.scripts.validate_pivoted_csv	ERR ConnectionError: HTTPConnectionPool(host='druid.invalid', port=8081): Max retries exceeded with url: /druid/coordinator/v1/metadata/datasources (Caused by NewConnectionError('<u

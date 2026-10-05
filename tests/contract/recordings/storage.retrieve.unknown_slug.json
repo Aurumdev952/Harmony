@@ -1,0 +1,23 @@
+{
+  "content_type": "application/json",
+  "headers": [],
+  "id": "storage.retrieve.unknown_slug",
+  "pinned": {},
+  "response_schema": {
+    "properties": {
+      "message": {
+        "type": "string"
+      },
+      "status": {
+        "type": "integer"
+      }
+    },
+    "required": [
+      "message",
+      "status"
+    ],
+    "type": "object"
+  },
+  "route": "GET /api2/storage/retrieve",
+  "status": 404
+}

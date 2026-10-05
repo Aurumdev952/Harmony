@@ -1,0 +1,47 @@
+{
+  "cases": [
+    {
+      "id": "role.delete",
+      "route": "DELETE /api2/role/<id>",
+      "path": "{role}"
+    },
+    {
+      "id": "group.update_roles.clear",
+      "route": "PATCH /api2/group/<id>/roles",
+      "path": "{group}/roles",
+      "body": {},
+      "note": "Run after role.delete on purpose: update_group_roles_from_map deletes the Role rows the group holds, not the memberships, so clearing a group's roles deletes those roles for everyone (WP-2c finding F10)."
+    },
+    {
+      "id": "group.update_roles.assign",
+      "route": "PATCH /api2/group/<id>/roles",
+      "path": "{group}/roles",
+      "body": {
+        "SITE": {
+          "sitewideRoles": [
+            "dashboard_viewer"
+          ],
+          "resources": {}
+        }
+      },
+      "note": "Any non-empty role map 500s: add_group_role passes resource_id, which GroupRoles no longer accepts (web/server/routes/views/groups.py). web/python_client sends this shape (WP-2c finding F10)."
+    },
+    {
+      "id": "group.delete",
+      "route": "DELETE /api2/group/<id>",
+      "path": "{group}"
+    },
+    {
+      "id": "pipeline_run_metadata.delete.all_sources",
+      "route": "DELETE /api2/pipeline_run_metadata/<id>",
+      "path": "{pipeline_run_all_sources}",
+      "note": "No client deletes pipeline runs; this removes what the seed cases created."
+    },
+    {
+      "id": "pipeline_run_metadata.delete.yellow_fever",
+      "route": "DELETE /api2/pipeline_run_metadata/<id>",
+      "path": "{pipeline_run_yellow_fever}",
+      "note": "No client deletes pipeline runs; this removes what the seed cases created."
+    }
+  ]
+}

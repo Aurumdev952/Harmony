@@ -1,8 +1,8 @@
 from datetime import timedelta
-from urllib.parse import urlparse
+from urllib.parse import urlparse, urlsplit
 
 import requests
-from flask import current_app, request, url_for
+from flask import current_app, request
 from requests import RequestException
 from flask_jwt_extended import create_access_token
 from werkzeug.exceptions import HTTPException
@@ -65,14 +65,46 @@ def dashboard_page_args(dashboard_url):
     return locale, session_hash
 
 
+def deployment_origin(deployment_base_url):
+    """The configured DEPLOYMENT_BASE_URL as a bare https origin, or ValueError.
+
+    Renders send a minted token to this origin and emails send links to it, so it
+    must name exactly one host: no userinfo (`https://real@attacker`), path,
+    query or fragment.
+    """
+    parts = urlsplit(deployment_base_url or "")
+    try:
+        has_valid_port = parts.port is None or parts.port > 0
+    except ValueError:
+        has_valid_port = False
+    if (
+        not has_valid_port
+        or parts.scheme != "https"
+        or not parts.hostname
+        or "@" in parts.netloc
+        or parts.path not in ("", "/")
+        or parts.query
+        or parts.fragment
+    ):
+        raise ValueError(
+            "DEPLOYMENT_BASE_URL must be an https origin with no userinfo, path, "
+            f"query or fragment: {deployment_base_url!r}"
+        )
+    return f"https://{parts.netloc}"
+
+
 def deployment_dashboard_url(name, locale=None):
     """The dashboard page's absolute URL on the deployment's configured origin.
 
-    Never built from the request's Host header: renders send a token to this
-    URL, and emails send it to their recipients.
+    Never built from the request: renders send a token to this URL, and emails
+    send it to their recipients. `url_for` would prefix the request's script
+    root, which gunicorn takes from a `SCRIPT_NAME` request header.
     """
-    origin = current_app.zen_config.general.DEPLOYMENT_BASE_URL.rstrip("/")
-    return origin + url_for("dashboard.grid_dashboard", locale=locale, name=name)
+    origin = deployment_origin(current_app.zen_config.general.DEPLOYMENT_BASE_URL)
+    path = current_app.url_map.bind("").build(
+        "dashboard.grid_dashboard", {"locale": locale, "name": name}
+    )
+    return origin + path
 
 
 def get_dashboard_downloadable_url(locale, name, output_format, session_hash):

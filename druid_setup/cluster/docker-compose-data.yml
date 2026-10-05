@@ -35,12 +35,10 @@ services:
       context: ../extensions
     volumes:
       - zen_extensions:/druid/extensions
-    environment:
-      - ZEN_DRUID_VERSION=${DRUID_VERSION}
     logging: *default-logging
 
   historical:
-    image: apache/druid:${DRUID_VERSION}
+    image: apache/druid:0.23.0@sha256:ed9719968b4be3a2f1643907a1a5a5814e2ee1215f3604da8b2da2ac05f65912
     container_name: historical
     restart: always
     volumes:
@@ -50,8 +48,10 @@ services:
       - zen_extensions:/var/lib/zen/extensions/
     depends_on:
       - extension_loader
+    # Druid runs without authentication: private address only, firewalled to
+    # the other Druid hosts.
     ports:
-      - "8083:8083"
+      - "${DRUID_DATA_HOST:?set DRUID_DATA_HOST to this host's private IP}:8083:8083"
     command:
       - historical
     env_file:
@@ -63,7 +63,7 @@ services:
     logging: *default-logging
 
   middlemanager:
-    image: apache/druid:${DRUID_VERSION}
+    image: apache/druid:0.23.0@sha256:ed9719968b4be3a2f1643907a1a5a5814e2ee1215f3604da8b2da2ac05f65912
     container_name: middlemanager
     restart: always
     volumes:
@@ -74,8 +74,8 @@ services:
     depends_on:
       - extension_loader
     ports:
-      - "8091:8091"
-      - "8100-8105:8100-8105"
+      - "${DRUID_DATA_HOST:?set DRUID_DATA_HOST to this host's private IP}:8091:8091"
+      - "${DRUID_DATA_HOST:?set DRUID_DATA_HOST to this host's private IP}:8100-8105:8100-8105"
     command:
       - middleManager
     env_file:

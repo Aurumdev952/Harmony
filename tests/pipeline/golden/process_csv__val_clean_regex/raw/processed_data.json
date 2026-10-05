@@ -1,0 +1,2 @@
+{"key": {"StateName": "Northvale", "MunicipalityName": "Ashford"}, "data": {"demo_doses_given": 1219}, "Real_Date": "2021-08-01", "source": "demo_dirty"}
+{"key": {"StateName": "Southmere", "MunicipalityName": "Cedar Point"}, "data": {"demo_doses_given": 2000.5}, "Real_Date": "2021-08-02", "source": "demo_dirty"}

@@ -72,6 +72,7 @@ None blocking. Two notes for the lead:
    - Expected: a valid Druid filter.
    - Actual: `{"type": "and", "fields": [null, {"type": "in", "dimension": "StateName", "values": ["Acre"]}]}`. The cause is `restrict_query_filter_to_user_permissions` wrapping an `EmptyFilter`, which serialises to `null`. A real broker rejects this.
    - This bears on SEC-4 and WP-0c and 4e. The fix WP updates this case with an INV-2 note.
+   - **Resolved by WP-0c** (7584a1a, merged into `mig/integration`). The case was regenerated; see "Regeneration after WP-0c" below.
 2. **core: field ids that collide with strict-null count aggregators crash the query.**
    - Example: one field `yellow_fever_cases` (SUM) next to another field with id `yellow_fever_cases__count`.
    - Result: `AssertionError: Attempting to overwrite existing aggregation for key: yellow_fever_cases__count` and HTTP 500.
@@ -87,9 +88,60 @@ None blocking. Two notes for the lead:
    - Pinned as today's behaviour.
    - Related, recorded by the reviewer and routed by the lead: `models/python/permissions.py:211-218` (`DimensionFilter.__and__` intersects exclude lists when both sides allow all values).
 
-## Pending regeneration
+## Regeneration after WP-0c (executed)
 
-Not yet executed. Run this only when the lead confirms that WP-0c (branch `mig/WP-0c-pure-mistake-bugs-backend`, test 70ecd0e, fix a89c55d) is on `mig/integration`. Regenerate only against WP-0c at 60edb27 or later. Never regenerate against 64dc60e alone: its pydruid `&` flattened and-shaped request filters in place, which would show up as unrelated golden diffs. Until then the case keeps characterising today's code, and the suite must keep passing on `mig/integration`.
+Executed on 2026-10-04 by qa-1, after `git merge mig/integration` brought in WP-0c at 7584a1a. That commit contains 60edb27 and the `and_policy_filter` fix a89c55d.
+
+**Drift check.** Exactly the predicted file changed, and nothing else:
+
+```
+$ uv run python tests/golden/record.py --check
+would change: policy_include_all_all_time/druid_query.json
+85 cases, 1 fixture files would change
+```
+
+**Regenerate and verify.**
+
+```
+$ uv run python tests/golden/record.py policy_include_all_all_time
+written: policy_include_all_all_time/druid_query.json
+1 cases, 1 fixture files written
+$ uv run pytest tests/golden -q
+269 passed
+$ uv run python tests/golden/record.py --check
+85 cases, 0 fixture files would change
+```
+
+**The diff** in `tests/golden/cases/policy_include_all_all_time/druid_query.json`, the only fixture that changed:
+
+```diff
+     "filter": {
+-      "fields": [
+-        null,
+-        {
+-          "dimension": "StateName",
+-          "type": "in",
+-          "values": [
+-            "Acre"
+-          ]
+-        }
+-      ],
+-      "type": "and"
++      "dimension": "StateName",
++      "type": "in",
++      "values": [
++        "Acre"
++      ]
+     },
+```
+
+- `druid_response.json` and `expected_response.json` are byte-identical, as predicted.
+- I removed the "a real broker rejects" sentence from the case description in `case.json`, and the matching known-gap line from the README.
+- Reviewer acceptance of this diff is given when PR #5 is merged; the lead recorded that in the PR body.
+
+## Pending regeneration (as planned before WP-0c landed)
+
+Executed as described above. The original instructions follow. Run this only when the lead confirms that WP-0c (branch `mig/WP-0c-pure-mistake-bugs-backend`, test 70ecd0e, fix a89c55d) is on `mig/integration`. Regenerate only against WP-0c at 60edb27 or later. Never regenerate against 64dc60e alone: its pydruid `&` flattened and-shaped request filters in place, which would show up as unrelated golden diffs. Until then the case keeps characterising today's code, and the suite must keep passing on `mig/integration`.
 
 **INV-2 note for `policy_include_all_all_time`:**
 - **Cause.** WP-0c changes `restrict_query_filter_to_user_permissions` to combine filters through `and_policy_filter`. A non-empty request filter is posted byte-identically to before. A None or `EmptyFilter` request filter is replaced by the policy filter alone.

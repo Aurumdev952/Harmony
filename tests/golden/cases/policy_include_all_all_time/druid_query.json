@@ -36,17 +36,11 @@
       "StateName"
     ],
     "filter": {
-      "fields": [
-        null,
-        {
-          "dimension": "StateName",
-          "type": "in",
-          "values": [
-            "Acre"
-          ]
-        }
-      ],
-      "type": "and"
+      "dimension": "StateName",
+      "type": "in",
+      "values": [
+        "Acre"
+      ]
     },
     "granularity": "all",
     "having": null,

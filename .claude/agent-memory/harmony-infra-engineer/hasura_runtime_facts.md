@@ -10,6 +10,8 @@ Hasura `v2.45.8.cli-migrations-v2` facts, observed on 2026-10-04 (WP-0a):
 - Without an admin secret, `/v1/graphql` answers **HTTP 200** with `extensions.code: access-denied`. `/v1/metadata` answers **401**. Assert on the error code, not the status, when probing GraphQL.
 - With `HASURA_GRAPHQL_DEV_MODE=false`, the admin role still gets `internal` error detail, because `HASURA_GRAPHQL_ADMIN_INTERNAL_ERRORS` defaults to true. Dev mode governs the other roles, `user` and `anonymous`, which are what the Flask proxy sends.
 - `/console` returns 404 when `HASURA_GRAPHQL_ENABLE_CONSOLE=false`.
+- With `HASURA_GRAPHQL_ENABLED_APIS=graphql,metadata` on `v2.45.8-ce`, these return 404 even with the secret: `/v1alpha1/config`, `/v1alpha1/pg_dump`, `/v1/config`, `/v1/metrics` and `/dev/*`. But `POST /v1/query` and `POST /v2/query` with `run_sql` still return 200 with the secret, because they belong to the metadata API group. You cannot keep `/v1/metadata` and drop them. Probe with POST and a real body: a GET or a missing secret gives misleading results.
+- `/v1/version` reports `v2.45.8-ce` and `server_type: ce` on the CE tag. Hasura's own tooling uses the CE tag, not the plain `v2.45.8` (EE-capable) tag.
 - The image has `curl` and `bash` but no `wget`. `curl -fsS http://127.0.0.1:8080/healthz` works as the healthcheck.
 - The cli-migrations entrypoint runs a temporary server on port 9691 with only the metadata API enabled. `hasura-cli` authenticates to it through the `HASURA_GRAPHQL_ADMIN_SECRET` env var.
 - `docker compose exec hasura curl ...` is the way to probe in-network, since Hasura publishes no port. Host port 8080 here belongs to an unrelated app (Frappe), so do not probe it from the host.

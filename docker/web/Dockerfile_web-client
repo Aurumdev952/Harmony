@@ -1,4 +1,4 @@
-FROM node:18.17
+FROM node:18.17.1-bookworm@sha256:933bcfad91e9052a02bc29eb5aa29033e542afac4174f9524b79066d97b23c24
 
 # Separate directories for storing build files so that the post-build results
 # can be easily copied out.

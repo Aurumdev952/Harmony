@@ -1,13 +1,22 @@
 from datetime import timedelta
 from typing import Optional
 from flask import make_response, jsonify, current_app
-from flask_jwt_extended import create_access_token
+from flask_jwt_extended import (
+    create_access_token,
+    get_jwt_claims,
+    verify_jwt_in_request_optional,
+)
+from flask_jwt_extended.exceptions import JWTExtendedException
+from jwt import InvalidTokenError
 from werkzeug.wrappers import Response
+
+REMEMBER_ME_CLAIM = 'remember_me'
 
 
 def create_user_access_token(
     username: str,
     expires_delta: Optional[timedelta] = None,
+    remember_me: bool = False,
 ) -> str:
     if expires_delta is None:
         expires_delta = current_app.config['JWT_TOKEN_WEB_COOKIE_EXPIRATION']
@@ -17,6 +26,7 @@ def create_user_access_token(
         user_claims={
             'needs': ['*'],
             'query_needs': ['*'],
+            REMEMBER_ME_CLAIM: remember_me,
         },
         expires_delta=expires_delta,
     )
@@ -31,7 +41,7 @@ def login_user(
     if expires is None:
         expires = current_app.config['JWT_TOKEN_WEB_COOKIE_EXPIRATION']
 
-    access_token = create_user_access_token(username, expires)
+    access_token = create_user_access_token(username, expires, remember_me)
     return create_auth_response(msg, access_token, remember_me, expires)
 
 
@@ -49,10 +59,23 @@ def create_auth_response(
     max_age = int(expires.total_seconds()) if remember_me else None
 
     response.set_cookie(
-        'accessKey',
+        current_app.config['JWT_ACCESS_COOKIE_NAME'],
         access_token,
         max_age=max_age,
         httponly=True,
     )
 
     return response
+
+
+def is_session_persisted() -> bool:
+    '''True when the request's token came from a "Remember me" login.
+
+    Browsers never send a cookie's expiry back, so the choice is signed into the
+    token. Reads the same token, header first, that authenticated the request.
+    '''
+    try:
+        verify_jwt_in_request_optional()
+    except (InvalidTokenError, JWTExtendedException):
+        return False
+    return bool(get_jwt_claims().get(REMEMBER_ME_CLAIM))

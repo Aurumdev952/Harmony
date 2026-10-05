@@ -1,9 +1,10 @@
 # pylint: disable=too-many-branches,too-many-return-statements
+import json
 from typing import List, Optional, TYPE_CHECKING
 
 from pydruid.utils.filters import Filter
 
-from db.druid.util import EmptyFilter
+from db.druid.util import EmptyFilter, null_first
 
 # NOTE: Avoid circular dependency.
 if TYPE_CHECKING:
@@ -38,15 +39,16 @@ def hash_simple_filter(druid_filter: Filter, max_depth: int = 25) -> Optional[st
     if filter_type in SIMPLE_FILTER_TYPES:
         dimension = raw_filter['dimension']
 
-        # The `selector` filter matches a single value for a dimension.
+        # The `selector` filter matches a single value for a dimension. JSON keeps
+        # null apart from the text 'None'.
         if filter_type == 'selector':
-            value = raw_filter['value']
+            value = json.dumps(raw_filter['value'])
             return f'selector|{dimension}|{value}'
 
         # The `in` filter matches multiple values for a single dimension. Sorting the
-        # intervals helps this hash be stable.
+        # values helps this hash be stable.
         if filter_type == 'in':
-            values_str = ','.join(sorted(raw_filter['values']))
+            values_str = json.dumps(sorted(raw_filter['values'], key=null_first))
             return f'in|{dimension}|{values_str}'
 
         # The `interval` filter matches multiple time boundaries over a dimension (usually

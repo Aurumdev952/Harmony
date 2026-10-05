@@ -57,9 +57,20 @@ services:
       # This html directory is only used to write let's encrypt challenge
       # files during the cert issuing process.
       - nginx_html:/usr/share/nginx/html
-      # environment:
+    environment:
       # TODO: Establish if TRUST_DOWNSTREAM_PROXY needs to be set to true
       # - TRUST_DOWNSTREAM_PROXY=false
+      # Access lines as JSON with the app's keys (WP-2g); `$$` is a literal `$`.
+      # nginx-proxy cannot forward an X-Request-ID without a conf.d file on the
+      # host, so the id is the one the app returns. `$$uri` has no query string.
+      LOG_FORMAT_ESCAPE: json
+      LOG_FORMAT: >-
+        {"timestamp":"$$time_iso8601","level":"INFO","logger":"nginx.access",
+        "message":"$$request_method $$uri $$status","deployment":"${ZEN_ENV}",
+        "request_id":"$$upstream_http_x_request_id",
+        "http":{"method":"$$request_method","host":"$$host","path":"$$uri",
+        "status":$$status,"bytes":$$body_bytes_sent,"duration_s":$$request_time},
+        "client_ip":"$$remote_addr","user_agent":"$$http_user_agent"}
       # healthcheck:
       #   # TODO: Healthcheck causes problems with initial cert generation,
       #   # Further investigation required.
@@ -154,6 +165,8 @@ services:
       - VIRTUAL_HOST=${WEB_VIRTUAL_HOST}
       - OBJECT_STORAGE_ALIAS=${OBJECT_STORAGE_ALIAS}
       - ZEN_GUNICORN_WORKER_THREADS=${ZEN_GUNICORN_WORKER_THREADS:-4}
+      - LOG_FORMAT=json
+      - LOG_STREAM=stdout
       - RENDERER_URL=http://renderer:8080
       # The renderer loads dashboards from here, never from the request's Host.
       - RENDER_WEB_ORIGIN=http://web:5000
@@ -190,14 +203,16 @@ services:
       - DRUID_HOST=${DRUID_HOST}
       - MAPBOX_ACCESS_TOKEN=${MAPBOX_ACCESS_TOKEN}
       - OBJECT_STORAGE_ALIAS=${OBJECT_STORAGE_ALIAS}
+      - LOG_FORMAT=json
+      - LOG_STREAM=stdout
     command:
       [
         "celery",
+        "-q",
         "-A",
         "web.background_worker.celery",
         "worker",
-        "--beat",
-        "--loglevel=INFO"
+        "--beat"
       ]
     healthcheck:
       test:

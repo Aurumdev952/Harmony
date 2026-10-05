@@ -237,10 +237,119 @@ def test_long_junk_lines_are_rejected_quickly() -> None:
         '192.0.2.1 - - [15/Jan/2026:08:00:00 +0000] "' + "a" * 50_000,
         '"' + "\\a" * 25_000,
         "nginx-1 | " * 5_000,
+        "{" + "a" * 50_000,
+        "[" * 50_000,
+        '{"a":' * 20_000,
     ]
     started = time.perf_counter()
     assert [parse_line(line) for line in junk] == [None] * len(junk)
     assert time.perf_counter() - started < 1.0
+
+
+def json_line(client: str, user_agent: object, timestamp: str) -> str:
+    """A line in the JSON format docker-compose.yaml gives nginx (WP-2g).
+
+    `user_agent` is typed `object` so a test can pass a non-string.
+    """
+    entry = {
+        "timestamp": timestamp,
+        "level": "INFO",
+        "logger": "nginx.access",
+        "message": "GET /overview 200",
+        "deployment": "zz",
+        "request_id": "4bf92f3577b34da6a3ce929d0e0e4736",
+        "http": {
+            "method": "GET",
+            "host": "zz.example.org",
+            "path": "/overview",
+            "status": 200,
+            "bytes": 512,
+            "duration_s": 0.042,
+        },
+        "client_ip": client,
+        "user_agent": user_agent,
+    }
+    return json.dumps(entry)
+
+
+def test_parse_json_line() -> None:
+    line = json_line("192.0.2.12", chrome(124), "2026-01-15T10:00:00+02:00")
+    request = parse_line(line)
+    assert request == parse_line(f"nginx-1  | {line}")
+    assert request is not None
+    assert request.client == "192.0.2.12"
+    assert request.epoch_seconds == 1768464000
+    assert request.user_agent == chrome(124)
+
+
+# nginx-proxy runs nginx under forego, which prefixes every line with the process
+# name in ANSI colours, also in `docker logs` without a TTY. Captured from the
+# pinned 1.11.6 image by WP-2g-evidence/unit5_nginx_check.sh.
+FOREGO = "\x1b[0;33;1mnginx.1     | \x1b[0m"
+
+
+@pytest.mark.parametrize(
+    "prefix",
+    ["", FOREGO, f"nginx-1  | {FOREGO}"],
+    ids=["bare", "forego", "compose-and-forego"],
+)
+def test_parse_lines_from_docker_logs_of_nginx_proxy(prefix: str) -> None:
+    json_request = parse_line(
+        prefix + json_line("192.0.2.12", chrome(124), "2026-01-15T10:00:00+02:00")
+    )
+    vhost_request = parse_line(
+        prefix + "zz.example.org " + log_line("192.0.2.12", chrome(124), "08:00:00")
+    )
+    assert json_request is not None
+    assert vhost_request is not None
+    assert json_request == vhost_request
+
+
+def test_parse_json_line_keeps_escaped_quotes_in_the_user_agent() -> None:
+    user_agent = 'Mozilla/5.0 "quoted" \\ Chrome/120.0.0.0'
+    request = parse_line(json_line("192.0.2.13", user_agent, "2026-01-15T08:00:00Z"))
+    assert request is not None
+    assert request.user_agent == user_agent
+
+
+@pytest.mark.parametrize(
+    "line",
+    [
+        # An app line: JSON, but not an nginx access line.
+        '{"timestamp": "2026-01-15T08:00:00+00:00", "logger": "gunicorn.access"}',
+        json_line("192.0.2.14", chrome(126), "2026-01-15T08:00:00"),
+        json_line("192.0.2.14", chrome(126), "15/Jan/2026:08:00:00 +0000"),
+        json_line("192.0.2.14", 126, "2026-01-15T08:00:00+00:00"),
+        json_line("", chrome(126), "2026-01-15T08:00:00+00:00"),
+        json_line("192.0.2.14", chrome(126), "2026-01-15T08:00:00+00:00")[:-5],
+        "[1, 2, 3]",
+        '"just a string"',
+    ],
+    ids=[
+        "app-line",
+        "naive-timestamp",
+        "not-iso-timestamp",
+        "non-string-user-agent",
+        "empty-client",
+        "truncated",
+        "array",
+        "string",
+    ],
+)
+def test_json_lines_that_are_not_nginx_access_lines_return_none(line: str) -> None:
+    assert parse_line(line) is None
+
+
+def test_sessions_continue_across_the_switch_to_json_lines() -> None:
+    lines = [
+        log_line("192.0.2.15", firefox(115), "08:00:00"),
+        json_line("192.0.2.15", firefox(115), "2026-01-15T08:20:00+00:00"),
+        json_line("192.0.2.16", chrome(126), "2026-01-15T08:25:00+00:00"),
+    ]
+    report = build_report("zz", lines)
+    assert report.sessions == 2
+    assert report.below_baseline_sessions == 1
+    assert report.unparsed_lines == 0
 
 
 @pytest.mark.parametrize(

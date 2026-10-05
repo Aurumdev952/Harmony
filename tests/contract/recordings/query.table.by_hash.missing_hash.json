@@ -1,0 +1,11 @@
+{
+  "content_type": "application/json",
+  "headers": [],
+  "id": "query.table.by_hash.missing_hash",
+  "pinned": {},
+  "response_schema": {
+    "type": "string"
+  },
+  "route": "GET /api2/query/table",
+  "status": 400
+}

@@ -1,5 +1,13 @@
-import os
+'''Legacy view of `harmony.core.settings` for readers not yet moved to it (BE-2).
 
+Attributes, warnings and errors match the module this replaced, except that a
+missing DRUID_HOST raises RuntimeError rather than KeyError.
+'''
+
+import os
+from typing import Optional
+
+from harmony.core.settings import get_settings, refuse_default_secret
 from log import LOG
 
 
@@ -13,25 +21,39 @@ def getenv(name, default=None):
 
 def require_secret(name: str) -> str:
     '''Return environment variable `name`, refusing an unset, blank or default value (SEC-3).'''
-    value = os.environ.get(name, '')
-    if value.strip().lower() in ('', 'changeme'):
-        raise RuntimeError(
-            f'{name} is unset, empty or the default "changeme"; refusing to start. '
-            f'Set {name} to a random value, e.g. the output of `openssl rand -hex 32` '
-            'or `python3 -c "import secrets; print(secrets.token_hex(32))"`.'
-        )
+    try:
+        return refuse_default_secret(name, os.environ.get(name, ''))
+    except ValueError as error:
+        raise RuntimeError(str(error)) from None
+
+
+def setting(name: str) -> Optional[str]:
+    '''The optional setting `name`, logging a warning when it is unset or empty.'''
+    value = getattr(get_settings(), name)
+    if value is None or value == '':
+        LOG.warning('Environment variable %s not set', name)
     return value
 
 
-# Flask. Checked at import rather than where Flask reads it: pipeline runs build
-# a Flask app in their validate steps, so a lazy check would fail hours in.
-DEFAULT_SECRET_KEY = require_secret('DEFAULT_SECRET_KEY')
+# Loaded at import rather than where Flask reads it: pipeline runs build a Flask
+# app in their validate steps, so a lazy check would fail hours in.
+DEFAULT_SECRET_KEY = get_settings().DEFAULT_SECRET_KEY.get_secret_value()
 
 # Other
-NOREPLY_EMAIL = getenv('NOREPLY_EMAIL', None)
-SUPPORT_EMAIL = getenv('SUPPORT_EMAIL', None)
+NOREPLY_EMAIL = setting('NOREPLY_EMAIL')
+SUPPORT_EMAIL = setting('SUPPORT_EMAIL')
 
-REDIS_HOST = getenv('REDIS_HOST', '')  # Redis isn't a hard requirement
-HASURA_HOST = getenv('HASURA_HOST')  # Hasura is needed for web, but not for pipeline
+REDIS_HOST = setting('REDIS_HOST')
+HASURA_HOST = setting('HASURA_HOST')
 
-DRUID_HOST = os.environ['DRUID_HOST']
+DRUID_HOST = get_settings().DRUID_HOST
+
+# How LAST_VALUE is posted (WP-8a, N3): 'extension' (the aggregateLast extension,
+# Druid 0.23 with legacy nulls only) or 'native' (Druid's expression aggregator).
+# WP-8b makes native the only form and removes this setting (decision 0007, rule 5).
+DRUID_LAST_VALUE = os.environ.get('HARMONY_DRUID_LAST_VALUE') or 'extension'
+if DRUID_LAST_VALUE not in ('extension', 'native'):
+    raise ValueError(
+        "HARMONY_DRUID_LAST_VALUE must be 'extension' or 'native', "
+        f'not {DRUID_LAST_VALUE!r}'
+    )

@@ -8,6 +8,9 @@
 Tailwind CSS v4 needs Chrome 111, Safari 16.4 or Firefox 128. This reports which
 browsers a deployment's users run and the share of sessions below that line.
 
+It reads both nginx-proxy's default `vhost` lines and the JSON lines that
+docker-compose.yaml configures from WP-2g on, so logs that span the switch work.
+
 nginx logs no session id, so a session is one (client address, user agent) pair
 with no gap longer than 30 minutes between requests. Client addresses are only
 used as keys in memory and never printed.
@@ -83,11 +86,9 @@ class Request:
     user_agent: str
 
 
-# Anchored, so a long line that does not match fails in linear time. Accepts an
-# optional `docker compose logs` prefix and the `$host ` that nginx-proxy's
-# `vhost` format puts before the `combined` fields.
+# Anchored, so a long line that does not match fails in linear time. Accepts the
+# `$host ` that nginx-proxy's `vhost` format puts before the `combined` fields.
 _LINE = re.compile(
-    r"(?:[\w.-]+ +\| )?"
     r"(?:\S+ )?"
     r"(?P<client>\S+) \S+ \S+ \[(?P<time>[^\]]+)\] "
     r'"(?:[^"\\]|\\.)*" \d{3} \S+ '
@@ -124,8 +125,54 @@ _EDGE_HTML = re.compile(rf"Edge/{_N}")
 _IE = re.compile(rf"MSIE {_N}|Trident/[^)]*rv:{_N}")
 
 
+_ANSI_COLOUR = re.compile(r"\x1b\[[0-9;]*m")
+_PROCESS_PREFIX = re.compile(r"[\w.-]+ +\| ")
+
+
+def _strip_prefixes(line: str) -> str:
+    """The log line without `docker compose logs` and nginx-proxy's forego prefixes.
+
+    forego runs nginx inside nginx-proxy and writes `nginx.1     | ` in ANSI colours
+    before every line, also in `docker logs` without a TTY.
+    """
+    body = _ANSI_COLOUR.sub("", line)
+    for _ in range(2):
+        prefix = _PROCESS_PREFIX.match(body)
+        if prefix is None:
+            break
+        body = body[prefix.end() :]
+    return body
+
+
+def _parse_json_line(text: str) -> Request | None:
+    """A line in the JSON access format docker-compose.yaml gives nginx (WP-2g)."""
+    try:
+        entry = json.loads(text)
+    except (ValueError, RecursionError):
+        return None
+    if not isinstance(entry, dict) or entry.get("logger") != "nginx.access":
+        return None
+    client = entry.get("client_ip")
+    user_agent = entry.get("user_agent")
+    timestamp = entry.get("timestamp")
+    if not (client and isinstance(client, str)) or not isinstance(user_agent, str):
+        return None
+    if not isinstance(timestamp, str):
+        return None
+    try:
+        moment = datetime.fromisoformat(timestamp)
+    except ValueError:
+        return None
+    if moment.tzinfo is None:
+        return None
+    return Request(client, int(moment.timestamp()), user_agent)
+
+
 def parse_line(line: str) -> Request | None:
-    match = _LINE.match(line)
+    body = _strip_prefixes(line)
+    if body.startswith("{"):
+        return _parse_json_line(body)
+    match = _LINE.match(body)
     if match is None:
         return None
     try:

@@ -1,0 +1,80 @@
+{
+  "cases": [
+    {
+      "id": "data_catalog.export_metadata",
+      "route": "GET /api/export_data_catalog_metadata"
+    },
+    {
+      "id": "self_serve.export",
+      "route": "GET /api/export_self_serve",
+      "capture_body": "self_serve_export"
+    },
+    {
+      "id": "self_serve.validate.rejects_non_zip",
+      "route": "POST /api/validate_self_serve_upload",
+      "files": {
+        "file": "tests/contract/fixtures/not-a-data-catalog.txt"
+      },
+      "note": "A non-zip upload raises inside contains_valid_zipped_files, so this records a 500 (WP-2c finding F5)."
+    },
+    {
+      "id": "self_serve.validate.exported_zip",
+      "route": "POST /api/validate_self_serve_upload",
+      "files": {
+        "file": "capture:self_serve_export"
+      },
+      "pin": [
+        "/statusCode"
+      ]
+    },
+    {
+      "id": "self_serve.import.exported_zip",
+      "route": "POST /api/import_self_serve",
+      "files": {
+        "file": "capture:self_serve_export"
+      },
+      "pin": [
+        "/success"
+      ],
+      "note": "Re-imports what self_serve.export produced. The import upserts the data-catalog tables and deletes only the rows the export lacks, so the seeded unpublished-field mappings, which reference rows the export carries, survive (WP-2c finding F13, fixed by core at d016bce)."
+    },
+    {
+      "id": "configuration.reset.after_import",
+      "route": "POST /api2/configuration/<key>/reset",
+      "path": "/api2/configuration/data_catalog_last_import_date/reset",
+      "body": {},
+      "note": "The import stamps this key; resetting it keeps configuration.list stable across runs."
+    },
+    {
+      "id": "data_catalog.download_changes.missing_key",
+      "route": "GET /api/download_data_catalog_changes",
+      "pin": [
+        "/msg"
+      ],
+      "note": "Only the validation paths; a valid key reads object storage, which the stack does not run."
+    },
+    {
+      "id": "data_catalog.download_changes.invalid_key",
+      "route": "GET /api/download_data_catalog_changes",
+      "query": {
+        "changes_summary_file_key": "../not-a-valid-key"
+      },
+      "pin": [
+        "/msg"
+      ],
+      "note": "Only the validation paths; a valid key reads object storage, which the stack does not run."
+    },
+    {
+      "id": "data_catalog.import_fields_csv.header_only",
+      "route": "POST /api/import_data_catalog_fields_csv",
+      "files": {
+        "file": "tests/contract/fixtures/fields-header-only.csv"
+      }
+    },
+    {
+      "id": "data_upload.update_all_dataprep_jobs",
+      "route": "POST /api2/data_upload_file_summary/update_all_dataprep_jobs",
+      "body": {}
+    }
+  ]
+}

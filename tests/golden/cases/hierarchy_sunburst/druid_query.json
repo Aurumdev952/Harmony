@@ -56,12 +56,12 @@
               {
                 "dimension": "Age",
                 "type": "selector",
-                "value": ""
+                "value": null
               },
               {
                 "dimension": "StateName",
                 "type": "selector",
-                "value": ""
+                "value": null
               }
             ],
             "type": "or"

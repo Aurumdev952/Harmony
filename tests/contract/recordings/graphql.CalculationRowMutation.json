@@ -1,0 +1,47 @@
+{
+  "content_type": "text/html",
+  "headers": [],
+  "id": "graphql.CalculationRowMutation",
+  "pinned": {},
+  "response_schema": {
+    "properties": {
+      "data": {
+        "properties": {
+          "update_field_by_pk": {
+            "properties": {
+              "calculation": {
+                "properties": {
+                  "type": {
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "type"
+                ],
+                "type": "object"
+              },
+              "id": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "calculation",
+              "id"
+            ],
+            "type": "object"
+          }
+        },
+        "required": [
+          "update_field_by_pk"
+        ],
+        "type": "object"
+      }
+    },
+    "required": [
+      "data"
+    ],
+    "type": "object"
+  },
+  "route": "POST /api/graphql",
+  "status": 200
+}

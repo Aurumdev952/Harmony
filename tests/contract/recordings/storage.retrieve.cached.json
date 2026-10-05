@@ -1,0 +1,11 @@
+{
+  "content_type": "application/json",
+  "headers": [],
+  "id": "storage.retrieve.cached",
+  "pinned": {},
+  "response_schema": {
+    "type": "string"
+  },
+  "route": "GET /api2/storage/retrieve",
+  "status": 200
+}

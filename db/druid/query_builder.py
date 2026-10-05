@@ -1,12 +1,12 @@
 from datetime import datetime, timezone
 from itertools import chain
 from types import GeneratorType
-from typing import Dict, List, Union
+from typing import Dict
 import operator
 
 from pydruid.query import Query as PydruidQuery, QueryBuilder as DruidQueryBuilder
 from pydruid.utils.dimensions import DimensionSpec
-from pydruid.utils.filters import Dimension, Filter
+from pydruid.utils.filters import Filter
 
 from db.druid.aggregations.query_dependent_aggregation import QueryDependentAggregation
 from db.druid.aggregations.query_modifying_aggregation import QueryModifyingAggregation
@@ -29,6 +29,39 @@ NEG_INFINITY = -POS_INFINITY
 # range of possible timestamps we will see is low, so this cache should not grow too
 # large.
 _DATE_CACHE: Dict[float, str] = {}
+
+
+def outer_merge_in_appearance_order(left, right):
+    '''Outer-merge two dataframes on their shared columns, with rows in the order
+    pandas 1.x gave for `merge(how='outer', sort=False)`. Since pandas 2.2 an outer
+    merge always sorts by the join keys, and row order reaches charts and tables.
+
+    The pandas 1.x order: keys are ranked by first appearance, in `left` then in
+    `right`; rows come key by key, and within a key, left rows in their order, each
+    crossed with the matching right rows in their order. Null keys match each other.
+    Both frames must be non-empty: pandas 1.x took another path for an empty side.
+    '''
+    import numpy as np  # pylint: disable=import-outside-toplevel
+
+    keys = [column for column in left.columns if column in right.columns]
+    left_row, right_row = '__left_row', '__right_row'
+    merged = left.assign(**{left_row: np.arange(len(left))}).merge(
+        right.assign(**{right_row: np.arange(len(right))}), how='outer', copy=False
+    )
+    # A key found in `left` is first seen at its first left row; any other key, after
+    # all of `left`, at its first right row.
+    first_seen = merged[left_row].fillna(merged[right_row] + len(left))
+    key_rank = first_seen.groupby(
+        [merged[key] for key in keys], sort=False, dropna=False
+    ).transform('min')
+    order = np.lexsort(
+        (
+            merged[right_row].fillna(-1).to_numpy(),
+            merged[left_row].fillna(-1).to_numpy(),
+            key_rank.to_numpy(),
+        )
+    )
+    return merged.drop(columns=[left_row, right_row]).take(order).reset_index(drop=True)
 
 
 def _timestamp_to_date_str(timestamp_ms):
@@ -747,7 +780,7 @@ class PydruidQueryWrapper(PydruidQuery):
 
         # Join the two dataframes together so that every possible unique dimension value
         # set has every required timestamp.
-        return df.merge(dimensions_by_timestamp_df, how='outer', sort=False, copy=False)
+        return outer_merge_in_appearance_order(df, dimensions_by_timestamp_df)
 
     def _build_result_dates(self, df):
         '''Build a list of dates this dataset covers. This can be different than the

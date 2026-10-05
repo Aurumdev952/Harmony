@@ -1,0 +1,233 @@
+"""Consistency checks between INVENTORY.md, the cases and the recordings.
+
+Each function returns a list of problems (empty when consistent).
+test_catalogue.py asserts each one, and ``record.py --dry-run`` prints them,
+so both read the same rules.
+"""
+
+from __future__ import annotations
+
+import json
+import re
+from collections import Counter
+from pathlib import Path
+
+from .cases import (
+    RECORDINGS_DIR,
+    RELAY_PREFIX,
+    Case,
+    captures_of,
+    placeholders,
+    recording_path,
+)
+from .inventory import RelayRow, Row, client_relay_operations
+
+# Patterns that would mean a value, not a shape, reached a fixture (SPEC INV-6).
+LEAKS = re.compile(
+    r"[\w.+-]+@[\w-]+\.[\w.]+"  # email addresses
+    r"|eyJ[\w-]{8,}"  # JWTs
+    r"|[0-9a-f]{32,}"  # hex digests and tokens
+)
+
+
+def duplicate_routes(rows: list[Row]) -> list[str]:
+    return [route for route, n in Counter(r.route for r in rows).items() if n > 1]
+
+
+def cases_without_a_row(cases: list[Case], rows: list[Row]) -> list[str]:
+    routes = {r.route for r in rows}
+    return [
+        f"{c.id}: {c.route} is not in INVENTORY.md"
+        for c in cases
+        if c.route not in routes
+    ]
+
+
+def coverage_problems(cases: list[Case], rows: list[Row]) -> list[str]:
+    covered = {c.route for c in cases}
+    problems = []
+    for r in rows:
+        if r.coverage == "recorded" and r.route not in covered:
+            problems.append(f"{r.route}: marked recorded but has no case")
+        elif r.deferred and r.route in covered:
+            problems.append(f"{r.route}: deferred but has a case")
+        elif r.coverage != "recorded" and not re.match(r"deferred: \S", r.coverage):
+            problems.append(
+                f"{r.route}: coverage must be 'recorded' or 'deferred: <reason>'"
+            )
+    return problems
+
+
+def relay_problems(cases: list[Case], relay_rows: list[RelayRow]) -> list[str]:
+    """Every Relay operation in web/client is listed once; recorded ones have a
+    case that sends that operation's text, deferred ones have none."""
+    sent = {
+        c.body["query"].removeprefix(RELAY_PREFIX)
+        for c in cases
+        if isinstance(c.body, dict)
+        and str(c.body.get("query", "")).startswith(RELAY_PREFIX)
+    }
+    operations = client_relay_operations()
+    listed = {r.artifact: r for r in relay_rows}
+    problems = [
+        f"{a}: Relay operation missing from INVENTORY.md"
+        for a in sorted(set(operations) - set(listed))
+    ]
+    problems += [
+        f"{a}: listed but not a client Relay operation"
+        for a in sorted(set(listed) - set(operations))
+    ]
+    for artifact, row in sorted(listed.items()):
+        if row.recorded and artifact not in sent:
+            problems.append(f"{row.operation}: marked recorded but no case sends it")
+        elif row.deferred and artifact in sent:
+            problems.append(f"{row.operation}: deferred but a case sends it")
+        elif not row.recorded and not re.match(r"deferred: \S", row.coverage):
+            problems.append(
+                f"{row.operation}: coverage must be 'recorded',"
+                " 'recorded (empty connection, <reason>)' or 'deferred: <reason>'"
+            )
+    problems += [
+        f"{a}: a case sends it but INVENTORY.md does not list it"
+        for a in sorted(sent - set(listed))
+    ]
+    return problems
+
+
+def _empty_edges(node: dict, path: str = "$") -> list[str]:
+    """Paths of Relay connection ``edges`` arrays that recorded no item."""
+    found = []
+    for key, child in (node.get("properties") or {}).items():
+        here = f"{path}.{key}"
+        if key == "edges" and child.get("maxItems") == 0:
+            found.append(here)
+        found += _empty_edges(child, here)
+    if isinstance(node.get("items"), dict):
+        found += _empty_edges(node["items"], f"{path}[]")
+    return found
+
+
+def empty_connection_problems(
+    cases: list[Case],
+    relay_rows: list[RelayRow],
+    recordings_dir: Path = RECORDINGS_DIR,
+) -> list[str]:
+    """A Relay operation whose every recording has an empty connection pins no
+    item shape, so its row must say why; a row that says so while a recording
+    has items is stale."""
+    empties: dict[str, list[list[str]]] = {}
+    for case in cases:
+        query = case.body.get("query", "") if isinstance(case.body, dict) else ""
+        path = recording_path(case.id, recordings_dir)
+        if str(query).startswith(RELAY_PREFIX) and path.exists():
+            schema = json.loads(path.read_text())["response_schema"] or {}
+            artifact = query.removeprefix(RELAY_PREFIX)
+            empties.setdefault(artifact, []).append(_empty_edges(schema))
+    problems = []
+    for row in relay_rows:
+        recorded = empties.get(row.artifact)
+        if not recorded:
+            continue
+        all_empty = all(recorded)
+        if all_empty and not row.empty_connection:
+            problems.append(
+                f"{row.operation}: every recording has an empty connection"
+                f" ({', '.join(recorded[0])}); seed rows or mark it"
+                " 'recorded (empty connection, <reason>)'"
+            )
+        elif row.empty_connection and not all_empty:
+            problems.append(
+                f"{row.operation}: marked empty connection but a recording has items"
+            )
+    return problems
+
+
+def _list_paths(node: dict, path: str, filled: dict[str, bool]) -> None:
+    """Record, for each array in a response schema, whether it held items."""
+    types = node.get("type")
+    if types == "array" or (isinstance(types, list) and "array" in types):
+        filled[path] = filled.get(path, False) or node.get("maxItems") != 0
+    for key, child in (node.get("properties") or {}).items():
+        _list_paths(child, f"{path}.{key}", filled)
+    if isinstance(node.get("items"), dict):
+        _list_paths(node["items"], f"{path}[]", filled)
+
+
+def _operation(case: Case) -> str:
+    query = case.body.get("query", "") if isinstance(case.body, dict) else ""
+    if str(query).startswith(RELAY_PREFIX):
+        return Path(query).name.split(".", 1)[0]
+    return case.route
+
+
+def always_empty_lists(
+    cases: list[Case], recordings_dir: Path = RECORDINGS_DIR
+) -> dict[str, list[str]]:
+    """Lists that are empty in every recording of a route, or of a Relay
+    operation for ``POST /api/graphql``. Such a list pins no item shape, so
+    the replay accepts any items there. ``record.py --dry-run`` prints them."""
+    filled: dict[str, dict[str, bool]] = {}
+    for case in cases:
+        path = recording_path(case.id, recordings_dir)
+        if path.exists():
+            schema = json.loads(path.read_text())["response_schema"] or {}
+            _list_paths(schema, "$", filled.setdefault(_operation(case), {}))
+    return {
+        operation: sorted(p for p, has_items in paths.items() if not has_items)
+        for operation, paths in sorted(filled.items())
+        if not all(paths.values())
+    }
+
+
+def capture_order_problems(cases: list[Case]) -> list[str]:
+    captured: set[str] = set()
+    problems = []
+    for case in cases:
+        problems += [
+            f"{case.id}: uses {p} before any case captures it"
+            for p in placeholders(case)
+            if p not in captured
+        ]
+        captured.update(captures_of(case))
+    return problems
+
+
+def recording_problems(
+    cases: list[Case], recordings_dir: Path = RECORDINGS_DIR
+) -> list[str]:
+    ids = {c.id for c in cases}
+    on_disk = {p.stem for p in recordings_dir.glob("*.json")}
+    problems = [f"{i}: no recording" for i in sorted(ids - on_disk)]
+    problems += [f"{i}: recording without a case" for i in sorted(on_disk - ids)]
+    for case in cases:
+        path = recording_path(case.id, recordings_dir)
+        if path.exists():
+            recording = json.loads(path.read_text())
+            if (recording["id"], recording["route"]) != (case.id, case.route):
+                problems.append(
+                    f"{case.id}: recording names {recording['id']} / {recording['route']}"
+                )
+    return problems
+
+
+def leak_problems(recordings_dir: Path = RECORDINGS_DIR) -> list[str]:
+    return [
+        f"{p.name}: {match}"
+        for p in sorted(recordings_dir.glob("*.json"))
+        for match in LEAKS.findall(p.read_text())
+    ]
+
+
+def all_problems(
+    cases: list[Case], rows: list[Row], relay_rows: list[RelayRow]
+) -> list[str]:
+    return [
+        *duplicate_routes(rows),
+        *cases_without_a_row(cases, rows),
+        *coverage_problems(cases, rows),
+        *relay_problems(cases, relay_rows),
+        *empty_connection_problems(cases, relay_rows),
+        *capture_order_problems(cases),
+        *recording_problems(cases),
+        *leak_problems(),
+    ]

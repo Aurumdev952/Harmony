@@ -1,0 +1,5 @@
+{
+  "description": "IN filter on municipality.",
+  "endpoint": "table",
+  "policy": null
+}

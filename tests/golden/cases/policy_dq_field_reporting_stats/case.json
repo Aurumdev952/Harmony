@@ -1,0 +1,16 @@
+{
+  "description": "Field reporting stats for a user restricted to Pará.",
+  "endpoint": "field_reporting_stats",
+  "policy": {
+    "query_policies": [
+      {
+        "dimension": "StateName",
+        "dimension_value": "Pará"
+      },
+      {
+        "dimension": "source",
+        "dimension_value": null
+      }
+    ]
+  }
+}

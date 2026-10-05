@@ -1,0 +1,12 @@
+{
+  "content_type": "application/json",
+  "headers": [],
+  "id": "dashboard.viewable.official",
+  "pinned": {},
+  "response_schema": {
+    "maxItems": 0,
+    "type": "array"
+  },
+  "route": "GET /api2/dashboard/viewable",
+  "status": 200
+}

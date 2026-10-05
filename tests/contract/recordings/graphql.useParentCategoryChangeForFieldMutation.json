@@ -1,0 +1,168 @@
+{
+  "content_type": "text/html",
+  "headers": [],
+  "id": "graphql.useParentCategoryChangeForFieldMutation",
+  "pinned": {},
+  "response_schema": {
+    "properties": {
+      "data": {
+        "properties": {
+          "update_field_category_mapping": {
+            "properties": {
+              "returning": {
+                "items": {
+                  "properties": {
+                    "category": {
+                      "properties": {
+                        "childrenCategoryAggregate": {
+                          "properties": {
+                            "aggregate": {
+                              "properties": {
+                                "count": {
+                                  "type": "integer"
+                                }
+                              },
+                              "required": [
+                                "count"
+                              ],
+                              "type": "object"
+                            }
+                          },
+                          "required": [
+                            "aggregate"
+                          ],
+                          "type": "object"
+                        },
+                        "fieldCategoryMappingsAggregate": {
+                          "properties": {
+                            "aggregate": {
+                              "properties": {
+                                "count": {
+                                  "type": "integer"
+                                }
+                              },
+                              "required": [
+                                "count"
+                              ],
+                              "type": "object"
+                            }
+                          },
+                          "required": [
+                            "aggregate"
+                          ],
+                          "type": "object"
+                        },
+                        "field_category_mappings": {
+                          "items": {
+                            "properties": {
+                              "field": {
+                                "properties": {
+                                  "id": {
+                                    "type": "string"
+                                  }
+                                },
+                                "required": [
+                                  "id"
+                                ],
+                                "type": "object"
+                              },
+                              "id": {
+                                "type": "string"
+                              }
+                            },
+                            "required": [
+                              "field",
+                              "id"
+                            ],
+                            "type": "object"
+                          },
+                          "type": "array"
+                        },
+                        "id": {
+                          "type": "string"
+                        }
+                      },
+                      "required": [
+                        "childrenCategoryAggregate",
+                        "fieldCategoryMappingsAggregate",
+                        "field_category_mappings",
+                        "id"
+                      ],
+                      "type": "object"
+                    },
+                    "field": {
+                      "properties": {
+                        "field_category_mappings": {
+                          "items": {
+                            "properties": {
+                              "category": {
+                                "properties": {
+                                  "id": {
+                                    "type": "string"
+                                  }
+                                },
+                                "required": [
+                                  "id"
+                                ],
+                                "type": "object"
+                              },
+                              "id": {
+                                "type": "string"
+                              },
+                              "visibilityStatus": {
+                                "type": "string"
+                              }
+                            },
+                            "required": [
+                              "category",
+                              "id",
+                              "visibilityStatus"
+                            ],
+                            "type": "object"
+                          },
+                          "type": "array"
+                        },
+                        "id": {
+                          "type": "string"
+                        }
+                      },
+                      "required": [
+                        "field_category_mappings",
+                        "id"
+                      ],
+                      "type": "object"
+                    },
+                    "id": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "category",
+                    "field",
+                    "id"
+                  ],
+                  "type": "object"
+                },
+                "type": "array"
+              }
+            },
+            "required": [
+              "returning"
+            ],
+            "type": "object"
+          }
+        },
+        "required": [
+          "update_field_category_mapping"
+        ],
+        "type": "object"
+      }
+    },
+    "required": [
+      "data"
+    ],
+    "type": "object"
+  },
+  "route": "POST /api/graphql",
+  "status": 200
+}

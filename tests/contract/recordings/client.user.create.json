@@ -1,0 +1,68 @@
+{
+  "content_type": "application/json",
+  "headers": [],
+  "id": "client.user.create",
+  "pinned": {},
+  "response_schema": {
+    "properties": {
+      "$uri": {
+        "type": "string",
+        "x-format": "api-uri"
+      },
+      "acls": {
+        "maxItems": 0,
+        "type": "array"
+      },
+      "apiTokens": {
+        "maxItems": 0,
+        "type": "array"
+      },
+      "created": {
+        "properties": {
+          "$date": {
+            "type": "integer"
+          }
+        },
+        "required": [
+          "$date"
+        ],
+        "type": "object"
+      },
+      "firstName": {
+        "type": "string"
+      },
+      "lastName": {
+        "type": "string"
+      },
+      "phoneNumber": {
+        "type": "string"
+      },
+      "roles": {
+        "maxItems": 0,
+        "type": "array"
+      },
+      "status": {
+        "type": "string"
+      },
+      "username": {
+        "type": "string",
+        "x-format": "email"
+      }
+    },
+    "required": [
+      "$uri",
+      "acls",
+      "apiTokens",
+      "created",
+      "firstName",
+      "lastName",
+      "phoneNumber",
+      "roles",
+      "status",
+      "username"
+    ],
+    "type": "object"
+  },
+  "route": "POST /api2/user",
+  "status": 200
+}

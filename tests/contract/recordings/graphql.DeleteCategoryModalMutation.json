@@ -1,0 +1,105 @@
+{
+  "content_type": "text/html",
+  "headers": [],
+  "id": "graphql.DeleteCategoryModalMutation",
+  "pinned": {},
+  "response_schema": {
+    "properties": {
+      "data": {
+        "properties": {
+          "delete_category_by_pk": {
+            "properties": {
+              "children": {
+                "maxItems": 0,
+                "type": "array"
+              },
+              "childrenCategoryAggregate": {
+                "properties": {
+                  "aggregate": {
+                    "properties": {
+                      "count": {
+                        "type": "integer"
+                      }
+                    },
+                    "required": [
+                      "count"
+                    ],
+                    "type": "object"
+                  }
+                },
+                "required": [
+                  "aggregate"
+                ],
+                "type": "object"
+              },
+              "fieldCategoryMappingsAggregate": {
+                "properties": {
+                  "aggregate": {
+                    "properties": {
+                      "count": {
+                        "type": "integer"
+                      }
+                    },
+                    "required": [
+                      "count"
+                    ],
+                    "type": "object"
+                  }
+                },
+                "required": [
+                  "aggregate"
+                ],
+                "type": "object"
+              },
+              "id": {
+                "type": "string"
+              },
+              "name": {
+                "type": "string"
+              },
+              "parent": {
+                "properties": {
+                  "children": {
+                    "maxItems": 0,
+                    "type": "array"
+                  },
+                  "id": {
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "children",
+                  "id"
+                ],
+                "type": "object"
+              },
+              "visibilityStatus": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "children",
+              "childrenCategoryAggregate",
+              "fieldCategoryMappingsAggregate",
+              "id",
+              "name",
+              "parent",
+              "visibilityStatus"
+            ],
+            "type": "object"
+          }
+        },
+        "required": [
+          "delete_category_by_pk"
+        ],
+        "type": "object"
+      }
+    },
+    "required": [
+      "data"
+    ],
+    "type": "object"
+  },
+  "route": "POST /api/graphql",
+  "status": 200
+}

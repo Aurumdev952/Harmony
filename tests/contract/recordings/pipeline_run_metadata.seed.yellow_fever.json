@@ -1,0 +1,67 @@
+{
+  "content_type": "application/json",
+  "headers": [],
+  "id": "pipeline_run_metadata.seed.yellow_fever",
+  "pinned": {},
+  "response_schema": {
+    "properties": {
+      "$uri": {
+        "type": "string",
+        "x-format": "api-uri"
+      },
+      "digestMetadata": {
+        "properties": {
+          "data_points_count": {
+            "type": "integer"
+          },
+          "end_date": {
+            "type": "string",
+            "x-format": "date"
+          },
+          "fields_count": {
+            "type": "integer"
+          },
+          "start_date": {
+            "type": "string",
+            "x-format": "date"
+          },
+          "start_ts": {
+            "type": "string",
+            "x-format": "date-time"
+          }
+        },
+        "required": [
+          "data_points_count",
+          "end_date",
+          "fields_count",
+          "start_date",
+          "start_ts"
+        ],
+        "type": "object"
+      },
+      "generationDatetime": {
+        "properties": {
+          "$date": {
+            "type": "integer"
+          }
+        },
+        "required": [
+          "$date"
+        ],
+        "type": "object"
+      },
+      "source": {
+        "type": "string"
+      }
+    },
+    "required": [
+      "$uri",
+      "digestMetadata",
+      "generationDatetime",
+      "source"
+    ],
+    "type": "object"
+  },
+  "route": "POST /api2/pipeline_run_metadata",
+  "status": 200
+}

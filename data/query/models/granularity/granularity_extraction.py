@@ -2,10 +2,10 @@ from typing import List
 
 import related
 
-from pydruid.utils.dimensions import DimensionSpec, JavascriptExtraction
+from pydruid.utils.dimensions import DimensionSpec
 
+from data.query.models.granularity.epi_week import EPI_WEEK_OF_YEAR_EXTRACTION
 from data.query.models.granularity.granularity import Granularity
-from db.druid.js_formulas.week_extraction import WHO_EPI_WEEK_EXTRACTION_FORMULA
 from db.druid.util import GranularityTimeFormatExtraction
 
 
@@ -29,7 +29,7 @@ class GranularityExtraction(Granularity):
         'week_of_year': GranularityTimeFormatExtraction('3000-MM-dd', 'week'),
         'month_of_year': GranularityTimeFormatExtraction('3000-MM-01', 'month'),
         'quarter_of_year': GranularityTimeFormatExtraction('3000-MM-01', 'quarter'),
-        'epi_week_of_year': JavascriptExtraction(WHO_EPI_WEEK_EXTRACTION_FORMULA),
+        'epi_week_of_year': EPI_WEEK_OF_YEAR_EXTRACTION,
     }
 
     def to_druid(self, query_intervals: List[str]) -> DimensionSpec:

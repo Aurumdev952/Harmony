@@ -1,0 +1,73 @@
+## audit_in_with_empty_value
+- druid_response: 4 differing values
+    druid_response[0].length: 2 -> 1
+    druid_response[0][0][0]: null -> "Acre"
+    druid_response[0][0][1]: 1010.0 -> 23107.0
+    druid_response[0][0][2]: 179 -> 3985
+- body: 3 differing values
+    body.data.length: 2 -> 1
+    body.data[0].StateName: null -> "Acre"
+    body.data[0].yellow_fever_cases: 1010.0 -> 23107.0
+## audit_not_in_query_filter
+- druid_response: 6 differing values
+    druid_response[0][0][1]: 3002.0 -> 2757.0
+    druid_response[0][0][2]: 470 -> 429
+    druid_response[0][1][1]: 1938.0 -> 1701.0
+    druid_response[0][1][2]: 326 -> 295
+    druid_response[0][2][1]: 2162.0 -> 1958.0
+    druid_response[0][2][2]: 347 -> 318
+- body: 3 differing values
+    body.data[0].yellow_fever_cases: 3002.0 -> 2757.0
+    body.data[1].yellow_fever_cases: 1938.0 -> 1701.0
+    body.data[2].yellow_fever_cases: 2162.0 -> 1958.0
+## audit_not_selector_calculation_filter
+- druid_response: 6 differing values
+    druid_response[0][0][1]: 2862.0 -> 2656.0
+    druid_response[0][0][2]: 469 -> 432
+    druid_response[0][1][1]: 1852.0 -> 1638.0
+    druid_response[0][1][2]: 329 -> 293
+    druid_response[0][2][1]: 2038.0 -> 1749.0
+    druid_response[0][2][2]: 318 -> 274
+- body: 3 differing values
+    body.data[0].yellow_fever_cases__nf: 2862.0 -> 2656.0
+    body.data[1].yellow_fever_cases__nf: 1852.0 -> 1638.0
+    body.data[2].yellow_fever_cases__nf: 2038.0 -> 1749.0
+## audit_not_selector_query_filter
+- druid_response: 6 differing values
+    druid_response[0][0][1]: 2862.0 -> 2656.0
+    druid_response[0][0][2]: 469 -> 432
+    druid_response[0][1][1]: 1852.0 -> 1638.0
+    druid_response[0][1][2]: 329 -> 293
+    druid_response[0][2][1]: 2038.0 -> 1749.0
+    druid_response[0][2][2]: 318 -> 274
+- body: 3 differing values
+    body.data[0].yellow_fever_cases: 2862.0 -> 2656.0
+    body.data[1].yellow_fever_cases: 1852.0 -> 1638.0
+    body.data[2].yellow_fever_cases: 2038.0 -> 1749.0
+## audit_selector_empty_value
+- druid_response: 1 differing values
+    druid_response[0].length: 1 -> 0
+- body: 1 differing values
+    body.data.length: 1 -> 0
+## calc_last_value
+- error: 1 differing values
+    error: null -> "AssertionError: calc_last_value: HTTP 500\n<!DOCTYPE HTML PUBLIC \"-//W3C//DTD HTML 3.2 Final//EN\">\n<title>500 Internal Server Error</title>\n<h1>Internal Se
+- druid_query: 1 differing values
+    druid_query: [{"aggregations": [{"aggregator": {"aggregator": {"fieldName": "sum", "name": "yellow_fever_cases", "type": "doubleSum"}, "name": "yellow_fever_cases", "type":  -> null
+- druid_response: 1 differing values
+    druid_response: [[[1704067200000, "Acre", 82.0, 298], [1704067200000, "Par\u00e1", 26.0, 196], [1704067200000, "Roraima", 46.0, 202], [1706745600000, "Acre", 134.0, 274], [1706 -> null
+- body: 1 differing values
+    body: {"data": [{"StateName": "Acre", "timestamp": "2024-01-01", "yellow_fever_cases": 82.0}, {"StateName": "Par\u00e1", "timestamp": "2024-01-01", "yellow_fever_case -> null
+## filter_empty_value
+- druid_response: 5 differing values
+    druid_response[0].length: 3 -> 1
+    druid_response[0][0][0]: null -> "Par\u00e1"
+    druid_response[0][0][1]: null -> "Bel\u00e9m"
+    druid_response[0][0][2]: 295.0 -> 1747.0
+    druid_response[0][0][3]: 51 -> 295
+- body: 4 differing values
+    body.data.length: 3 -> 1
+    body.data[0].MunicipalityName: null -> "Bel\u00e9m"
+    body.data[0].StateName: null -> "Par\u00e1"
+    body.data[0].yellow_fever_cases: 295.0 -> 1747.0
+7 cases differ between /tmp/wp8a/out/final/legacy-integration and /tmp/wp8a/out/final/druid38-integration; 7 in Druid rows, body or error, 0 in query text only

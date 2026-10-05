@@ -184,9 +184,7 @@ def add_user_role(
 
     if not entity:
         exists = True
-        entity = UserRoles(
-            user_id=user.id, role_id=role.id, resource_id=resource_id
-        )  # type: ignore
+        entity = UserRoles(user_id=user.id, role_id=role.id, resource_id=resource_id)  # type: ignore
         before_user_role_change.send(user, role=role)
         add_entity(session, entity, flush, commit)
         after_user_role_change.send(user, role=role)
@@ -388,6 +386,17 @@ def update_user_groups(user: User, new_groups: List[str]) -> None:
         user.groups = groups  # type: ignore
 
 
+def issue_api_token(user: User) -> APIToken:
+    '''Generates an API token for `user` and stores it, so the token authenticates as
+    soon as the caller has it.'''
+    token = APIToken.generate_token(user)
+    # generate_token sets the user through a view-only relationship, which is not saved.
+    token.user_id = user.id
+    with Transaction() as transaction:
+        transaction.add_or_update(token)
+    return token
+
+
 def update_user_api_tokens(user: User, tokens: List[APITokenType]):
     # pylint: disable=import-outside-toplevel
     from web.server.security.signal_handlers import check_token_validity
@@ -417,8 +426,7 @@ def update_user_api_tokens(user: User, tokens: List[APITokenType]):
 
         # now revoke tokens to be revoked, we don't allow un-revoke them
         user.api_tokens.filter(  # type: ignore[attr-defined]
-            # pylint: disable=singleton-comparison
-            APIToken.is_revoked == False,
+            APIToken.is_revoked.is_(False),
             APIToken.id.in_(to_revoke),
         ).update({'is_revoked': True}, synchronize_session=False)
 

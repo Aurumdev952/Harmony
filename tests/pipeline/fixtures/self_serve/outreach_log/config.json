@@ -1,0 +1,12 @@
+{
+  "date_column": "Date",
+  "source": "outreach_log",
+  "data_filename": "outreach_log.csv.gz",
+  "dimensions": [
+    {"input_name": "StateName", "output_name": "StateName"},
+    {"input_name": "Site", "output_name": "MunicipalityName"}
+  ],
+  "fields": [
+    {"input_name": "Households Reached", "output_name": "outreach_log_households_reached"}
+  ]
+}

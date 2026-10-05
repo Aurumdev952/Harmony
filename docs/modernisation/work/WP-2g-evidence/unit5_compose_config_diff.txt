@@ -1,0 +1,34 @@
+=== docker-compose.yaml docker-compose.prod.yaml
+39a40,45
+>     environment:
+>       LOG_FORMAT: '{"timestamp":"$$time_iso8601","level":"INFO","logger":"nginx.access",
+>         "message":"$$request_method $$uri $$status","deployment":"harmony_demo", "request_id":"$$upstream_http_x_request_id",
+>         "http":{"method":"$$request_method","host":"$$host","path":"$$uri", "status":$$status,"bytes":$$body_bytes_sent,"duration_s":$$request_time},
+>         "client_ip":"$$remote_addr","user_agent":"$$http_user_agent"}'
+>       LOG_FORMAT_ESCAPE: json
+165a172,173
+>       LOG_FORMAT: json
+>       LOG_STREAM: stdout
+231a240,241
+>       LOG_FORMAT: json
+>       LOG_STREAM: stdout
+=== docker-compose.yaml docker-compose.dev.yaml
+48a49
+>       LOG_FORMAT: text
+173a175,176
+>       LOG_FORMAT: text
+>       LOG_STREAM: stdout
+261a265,266
+>       LOG_FORMAT: text
+>       LOG_STREAM: stdout
+=== docker-compose.pipeline.yaml
+1c1
+< name: before
+---
+> name: agent-afdc329d2f417884d
+17a18
+>       LOG_FORMAT: json
+45c46
+<     name: before_default
+---
+>     name: agent-afdc329d2f417884d_default

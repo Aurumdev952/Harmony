@@ -300,6 +300,28 @@
           table:
             name: unpublished_field_category_mapping
             schema: public
+  insert_permissions:
+    - role: user
+      permission:
+        check: {}
+        columns: '*'
+        backend_only: false
+  select_permissions:
+    - role: user
+      permission:
+        columns: '*'
+        filter: {}
+        allow_aggregations: true
+  update_permissions:
+    - role: user
+      permission:
+        columns: '*'
+        filter: {}
+        check: {}
+  delete_permissions:
+    - role: user
+      permission:
+        filter: {}
 - table:
     name: dashboard
     schema: public
@@ -325,6 +347,27 @@
     - name: self_serve_source
       using:
         foreign_key_constraint_on: self_serve_source_id
+  insert_permissions:
+    - role: user
+      permission:
+        check: {}
+        columns: '*'
+        backend_only: false
+  select_permissions:
+    - role: user
+      permission:
+        columns: '*'
+        filter: {}
+  update_permissions:
+    - role: user
+      permission:
+        columns: '*'
+        filter: {}
+        check: {}
+  delete_permissions:
+    - role: user
+      permission:
+        filter: {}
 - table:
     name: dataprep_flow
     schema: public
@@ -343,6 +386,27 @@
           table:
             name: self_serve_source
             schema: public
+  insert_permissions:
+    - role: user
+      permission:
+        check: {}
+        columns: '*'
+        backend_only: false
+  select_permissions:
+    - role: user
+      permission:
+        columns: '*'
+        filter: {}
+  update_permissions:
+    - role: user
+      permission:
+        columns: '*'
+        filter: {}
+        check: {}
+  delete_permissions:
+    - role: user
+      permission:
+        filter: {}
 - table:
     name: dataprep_job
     schema: public
@@ -350,6 +414,15 @@
     - name: dataprep_flow
       using:
         foreign_key_constraint_on: dataprep_flow_id
+  select_permissions:
+    - role: user
+      permission:
+        columns: '*'
+        filter: {}
+  delete_permissions:
+    - role: user
+      permission:
+        filter: {}
 - table:
     name: dimension
     schema: public
@@ -417,6 +490,18 @@
           table:
             name: unpublished_field_dimension_mapping
             schema: public
+  select_permissions:
+    - role: anonymous
+      permission:
+        columns:
+          - description
+          - id
+          - name
+        filter: {}
+    - role: user
+      permission:
+        columns: '*'
+        filter: {}
 - table:
     name: dimension_category
     schema: public
@@ -439,6 +524,17 @@
           table:
             name: dimension_category_mapping
             schema: public
+  select_permissions:
+    - role: anonymous
+      permission:
+        columns:
+          - id
+          - name
+        filter: {}
+    - role: user
+      permission:
+        columns: '*'
+        filter: {}
 - table:
     name: dimension_category_mapping
     schema: public
@@ -449,6 +545,16 @@
     - name: dimension_category
       using:
         foreign_key_constraint_on: category_id
+  select_permissions:
+    - role: anonymous
+      permission:
+        columns:
+          - id
+        filter: {}
+    - role: user
+      permission:
+        columns: '*'
+        filter: {}
 - table:
     name: external_alert_activity_to_ignore
     schema: public
@@ -525,6 +631,27 @@
           table:
             name: field_pipeline_datasource_mapping
             schema: public
+  insert_permissions:
+    - role: user
+      permission:
+        check: {}
+        columns: '*'
+        backend_only: false
+  select_permissions:
+    - role: user
+      permission:
+        columns: '*'
+        filter: {}
+  update_permissions:
+    - role: user
+      permission:
+        columns: '*'
+        filter: {}
+        check: {}
+  delete_permissions:
+    - role: user
+      permission:
+        filter: {}
 - table:
     name: field_category_mapping
     schema: public
@@ -535,6 +662,24 @@
     - name: field
       using:
         foreign_key_constraint_on: field_id
+  insert_permissions:
+    - role: user
+      permission:
+        check: {}
+        columns: '*'
+        backend_only: false
+  select_permissions:
+    - role: user
+      permission:
+        columns: '*'
+        filter: {}
+        allow_aggregations: true
+  update_permissions:
+    - role: user
+      permission:
+        columns: '*'
+        filter: {}
+        check: {}
 - table:
     name: field_dimension_mapping
     schema: public
@@ -545,6 +690,11 @@
     - name: field
       using:
         foreign_key_constraint_on: field_id
+  select_permissions:
+    - role: user
+      permission:
+        columns: '*'
+        filter: {}
 - table:
     name: field_pipeline_datasource_mapping
     schema: public
@@ -555,6 +705,17 @@
     - name: pipeline_datasource
       using:
         foreign_key_constraint_on: pipeline_datasource_id
+  insert_permissions:
+    - role: user
+      permission:
+        check: {}
+        columns: '*'
+        backend_only: false
+  select_permissions:
+    - role: user
+      permission:
+        columns: '*'
+        filter: {}
 - table:
     name: geo_dimension_metadata
     schema: public
@@ -621,6 +782,23 @@
           table:
             name: unpublished_field_pipeline_datasource_mapping
             schema: public
+  insert_permissions:
+    - role: user
+      permission:
+        check: {}
+        columns: '*'
+        backend_only: false
+  select_permissions:
+    - role: user
+      permission:
+        columns: '*'
+        filter: {}
+  update_permissions:
+    - role: user
+      permission:
+        columns: '*'
+        filter: {}
+        check: {}
 - table:
     name: pipeline_entity_match
     schema: public
@@ -652,6 +830,11 @@
 - table:
     name: pipeline_run_metadata
     schema: public
+  select_permissions:
+    - role: user
+      permission:
+        columns: '*'
+        filter: {}
 - table:
     name: raw_pipeline_entity
     schema: public
@@ -708,6 +891,27 @@
           table:
             name: data_upload_file_summary
             schema: public
+  insert_permissions:
+    - role: user
+      permission:
+        check: {}
+        columns: '*'
+        backend_only: false
+  select_permissions:
+    - role: user
+      permission:
+        columns: '*'
+        filter: {}
+  update_permissions:
+    - role: user
+      permission:
+        columns: '*'
+        filter: {}
+        check: {}
+  delete_permissions:
+    - role: user
+      permission:
+        filter: {}
 - table:
     name: unpublished_field
     schema: public
@@ -733,6 +937,27 @@
           table:
             name: unpublished_field_pipeline_datasource_mapping
             schema: public
+  insert_permissions:
+    - role: user
+      permission:
+        check: {}
+        columns: '*'
+        backend_only: false
+  select_permissions:
+    - role: user
+      permission:
+        columns: '*'
+        filter: {}
+  update_permissions:
+    - role: user
+      permission:
+        columns: '*'
+        filter: {}
+        check: {}
+  delete_permissions:
+    - role: user
+      permission:
+        filter: {}
 - table:
     name: unpublished_field_category_mapping
     schema: public
@@ -743,6 +968,21 @@
     - name: unpublished_field
       using:
         foreign_key_constraint_on: unpublished_field_id
+  insert_permissions:
+    - role: user
+      permission:
+        check: {}
+        columns: '*'
+        backend_only: false
+  select_permissions:
+    - role: user
+      permission:
+        columns: '*'
+        filter: {}
+  delete_permissions:
+    - role: user
+      permission:
+        filter: {}
 - table:
     name: unpublished_field_dimension_mapping
     schema: public
@@ -763,3 +1003,21 @@
     - name: unpublished_field
       using:
         foreign_key_constraint_on: unpublished_field_id
+  insert_permissions:
+    - role: user
+      permission:
+        check: {}
+        columns: '*'
+        backend_only: false
+  select_permissions:
+    - role: user
+      permission:
+        columns: '*'
+        filter: {}
+        allow_aggregations: true
+  update_permissions:
+    - role: user
+      permission:
+        columns: '*'
+        filter: {}
+        check: {}

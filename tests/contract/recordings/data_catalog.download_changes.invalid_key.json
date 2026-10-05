@@ -1,0 +1,21 @@
+{
+  "content_type": "application/json",
+  "headers": [],
+  "id": "data_catalog.download_changes.invalid_key",
+  "pinned": {
+    "/msg": "File key is invalid"
+  },
+  "response_schema": {
+    "properties": {
+      "msg": {
+        "type": "string"
+      }
+    },
+    "required": [
+      "msg"
+    ],
+    "type": "object"
+  },
+  "route": "GET /api/download_data_catalog_changes",
+  "status": 400
+}

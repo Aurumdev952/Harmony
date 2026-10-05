@@ -1,0 +1,78 @@
+{
+  "columns": {
+    "MunicipalityID": {
+      "rows_present": 2,
+      "types": [
+        "string"
+      ]
+    },
+    "MunicipalityLat": {
+      "rows_present": 2,
+      "types": [
+        "string"
+      ]
+    },
+    "MunicipalityLon": {
+      "rows_present": 2,
+      "types": [
+        "string"
+      ]
+    },
+    "MunicipalityName": {
+      "rows_present": 2,
+      "types": [
+        "string"
+      ]
+    },
+    "Real_Date": {
+      "rows_present": 2,
+      "types": [
+        "string"
+      ]
+    },
+    "StateID": {
+      "rows_present": 2,
+      "types": [
+        "string"
+      ]
+    },
+    "StateLat": {
+      "rows_present": 2,
+      "types": [
+        "string"
+      ]
+    },
+    "StateLon": {
+      "rows_present": 2,
+      "types": [
+        "string"
+      ]
+    },
+    "StateName": {
+      "rows_present": 2,
+      "types": [
+        "string"
+      ]
+    },
+    "field": {
+      "rows_present": 2,
+      "types": [
+        "string"
+      ]
+    },
+    "source": {
+      "rows_present": 2,
+      "types": [
+        "string"
+      ]
+    },
+    "val": {
+      "rows_present": 2,
+      "types": [
+        "float",
+        "integer"
+      ]
+    }
+  },
+  "row_count": 2
+}

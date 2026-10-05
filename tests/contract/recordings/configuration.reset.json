@@ -1,0 +1,34 @@
+{
+  "content_type": "application/json",
+  "headers": [],
+  "id": "configuration.reset",
+  "pinned": {
+    "/value": "/overview"
+  },
+  "response_schema": {
+    "properties": {
+      "$uri": {
+        "type": "string",
+        "x-format": "api-uri"
+      },
+      "defaultValue": {
+        "type": "string"
+      },
+      "key": {
+        "type": "string"
+      },
+      "value": {
+        "type": "string"
+      }
+    },
+    "required": [
+      "$uri",
+      "defaultValue",
+      "key",
+      "value"
+    ],
+    "type": "object"
+  },
+  "route": "POST /api2/configuration/<key>/reset",
+  "status": 200
+}

@@ -1,0 +1,22 @@
+{
+  "data": [
+    {
+      "MunicipalityName": "Belém",
+      "yellow_fever_cases": null
+    },
+    {
+      "MunicipalityName": "Pacaraima",
+      "yellow_fever_cases": 243.0
+    },
+    {
+      "MunicipalityName": "Rio Branco",
+      "yellow_fever_cases": null
+    }
+  ],
+  "dimensions": [
+    "MunicipalityName"
+  ],
+  "fields": [
+    "yellow_fever_cases"
+  ]
+}

@@ -171,12 +171,6 @@ def _rename_post_aggregator(suffix, post_aggregator):
     if field_name:
         post_aggregator['fieldName'] = f'{field_name}{suffix}'
 
-    # JS post aggregators can reference multiple fields.
-    if post_aggregator['type'] == 'javascript':
-        post_aggregator['fieldNames'] = [
-            f'{field_name}{suffix}' for field_name in post_aggregator['fieldNames']
-        ]
-
     # Expression post aggregators are special and can contain field references
     # directly in the formula referenced.
     if post_aggregator['type'] == 'expression':

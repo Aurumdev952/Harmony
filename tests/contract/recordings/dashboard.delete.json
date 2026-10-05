@@ -1,0 +1,9 @@
+{
+  "content_type": "application/json",
+  "headers": [],
+  "id": "dashboard.delete",
+  "pinned": {},
+  "response_schema": null,
+  "route": "DELETE /api2/dashboard/<id>",
+  "status": 204
+}

@@ -63,7 +63,7 @@
           "field": {
             "dimension": "MunicipalityName",
             "type": "selector",
-            "value": ""
+            "value": null
           },
           "type": "not"
         }

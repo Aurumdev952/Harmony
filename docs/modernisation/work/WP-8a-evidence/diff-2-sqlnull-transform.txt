@@ -1,0 +1,445 @@
+## audit_count_distinct_nullable_dimension
+- druid_response: 7 differing values
+    druid_response[0].length: 3 -> 4
+    druid_response[0][0][0]: "Acre" -> null
+- body: 4 differing values
+    body.data.length: 3 -> 4
+    body.data[0].StateName: "Acre" -> null
+## audit_not_in_query_filter
+- druid_response: 10 differing values
+    druid_response[0].length: 3 -> 4
+    druid_response[0][0][0]: "Acre" -> null
+- body: 7 differing values
+    body.data.length: 3 -> 4
+    body.data[0].StateName: "Acre" -> null
+## audit_not_selector_calculation_filter
+- druid_response: 10 differing values
+    druid_response[0].length: 3 -> 4
+    druid_response[0][0][0]: "Acre" -> null
+- body: 7 differing values
+    body.data.length: 3 -> 4
+    body.data[0].StateName: "Acre" -> null
+## audit_not_selector_query_filter
+- druid_response: 10 differing values
+    druid_response[0].length: 3 -> 4
+    druid_response[0][0][0]: "Acre" -> null
+- body: 7 differing values
+    body.data.length: 3 -> 4
+    body.data[0].StateName: "Acre" -> null
+## bar_graph_box_plot
+- druid_response: 24 differing values
+    druid_response[0].length: 6 -> 8
+    druid_response[0][0][0]: "Acre" -> null
+- body: 18 differing values
+    body.data.length: 6 -> 8
+    body.data[0].dimensions.MunicipalityName: "Cruzeiro do Sul" -> null
+## bar_graph_bubble_chart
+- druid_response: 49 differing values
+    druid_response[0].length: 6 -> 7
+    druid_response[0][0][0]: "Alto Alegre" -> null
+- body: 25 differing values
+    body.data.length: 6 -> 7
+    body.data[0].dimensions.MunicipalityName: "Alto Alegre" -> null
+## bar_graph_histogram
+- druid_response: 42 differing values
+    druid_response[0].length: 12 -> 15
+    druid_response[0][0][1]: "Acre" -> null
+- body: 30 differing values
+    body.data.length: 12 -> 15
+    body.data[0].dimensions.StateName: "Acre" -> null
+## bar_graph_sum_by_state_month
+- druid_response: 31 differing values
+    druid_response[0].length: 9 -> 12
+    druid_response[0][0][1]: "Acre" -> null
+- body: 22 differing values
+    body.data.length: 9 -> 12
+    body.data[0].dimensions.StateName: "Acre" -> null
+## calc_average_over_time
+- druid_response: 11 differing values
+    druid_response[0].length: 3 -> 4
+    druid_response[0][0][0]: "Acre" -> null
+- body: 7 differing values
+    body.data.length: 3 -> 4
+    body.data[0].StateName: "Acre" -> null
+## calc_avg
+- druid_response: 16 differing values
+    druid_response[0].length: 3 -> 4
+    druid_response[0][0][0]: "Acre" -> null
+- body: 7 differing values
+    body.data.length: 3 -> 4
+    body.data[0].StateName: "Acre" -> null
+## calc_complex
+- druid_response: 10 differing values
+    druid_response[0].length: 3 -> 4
+    druid_response[0][0][0]: "Acre" -> null
+- body: 7 differing values
+    body.data.length: 3 -> 4
+    body.data[0].StateName: "Acre" -> null
+## calc_count
+- druid_response: 7 differing values
+    druid_response[0].length: 3 -> 4
+    druid_response[0][0][0]: "Acre" -> null
+- body: 7 differing values
+    body.data.length: 3 -> 4
+    body.data[0].StateName: "Acre" -> null
+## calc_formula
+- druid_response: 21 differing values
+    druid_response[0].length: 3 -> 4
+    druid_response[0][0][0]: "Acre" -> null
+- body: 7 differing values
+    body.data.length: 3 -> 4
+    body.data[0].StateName: "Acre" -> null
+## calc_formula_with_filter
+- druid_response: 22 differing values
+    druid_response[0].length: 3 -> 4
+    druid_response[0][0][0]: "Acre" -> null
+- body: 7 differing values
+    body.data.length: 3 -> 4
+    body.data[0].StateName: "Acre" -> null
+## calc_last_value
+- error: 1 differing values
+    error: null -> "AssertionError: calc_last_value: HTTP 500\n<!DOCTYPE HTML PUBLIC \"-//W3C//DTD HTML 3.2 Final//EN\">\n<title>500 Internal Server Error</title>\n<h1>Internal Se
+- druid_query: 1 differing values
+    druid_query: [{"aggregations": [{"aggregator": {"aggregator": {"fieldName": "sum", "name": "yellow_fever_cases", "type": "doubleSum"}, "name": "yellow_fever_cases", "type":  -> null
+- druid_response: 1 differing values
+    druid_response: [[[1704067200000, "Acre", 82.0, 298], [1704067200000, "Par\u00e1", 26.0, 196], [1704067200000, "Roraima", 46.0, 202], [1706745600000, "Acre", 134.0, 274], [1706 -> null
+- body: 1 differing values
+    body: {"data": [{"StateName": "Acre", "timestamp": "2024-01-01", "yellow_fever_cases": 82.0}, {"StateName": "Par\u00e1", "timestamp": "2024-01-01", "yellow_fever_case -> null
+## calc_many_fields
+- druid_response: 48 differing values
+    druid_response[0].length: 3 -> 4
+    druid_response[0][0][0]: "Acre" -> null
+- body: 16 differing values
+    body.data.length: 3 -> 4
+    body.data[0].StateName: "Acre" -> null
+## calc_max
+- druid_response: 7 differing values
+    druid_response[0].length: 3 -> 4
+    druid_response[0][0][0]: "Acre" -> null
+- body: 4 differing values
+    body.data.length: 3 -> 4
+    body.data[0].StateName: "Acre" -> null
+## calc_min
+- druid_response: 7 differing values
+    druid_response[0].length: 3 -> 4
+    druid_response[0][0][0]: "Acre" -> null
+- body: 4 differing values
+    body.data.length: 3 -> 4
+    body.data[0].StateName: "Acre" -> null
+## calc_special_values
+- druid_response: 43 differing values
+    druid_response[0].length: 6 -> 7
+    druid_response[0][0][0]: "Alto Alegre" -> null
+- body: 13 differing values
+    body.data.length: 6 -> 7
+    body.data[0].dimensions.MunicipalityName: "Alto Alegre" -> null
+## calc_sum_with_dimension_filter
+- druid_response: 9 differing values
+    druid_response[0].length: 3 -> 4
+    druid_response[0][0][0]: "Acre" -> null
+- body: 7 differing values
+    body.data.length: 3 -> 4
+    body.data[0].StateName: "Acre" -> null
+## calc_window
+- druid_response: 139 differing values
+    druid_response[0].length: 36 -> 46
+    druid_response[0][0][1]: "Acre" -> null
+- body: 90 differing values
+    body.data.length: 36 -> 48
+    body.data[0].dimensions.StateName: "Acre" -> null
+## dq_data_quality_table
+- druid_response: 24 differing values
+    druid_response[0].length: 6 -> 8
+    druid_response[0][0][0]: "Acre" -> null
+- body: 19 differing values
+    body.length: 6 -> 8
+    body[0].geographyHierarchy.MunicipalityName: "Cruzeiro do Sul" -> null
+## dq_field_reporting_stats
+- druid_response: 13 differing values
+    druid_response[0].length: 3 -> 4
+    druid_response[0][0][0]: "Acre" -> null
+- body: 10 differing values
+    body.length: 3 -> 4
+    body[0].dimensions.StateName: "Acre" -> null
+## dq_outliers_box_plot
+- druid_response: 365 differing values
+    druid_response[0].length: 95 -> 101
+    druid_response[0][7][1]: "Acre" -> null
+## dq_outliers_line_graph
+- druid_response: 145 differing values
+    druid_response[0].length: 42 -> 48
+    druid_response[0][3][1]: "Acre" -> null
+- body: 330 differing values
+    body.data.length: 42 -> 48
+    body.data[0].mean: 46.595238095238095 -> 42.3125
+## dq_outliers_table
+- druid_response: 365 differing values
+    druid_response[0].length: 95 -> 101
+    druid_response[0][7][1]: "Acre" -> null
+## dq_reporting_completeness_line_graph
+- druid_response: 106 differing values
+    druid_response[0].length: 42 -> 48
+    druid_response[0][3][1]: "Acre" -> null
+- body: 143 differing values
+    body.data.length: 42 -> 56
+    body.data[3].dimensions.StateName: "Acre" -> null
+## empty_bar_graph
+- druid_response: 31 differing values
+    druid_response[0].length: 9 -> 12
+    druid_response[0][0][1]: "Acre" -> null
+- body: 22 differing values
+    body.data.length: 9 -> 12
+    body.data[0].dimensions.StateName: "Acre" -> null
+## empty_hierarchy
+- druid_response: 13 differing values
+    druid_response[0].length: 4 -> 5
+    druid_response[0][0][0]: "Acre" -> null
+- body: 8 differing values
+    body.root.children.length: 3 -> 4
+    body.root.children[0].metrics.yellow_fever_cases: 5182.0 -> 295.0
+## empty_line_graph
+- druid_response: 41 differing values
+    druid_response[0].length: 9 -> 12
+    druid_response[0][0][1]: "Acre" -> null
+- body: 32 differing values
+    body.data.length: 9 -> 12
+    body.data[0].dimensions.StateName: "Acre" -> null
+## empty_map
+- druid_response: 16 differing values
+    druid_response[0].length: 3 -> 4
+    druid_response[0][0][0]: "Acre" -> null
+- body: 13 differing values
+    body.data[0].datedData.length: 3 -> 4
+    body.data[0].datedData[0].dimensions.StateName: "Acre" -> null
+## empty_table
+- druid_response: 10 differing values
+    druid_response[0].length: 3 -> 4
+    druid_response[0][0][0]: "Acre" -> null
+- body: 7 differing values
+    body.data.length: 3 -> 4
+    body.data[0].StateName: "Acre" -> null
+## filter_field_in
+- druid_response: 10 differing values
+    druid_response[0].length: 3 -> 4
+    druid_response[0][0][0]: "Acre" -> null
+- body: 7 differing values
+    body.data.length: 3 -> 4
+    body.data[0].StateName: "Acre" -> null
+## filter_nested
+- druid_response: 17 differing values
+    druid_response[0].length: 5 -> 8
+    druid_response[0][0][1]: "50+" -> null
+- body: 12 differing values
+    body.data.length: 5 -> 8
+    body.data[0].Age: "50+" -> null
+## filter_not
+- druid_response: 10 differing values
+    druid_response[0].length: 3 -> 4
+    druid_response[0][0][0]: "Acre" -> null
+- body: 7 differing values
+    body.data.length: 3 -> 4
+    body.data[0].StateName: "Acre" -> null
+## filter_or
+- druid_response: 23 differing values
+    druid_response[0].length: 6 -> 11
+    druid_response[0][0][0]: "Acre" -> null
+- body: 17 differing values
+    body.data.length: 6 -> 11
+    body.data[0].StateName: "Acre" -> null
+## filter_selector
+- druid_response: 10 differing values
+    druid_response[0].length: 3 -> 4
+    druid_response[0][0][0]: "Acre" -> null
+- body: 7 differing values
+    body.data.length: 3 -> 4
+    body.data[0].StateName: "Acre" -> null
+## group_dimension_include_all
+- druid_response: 10 differing values
+    druid_response[0].length: 3 -> 4
+    druid_response[0][0][0]: "Acre" -> null
+- body: 7 differing values
+    body.data.length: 3 -> 4
+    body.data[0].StateName: "Acre" -> null
+## group_dimension_include_null
+- druid_response: 24 differing values
+    druid_response[0].length: 7 -> 8
+    druid_response[0][0][0]: "Acre" -> null
+- body: 17 differing values
+    body.data.length: 7 -> 8
+    body.data[0].StateName: "Acre" -> null
+## group_granularity_day
+- druid_response: 145 differing values
+    druid_response[0].length: 42 -> 48
+    druid_response[0][3][1]: "Acre" -> null
+- body: 108 differing values
+    body.data.length: 42 -> 56
+    body.data[3].dimensions.StateName: "Acre" -> null
+## group_granularity_day_of_year
+- druid_response: 145 differing values
+    druid_response[0].length: 42 -> 48
+    druid_response[0][3][1]: "Acre" -> null
+- body: 108 differing values
+    body.data.length: 42 -> 48
+    body.data[3].dimensions.StateName: "Acre" -> null
+## group_granularity_month_of_year
+- druid_response: 130 differing values
+    druid_response[0].length: 36 -> 46
+    druid_response[0][0][1]: "Acre" -> null
+- body: 94 differing values
+    body.data.length: 36 -> 46
+    body.data[0].dimensions.StateName: "Acre" -> null
+## group_granularity_quarter
+- druid_response: 84 differing values
+    druid_response[0].length: 24 -> 32
+    druid_response[0][0][1]: "Acre" -> null
+- body: 61 differing values
+    body.data.length: 24 -> 32
+    body.data[0].dimensions.StateName: "Acre" -> null
+## group_granularity_quarter_of_year
+- druid_response: 40 differing values
+    druid_response[0].length: 12 -> 16
+    druid_response[0][0][1]: "Acre" -> null
+- body: 28 differing values
+    body.data.length: 12 -> 16
+    body.data[0].dimensions.StateName: "Acre" -> null
+## group_granularity_total
+- druid_response: 35 differing values
+    druid_response[0].length: 10 -> 13
+    druid_response[0][0][1]: "Acre" -> null
+- body: 25 differing values
+    body.data.length: 10 -> 13
+    body.data[0].StateName: "Acre" -> null
+## group_granularity_week
+- druid_response: 141 differing values
+    druid_response[0].length: 39 -> 52
+    druid_response[0][0][1]: "Acre" -> null
+- body: 103 differing values
+    body.data.length: 39 -> 52
+    body.data[0].dimensions.StateName: "Acre" -> null
+## group_granularity_week_of_year
+- druid_response: 141 differing values
+    druid_response[0].length: 39 -> 52
+    druid_response[0][0][1]: "Acre" -> null
+- body: 103 differing values
+    body.data.length: 39 -> 52
+    body.data[0].dimensions.StateName: "Acre" -> null
+## group_granularity_year
+- druid_response: 31 differing values
+    druid_response[0].length: 9 -> 12
+    druid_response[0][0][1]: "Acre" -> null
+- body: 22 differing values
+    body.data.length: 9 -> 12
+    body.data[0].dimensions.StateName: "Acre" -> null
+## group_two_totals
+- druid_response: 62 differing values
+    druid_response[0].length: 16 -> 33
+    druid_response[0][0][0]: "Acre" -> null
+- body: 47 differing values
+    body.data.length: 16 -> 33
+    body.data[0].StateName: "Acre" -> null
+## hierarchy_expando_tree
+- druid_response: 38 differing values
+    druid_response[0].length: 10 -> 13
+    druid_response[0][0][0]: "Acre" -> null
+- body: 20 differing values
+    body.root.children.length: 3 -> 4
+    body.root.children[0].children.length: 2 -> 1
+## hierarchy_pie_by_sex
+- druid_response: 13 differing values
+    druid_response[0].length: 3 -> 4
+    druid_response[0][0][0]: "F" -> null
+- body: 9 differing values
+    body.root.children.length: 2 -> 3
+    body.root.children[0].metrics.yellow_fever_cases: 6016.0 -> 709.0
+## hierarchy_sunburst
+- druid_response: 36 differing values
+    druid_response[0].length: 10 -> 16
+    druid_response[0][0][0]: "Acre" -> null
+- body: 20 differing values
+    body.root.children.length: 3 -> 4
+    body.root.children[0].children[0].metrics.yellow_fever_cases: 2757.0 -> 151.0
+## interval_all_time
+- druid_response: 10 differing values
+    druid_response[0].length: 3 -> 4
+    druid_response[0][0][0]: "Acre" -> null
+- body: 7 differing values
+    body.data.length: 3 -> 4
+    body.data[0].dimensions.StateName: "Acre" -> null
+## interval_two_ranges
+- druid_response: 10 differing values
+    druid_response[0].length: 3 -> 4
+    druid_response[0][0][0]: "Acre" -> null
+- body: 7 differing values
+    body.data.length: 3 -> 4
+    body.data[0].dimensions.StateName: "Acre" -> null
+## line_graph_bump_chart_quarter
+- druid_response: 94 differing values
+    druid_response[0].length: 24 -> 32
+    druid_response[0][0][1]: "Acre" -> null
+- body: 80 differing values
+    body.data.length: 24 -> 32
+    body.data[0].dimensions.StateName: "Acre" -> null
+## line_graph_heat_tiles_week
+- druid_response: 101 differing values
+    druid_response[0].length: 26 -> 39
+    druid_response[0][0][1]: "F" -> null
+- body: 87 differing values
+    body.data.length: 26 -> 39
+    body.data[0].dimensions.Sex: "F" -> null
+## line_graph_time_by_state
+- druid_response: 139 differing values
+    druid_response[0].length: 36 -> 46
+    druid_response[0][0][1]: "Acre" -> null
+- body: 125 differing values
+    body.data.length: 36 -> 48
+    body.data[0].dimensions.StateName: "Acre" -> null
+## map_by_municipality
+- druid_response: 22 differing values
+    druid_response[0].length: 4 -> 5
+    druid_response[0][0][1]: "Cruzeiro do Sul" -> null
+- body: 18 differing values
+    body.data[0].datedData.length: 4 -> 5
+    body.data[0].datedData[0].dimensions.MunicipalityName: "Cruzeiro do Sul" -> null
+## map_by_state_month
+- druid_response: 49 differing values
+    druid_response[0].length: 9 -> 12
+    druid_response[0][0][1]: "Acre" -> null
+- body: 39 differing values
+    body.data[0].datedData.length: 3 -> 4
+    body.data[0].datedData[0].dimensions.StateName: "Acre" -> null
+## policy_all_values
+- druid_response: 10 differing values
+    druid_response[0].length: 3 -> 4
+    druid_response[0][0][0]: "Acre" -> null
+- body: 7 differing values
+    body.data.length: 3 -> 4
+    body.data[0].dimensions.StateName: "Acre" -> null
+## policy_hierarchy
+- druid_response: 13 differing values
+    druid_response[0].length: 4 -> 5
+    druid_response[0][0][1]: "F" -> null
+- body: 7 differing values
+    body.root.children[0].children.length: 2 -> 3
+    body.root.children[0].children[0].metrics.yellow_fever_cases: 1769.0 -> 214.0
+## policy_two_states
+- druid_response: 14 differing values
+    druid_response[0].length: 4 -> 6
+    druid_response[0][0][1]: "F" -> null
+- body: 10 differing values
+    body.data.length: 4 -> 6
+    body.data[0].Sex: "F" -> null
+## table_by_state_sex_with_total
+- druid_response: 34 differing values
+    druid_response[0].length: 7 -> 12
+    druid_response[0][0][0]: "Acre" -> null
+- body: 27 differing values
+    body.data.length: 7 -> 12
+    body.data[0].StateName: "Acre" -> null
+## table_disaggregated
+- druid_response: 706 differing values
+    druid_response[0].length: 167 -> 185
+    druid_response[0][0][1]: "15-49" -> null
+- body: 602 differing values
+    body.data.length: 167 -> 185
+    body.data[0].Age: "15-49" -> null
+64 cases differ between /tmp/wp8a/out/legacy2 and /tmp/wp8a/out/sqlnull-t2

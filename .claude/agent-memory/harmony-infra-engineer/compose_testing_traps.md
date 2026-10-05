@@ -18,5 +18,8 @@ Lessons from WP-0b (2026-10-04) for checking Compose files without touching `.en
 - **Pass `-p` to `uv run --no-project`.** Since `pyproject.toml` (`requires-python = "==3.9.*"`) landed, a bare run picks 3.9. Use `-p 3.13` for `tests/core` and `tests/infra`, and `-p 3.8` with the web requirements for `tests/web`, until WP-3b unifies the interpreter.
 - Repo Python style is black with `--skip-string-normalization`. Check with `uvx ruff format --check --config "format.quote-style='single'"` until WP-2f adds ruff config.
 
-**Why:** each of these cost a retry or left something to clean up in WP-0b.
+- **`docker compose config` keeps `$$` escaped** in its output; containers see `$`. Tests reading rendered values must unescape (`tests/infra/test_compose_logging.py`).
+- **Starting one production service in isolation:** a throwaway compose file with `extends: {file: ../docker-compose.yaml, service: nginx}` plus `ports: !override [127.0.0.1:...]` and `volumes: !override [...]`. `extends` interpolates the whole base file, so the env file needs placeholders for every `${X:?}` (see `WP-2g-evidence/unit5_nginx_check.sh`). nginx-proxy needs the local rootless socket `/run/user/$UID/docker.sock` mounted read-only at `/tmp/docker.sock`.
+
+**Why:** each of these cost a retry or left something to clean up in WP-0b and WP-2g.
 **How to apply:** any infra unit that renders or starts Compose services.

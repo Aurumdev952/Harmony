@@ -21,7 +21,7 @@ WP-0h's scope (decision 0004 rule 1) covers grants a caller confers; a rename an
    |---|---|---|---|
    | non-superuser with `manager` + `user_admin` | `PATCH /api2/user/<id>` changing `username`, or `POST /api2/user/<id>/reset_password`, of a user holding grants the caller does not hold | 200 / 204; username changed; reset mailed to the new address | 403; nothing written; audit line |
 
-4. Optional, decided by the builder with security: `UserResourceManager` also hides users who are administrators through a group from non-superusers, matching its existing direct-administrator rule; if adopted it gets its own INV-3 row.
+4. Adopted as a requirement by decision 0010: `UserResourceManager` also hides users who are administrators through a group from non-superusers, matching its existing direct-administrator rule; if adopted it gets its own INV-3 row.
 5. WP-2b pins today's behaviour; WP-0j flips the pins in its own stack, by qa.
 
 ## Consequences

@@ -4,7 +4,7 @@
 //
 //   eval "$(scripts/perf/stack.sh env)"
 //   npm ci --prefix scripts/perf
-//   node scripts/perf/dashboards.mjs [--rounds 10] [--warmup 2] [--dashboard SLUG]
+//   node scripts/perf/dashboards.mjs [--rounds 30] [--warmup 2] [--dashboard SLUG]
 //
 // It makes sure every reference dashboard in dashboards.json exists with that
 // specification (created, or patched back to it), then loads each one in
@@ -163,7 +163,7 @@ async function loadOnce(browser, baseUrl, storageState, slug, tiles) {
 async function main() {
   const { values } = parseArgs({
     options: {
-      rounds: { type: 'string', default: '10' },
+      rounds: { type: 'string', default: '30' },
       warmup: { type: 'string', default: '2' },
       dashboard: { type: 'string', multiple: true },
     },

@@ -30,6 +30,10 @@ about 140 s a request, which would make one run take well over an hour.
 Requests run one at a time from one client, after warm-up rounds, so Druid's
 and the app's caches are warm: the numbers are steady-state latency for a
 repeated query, not cold-start latency.
+
+A case gets 100 timed requests and a dashboard 30 loads. Of 100 requests,
+p95 lies between the fifth- and sixth-slowest; of 30, between the second- and
+third-slowest, so two stalls on a shared host would set it.
 """
 
 from __future__ import annotations
@@ -587,7 +591,7 @@ def main(argv: list[str] | None = None) -> int:
         parsed = parser.parse_args(argv[1:])
         return report_comparison(parsed.base, parsed.new)
     parser = argparse.ArgumentParser(description=__doc__.split('\n')[0])
-    parser.add_argument('--rounds', type=int, default=30)
+    parser.add_argument('--rounds', type=int, default=100)
     parser.add_argument('--warmup', type=int, default=3)
     parser.add_argument(
         '--case',
@@ -597,7 +601,7 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument(
         '--no-dashboards', action='store_true', help='skip dashboards.mjs'
     )
-    parser.add_argument('--dashboard-rounds', type=int, default=10)
+    parser.add_argument('--dashboard-rounds', type=int, default=30)
     parser.add_argument('--dashboard-warmup', type=int, default=2)
     parser.add_argument('--label', default='', help='suffix for the output file names')
     parser.add_argument('--out', type=Path, default=RESULTS_DIR)

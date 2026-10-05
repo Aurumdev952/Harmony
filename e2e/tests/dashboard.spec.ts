@@ -9,8 +9,8 @@ import { expect, test } from '../support/fixtures';
 import { latestMail, linkIn } from '../support/mailbox';
 
 // One dashboard, made in the first case, goes through the flows a user
-// takes with it: create from a query, open, edit, share by link and e-mail,
-// and export. The cases run in order on it.
+// takes with it: create from a query, open, edit, present, share by link and
+// e-mail, and export. The cases run in order on it.
 test.describe.configure({ mode: 'serial' });
 
 const run = randomBytes(4).toString('hex');
@@ -95,6 +95,26 @@ test.describe('dashboard flows @smoke @dashboard', () => {
     await page.reload();
     await expect(page.getByText(NOTE)).toBeVisible();
     await expect(page.getByRole('figure', { name: 'bar chart' })).toBeVisible();
+  });
+
+  test('present mode hides the editing controls and keeps the tiles', async ({ page }) => {
+    await page.goto(dashboardPath);
+    await expect(page.getByRole('heading', { name: TITLE })).toBeVisible();
+    // The switch has no accessible name (aria-toggle-field-name in the a11y
+    // baseline), so it is found by its container.
+    const toggle = page.locator('.gd-dashboard-header__presentation-toggle [role="switch"]');
+    const addContent = page.getByRole('button', { name: 'Add Content' });
+    await expect(addContent.first()).toBeVisible();
+
+    await toggle.click();
+    await expect(toggle).toHaveAttribute('aria-checked', 'true');
+    await expect(addContent).toHaveCount(0);
+    await expect(page.getByText(NOTE)).toBeVisible();
+    await expect(page.getByRole('figure', { name: 'bar chart' })).toBeVisible();
+
+    await toggle.click();
+    await expect(toggle).toHaveAttribute('aria-checked', 'false');
+    await expect(addContent.first()).toBeVisible();
   });
 
   test('the share link is the dashboard URL and opens it', async ({ page }) => {

@@ -29,7 +29,10 @@ exec > "${OUT}" 2>&1
 echo "== stack down/up (${PROJECT})"
 "${HERE}/stack.sh" down
 "${HERE}/stack.sh" up
-eval "$("${HERE}/stack.sh" env)"
+# Assigned first: eval of a failed substitution would return 0 under set -e.
+stack_env="$("${HERE}/stack.sh" env)"
+eval "${stack_env}"
+: "${AUTHZ_BASE_URL:?stack env did not set AUTHZ_BASE_URL}"
 echo "== whole suite, stack env set (pure and live-stack layers)"
 run_suite
 echo "== live-stack layer, run 2"

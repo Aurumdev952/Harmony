@@ -1,4 +1,5 @@
 from past.builtins import basestring
+from sqlalchemy import func
 
 
 def get_db_adapter():
@@ -218,7 +219,8 @@ def find_one_by_fields(entity_class, case_sensitive, search_fields, session=None
         The SQLAlchemy Model Class.
 
     case_sensitive: bool
-        Indicates whether or not the comparison is case-sensitive or not.
+        Indicates whether or not the comparison is case-sensitive or not. Either way
+        string values match exactly, never as LIKE patterns.
 
     search_fields: dict
         A dictionary with keys representing column names and values representing
@@ -250,8 +252,8 @@ def find_one_by_fields(entity_class, case_sensitive, search_fields, session=None
             raise KeyError(f'Class \'{entity_class}\' has no field \'{field_name}\'.')
 
         if isinstance(field_value, basestring):
-            # Add a case sensitive filter to the query
-            query = query.filter(field.ilike(field_value))  # case INsensitive!!
+            # Equality, not ILIKE: `_` and `%` in a name must not act as wildcards.
+            query = query.filter(func.lower(field) == func.lower(field_value))
         else:
             query = query.filter(field == field_value)
 

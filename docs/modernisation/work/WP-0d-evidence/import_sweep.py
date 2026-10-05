@@ -1,13 +1,26 @@
 """Import every module under the given roots; print one line per module."""
+
 import importlib
 import os
 import signal
 import sys
 
 REMOVED = {
-    'flask_admin', 'graphene', 'graphene_sqlalchemy', 'flask_graphql', 'graphql',
-    'dask', 'google', 'analytics', 'paramiko', 'nacl', 'pyasn1', 'cryptography',
-    'fuzzywuzzy', 'jellyfish', 'editdistance',
+    'flask_admin',
+    'graphene',
+    'graphene_sqlalchemy',
+    'flask_graphql',
+    'graphql',
+    'dask',
+    'google',
+    'analytics',
+    'paramiko',
+    'nacl',
+    'pyasn1',
+    'cryptography',
+    'fuzzywuzzy',
+    'jellyfish',
+    'editdistance',
 }
 SKIP_DIRS = {'node_modules', '__pycache__', 'client', 'public'}
 
@@ -35,9 +48,14 @@ for root in roots:
         try:
             importlib.import_module(mod)
             status = 'OK'
-        except BaseException as exc:  # SystemExit from import-time flag parsing counts too
+        # SystemExit from import-time flag parsing counts too
+        except BaseException as exc:
             missing = getattr(exc, 'name', None) or ''
-            flag = ' REMOVED-PKG' if isinstance(exc, ImportError) and missing.split('.')[0] in REMOVED else ''
+            flag = (
+                ' REMOVED-PKG'
+                if isinstance(exc, ImportError) and missing.split('.')[0] in REMOVED
+                else ''
+            )
             first = str(exc).splitlines()[0][:160] if str(exc) else ''
             status = f'ERR {type(exc).__name__}: {first}{flag}'
         finally:

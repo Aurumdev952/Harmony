@@ -5,3 +5,4 @@
 - [Authz suite harness](authz_suite_harness.md) — how tests/authz runs (root uv project py3.9, WP-2c stack on 58660) and the traps hit building it
 - [Authz escalations found](authz_escalations_found.md) — pinned group/role escalations (H1-H3, N3-N6); flipping them needs a Sec WP
 - [Golden contract vs layout](golden_contract_vs_layout.md) — goldens guarding a rewrite: store-level contract layer, typed round-trip test, consumed files are contract
+- [Tooling traps](tooling_traps.md) — lint gate scope post WP-2f, golden record --check, expected pipeline skip, ruff py39 with-format

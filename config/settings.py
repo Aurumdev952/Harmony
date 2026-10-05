@@ -1,7 +1,6 @@
 import os
 
 from log import LOG
-from web.server.environment import IS_PRODUCTION, IS_TEST
 
 
 def getenv(name, default=None):

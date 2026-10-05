@@ -59,7 +59,8 @@ class ConfigImporter(importlib.abc.MetaPathFinder):
         if site_module is not None:
             site_module = site_module.lower()
             message = f'Invalid ZEN_ENV {site_module} not in {VALID_MODULES}'
-            assert site_module in VALID_MODULES, message
+            if site_module not in VALID_MODULES:
+                raise AssertionError(message)
         self._new_config_module = site_module
 
     def find_spec(

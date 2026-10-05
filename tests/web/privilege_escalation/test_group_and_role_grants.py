@@ -419,6 +419,12 @@ def _user_patch(db, _admin, other):
     return ('PATCH', f'/api2/user/{other.id}', body), lambda: _is_admin(db, other)
 
 
+def _user_patch_admin_group(db, admin, other):
+    group = _make_group(db, roles=['admin'], users=[admin])
+    body = _user_body(db, other.id, groups=[group.id])
+    return ('PATCH', f'/api2/user/{other.id}', body), lambda: _is_admin(db, other)
+
+
 @pytest.mark.parametrize(
     'grant_path',
     [
@@ -431,6 +437,7 @@ def _user_patch(db, _admin, other):
         _role_add_policy,
         _role_users_route,
         _user_patch,
+        _user_patch_admin_group,
     ],
     ids=lambda grant_path: grant_path.__name__.lstrip('_'),
 )

@@ -118,7 +118,11 @@ def member_groups_from_uris(
     if current_user_is_superuser():
         return groups
     allowed_ids = {group.id for group in existing} | {
-        group.id for group in current_user.groups
+        group.id
+        for group in current_user.groups
+        # As in `held_roles_from_uris`: a narrowed token on an admin account
+        # must not pass on a group carrying the admin role.
+        if all(role.name != SUPERUSER_ROLENAME for role in group.roles)
     }
     not_member = [group for group in groups if group.id not in allowed_ids]
     if not_member:

@@ -402,13 +402,20 @@ def test_a_paired_run_writes_both_sides_and_fails_on_a_clear_regression(
     ]
     assert recorded[0] == {'case_id': 'q', 'reference_ms': ms, 'candidate_ms': ms}
     text = Path(f'{stem}.md').read_text()
-    assert '| q | 119.0 | 119.0 | 1.000 | 1.000 | ok |' in text
+    assert '| q | 119.0 | 119.0 | 1.000 | 1.000 | 1.000 | 1.000 | 1.100 | ok |' in text
+    assert 'every case would have failed a slowdown of 1.100 or more' in text
+    assert (
+        'every case would have failed a slowdown of 1.100 or more'
+        in capsys.readouterr().out
+    )
     assert 'load [40.0, 1, 1] at start, [20.0, 1, 1] at end' in text
     slower = {'q': (ms, ms), 'perf-mixed-6': (ms, [v * 1.2 for v in ms])}
     assert (
         baseline.finish_paired(stem, reference, reference, slower, _paired_meta()) == 1
     )
-    assert 'FAIL: perf-mixed-6' in capsys.readouterr().out
+    out = capsys.readouterr().out
+    assert 'REGRESSED (p95, paired median)' in out
+    assert 'FAIL: perf-mixed-6' in out
 
 
 @given(
@@ -464,6 +471,67 @@ def test_independent_stalls_trip_the_bare_p95_ratio_but_not_the_paired_verdict()
         regressed += result.regressed
     assert bare_over > 0
     assert regressed == 0
+
+
+def _loaded_host_rounds(rng, factor, tail_every=0, rounds=100):
+    """One case on the simulated loaded host above: a shared load per round,
+    independent stalls per request, and the candidate `factor` times slower.
+    With tail_every, every tail_every-th round the candidate alone takes 3x."""
+
+    def latency(load):
+        stall = rng.uniform(1, 3) if rng.random() < 0.1 else 1
+        return 50 * load * stall
+
+    reference, candidate = [], []
+    for index in range(rounds):
+        load = rng.uniform(1, 3)
+        reference.append(latency(load))
+        tail = 3 if tail_every and index % tail_every == 0 else 1
+        candidate.append(latency(load) * factor * tail)
+    return reference, candidate
+
+
+def test_a_uniform_fifteen_percent_slowdown_fails_every_case_on_a_loaded_host():
+    # The noise that keeps an A/A run from failing must not hide a real
+    # regression: p95 alone cannot see 15% through these stalls, the paired
+    # per-round ratio can.
+    rng = random.Random(20261006)
+    cases = 24
+    for case in range(cases):
+        reference, candidate = _loaded_host_rounds(rng, 1.15)
+        result = baseline.paired_result(f'c{case}', reference, candidate, 0.05 / cases)
+        assert result.regressed, result
+
+
+def test_a_tail_regression_fails_on_p95_even_when_the_typical_request_is_unchanged():
+    # A slow path one request in ten takes leaves the paired median at 1 and
+    # triples p95; the p95 check still fires on its own.
+    rng = random.Random(7)
+    reference = [100 + rng.uniform(0, 5) for _ in range(100)]
+    candidate = [
+        ms * (3 if index % 10 == 0 else 1) for index, ms in enumerate(reference)
+    ]
+    result = baseline.paired_result('c', reference, candidate, 0.05 / 24)
+    assert result.shift == pytest.approx(1)
+    assert not result.shift_regressed
+    assert result.p95_regressed and result.regressed
+
+
+@given(
+    st.lists(st.tuples(st.floats(1, 1e4), st.floats(1, 1e4)), min_size=5, max_size=60),
+    st.floats(min_value=0.5, max_value=3),
+)
+def test_detects_is_the_smallest_uniform_slowdown_the_run_would_fail(pairs, factor):
+    # p95, the median and the seeded bootstrap all scale with the candidate,
+    # so scaling the candidate by `factor` fails exactly when factor > detects.
+    reference = [r for r, _ in pairs]
+    candidate = [c for _, c in pairs]
+    detects = baseline.paired_result('c', reference, candidate, 0.05, 50).detects
+    scaled = baseline.paired_result(
+        'c', reference, [ms * factor for ms in candidate], 0.05, 50
+    )
+    if not math.isclose(factor, detects, rel_tol=1e-6):
+        assert scaled.regressed == (factor > detects)
 
 
 def test_paired_is_the_default_and_compare_selects_the_committed_baseline():

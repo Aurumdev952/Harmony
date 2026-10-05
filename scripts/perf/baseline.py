@@ -11,14 +11,25 @@ Paired mode, the default and the PERF-7 check. The stack runs two copies of
 the app against the same Druid: the reference (old code, `stack.sh reference
 <git ref>`) and the candidate (this checkout). Every case alternates between
 them request by request, the reference first in even rounds and the candidate
-first in odd ones, so both sides see the same host load. A case fails when its
-candidate p95 is more than 10% above its reference p95 and the candidate is
-slower beyond sampling noise: the lower bound of a paired bootstrap of the
-p95 ratio (rounds resampled as pairs) is above 1. The bound's one-sided
-level is 5% split across the cases, so an A/A run fails less than one time in
-twenty. A bare p95 ratio cannot be the test on a shared host: in an A/A run
-over 100 rounds, stalls that hit one request and not its pair moved single
-cases' p95 ratios to 1.28.
+first in odd ones, so both sides see the same host load. Each case and
+dashboard is judged by two ratios of candidate to reference, and fails when
+either is over 1.10 and the lower bound of a paired bootstrap of it (rounds
+resampled as pairs) is over 1:
+
+- the p95 ratio, candidate p95 over reference p95: PERF-7 as written, and the
+  only check that sees a regression confined to the slow tail;
+- the paired median ratio, the median over rounds of candidate time over
+  reference time in the same round. The load both sides shared cancels in
+  each round, so it sees a slowdown of every request that p95 cannot: stalls
+  hitting one side and not its pair move single cases' p95 ratios by up to
+  30% in an A/A run on a loaded host, enough to hide a 25% regression. A
+  slowdown of every request by a factor raises p95 by the same factor.
+
+The bounds' one-sided level is 5% split across the cases, so an A/A run fails
+less than one time in twenty. The report gives each case's `detects`: the
+smallest slowdown of every candidate request that would have failed it. On an
+A/A run that is what the run could see; a passing run's claim is only as
+strong as its largest `detects`.
 
     scripts/perf/stack.sh up && scripts/perf/stack.sh ui
     scripts/perf/stack.sh reference main
@@ -251,20 +262,53 @@ def summarise_dashboard(record: dict[str, Any]) -> PerfSample:
     )
 
 
+def beyond_limit(point: float, lower: float) -> bool:
+    """A ratio over the PERF-7 limit whose lower confidence bound is over 1."""
+    return point > 1 + P95_REGRESSION_LIMIT and lower > 1
+
+
 @dataclasses.dataclass(frozen=True)
 class PairedResult:
-    """One case of a paired run: both sides' p95, their ratio, and the ratio's
-    lower confidence bound from a bootstrap over rounds."""
+    """One case of a paired run, judged by two ratios of candidate to
+    reference, each with the lower confidence bound of a bootstrap over rounds:
+
+    - `ratio`, candidate p95 over reference p95: PERF-7 itself, and the only
+      check that sees a regression in the slow tail alone;
+    - `shift`, the median over rounds of candidate time over reference time in
+      the same round: the shared load cancels in each round, so it sees a
+      slowdown of every request through noise that hides it from p95. A
+      slowdown of every request by a factor raises p95 by that factor too."""
 
     case_id: str
     reference_p95: float
     candidate_p95: float
     ratio: float
     lower: float
+    shift: float
+    shift_lower: float
+
+    @property
+    def p95_regressed(self) -> bool:
+        return beyond_limit(self.ratio, self.lower)
+
+    @property
+    def shift_regressed(self) -> bool:
+        return beyond_limit(self.shift, self.shift_lower)
 
     @property
     def regressed(self) -> bool:
-        return self.ratio > 1 + P95_REGRESSION_LIMIT and self.lower > 1
+        return self.p95_regressed or self.shift_regressed
+
+    @property
+    def detects(self) -> float:
+        """The smallest factor by which slowing every candidate request would
+        fail this case. Both ratios and their bounds scale with the candidate,
+        so this is exact; on an A/A run it is the slowdown the run could see."""
+        limit = 1 + P95_REGRESSION_LIMIT
+        return min(
+            max(limit / self.ratio, 1 / self.lower),
+            max(limit / self.shift, 1 / self.shift_lower),
+        )
 
 
 def paired_result(
@@ -274,47 +318,63 @@ def paired_result(
     alpha: float,
     resamples: int = BOOTSTRAP_RESAMPLES,
 ) -> PairedResult:
-    """Candidate p95 over reference p95, with the alpha quantile of that ratio
-    over `resamples` resamplings of the rounds. Rounds are resampled as pairs,
+    """Both ratios of PairedResult, with the alpha quantile of each over
+    `resamples` resamplings of the rounds. Rounds are resampled as pairs,
     which keeps the load the two sides shared in a round together. Seeded by
     the case, so a run's files always give the same verdict."""
     if len(reference_ms) != len(candidate_ms):
         raise ValueError(f'{case_id}: sides have different round counts')
     n = len(reference_ms)
+    per_round = [c / r for r, c in zip(reference_ms, candidate_ms)]
     reference_p95 = percentile(reference_ms, 0.95)
     candidate_p95 = percentile(candidate_ms, 0.95)
     rng = random.Random(f'{case_id}:{n}')
-    ratios = []
+    ratios, shifts = [], []
     for _ in range(resamples):
         rounds = [rng.randrange(n) for _ in range(n)]
         ratios.append(
             percentile([candidate_ms[i] for i in rounds], 0.95)
             / percentile([reference_ms[i] for i in rounds], 0.95)
         )
+        shifts.append(percentile([per_round[i] for i in rounds], 0.5))
     return PairedResult(
         case_id,
         reference_p95,
         candidate_p95,
         candidate_p95 / reference_p95,
         percentile(ratios, alpha),
+        percentile(per_round, 0.5),
+        percentile(shifts, alpha),
     )
+
+
+def paired_verdict(result: PairedResult) -> str:
+    failed = [
+        name
+        for name, flagged in (
+            ('p95', result.p95_regressed),
+            ('paired median', result.shift_regressed),
+        )
+        if flagged
+    ]
+    if failed:
+        return f'REGRESSED ({", ".join(failed)})'
+    if max(result.ratio, result.shift) > 1 + P95_REGRESSION_LIMIT:
+        return 'over the limit, within noise'
+    return 'ok'
 
 
 def paired_table(results: list[PairedResult]) -> str:
     rows = [
-        '| case | reference p95 ms | candidate p95 ms | ratio | lower bound | verdict |',
-        '|---|---:|---:|---:|---:|---|',
+        '| case | reference p95 ms | candidate p95 ms | p95 ratio | lower bound '
+        '| paired median ratio | lower bound | detects | verdict |',
+        '|---|---:|---:|---:|---:|---:|---:|---:|---|',
     ]
     for r in results:
-        if r.regressed:
-            verdict = 'REGRESSED'
-        elif r.ratio > 1 + P95_REGRESSION_LIMIT:
-            verdict = 'over the limit, within noise'
-        else:
-            verdict = 'ok'
         rows.append(
             f'| {r.case_id} | {r.reference_p95:.1f} | {r.candidate_p95:.1f} '
-            f'| {r.ratio:.3f} | {r.lower:.3f} | {verdict} |'
+            f'| {r.ratio:.3f} | {r.lower:.3f} | {r.shift:.3f} | {r.shift_lower:.3f} '
+            f'| {r.detects:.3f} | {paired_verdict(r)} |'
         )
     return '\n'.join(rows)
 
@@ -771,10 +831,21 @@ def finish_paired(
     Path(f'{stem}.meta.json').write_text(json.dumps(meta, indent=2) + '\n')
     table = paired_table(results)
     heading = (
-        f'Candidate p95 over reference p95; a case regresses when the ratio is '
-        f'over {1 + P95_REGRESSION_LIMIT:.2f} and its lower bound '
-        f'(one-sided {alpha:.2%}, paired bootstrap of {BOOTSTRAP_RESAMPLES} '
-        f'resamples) is over 1'
+        f'Candidate over reference; a case regresses when its p95 ratio or its '
+        f'paired median ratio is over {1 + P95_REGRESSION_LIMIT:.2f} and that '
+        f"ratio's lower bound (one-sided {alpha:.2%}, paired bootstrap of "
+        f'{BOOTSTRAP_RESAMPLES} resamples) is over 1. `detects` is the smallest '
+        f'slowdown of every candidate request that would have failed the case'
+    )
+    failed = [r.case_id for r in results if r.regressed]
+    sensitivity = (
+        f'every case would have failed a slowdown of '
+        f'{max(r.detects for r in results):.3f} or more'
+    )
+    outcome = (
+        f'FAIL: {", ".join(failed)}'
+        if failed
+        else f'OK: no case regressed; {sensitivity}'
     )
     Path(f'{stem}.md').write_text(
         '\n'.join(
@@ -788,6 +859,8 @@ def finish_paired(
                 heading + '.',
                 '',
                 table,
+                '',
+                outcome,
                 '',
                 '## Reference, absolute (evidence only)',
                 '',
@@ -803,12 +876,8 @@ def finish_paired(
     print(f'wrote {stem}.{{reference,candidate,rounds}}.jsonl, .meta.json and .md')
     print(heading + ':')
     print(table)
-    failed = [r.case_id for r in results if r.regressed]
-    if failed:
-        print(f'FAIL: {", ".join(failed)}')
-        return 1
-    print('OK: no case regressed')
-    return 0
+    print(outcome)
+    return 1 if failed else 0
 
 
 def run(args: argparse.Namespace) -> int:
@@ -837,9 +906,10 @@ def run(args: argparse.Namespace) -> int:
         meta['method']['pairing'] = (
             'reference and candidate apps on one host against one Druid; each '
             'round sends the case to both, reference first in even rounds and '
-            'candidate first in odd ones; a case regresses when candidate p95 '
-            'over reference p95 is above 1.10 and its paired-bootstrap lower '
-            'bound is above 1; every request on a new connection'
+            'candidate first in odd ones; a case regresses when its p95 ratio or '
+            'its paired median ratio (median over rounds of candidate over '
+            'reference time) is above 1.10 with a paired-bootstrap lower bound '
+            'above 1; every request on a new connection'
         )
     if args.dataset:
         meta['dataset'] = args.dataset

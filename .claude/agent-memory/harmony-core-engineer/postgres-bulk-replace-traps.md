@@ -1,6 +1,6 @@
 ---
 name: postgres-bulk-replace-traps
-description: Traps when replacing catalogue table contents in Postgres (self-serve import, any staged upsert or data migration); cascade order, setval, test fixtures
+description: Traps when replacing catalogue table contents in Postgres (self-serve import, any staged upsert or data migration); cascade order, setval, last_modified trigger, test fixtures
 metadata:
   type: project
 ---
@@ -11,6 +11,9 @@ Replacing rows in Harmony's catalogue tables, which have ON DELETE CASCADE depen
 - **`setval` is not transactional.** Set sequences last, and never lower them (`GREATEST(last used, max(id)) + 1`), or a rollback leaves the next insert reusing a live id. A deferred constraint trigger is a cheap way to inject a COMMIT failure in a test.
 - **Tables nothing references** (mapping tables with drifting serial ids and a unique pair) are safer emptied and reloaded than upserted on `id`.
 - **DELETE, not TRUNCATE, inside a long transaction.** TRUNCATE holds ACCESS EXCLUSIVE until commit and blocks web readers.
+- **Catalogue tables carry `update_last_modified`** (migration 2b730c14f514), a BEFORE UPDATE trigger that sets `last_modified = now()` with no condition. Any UPDATE, even an upsert or a follow-up `SET last_modified = ...`, overwrites the value, and the self-serve validator reads it for conflict detection. Skip unchanged rows (`DO UPDATE ... WHERE ROW(t.c::text, ...) IS DISTINCT FROM ROW(EXCLUDED.c::text, ...)`; cast to text because json has no `=`). Run the write with `ALTER TABLE ... DISABLE TRIGGER update_last_modified`, which is transactional and needs ownership (security N1, 2026-10-05).
+- **`ALTER TABLE ... ENABLE TRIGGER` fails while the table has deferred trigger events pending.** Re-enable before writing to any table that has a deferred constraint or trigger, or do not disable the trigger on that table at all.
+- **`create_all` test schemas have no migration triggers.** A test of how a write affects `last_modified` must install them. `tests/db` runs the migration's `upgrade()` with `op` stubbed to `SimpleNamespace(execute=cursor.execute)`. N1 went unseen for a full review round because of this.
 - **Throwaway Postgres for tests:** `tests/throwaway_postgres.py` (docker); see [[feedback_worktree_shell_guard]] for running ad-hoc scratch containers.
 
 **Why:** backend's first F13 patch hit the first two traps and passed its own tests.

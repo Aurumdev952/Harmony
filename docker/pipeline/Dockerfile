@@ -40,6 +40,9 @@ RUN case $(uname -m) in \
 # pydantic-core publishes no wheel for jammy's PyPy 3.8 (7.3.9), and its sdist
 # needs Rust. Build the wheel here so the runtime image gets no Rust toolchain.
 # PYDANTIC_CORE_VERSION must match uv.lock (tests/infra/test_dockerfiles.py).
+# Delete with the PyPy venv (WP-3b, or WP-8d if PyPy goes first): the rust and
+# pypy-wheels stages, the --find-links install below, and the drift test, which
+# fails while these stages outlive venv_pypy3.
 FROM rust:1.83.0-slim-bookworm@sha256:540c902e99c384163b688bbd8b5b8520e94e7731b27f7bd0eaa56ae1960627ab AS rust
 
 FROM ubuntu:jammy-20260924.1@sha256:5ec03bb3441e8b0bf3b4f9cd4629a1ae763010dc3035bb8da3ae6cf026486401 AS pypy-wheels

@@ -115,9 +115,19 @@ def test_python_images_copy_what_deployment_loading_imports(dockerfile):
     assert missing == set(), f'{dockerfile} does not copy {sorted(missing)}'
 
 
-def test_pipeline_pypy_wheel_matches_the_locked_pydantic_core():
+def stage_names(dockerfile):
+    return {stage for _, stage in FROM.findall(dockerfile) if stage}
+
+
+def test_pipeline_pypy_wheel_stages_live_exactly_as_long_as_the_pypy_venv():
+    dockerfile = (REPO / 'docker/pipeline/Dockerfile').read_text()
+    creates_venv = 'pypy3 -m venv venv_pypy3' in dockerfile
+    wheel_stages = {'rust', 'pypy-wheels'} & stage_names(dockerfile)
+    if not creates_venv:
+        assert wheel_stages == set(), f'dead PyPy wheel stages: {sorted(wheel_stages)}'
+        return
+    assert wheel_stages == {'rust', 'pypy-wheels'}
     lock = tomllib.loads((REPO / 'uv.lock').read_text())
     locked = {p['name']: p['version'] for p in lock['package']}['pydantic-core']
-    dockerfile = (REPO / 'docker/pipeline/Dockerfile').read_text()
     built = re.search(r'ARG PYDANTIC_CORE_VERSION=(\S+)', dockerfile).group(1)
     assert built == locked

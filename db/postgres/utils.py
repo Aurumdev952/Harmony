@@ -345,7 +345,7 @@ class _StagedTable:
         if 'id' not in self.columns:
             return
         cursor.execute(
-            'SELECT c.oid::integer, n.nspname, c.relname FROM pg_class c'
+            'SELECT n.nspname, c.relname FROM pg_class c'
             ' JOIN pg_namespace n ON n.oid = c.relnamespace'
             " WHERE c.oid = pg_get_serial_sequence(%s, 'id')::regclass",
             (self.regclass,),
@@ -353,15 +353,15 @@ class _StagedTable:
         row = cursor.fetchone()
         if row is None:
             return
-        oid, schema, name = row
+        sequence = sql.Identifier(*row)
         cursor.execute(
             sql.SQL(
-                'SELECT setval(%s::oid::regclass, GREATEST('
+                'SELECT setval(%s::regclass, GREATEST('
                 '(SELECT CASE WHEN is_called THEN last_value ELSE last_value - 1 END'
                 ' FROM {sequence}),'
                 ' (SELECT coalesce(max(id), 0) FROM {table})) + 1, false)'
-            ).format(sequence=sql.Identifier(schema, name), table=self.table),
-            (oid,),
+            ).format(sequence=sequence, table=self.table),
+            (sequence.as_string(cursor),),
         )
 
 

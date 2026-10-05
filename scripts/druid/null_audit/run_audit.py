@@ -2,7 +2,7 @@
 
     AUDIT=scripts/druid/null_audit/run_audit.py
     uv run python $AUDIT index  --port 58891 [--raw]
-    uv run python $AUDIT replay --port 58891 --out OUT/legacy [--candidate] [CASE...]
+    uv run python $AUDIT replay --port 58891 --out OUT/legacy [CASE...]
     uv run python $AUDIT diff OUT/legacy OUT/sqlnull
     uv run python $AUDIT parity --port 58891 [--js]
 
@@ -13,8 +13,7 @@ production data schema (db/druid/indexing/common.py), or without its
 `replay` POSTs each golden case and each audit case (cases/) through the golden
 harness (tests/golden/harness.py), answering the app's Druid queries from the
 live broker, and stores the app's queries, the raw Druid rows and the endpoint
-body per case. `--candidate` rewrites each query on its way to Druid as the
-builder fixes requested from core would build it (`candidate_filters`).
+body per case.
 
 `diff` lists every case whose raw Druid rows or endpoint body differ between
 two replays, with the first differing paths.
@@ -204,46 +203,10 @@ def _run_index_task(base: str, datasource: str, task: dict) -> None:
     print(f'{datasource} version {version} served: {counts.json()[0]["result"]}')
 
 
-_VALUE_LEAVES = {'selector', 'in', 'bound', 'regex', 'search', 'like'}
-
-
-def _two_valued(node: Any) -> Any:
-    '''Inside a `not`, make every value comparison false rather than unknown on a
-    null dimension: `leaf AND NOT dimension IS NULL`. Druid 28+ evaluates native
-    filters with three-valued logic, so `not(Sex = F)` drops null-Sex rows that
-    legacy Druid kept. On 0.23 the wrapper changes nothing.'''
-    if isinstance(node, list):
-        return [_two_valued(item) for item in node]
-    if not isinstance(node, dict):
-        return node
-    if node.get('type') in _VALUE_LEAVES and node.get('value', '') is not None:
-        is_null = {'type': 'selector', 'dimension': node['dimension'], 'value': None}
-        return {'type': 'and', 'fields': [node, {'type': 'not', 'field': is_null}]}
-    return {key: _two_valued(value) for key, value in node.items()}
-
-
-def candidate_filters(node: Any) -> Any:
-    '''The builder fixes WP-8a requests from core, applied to a posted query:
-    - the "has no value" test is `selector value null`, not `selector value ''`,
-      which under SQL-compatible nulls matches only the empty string;
-    - a negated filter keeps rows where the dimension is null (`_two_valued`).'''
-    if isinstance(node, list):
-        return [candidate_filters(item) for item in node]
-    if not isinstance(node, dict):
-        return node
-    if node.get('type') == 'selector' and node.get('value') == '':
-        return {**node, 'value': None}
-    if node.get('type') == 'not':
-        return {**node, 'field': _two_valued(candidate_filters(node['field']))}
-    return {key: candidate_filters(value) for key, value in node.items()}
-
-
-def _broker(port: int, session: requests.Session, candidate: bool):
+def _broker(port: int, session: requests.Session):
     url = f'{_router(port)}/druid/v2'
 
     def answer(query: dict) -> list:
-        if candidate:
-            query = candidate_filters(query)
         response = session.post(url, json=query, timeout=QUERY_TIMEOUT_S)
         if response.status_code != 200:
             raise RuntimeError(f'Druid {response.status_code}: {response.text[:1000]}')
@@ -252,7 +215,7 @@ def _broker(port: int, session: requests.Session, candidate: bool):
     return answer
 
 
-def replay(port: int, out: Path, names: List[str], candidate: bool) -> None:
+def replay(port: int, out: Path, names: List[str]) -> None:
     bootstrap()
     out.mkdir(parents=True, exist_ok=True)
     session = requests.Session()
@@ -263,7 +226,7 @@ def replay(port: int, out: Path, names: List[str], candidate: bool) -> None:
     for case in cases:
         record: dict
         try:
-            exchanges, body = run_case(case, _broker(port, session, candidate))
+            exchanges, body = run_case(case, _broker(port, session))
             record = {
                 'druid_query': [query for query, _ in exchanges],
                 'druid_response': [rows for _, rows in exchanges],
@@ -451,11 +414,6 @@ def main() -> int:
     replay_parser.add_argument('--port', type=int, required=True)
     replay_parser.add_argument('--out', type=Path, required=True)
     replay_parser.add_argument('cases', nargs='*')
-    replay_parser.add_argument(
-        '--candidate',
-        action='store_true',
-        help='post queries as the requested builder fixes would build them',
-    )
     diff_parser = commands.add_parser('diff')
     diff_parser.add_argument('left', type=Path)
     diff_parser.add_argument('right', type=Path)
@@ -469,7 +427,7 @@ def main() -> int:
         bootstrap()
         index(args.port, args.raw)
     elif args.command == 'replay':
-        replay(args.port, args.out, args.cases, args.candidate)
+        replay(args.port, args.out, args.cases)
     elif args.command == 'parity':
         return parity(args.port, args.js)
     else:

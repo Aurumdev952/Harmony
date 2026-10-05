@@ -8,7 +8,7 @@ outbound mail.
 import os
 
 import pytest
-from flask import Blueprint, Flask, request
+from flask import Flask, request
 from flask_login import LoginManager
 
 from config.loader import import_configuration_module
@@ -18,11 +18,13 @@ from tests.web.links.support import (
     FakeUserManager,
     RecordingMailer,
 )
+from web.server.routes.dashboard import DashboardPageRouter
+from web.server.routes.index import PageRouter
 from web.server.routes.user_authentication import UserAuthenticationRouter
 from web.server.util.emails import EmailRenderer
 
 
-def _page(**_kwargs):
+def _page():
     return ''
 
 
@@ -39,19 +41,12 @@ def fixture_app() -> Flask:
     def _load_user(_request):
         return USERS.get(request.headers.get('X-Test-User', ''))
 
-    # The production rules each mailed link is built for.
+    # The production routers each mailed link is built for, and flask-user's
+    # register rule as UserManager adds it from USER_REGISTER_URL.
     app.register_blueprint(UserAuthenticationRouter(None, 'en').generate_blueprint())
-    user = Blueprint('user', __name__)
-    user.add_url_rule('/zen/register', 'register', _page)  # USER_REGISTER_URL
-    app.register_blueprint(user)
-    dashboard = Blueprint('dashboard', __name__)
-    dashboard.add_url_rule('/dashboard/<name>', 'grid_dashboard', _page)
-    dashboard.add_url_rule('/<locale>/dashboard/<name>', 'grid_dashboard', _page)
-    app.register_blueprint(dashboard)
-    index = Blueprint('index', __name__)
-    index.add_url_rule('/advanced-query', 'advanced_query', _page)
-    index.add_url_rule('/<locale>/advanced-query', 'advanced_query', _page)
-    app.register_blueprint(index)
+    app.register_blueprint(DashboardPageRouter(None, 'en').generate_blueprint())
+    app.register_blueprint(PageRouter(None, 'en', 'demo', None).generate_blueprint())
+    app.add_url_rule('/zen/register', 'user.register', _page)
     return app
 
 

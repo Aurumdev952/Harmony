@@ -18,25 +18,31 @@ DASHBOARD = SimpleNamespace(slug='malaria-overview')
 SHARED = '?source=shared_dashboard_email'
 PAGE = f'{ORIGIN}/dashboard/malaria-overview'
 
-# (caller's link, mailed link). The source parameter lands after the fragment,
-# as it did before WP-0k.
+# (caller's link, mailed link). The source parameter goes before the fragment,
+# where the page can read it and does not take it for part of the session hash.
 DASHBOARD_LINKS = [
     (None, f'{PAGE}{SHARED}'),
     ('', f'{PAGE}{SHARED}'),
-    (f'{PAGE}#h=a1b2c3', f'{PAGE}#h=a1b2c3{SHARED}'),
+    (f'{PAGE}#h=a1b2c3', f'{PAGE}{SHARED}#h=a1b2c3'),
     (
         f'{ORIGIN}/fr/dashboard/malaria-overview#h=a1b2c3',
-        f'{ORIGIN}/fr/dashboard/malaria-overview#h=a1b2c3{SHARED}',
+        f'{ORIGIN}/fr/dashboard/malaria-overview{SHARED}#h=a1b2c3',
     ),
+    # A page opened from a shared link, shared again with its current filters.
+    (f'{PAGE}#h=a1b2c3#h=d4e5f6', f'{PAGE}{SHARED}#h=d4e5f6'),
     ('https://attacker.invalid/dashboard/malaria-overview', f'{PAGE}{SHARED}'),
     (
         'https://attacker.invalid/fr/dashboard/elsewhere#h=a1b2c3',
-        f'{ORIGIN}/fr/dashboard/malaria-overview#h=a1b2c3{SHARED}',
+        f'{ORIGIN}/fr/dashboard/malaria-overview{SHARED}#h=a1b2c3',
     ),
+    # Only Harmony's locales: any other first path segment is dropped.
+    (f'{ORIGIN}/api2/dashboard/malaria-overview', f'{PAGE}{SHARED}'),
+    (f'{ORIGIN}/%40attacker.invalid/dashboard/malaria-overview', f'{PAGE}{SHARED}'),
+    ('http://[::1/dashboard/x#h=a1b2c3', f'{PAGE}{SHARED}'),
     ('https://harmony.example.org@attacker.invalid/dashboard/x', f'{PAGE}{SHARED}'),
     ('//attacker.invalid/dashboard/malaria-overview', f'{PAGE}{SHARED}'),
     ('javascript:alert(1)//', f'{PAGE}{SHARED}'),
-    (f'{ORIGIN}/advanced-query#h=a1b2c3', f'{PAGE}#h=a1b2c3{SHARED}'),
+    (f'{ORIGIN}/advanced-query#h=a1b2c3', f'{PAGE}{SHARED}#h=a1b2c3'),
     (f'{PAGE}#h="><a href="https://attacker.invalid/">', f'{PAGE}{SHARED}'),
     (f'{PAGE}#h=a1b2c3/../../x', f'{PAGE}{SHARED}'),
 ]

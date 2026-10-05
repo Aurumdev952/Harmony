@@ -26,7 +26,7 @@ Dear %s,
 Please reset your password at this URL: %s
 
 This URL will expire in %d days.
-'''
+'''  # noqa: S105 (a mail template)
 
 RESET_PASSWORD_BODY_FR = '''
 Cher %s,
@@ -34,7 +34,7 @@ Cher %s,
 Veuillez réinitialiser votre mot de passe à cette adresse URL: %s
 
 Cette URL expirera dans %d jours.
-'''
+'''  # noqa: S105 (a mail template)
 
 INVITE_USER_BODY_FR = '''
 Cher %s,
@@ -78,7 +78,7 @@ SUPPORT_CONTACT = f'We\'re ready to assist, email us at {SUPPORT_EMAIL}'
 
 ALERT_NOTIFICATION_TAG = 'alert_notification'
 NEW_DAHSBOARD_CREATED_TAG = 'new_dashboard_created'
-PASSWORD_RESET_TAG = 'password_reset'
+PASSWORD_RESET_TAG = 'password_reset'  # noqa: S105 (a mail tag)
 PLATFORM_INVITATION_TAG = 'platform_invitation'
 DASHBOARD_ACCESS_GRANTED_TAG = 'dashboard_access_granted'
 SHARE_AQT_ANALYSIS_TAG = 'share_aqt_analysis'
@@ -465,7 +465,10 @@ class EmailRenderer:
             if is_scheduled_report
             else DashboardViewSources.SHARED_DASHBOARD_EMAIL.value
         )
-        dashboard_url = f'{dashboard_url}?source={source}'
+        # The query goes before the `#h=` fragment, or the page reads it as part
+        # of the session hash.
+        page, hash_mark, fragment = dashboard_url.partition('#')
+        dashboard_url = f'{page}?source={source}{hash_mark}{fragment}'
         html = html_builder.generate_html(
             body_message=body_message,
             shared_link=dashboard_url,

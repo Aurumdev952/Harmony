@@ -12,9 +12,13 @@ from urllib.parse import urlsplit
 from flask import current_app
 from werkzeug.exceptions import HTTPException
 
-# Dashboard and query session hashes are hex digests; anything else in a link's
-# `#h=` fragment is dropped rather than copied into a mailed or rendered URL.
-_SESSION_HASH = re.compile(r'[0-9A-Za-z_-]{1,128}')
+from config.locales import LOCALES
+
+# A session hash in a link's fragment. A page opened from a shared link already
+# ends in `#h=<old>`, and the share dialog appends `#h=<new>`, so the last one
+# counts. Anything else in the fragment is dropped rather than copied into a
+# mailed or rendered URL.
+_SESSION_HASH = re.compile(r"(?:^|#)h=([0-9A-Za-z_-]{1,128})(?=#|$)")
 
 
 def deployment_origin(deployment_base_url):
@@ -55,18 +59,23 @@ def deployment_url(endpoint, **values):
 def page_args(link, endpoint):
     """The locale and session hash in a caller's link to `endpoint`'s page.
 
-    Nothing else is taken from the link: its host, path and query are ignored.
+    Nothing else is taken from the link: its host, path and query are ignored,
+    and a locale is kept only if it is one Harmony has.
     """
-    if not link:
+    try:
+        parts = urlsplit(link or "")
+    except ValueError:
         return None, ""
-    parts = urlsplit(link)
     try:
         matched, args = current_app.url_map.bind("").match(parts.path)
     except HTTPException:
         matched, args = None, {}
     locale = args.get("locale") if matched == endpoint else None
-    session_hash = parts.fragment[2:] if parts.fragment.startswith("h=") else ""
-    return locale, session_hash if _SESSION_HASH.fullmatch(session_hash) else ""
+    session_hashes = _SESSION_HASH.findall(parts.fragment)
+    return (
+        locale if locale in LOCALES else None,
+        session_hashes[-1] if session_hashes else "",
+    )
 
 
 def shared_page_url(link, endpoint, **values):

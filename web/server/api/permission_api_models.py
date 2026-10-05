@@ -46,7 +46,6 @@ from web.server.potion.filters import ResourceTypeFilter
 from web.server.potion.managers import RoleResourceManager
 from web.server.potion.signals import after_roles_update
 from web.server.routes.views.authorization import AuthorizedOperation
-from web.server.routes.views.page_renderer import deployment_dashboard_url
 from web.server.routes.views.permission import build_role, add_current_user_to_role
 from web.server.routes.views.resource import (
     update_resource_roles,
@@ -54,6 +53,7 @@ from web.server.routes.views.resource import (
     update_role_users,
 )
 from web.server.security.permissions import SuperUserPermission, principals
+from web.server.util.deployment_links import deployment_url
 from web.server.util.util import get_resource_string
 
 
@@ -272,7 +272,13 @@ def send_email(sender, existing_roles, new_roles):
             dashboard = transaction.find_one_by_fields(
                 Dashboard, True, {'resource_id': sender.id}
             )
-        dashboard_url = deployment_dashboard_url(dashboard.slug)
+        if not (dashboard and dashboard.slug):
+            g.request_logger.error(
+                'No dashboard slug for resource %s; no access-granted email sent',
+                sender.id,
+            )
+            return
+        dashboard_url = deployment_url('dashboard.grid_dashboard', name=dashboard.slug)
         try:
             for recepient in recepients:
                 msg = current_app.email_renderer.create_add_dashboard_user_message(
@@ -549,10 +555,11 @@ class RoleResource(PrincipalResource):
         rel='updateUsers',
     )
     def update_users(self, role, usernames):
-        with AuthorizedOperation('edit_resource', 'role', role.id):
-            with Transaction() as transaction:
-                update_role_users(role, usernames, transaction)
-                return StandardResponse('Role usernames has been updated', OK, True)
+        with AuthorizedOperation(
+            'edit_resource', 'role', role.id
+        ), Transaction() as transaction:
+            update_role_users(role, usernames, transaction)
+            return StandardResponse('Role usernames has been updated', OK, True)
         return None, UNAUTHORIZED
 
 

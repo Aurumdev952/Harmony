@@ -13,7 +13,6 @@ import pytest
 
 from models.alchemy.dashboard import Dashboard
 from models.alchemy.permission import ResourceTypeEnum
-from models.alchemy.user import User
 from tests.web.links.support import (
     HOSTILE_ENVIRONS,
     INVITER,
@@ -40,11 +39,15 @@ DASHBOARD_RESOURCE = SimpleNamespace(
 DASHBOARD = SimpleNamespace(slug='malaria-overview', resource_id=DASHBOARD_RESOURCE.id)
 
 
-def fake_transaction(rows):
+def fake_transaction(rows=()):
     """A `Transaction` whose `find_one_by_fields` answers from `rows`, a list of
     (entity class, search fields, result)."""
 
     class FakeTransaction:
+        @staticmethod
+        def run_raw():
+            return None
+
         def find_one_by_fields(self, entity, case_sensitive, search_fields):
             assert case_sensitive
             for row_entity, row_fields, result in rows:
@@ -81,10 +84,11 @@ def fixture_dashboard_models(app):
 
 
 def _send_reset(app, monkeypatch, environ):
+    monkeypatch.setattr(admin, 'Transaction', fake_transaction())
     monkeypatch.setattr(
         admin,
-        'Transaction',
-        fake_transaction([(User, {'username': TARGET.username}, TARGET)]),
+        'find_user_by_username',
+        lambda username, _session: TARGET if username == TARGET.username else None,
     )
     with request_as(app, environ, path='/api2/authentication/forgot_password'):
         admin.send_reset_password(TARGET.username)
@@ -135,6 +139,32 @@ def test_access_granted_link_is_the_dashboard_page_on_the_configured_origin(
     assert mailed_links(message, '/dashboard/') == {
         f'{ORIGIN}/dashboard/malaria-overview?source=dashboard_permission_email'
     }
+
+
+@pytest.mark.parametrize(
+    'dashboard', [None, SimpleNamespace(slug=None, resource_id=DASHBOARD_RESOURCE.id)]
+)
+def test_access_granted_without_a_dashboard_slug_mails_nothing(
+    app, mailer, monkeypatch, permission_models, dashboard
+):
+    monkeypatch.setattr(
+        permission_models,
+        'Transaction',
+        fake_transaction(
+            [(Dashboard, {'resource_id': DASHBOARD_RESOURCE.id}, dashboard)]
+        ),
+    )
+    with request_as(app, {}, username=INVITER.username):
+        # Runs after the role change is committed, so it must not raise.
+        permission_models.send_email(
+            DASHBOARD_RESOURCE,
+            existing_roles={'userRoles': {}},
+            new_roles={
+                'userRoles': {'viewer@harmony.example.org': ['dashboard_viewer']}
+            },
+        )
+
+    assert not mailer.messages
 
 
 @ENVIRONS

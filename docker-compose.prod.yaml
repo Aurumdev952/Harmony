@@ -36,3 +36,5 @@ services:
     restart: always
   renderer:
     restart: always
+  render-egress:
+    restart: always

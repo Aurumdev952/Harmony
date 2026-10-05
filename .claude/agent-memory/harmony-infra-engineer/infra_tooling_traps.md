@@ -19,3 +19,6 @@ metadata:
 
 **Why:** each of these cost a retry during WP-0g, WP-2f or WP-3b.
 **How to apply:** follow these before the first lint, type check or commit in an infra WP, and whenever the lead asks for a small separate branch.
+- The isolation guard matches "git" as a substring, so `.github/...` in a command with `PATH=...`, pipes or `$(...)` is refused as a git command. Put such commands in a `/tmp/<wp>/*.sh` file and run `bash <file>` with plain arguments.
+- A hook rejects `python3 <script>` and asks for `uv run python <script>`. On a branch whose `required-version` the host uv does not meet, put a shim first on PATH (`exec uvx --from uv==0.12.23 uv "$@"`), or run from `/tmp` with `uv run --no-project`.
+- `mig/integration` keeps moving while a WP merges it. Check `git log <merged-sha>..mig/integration` before the evidence run, and merge again if it moved.

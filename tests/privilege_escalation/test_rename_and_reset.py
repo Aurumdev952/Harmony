@@ -65,17 +65,28 @@ def fixture_mailer(app, monkeypatch):
 
 
 @pytest.fixture(name='refusals')
-def fixture_refusals(caplog):
+def fixture_refusals():
     '''The WARNING audit lines of refusals logged so far.'''
-    # The app logger does not propagate to the root logger caplog listens on.
+    # A handler on the app logger itself sees each record once, whether or not
+    # the logger propagates to the root logger (it does once log.config runs).
+    handler = _RecordList()
     app_logger = logging.getLogger('ZenysisLogger')
-    app_logger.addHandler(caplog.handler)
+    app_logger.addHandler(handler)
     yield lambda: [
         record.getMessage()
-        for record in caplog.records
+        for record in handler.records
         if record.levelno == logging.WARNING and 'Refused' in record.getMessage()
     ]
-    app_logger.removeHandler(caplog.handler)
+    app_logger.removeHandler(handler)
+
+
+class _RecordList(logging.Handler):
+    def __init__(self) -> None:
+        super().__init__()
+        self.records: list[logging.LogRecord] = []
+
+    def emit(self, record: logging.LogRecord) -> None:
+        self.records.append(record)
 
 
 def _name(prefix: str) -> str:

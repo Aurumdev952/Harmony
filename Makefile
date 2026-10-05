@@ -35,8 +35,6 @@ format-python: # Ruff: fix and format the Python files changed with respect to m
 build: # Build docker images (for development and production) using docker compose.
 	docker compose --env-file $(ENV_FILE) -f docker-compose.build.yaml build $(SERVICE)
 
-requirements: # Regenerate requirements*.txt from pyproject.toml (the images still install them with pip).
-	uv run docker/export_requirements.py
 
 push: # Push the images built by `make build` to $DOCKER_NAMESPACE (default ghcr.io/zenysis).
 	docker compose --env-file $(ENV_FILE) -f docker-compose.build.yaml push $(or $(SERVICE),web-client web-server web etl-pipeline)

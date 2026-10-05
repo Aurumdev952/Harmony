@@ -3,7 +3,7 @@ name = "harmony"
 version = "0"
 # The one interpreter for the images, CI and development.
 requires-python = "==3.13.*"
-# Shared by the web server and the pipeline (exported to requirements.txt).
+# Shared by the web server and the pipeline images.
 dependencies = [
     "setuptools==71.1.0",
     # Before 22.1, slotted classes (related.immutable) break zero-argument super()
@@ -73,7 +73,7 @@ dependencies = [
 ]
 
 [dependency-groups]
-# Exported to requirements-web.txt.
+# The web image (web and worker).
 web = [
     "flask-jwt-extended==3.25.1",
     "blinker==1.4",
@@ -88,7 +88,7 @@ web = [
     "typing_extensions==4.1.1",
     "alembic>=1.7.1",
 ]
-# Exported to requirements-pipeline.txt.
+# The pipeline image.
 pipeline = [
     "xlrd>=1.0.0",
     "pyshp",
@@ -109,7 +109,7 @@ pipeline = [
     "croniter==1.3.7",
     "lz4==4.4.5",
 ]
-# Exported to requirements-dev.txt.
+# Development and CI only.
 dev = [
     "pytest>=7.4.3",
     "pytest-flask>=0.15.0",
@@ -208,7 +208,6 @@ files = [
     "models",
     "db",
     "prod/browser_share/browser_share.py",
-    "docker/export_requirements.py",
 ]
 plugins = ["sqlmypy"]
 ignore_missing_imports = false
@@ -223,9 +222,9 @@ module = ["models.python.dashboard.*", "web.server.migrations.*"]
 ignore_errors = true
 
 [[tool.mypy.overrides]]
-# The standalone tools are checked as `mypy --strict` would, minus its two global
+# The standalone tool is checked as `mypy --strict` would, minus its two global
 # flags (warn_unused_configs, warn_redundant_casts), which mypy cannot scope.
-module = ["prod.browser_share.browser_share", "docker.export_requirements"]
+module = ["prod.browser_share.browser_share"]
 disallow_any_generics = true
 disallow_subclassing_any = true
 disallow_untyped_calls = true

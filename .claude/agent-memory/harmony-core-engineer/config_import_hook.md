@@ -17,3 +17,5 @@ The alias loader returns the real module from `create_module`. The import system
 
 **Why:** WP-3b (CPython 3.13) and WP-4a (`harmony.core.deployment`) build on this.
 **How to apply:** when replacing it with `harmony.core.deployment` in WP-4a, keep the shared-module-object and reload behaviour, or record the change. Related: [[tooling-traps]].
+
+Since WP-4a (2026-10-05), `config.VALID_MODULES` is `harmony.core.deployment.deployment_codes()`, and `config.loader.import_configuration_module` returns a frozen `Deployment` holding the same module objects. `config/__init__.py` imports `harmony.core.deployment`, so that module must never `import config` at module level. It uses `importlib.util.find_spec('config')` instead.

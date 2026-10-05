@@ -37,3 +37,4 @@ types-Werkzeug==0.1.8
 testfixtures==6.17.1
 alchemy-mock==0.4.3
 factory-boy==3.2.0
+import-linter==2.5.2

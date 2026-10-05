@@ -8,9 +8,13 @@
 #                                  and e2e run, each passing if it has no
 #                                  matching test
 #   e2e/run.sh up | down           manage the stack for an iterating session;
-#                                  `up` prints the playwright command to run
-#   e2e/run.sh visual [args]       run the visual suite on a stack that is up
-#                                  (--update-snapshots rewrites e2e/visual/)
+#                                  `up` prints the commands to run, in order
+#   e2e/run.sh visual [args]       run one project on a stack that is up;
+#   e2e/run.sh a11y [args]         visual and a11y need the stack as seeded,
+#   e2e/run.sh e2e [args]          so run them before e2e, and after an e2e
+#                                  run start a new stack (down, then up)
+#                                  (visual --update-snapshots rewrites
+#                                  e2e/visual/)
 #   e2e/run.sh client              rebuild the client if its sources changed
 #   e2e/run.sh build               rebuild the production client bundles
 #
@@ -190,9 +194,11 @@ case "${1:-}" in
   up)
     stack_up
     export_env
-    echo "e2e: stack up. From e2e/, run:"
-    echo "  E2E_BASE_URL=${E2E_BASE_URL} E2E_USERNAME=${E2E_USERNAME} E2E_PROJECT=${E2E_PROJECT} E2E_CREDENTIALS_FILE=${E2E_CREDENTIALS_FILE} E2E_ADMIN_STATE=${E2E_ADMIN_STATE} node_modules/.bin/playwright test --project a11y --project e2e"
-    echo "and for the visual suite: e2e/run.sh visual"
+    echo "e2e: stack up. Run the projects one at a time, in this order:"
+    echo "  e2e/run.sh visual   # needs the stack as seeded"
+    echo "  e2e/run.sh a11y     # needs the stack as seeded"
+    echo "  e2e/run.sh e2e      # adds dashboards, users and sources"
+    echo "After an e2e run, visual and a11y need a new stack (e2e/run.sh down, then up)."
     ;;
   down)
     stack_down
@@ -201,6 +207,11 @@ case "${1:-}" in
     ensure_playwright
     export_env
     run_visual "${@:2}"
+    ;;
+  a11y | e2e)
+    ensure_playwright
+    export_env
+    run_project "$1" "${@:2}"
     ;;
   client)
     ensure_client

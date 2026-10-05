@@ -269,3 +269,23 @@ def test_viewers_with_the_same_policy_have_the_same_digest(app):
     assert _policy_digest(app, NORTH_ACCOUNT) != _policy_digest(
         app, {VIEW_DASHBOARD, _policy('South')}
     )
+
+
+def test_a_caller_on_a_narrowed_token_gets_no_render(app):
+    # The caller's API token narrows a North and South account to North, so the
+    # thumbnail cache key is the North digest. The page load resolves the
+    # account's wider policy; rendering it would cache North and South data
+    # under the North key, so the render gets nothing instead.
+    account = {VIEW_DASHBOARD, _policy('North', 'South')}
+    narrowed_token = {
+        'needs': ['*'],
+        'query_needs': [{STATE: {'include_values': ['North']}}],
+    }
+    with _signed_in(app, account) as identity, mock.patch(
+        'web.server.security.signal_handlers.get_jwt_claims', lambda: narrowed_token
+    ):
+        _install_token_needs(identity)
+        digest = query_policy_fingerprint()
+
+    assert digest == _policy_digest(app, {VIEW_DASHBOARD, _policy('North')})
+    assert _page_load(app, account, digest) == set()

@@ -6,3 +6,4 @@
 - [WP-2f toolchain](wp_2f_next.md): two uv lanes (3.9 app, 3.13 tools), generated requirements, ruff/pytest traps
 - [Infra tooling traps](infra_tooling_traps.md) — *.log gitignored, strict mypy via ci/tools313, scripts/ vs prod/ ownership, nginx-proxy forego prefix, ZEN_PROD in images, worktree git
 - [Image verification recipes](image_verification_recipes.md) — unique compose build names, sweep env/PYTHONPATH, overlays, PyPy: import-test wheels, gspread marker
+- [Logging traps](logging_traps.md) — redaction regex cost on client text, Celery stdout banner/shutdown line, worker loglevel ignored, nginx X-Request-ID

@@ -1,8 +1,8 @@
 '''API-token issue and revocation (contract C-5), as they behave with WP-2c merged.
 
 `login_from_request` accepts a JWT that carries an `id` claim only while the
-`api_token` row with that id exists and is not revoked (`check_token_validity`,
-memoised; `update_user_api_tokens` clears the memo when it saves or revokes).
+`api_token` row with that id exists and is not revoked (`api_token_user_id`,
+read on every request since WP-0k; nothing is memoised).
 `generate_api_token` stores the row as it issues the token (WP-2c F12,
 `issue_api_token`), so the token authenticates at once; the admin app's later
 save inserts with ON CONFLICT DO NOTHING and adds no second row. Only admin can

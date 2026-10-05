@@ -1,0 +1,35 @@
+{
+  "content_type": "application/json",
+  "cookies": [
+    "accessKey; cleared; httponly; path=/",
+    "csrf_access_token; cleared; path=/",
+    "csrf_refresh_token; cleared; path=/",
+    "refresh_token_cookie; cleared; httponly; path=/"
+  ],
+  "headers": [],
+  "id": "auth.timeout",
+  "pinned": {
+    "/data/timeout": true
+  },
+  "response_schema": {
+    "properties": {
+      "data": {
+        "properties": {
+          "timeout": {
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "timeout"
+        ],
+        "type": "object"
+      }
+    },
+    "required": [
+      "data"
+    ],
+    "type": "object"
+  },
+  "route": "POST /api/timeout",
+  "status": 200
+}

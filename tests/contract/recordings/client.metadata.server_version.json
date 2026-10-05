@@ -1,0 +1,14 @@
+{
+  "content_type": "application/json",
+  "headers": [],
+  "id": "client.metadata.server_version",
+  "pinned": {
+    "": "2020-07-20"
+  },
+  "response_schema": {
+    "type": "string",
+    "x-format": "date"
+  },
+  "route": "GET /api2/metadata/server_version",
+  "status": 200
+}

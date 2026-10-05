@@ -1,0 +1,188 @@
+{
+  "content_type": "text/html",
+  "headers": [],
+  "id": "graphql.DirectoryTableContainerQuery.root",
+  "pinned": {},
+  "response_schema": {
+    "properties": {
+      "data": {
+        "properties": {
+          "node": {
+            "properties": {
+              "__typename": {
+                "type": "string"
+              },
+              "children": {
+                "items": {
+                  "properties": {
+                    "childrenCategoryAggregate": {
+                      "properties": {
+                        "aggregate": {
+                          "properties": {
+                            "count": {
+                              "type": "integer"
+                            }
+                          },
+                          "required": [
+                            "count"
+                          ],
+                          "type": "object"
+                        }
+                      },
+                      "required": [
+                        "aggregate"
+                      ],
+                      "type": "object"
+                    },
+                    "fieldCategoryMappingsAggregate": {
+                      "properties": {
+                        "aggregate": {
+                          "properties": {
+                            "count": {
+                              "type": "integer"
+                            }
+                          },
+                          "required": [
+                            "count"
+                          ],
+                          "type": "object"
+                        }
+                      },
+                      "required": [
+                        "aggregate"
+                      ],
+                      "type": "object"
+                    },
+                    "id": {
+                      "type": "string"
+                    },
+                    "name": {
+                      "type": "string"
+                    },
+                    "visibilityStatus": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "childrenCategoryAggregate",
+                    "fieldCategoryMappingsAggregate",
+                    "id",
+                    "name",
+                    "visibilityStatus"
+                  ],
+                  "type": "object"
+                },
+                "type": "array"
+              },
+              "fieldCategoryMappings": {
+                "items": {
+                  "properties": {
+                    "field": {
+                      "properties": {
+                        "copiedFromFieldId": {
+                          "type": "null"
+                        },
+                        "description": {
+                          "type": "string"
+                        },
+                        "fieldPipelineDatasourceMappings": {
+                          "items": {
+                            "properties": {
+                              "id": {
+                                "type": "string"
+                              },
+                              "pipelineDatasource": {
+                                "properties": {
+                                  "id": {
+                                    "type": "string"
+                                  },
+                                  "name": {
+                                    "type": "string"
+                                  }
+                                },
+                                "required": [
+                                  "id",
+                                  "name"
+                                ],
+                                "type": "object"
+                              }
+                            },
+                            "required": [
+                              "id",
+                              "pipelineDatasource"
+                            ],
+                            "type": "object"
+                          },
+                          "type": "array"
+                        },
+                        "id": {
+                          "type": "string"
+                        },
+                        "name": {
+                          "type": "string"
+                        },
+                        "serializedCalculation": {
+                          "properties": {
+                            "type": {
+                              "type": "string"
+                            }
+                          },
+                          "required": [
+                            "type"
+                          ],
+                          "type": "object"
+                        }
+                      },
+                      "required": [
+                        "copiedFromFieldId",
+                        "description",
+                        "fieldPipelineDatasourceMappings",
+                        "id",
+                        "name",
+                        "serializedCalculation"
+                      ],
+                      "type": "object"
+                    },
+                    "id": {
+                      "type": "string"
+                    },
+                    "visibilityStatus": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "field",
+                    "id",
+                    "visibilityStatus"
+                  ],
+                  "type": "object"
+                },
+                "type": "array"
+              },
+              "id": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "__typename",
+              "children",
+              "fieldCategoryMappings",
+              "id"
+            ],
+            "type": "object"
+          }
+        },
+        "required": [
+          "node"
+        ],
+        "type": "object"
+      }
+    },
+    "required": [
+      "data"
+    ],
+    "type": "object"
+  },
+  "route": "POST /api/graphql",
+  "status": 200
+}

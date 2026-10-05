@@ -1,3 +1,6 @@
+- [Legacy Flask test and lint env](legacy-flask-test-and-lint-env.md) — py3.8 uv recipe, CI pylint/black on changed files, worktree-hook command traps
+- [Narrowed admin tokens](narrowed-admin-tokens.md) — superuser from identity not account; render token is a narrowed admin JWT; managers decide reach
+- [Tooling traps](tooling-traps.md) — ownership.py via uv, compound bash refused in worktrees, task_gate's stale branch ref, caplog doubling
 - [Local Flask stack](local-flask-stack.md) — run legacy Flask, Alembic and replays without images: py3.8 venv, Druid stub, SERVER_SOFTWARE=gunicorn
 - [Flask local test env](flask_local_test_env.md) — import and build the Flask app without Docker: py3.8 uv env, env placeholders, route mocks
 - [py3.8 web tests](py38_web_tests.md) — run tests/web on Flask 1.0 / Python 3.8 with uv despite the worktree guard
@@ -14,3 +17,8 @@
 - [ruff format vs py3.8](ruff_format_py38_trap.md) — ruff format writes parenthesized `with` that the 3.8 web image rejects; nest them, parse under 3.8
 - [Absolute URLs and script root](absolute_urls_and_script_root.md) — Host and SCRIPT_NAME are caller-controlled; build token URLs from url_map on the configured origin
 - [Token identity rules](token_identity_rules.md) — JWTs bind to user_id / api_token row / iat vs created in the DB clock; Postgres created is session-TZ
+- [Post-WP-2f tooling](post_wp2f_tooling.md) — dev env py3.9 but prod 3.8 until WP-3b, lint-gate and noqa traps, guard workarounds, graphql stub
+- [Absolute URLs and script root](absolute_urls_and_script_root.md) — Host and SCRIPT_NAME are caller-controlled; build token URLs from url_map on the configured origin
+- [Gunicorn server checks](gunicorn_server_checks.md) — test web/gunicorn_server.py despite its gevent patch, mypy strict on 3.8, live run with a stub app
+- [Request logging wiring](request_logging_wiring.md) — test create_app/create_celery log wiring: non-gunicorn path gaps, global Celery signals, mypy on tasks
+- [Backend testing traps](backend-testing-traps.md) — real-Postgres fixture from tests/throwaway_postgres.py, contract stack, worktree guard, formatting

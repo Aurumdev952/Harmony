@@ -1,0 +1,35 @@
+{
+  "content_type": "application/json",
+  "headers": [],
+  "id": "group.update_roles.assign",
+  "pinned": {},
+  "response_schema": {
+    "properties": {
+      "data": {
+        "properties": {
+          "code": {
+            "type": "string"
+          },
+          "message": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "code",
+          "message"
+        ],
+        "type": "object"
+      },
+      "success": {
+        "type": "boolean"
+      }
+    },
+    "required": [
+      "data",
+      "success"
+    ],
+    "type": "object"
+  },
+  "route": "PATCH /api2/group/<id>/roles",
+  "status": 500
+}

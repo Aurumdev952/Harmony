@@ -1,0 +1,20 @@
+{
+  "content_type": "application/json",
+  "headers": [],
+  "id": "auth.login.token",
+  "pinned": {},
+  "response_schema": {
+    "properties": {
+      "access_token": {
+        "type": "string",
+        "x-format": "jwt"
+      }
+    },
+    "required": [
+      "access_token"
+    ],
+    "type": "object"
+  },
+  "route": "POST /api2/authentication/login",
+  "status": 200
+}

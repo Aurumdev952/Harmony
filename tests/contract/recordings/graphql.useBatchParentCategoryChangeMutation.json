@@ -1,0 +1,284 @@
+{
+  "content_type": "text/html",
+  "headers": [],
+  "id": "graphql.useBatchParentCategoryChangeMutation",
+  "pinned": {},
+  "response_schema": {
+    "properties": {
+      "data": {
+        "properties": {
+          "insert_category": {
+            "properties": {
+              "returning": {
+                "items": {
+                  "properties": {
+                    "children": {
+                      "maxItems": 0,
+                      "type": "array"
+                    },
+                    "childrenCategoryAggregate": {
+                      "properties": {
+                        "aggregate": {
+                          "properties": {
+                            "count": {
+                              "type": "integer"
+                            }
+                          },
+                          "required": [
+                            "count"
+                          ],
+                          "type": "object"
+                        }
+                      },
+                      "required": [
+                        "aggregate"
+                      ],
+                      "type": "object"
+                    },
+                    "fieldCategoryMappingsAggregate": {
+                      "properties": {
+                        "aggregate": {
+                          "properties": {
+                            "count": {
+                              "type": "integer"
+                            }
+                          },
+                          "required": [
+                            "count"
+                          ],
+                          "type": "object"
+                        }
+                      },
+                      "required": [
+                        "aggregate"
+                      ],
+                      "type": "object"
+                    },
+                    "id": {
+                      "type": "string"
+                    },
+                    "name": {
+                      "type": "string"
+                    },
+                    "parent": {
+                      "properties": {
+                        "children": {
+                          "items": {
+                            "properties": {
+                              "id": {
+                                "type": "string"
+                              }
+                            },
+                            "required": [
+                              "id"
+                            ],
+                            "type": "object"
+                          },
+                          "type": "array"
+                        },
+                        "id": {
+                          "type": "string"
+                        }
+                      },
+                      "required": [
+                        "children",
+                        "id"
+                      ],
+                      "type": "object"
+                    },
+                    "visibilityStatus": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "children",
+                    "childrenCategoryAggregate",
+                    "fieldCategoryMappingsAggregate",
+                    "id",
+                    "name",
+                    "parent",
+                    "visibilityStatus"
+                  ],
+                  "type": "object"
+                },
+                "type": "array"
+              }
+            },
+            "required": [
+              "returning"
+            ],
+            "type": "object"
+          },
+          "insert_field_category_mapping": {
+            "properties": {
+              "returning": {
+                "items": {
+                  "properties": {
+                    "category": {
+                      "properties": {
+                        "childrenCategoryAggregate": {
+                          "properties": {
+                            "aggregate": {
+                              "properties": {
+                                "count": {
+                                  "type": "integer"
+                                }
+                              },
+                              "required": [
+                                "count"
+                              ],
+                              "type": "object"
+                            }
+                          },
+                          "required": [
+                            "aggregate"
+                          ],
+                          "type": "object"
+                        },
+                        "fieldCategoryMappingsAggregate": {
+                          "properties": {
+                            "aggregate": {
+                              "properties": {
+                                "count": {
+                                  "type": "integer"
+                                }
+                              },
+                              "required": [
+                                "count"
+                              ],
+                              "type": "object"
+                            }
+                          },
+                          "required": [
+                            "aggregate"
+                          ],
+                          "type": "object"
+                        },
+                        "field_category_mappings": {
+                          "items": {
+                            "properties": {
+                              "field": {
+                                "properties": {
+                                  "id": {
+                                    "type": "string"
+                                  }
+                                },
+                                "required": [
+                                  "id"
+                                ],
+                                "type": "object"
+                              },
+                              "id": {
+                                "type": "string"
+                              }
+                            },
+                            "required": [
+                              "field",
+                              "id"
+                            ],
+                            "type": "object"
+                          },
+                          "type": "array"
+                        },
+                        "id": {
+                          "type": "string"
+                        }
+                      },
+                      "required": [
+                        "childrenCategoryAggregate",
+                        "fieldCategoryMappingsAggregate",
+                        "field_category_mappings",
+                        "id"
+                      ],
+                      "type": "object"
+                    },
+                    "field": {
+                      "properties": {
+                        "field_category_mappings": {
+                          "items": {
+                            "properties": {
+                              "category": {
+                                "properties": {
+                                  "id": {
+                                    "type": "string"
+                                  }
+                                },
+                                "required": [
+                                  "id"
+                                ],
+                                "type": "object"
+                              },
+                              "id": {
+                                "type": "string"
+                              },
+                              "visibilityStatus": {
+                                "type": "string"
+                              }
+                            },
+                            "required": [
+                              "category",
+                              "id",
+                              "visibilityStatus"
+                            ],
+                            "type": "object"
+                          },
+                          "type": "array"
+                        },
+                        "id": {
+                          "type": "string"
+                        }
+                      },
+                      "required": [
+                        "field_category_mappings",
+                        "id"
+                      ],
+                      "type": "object"
+                    },
+                    "id": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "category",
+                    "field",
+                    "id"
+                  ],
+                  "type": "object"
+                },
+                "type": "array"
+              }
+            },
+            "required": [
+              "returning"
+            ],
+            "type": "object"
+          },
+          "update_category": {
+            "properties": {
+              "returning": {
+                "maxItems": 0,
+                "type": "array"
+              }
+            },
+            "required": [
+              "returning"
+            ],
+            "type": "object"
+          }
+        },
+        "required": [
+          "insert_category",
+          "insert_field_category_mapping",
+          "update_category"
+        ],
+        "type": "object"
+      }
+    },
+    "required": [
+      "data"
+    ],
+    "type": "object"
+  },
+  "route": "POST /api/graphql",
+  "status": 200
+}

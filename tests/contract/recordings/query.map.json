@@ -1,0 +1,84 @@
+{
+  "content_type": "application/json",
+  "headers": [],
+  "id": "query.map",
+  "pinned": {},
+  "response_schema": {
+    "properties": {
+      "adminBoundaryExcludeLocations": {
+        "maxItems": 0,
+        "type": "array"
+      },
+      "adminBoundaryIncludeLocations": {
+        "maxItems": 0,
+        "type": "array"
+      },
+      "data": {
+        "items": {
+          "properties": {
+            "date": {
+              "type": "string",
+              "x-format": "date"
+            },
+            "datedData": {
+              "items": {
+                "properties": {
+                  "dimensions": {
+                    "properties": {
+                      "StateName": {
+                        "type": "string"
+                      }
+                    },
+                    "required": [
+                      "StateName"
+                    ],
+                    "type": "object"
+                  },
+                  "lat": {
+                    "type": "string"
+                  },
+                  "lng": {
+                    "type": "string"
+                  },
+                  "metrics": {
+                    "properties": {
+                      "yellow_fever_cases": {
+                        "type": "number"
+                      }
+                    },
+                    "required": [
+                      "yellow_fever_cases"
+                    ],
+                    "type": "object"
+                  }
+                },
+                "required": [
+                  "dimensions",
+                  "lat",
+                  "lng",
+                  "metrics"
+                ],
+                "type": "object"
+              },
+              "type": "array"
+            }
+          },
+          "required": [
+            "date",
+            "datedData"
+          ],
+          "type": "object"
+        },
+        "type": "array"
+      }
+    },
+    "required": [
+      "adminBoundaryExcludeLocations",
+      "adminBoundaryIncludeLocations",
+      "data"
+    ],
+    "type": "object"
+  },
+  "route": "POST /api2/query/map",
+  "status": 200
+}

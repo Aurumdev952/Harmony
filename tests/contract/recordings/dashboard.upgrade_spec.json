@@ -1,0 +1,116 @@
+{
+  "content_type": "application/json",
+  "headers": [],
+  "id": "dashboard.upgrade_spec",
+  "pinned": {},
+  "response_schema": {
+    "properties": {
+      "commonSettings": {
+        "properties": {
+          "filterSettings": {
+            "properties": {
+              "enabledCategories": {
+                "maxItems": 0,
+                "type": "array"
+              },
+              "enabledFilterHierarchy": {
+                "maxItems": 0,
+                "type": "array"
+              },
+              "excludedTiles": {
+                "maxItems": 0,
+                "type": "array"
+              },
+              "items": {
+                "maxItems": 0,
+                "type": "array"
+              },
+              "visible": {
+                "type": "boolean"
+              }
+            },
+            "required": [
+              "enabledCategories",
+              "enabledFilterHierarchy",
+              "excludedTiles",
+              "items",
+              "visible"
+            ],
+            "type": "object"
+          },
+          "groupingSettings": {
+            "properties": {
+              "enabledCategories": {
+                "maxItems": 0,
+                "type": "array"
+              },
+              "excludedTiles": {
+                "maxItems": 0,
+                "type": "array"
+              },
+              "items": {
+                "maxItems": 0,
+                "type": "array"
+              },
+              "visible": {
+                "type": "boolean"
+              }
+            },
+            "required": [
+              "enabledCategories",
+              "excludedTiles",
+              "items",
+              "visible"
+            ],
+            "type": "object"
+          },
+          "panelAlignment": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "filterSettings",
+          "groupingSettings",
+          "panelAlignment"
+        ],
+        "type": "object"
+      },
+      "items": {
+        "maxItems": 0,
+        "type": "array"
+      },
+      "legacy": {
+        "type": "boolean"
+      },
+      "options": {
+        "properties": {
+          "columnCount": {
+            "type": "integer"
+          },
+          "title": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "columnCount",
+          "title"
+        ],
+        "type": "object"
+      },
+      "version": {
+        "type": "string",
+        "x-format": "date"
+      }
+    },
+    "required": [
+      "commonSettings",
+      "items",
+      "legacy",
+      "options",
+      "version"
+    ],
+    "type": "object"
+  },
+  "route": "POST /api2/dashboard/upgrade_spec",
+  "status": 200
+}

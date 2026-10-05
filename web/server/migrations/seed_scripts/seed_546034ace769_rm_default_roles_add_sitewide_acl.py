@@ -4,6 +4,7 @@ import sqlalchemy as sa
 from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy.orm import relationship, backref
 
+from log import LOG
 from web.server.data.data_access import Transaction
 
 from . import get_session
@@ -353,7 +354,7 @@ def populate_default_roles_table_from_role(transaction):
         Role, True, {'name': QUERY_RUNNER_NAME}
     )
     if not query_runner_role:
-        print('No query_runner role in DB, skipping assignment')
+        LOG.info('No query_runner role in DB, skipping assignment')
         return
     transaction.add_or_update(
         DefaultRoles(
@@ -404,8 +405,8 @@ def migrate_from_sitewide_acl(transaction):
     cache = {}
     for sitewide_acl in transaction.find_all_by_fields(SitewideResourceAcl, {}):
         if not sitewide_acl.registered_resource_role:
-            print(
-                'No registered resourceRole for sitewide ACL on resource_id ',
+            LOG.info(
+                'No registered resourceRole for sitewide ACL on resource_id %s',
                 sitewide_acl.resource_id,
             )
             continue

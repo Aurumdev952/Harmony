@@ -1,0 +1,5 @@
+{
+  "description": "BUBBLE_CHART: three fields of different calculation types by municipality.",
+  "endpoint": "bar_graph",
+  "policy": null
+}

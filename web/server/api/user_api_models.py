@@ -2,6 +2,7 @@
 
 User APIs Accessible via http://<server_uri>:5000/api2/user
 '''
+
 from http.client import BAD_REQUEST, OK, NO_CONTENT, UNAUTHORIZED
 
 from flask import current_app, g
@@ -10,9 +11,8 @@ from flask_potion.routes import ItemRoute, Route
 from flask_potion.schema import FieldSet
 from flask_potion.signals import before_delete, after_delete
 from flask_user import current_user
-from werkzeug.exceptions import BadRequest
+from werkzeug.exceptions import BadRequest, Forbidden
 
-from models.alchemy.api_token import APIToken
 from models.alchemy.user import User, UserAcl
 from web.server.api.api_models import PrincipalResource
 from web.server.api.model_schemas import (
@@ -50,10 +50,16 @@ from web.server.routes.views.users import (
     force_delete_user,
     get_user_owned_resources,
     invite_users,
-    update_user_acls,
+    issue_api_token,
+    replace_user_acls,
     update_user_api_tokens,
     update_user_groups,
     update_user_roles_from_map,
+)
+from web.server.security.grants import (
+    held_roles_from_uris,
+    member_groups_from_uris,
+    verify_acl_grants,
 )
 from web.server.security.permissions import (
     SuperUserPermission,
@@ -141,10 +147,18 @@ class UserResource(PrincipalResource):
             # NOTE: this whole block must run in the same transaction
             # and can leave db in incosistent state like this but should be
             # addressed seaparately of why I'm here and requires quite a big refactoring
-            updates = build_user_updates(obj)
-            updated_user = self.manager.update(db_user, updates)
-            update_user_acls(updated_user, obj.get('acls', []))
-            update_user_groups(updated_user, obj.get('groups', []))
+            if not self.manager.can_update_item(db_user):
+                raise Forbidden()
+            roles = held_roles_from_uris(obj['roles'], existing=db_user.roles)
+            groups = member_groups_from_uris(
+                obj.get('groups', []), existing=db_user.groups
+            )
+            acl_grants = verify_acl_grants(
+                obj.get('acls', []), existing_acls=db_user.acls
+            )
+            updated_user = self.manager.update(db_user, build_user_updates(obj, roles))
+            replace_user_acls(updated_user, acl_grants)
+            update_user_groups(updated_user, groups)
             update_user_api_tokens(updated_user, obj.get('apiTokens', []))
             invalidate_user_identity_cache(db_user, None)
             return update_user_groups, OK
@@ -162,7 +176,7 @@ class UserResource(PrincipalResource):
         # to gain access to the account, so their security considerations are kind of
         # identical
         with AuthorizedOperation('change_password', 'user', db_user.id):
-            return APIToken.generate_token(db_user)
+            return issue_api_token(db_user)
 
     # The parameter is coming directly from the API which uses camelCase instead of
     # snake_case

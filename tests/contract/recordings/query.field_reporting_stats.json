@@ -1,0 +1,58 @@
+{
+  "content_type": "application/json",
+  "headers": [],
+  "id": "query.field_reporting_stats",
+  "pinned": {},
+  "response_schema": {
+    "items": {
+      "properties": {
+        "dimensions": {
+          "properties": {},
+          "required": [],
+          "type": "object"
+        },
+        "metrics": {
+          "properties": {
+            "yellow_fever_cases": {
+              "properties": {
+                "count": {
+                  "type": "integer"
+                },
+                "dateCount": {
+                  "type": "integer"
+                },
+                "endDate": {
+                  "type": "string",
+                  "x-format": "date"
+                },
+                "startDate": {
+                  "type": "string",
+                  "x-format": "date"
+                }
+              },
+              "required": [
+                "count",
+                "dateCount",
+                "endDate",
+                "startDate"
+              ],
+              "type": "object"
+            }
+          },
+          "required": [
+            "yellow_fever_cases"
+          ],
+          "type": "object"
+        }
+      },
+      "required": [
+        "dimensions",
+        "metrics"
+      ],
+      "type": "object"
+    },
+    "type": "array"
+  },
+  "route": "POST /api2/query/field_reporting_stats",
+  "status": 200
+}

@@ -1,0 +1,283 @@
+## audit_count_distinct_nullable_dimension
+- druid_query: 1 differing values
+    druid_query[0].filter.fields[2].field.value: "" -> null
+## audit_not_in_query_filter
+- druid_query: 8 differing values
+    druid_query[0].filter.fields[2].field.fields[0].dimension: "Age" -> "StateName"
+    druid_query[0].filter.fields[2].field.fields[0].type: "in" -> "selector"
+    druid_query[0].filter.fields[2].field.fields[0].value: "<absent>" -> null
+    druid_query[0].filter.fields[2].field.fields[0].values: ["50+"] -> "<absent>"
+    druid_query[0].filter.fields[2].field.fields[1].dimension: "StateName" -> "<absent>"
+    druid_query[0].filter.fields[2].field.fields[1].fields: "<absent>" -> [{"dimension": "Age", "type": "in", "values": ["50+"]}, {"field": {"dimension": "Age", "type": "selector", "value": null}, "type": "not"}]
+## audit_not_selector_calculation_filter
+- druid_query: 14 differing values
+    druid_query[0].aggregations[0].filter.fields[1].field.dimension: "Sex" -> "<absent>"
+    druid_query[0].aggregations[0].filter.fields[1].field.fields: "<absent>" -> [{"dimension": "Sex", "type": "selector", "value": "F"}, {"field": {"dimension": "Sex", "type": "selector", "value": null}, "type": "not"}]
+    druid_query[0].aggregations[0].filter.fields[1].field.type: "selector" -> "and"
+    druid_query[0].aggregations[0].filter.fields[1].field.value: "F" -> "<absent>"
+    druid_query[0].aggregations[1].filter.fields[1].field.dimension: "Sex" -> "<absent>"
+    druid_query[0].aggregations[1].filter.fields[1].field.fields: "<absent>" -> [{"field": {"dimension": "Sex", "type": "selector", "value": null}, "type": "not"}, {"fields": [{"dimension": "Sex", "type": "selector", "value": "F"}, {"field"
+## audit_not_selector_query_filter
+- druid_query: 6 differing values
+    druid_query[0].filter.fields[2].field.fields[0].dimension: "Sex" -> "StateName"
+    druid_query[0].filter.fields[2].field.fields[0].value: "F" -> null
+    druid_query[0].filter.fields[2].field.fields[1].dimension: "StateName" -> "<absent>"
+    druid_query[0].filter.fields[2].field.fields[1].fields: "<absent>" -> [{"dimension": "Sex", "type": "selector", "value": "F"}, {"field": {"dimension": "Sex", "type": "selector", "value": null}, "type": "not"}]
+    druid_query[0].filter.fields[2].field.fields[1].type: "selector" -> "and"
+    druid_query[0].filter.fields[2].field.fields[1].value: "" -> "<absent>"
+## bar_graph_box_plot
+- druid_query: 2 differing values
+    druid_query[0].filter.fields[2].field.fields[0].value: "" -> null
+    druid_query[0].filter.fields[2].field.fields[1].value: "" -> null
+## bar_graph_bubble_chart
+- druid_query: 1 differing values
+    druid_query[0].filter.fields[2].field.value: "" -> null
+## bar_graph_histogram
+- druid_query: 1 differing values
+    druid_query[0].filter.fields[2].field.value: "" -> null
+## bar_graph_sum_by_state_month
+- druid_query: 1 differing values
+    druid_query[0].filter.fields[2].field.value: "" -> null
+## calc_average_over_time
+- druid_query: 1 differing values
+    druid_query[0].filter.fields[2].field.value: "" -> null
+## calc_avg
+- druid_query: 1 differing values
+    druid_query[0].filter.fields[2].field.value: "" -> null
+## calc_complex
+- druid_query: 1 differing values
+    druid_query[0].filter.fields[2].field.value: "" -> null
+## calc_count
+- druid_query: 1 differing values
+    druid_query[0].filter.fields[2].field.value: "" -> null
+## calc_count_distinct_by_state
+- druid_query: 1 differing values
+    druid_query[0].filter.fields[2].field.value: "" -> null
+## calc_formula
+- druid_query: 1 differing values
+    druid_query[0].filter.fields[1].field.value: "" -> null
+## calc_formula_invalid
+- druid_query: 1 differing values
+    druid_query[0].filter.fields[2].field.value: "" -> null
+## calc_formula_with_filter
+- druid_query: 1 differing values
+    druid_query[0].filter.fields[1].field.value: "" -> null
+## calc_last_value
+- druid_query: 1 differing values
+    druid_query[0].filter.fields[2].field.value: "" -> null
+## calc_many_fields
+- druid_query: 1 differing values
+    druid_query[0].filter.fields[1].field.value: "" -> null
+## calc_max
+- druid_query: 1 differing values
+    druid_query[0].filter.fields[2].field.value: "" -> null
+## calc_min
+- druid_query: 1 differing values
+    druid_query[0].filter.fields[2].field.value: "" -> null
+## calc_special_values
+- druid_query: 1 differing values
+    druid_query[0].filter.fields[1].field.value: "" -> null
+## calc_sum_with_dimension_filter
+- druid_query: 1 differing values
+    druid_query[0].filter.fields[3].field.value: "" -> null
+## calc_window
+- druid_query: 2 differing values
+    druid_query[0].filter.fields[2].field.value: "" -> null
+    druid_query[1].filter.fields[2].field.value: "" -> null
+## dq_data_quality_table
+- druid_query: 2 differing values
+    druid_query[0].filter.fields[2].field.fields[0].value: "" -> null
+    druid_query[0].filter.fields[2].field.fields[1].value: "" -> null
+## dq_field_reporting_stats
+- druid_query: 1 differing values
+    druid_query[0].filter.fields[2].field.value: "" -> null
+## dq_outliers_box_plot
+- druid_query: 1 differing values
+    druid_query[0].filter.fields[2].field.value: "" -> null
+## dq_outliers_line_graph
+- druid_query: 1 differing values
+    druid_query[0].filter.fields[2].field.value: "" -> null
+## dq_outliers_table
+- druid_query: 1 differing values
+    druid_query[0].filter.fields[2].field.value: "" -> null
+## dq_reporting_completeness_line_graph
+- druid_query: 1 differing values
+    druid_query[0].filter.fields[2].field.value: "" -> null
+## empty_bar_graph
+- druid_query: 1 differing values
+    druid_query[0].filter.fields[2].field.value: "" -> null
+## empty_hierarchy
+- druid_query: 1 differing values
+    druid_query[0].filter.fields[2].field.value: "" -> null
+## empty_line_graph
+- druid_query: 2 differing values
+    druid_query[0].filter.fields[2].field.value: "" -> null
+    druid_query[1].filter.fields[2].field.value: "" -> null
+## empty_map
+- druid_query: 1 differing values
+    druid_query[0].filter.fields[2].field.value: "" -> null
+## empty_table
+- druid_query: 1 differing values
+    druid_query[0].filter.fields[2].field.value: "" -> null
+## filter_field_in
+- druid_query: 1 differing values
+    druid_query[0].filter.fields[3].field.value: "" -> null
+## filter_in
+- druid_query: 1 differing values
+    druid_query[0].filter.fields[3].field.value: "" -> null
+## filter_nested
+- druid_query: 6 differing values
+    druid_query[0].filter.fields[2].field.fields[0].value: "" -> null
+    druid_query[0].filter.fields[2].field.fields[1].value: "" -> null
+    druid_query[0].filter.fields[3].fields[1].fields[1].field.dimension: "Age" -> "<absent>"
+    druid_query[0].filter.fields[3].fields[1].fields[1].field.fields: "<absent>" -> [{"dimension": "Age", "type": "selector", "value": "15-49"}, {"field": {"dimension": "Age", "type": "selector", "value": null}, "type": "not"}]
+    druid_query[0].filter.fields[3].fields[1].fields[1].field.type: "selector" -> "and"
+    druid_query[0].filter.fields[3].fields[1].fields[1].field.value: "15-49" -> "<absent>"
+## filter_not
+- druid_query: 6 differing values
+    druid_query[0].filter.fields[2].field.fields[0].dimension: "Death" -> "StateName"
+    druid_query[0].filter.fields[2].field.fields[0].value: "1" -> null
+    druid_query[0].filter.fields[2].field.fields[1].dimension: "StateName" -> "<absent>"
+    druid_query[0].filter.fields[2].field.fields[1].fields: "<absent>" -> [{"dimension": "Death", "type": "selector", "value": "1"}, {"field": {"dimension": "Death", "type": "selector", "value": null}, "type": "not"}]
+    druid_query[0].filter.fields[2].field.fields[1].type: "selector" -> "and"
+    druid_query[0].filter.fields[2].field.fields[1].value: "" -> "<absent>"
+## filter_or
+- druid_query: 2 differing values
+    druid_query[0].filter.fields[2].field.fields[0].value: "" -> null
+    druid_query[0].filter.fields[2].field.fields[1].value: "" -> null
+## filter_selector
+- druid_query: 1 differing values
+    druid_query[0].filter.fields[3].field.value: "" -> null
+## group_dimension_include_all
+- druid_query: 1 differing values
+    druid_query[0].filter.fields[1].field.value: "" -> null
+## group_dimension_include_null
+- druid_query: 1 differing values
+    druid_query[0].filter.fields[2].field.value: "" -> null
+## group_granularity_day
+- druid_query: 1 differing values
+    druid_query[0].filter.fields[2].field.value: "" -> null
+## group_granularity_day_of_year
+- druid_query: 1 differing values
+    druid_query[0].filter.fields[2].field.value: "" -> null
+## group_granularity_month_of_year
+- druid_query: 1 differing values
+    druid_query[0].filter.fields[2].field.value: "" -> null
+## group_granularity_quarter
+- druid_query: 1 differing values
+    druid_query[0].filter.fields[2].field.value: "" -> null
+## group_granularity_quarter_of_year
+- druid_query: 1 differing values
+    druid_query[0].filter.fields[2].field.value: "" -> null
+## group_granularity_total
+- druid_query: 1 differing values
+    druid_query[0].filter.fields[2].field.value: "" -> null
+## group_granularity_week
+- druid_query: 1 differing values
+    druid_query[0].filter.fields[2].field.value: "" -> null
+## group_granularity_week_of_year
+- druid_query: 1 differing values
+    druid_query[0].filter.fields[2].field.value: "" -> null
+## group_granularity_year
+- druid_query: 1 differing values
+    druid_query[0].filter.fields[2].field.value: "" -> null
+## group_two_totals
+- druid_query: 3 differing values
+    druid_query[0].filter.fields[2].field.fields[0].value: "" -> null
+    druid_query[0].filter.fields[2].field.fields[1].value: "" -> null
+    druid_query[0].filter.fields[2].field.fields[2].value: "" -> null
+## hierarchy_expando_tree
+- druid_query: 2 differing values
+    druid_query[0].filter.fields[2].field.fields[0].value: "" -> null
+    druid_query[0].filter.fields[2].field.fields[1].value: "" -> null
+## hierarchy_pie_by_sex
+- druid_query: 1 differing values
+    druid_query[0].filter.fields[2].field.value: "" -> null
+## hierarchy_sunburst
+- druid_query: 2 differing values
+    druid_query[0].filter.fields[2].field.fields[0].value: "" -> null
+    druid_query[0].filter.fields[2].field.fields[1].value: "" -> null
+## interval_all_time
+- druid_query: 1 differing values
+    druid_query[0].filter.fields[1].field.value: "" -> null
+## interval_two_ranges
+- druid_query: 1 differing values
+    druid_query[0].filter.fields[1].field.value: "" -> null
+## line_graph_bump_chart_quarter
+- druid_query: 2 differing values
+    druid_query[0].filter.fields[2].field.value: "" -> null
+    druid_query[1].filter.fields[2].field.value: "" -> null
+## line_graph_heat_tiles_week
+- druid_query: 2 differing values
+    druid_query[0].filter.fields[2].field.value: "" -> null
+    druid_query[1].filter.fields[2].field.value: "" -> null
+## line_graph_time_by_state
+- druid_query: 2 differing values
+    druid_query[0].filter.fields[2].field.value: "" -> null
+    druid_query[1].filter.fields[2].field.value: "" -> null
+## map_by_municipality
+- druid_query: 1 differing values
+    druid_query[0].filter.fields[3].field.value: "" -> null
+## map_by_state_month
+- druid_query: 1 differing values
+    druid_query[0].filter.fields[2].field.value: "" -> null
+## policy_all_values
+- druid_query: 1 differing values
+    druid_query[0].filter.fields[2].field.value: "" -> null
+## policy_dq_data_quality_table
+- druid_query: 2 differing values
+    druid_query[0].filter.fields[3].field.fields[0].value: "" -> null
+    druid_query[0].filter.fields[3].field.fields[1].value: "" -> null
+## policy_dq_field_reporting_stats
+- druid_query: 1 differing values
+    druid_query[0].filter.fields[3].field.value: "" -> null
+## policy_dq_outliers_box_plot
+- druid_query: 1 differing values
+    druid_query[0].filter.fields[3].field.value: "" -> null
+## policy_dq_outliers_line_graph
+- druid_query: 1 differing values
+    druid_query[0].filter.fields[3].field.value: "" -> null
+## policy_dq_outliers_table
+- druid_query: 1 differing values
+    druid_query[0].filter.fields[3].field.value: "" -> null
+## policy_dq_reporting_completeness_line_graph
+- druid_query: 1 differing values
+    druid_query[0].filter.fields[3].field.value: "" -> null
+## policy_hierarchy
+- druid_query: 2 differing values
+    druid_query[0].filter.fields[3].field.fields[0].value: "" -> null
+    druid_query[0].filter.fields[3].field.fields[1].value: "" -> null
+## policy_jwt_complex_need
+- druid_query: 1 differing values
+    druid_query[0].filter.fields[4].field.value: "" -> null
+## policy_jwt_exclude_values
+- druid_query: 1 differing values
+    druid_query[0].filter.fields[3].field.value: "" -> null
+## policy_line_graph
+- druid_query: 2 differing values
+    druid_query[0].filter.fields[3].field.value: "" -> null
+    druid_query[1].filter.fields[3].field.value: "" -> null
+## policy_map
+- druid_query: 1 differing values
+    druid_query[0].filter.fields[3].field.value: "" -> null
+## policy_none
+- druid_query: 1 differing values
+    druid_query[0].filter.fields[4].field.value: "" -> null
+## policy_one_state
+- druid_query: 1 differing values
+    druid_query[0].filter.fields[3].field.value: "" -> null
+## policy_source_only
+- druid_query: 1 differing values
+    druid_query[0].filter.fields[4].field.value: "" -> null
+## policy_two_states
+- druid_query: 2 differing values
+    druid_query[0].filter.fields[4].field.fields[0].value: "" -> null
+    druid_query[0].filter.fields[4].field.fields[1].value: "" -> null
+## table_by_state_sex_with_total
+- druid_query: 2 differing values
+    druid_query[0].filter.fields[2].field.fields[0].value: "" -> null
+    druid_query[0].filter.fields[2].field.fields[1].value: "" -> null
+## table_disaggregated
+- druid_query: 1 differing values
+    druid_query[0].filter.fields[2].field.value: "" -> null
+80 cases differ between /tmp/wp8a/out/legacy2 and /tmp/wp8a/out/nojs-head; 0 in Druid rows, body or error, 80 in query text only

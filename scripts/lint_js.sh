@@ -2,7 +2,7 @@
 # Find all JS files that have changed with respect to some other branch or commit,
 # and run eslint on them.
 
-COMMIT=${COMMIT:-master}
+COMMIT=${COMMIT:-main}
 CHANGED_FILES=$(git diff --diff-filter=d --name-only $COMMIT -- '*.js' '*.jsx')
 COMMIT_HASH=$(git rev-parse ${COMMIT})
 

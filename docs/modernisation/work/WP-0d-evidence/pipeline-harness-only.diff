@@ -1,0 +1,37 @@
+--- /proc/self/fd/12	2026-10-04 17:47:30.500309159 +0200
++++ trim/docker/pipeline/Dockerfile.cpython-only	2026-10-04 17:37:05.807558733 +0200
+@@ -29,10 +29,10 @@
+ # Download minio client
+ RUN case $(uname -m) in \
+     "x86_64")\
+-    wget https://dl.minio.io/client/mc/release/linux-amd64/mc -O /usr/local/bin/mc;\
++    touch /usr/local/bin/mc;\
+     ;;\
+     "aarch64")\
+-    wget https://dl.minio.io/client/mc/release/linux-arm64/mc -O /usr/local/bin/mc;\
++    touch /usr/local/bin/mc;\
+     ;;\
+     esac;
+ 
+@@ -120,6 +120,7 @@
+ COPY --chmod=755 --from=downloader /usr/local/bin/mc /usr/local/bin/mc
+ 
+ WORKDIR /zenysis
++ENV PIP_DEFAULT_TIMEOUT=300 PIP_RETRIES=10
+ # Best practice not to use root in Docker containers:
+ # Create a system user 'zenysis', with home directory '/home/zenysis'
+ # -r, --system: Create a system account
+@@ -150,13 +151,9 @@
+ # TODO: Investigate what it would take to have venv happen in a different
+ #       build stage and copy it here. It would result in a leaner, cleaner
+ #       image.
+-RUN pypy3 -m venv venv_pypy3
+ # Install pypy dependencies.
+ # wheel 0.43.0 HAS to be installed prior to installing requirments. If changing version here, also
+ # change in requirements.txt.
+-RUN . venv_pypy3/bin/activate \
+-    && python -m pip install wheel==0.43.0 \
+-    && pypy -m pip install --no-build-isolation --verbose -r requirements.txt -r requirements-pipeline.txt
+ 
+ # Copy only what the pipeline needs.
+ COPY pipeline ./pipeline

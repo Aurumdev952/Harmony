@@ -1,0 +1,74 @@
+{
+  "content_type": "application/json",
+  "headers": [],
+  "id": "query.line_graph",
+  "pinned": {},
+  "response_schema": {
+    "properties": {
+      "data": {
+        "items": {
+          "properties": {
+            "dimensions": {
+              "properties": {
+                "StateName": {
+                  "type": "string"
+                }
+              },
+              "required": [
+                "StateName"
+              ],
+              "type": "object"
+            },
+            "key": {
+              "type": "string"
+            },
+            "timestamp": {
+              "type": "string",
+              "x-format": "date"
+            },
+            "yellow_fever_cases": {
+              "type": "number"
+            }
+          },
+          "required": [
+            "dimensions",
+            "key",
+            "timestamp",
+            "yellow_fever_cases"
+          ],
+          "type": "object"
+        },
+        "type": "array"
+      },
+      "dates": {
+        "items": {
+          "type": "string",
+          "x-format": "date"
+        },
+        "type": "array"
+      },
+      "totals": {
+        "additionalProperties": {
+          "properties": {
+            "yellow_fever_cases": {
+              "type": "number"
+            }
+          },
+          "required": [
+            "yellow_fever_cases"
+          ],
+          "type": "object"
+        },
+        "type": "object"
+      }
+    },
+    "required": [
+      "data",
+      "dates",
+      "totals"
+    ],
+    "type": "object"
+  },
+  "route": "POST /api2/query/line_graph",
+  "status": 200
+}

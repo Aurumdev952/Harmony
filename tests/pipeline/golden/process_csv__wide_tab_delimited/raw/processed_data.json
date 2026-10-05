@@ -1,0 +1,2 @@
+{"key": {"StateName": "Northvale", "MunicipalityName": "Ashford", "Age": "30", "Sex": "F", "Death": "NAO"}, "data": {"demo_malaria_positive": 5, "demo_malaria_tested": 15}, "Real_Date": "2021-05-01", "source": "demo_wide"}
+{"key": {"StateName": "Southmere", "MunicipalityName": "Cedar Point, East", "Age": "5", "Sex": "F", "Death": "NAO"}, "data": {"demo_malaria_positive": 7, "demo_malaria_tested": 7}, "Real_Date": "2021-06-30", "source": "demo_wide"}

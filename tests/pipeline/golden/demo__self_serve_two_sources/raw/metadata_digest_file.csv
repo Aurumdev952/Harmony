@@ -1,0 +1,4 @@
+indicator_id,count,start_date,end_date
+clinic_survey_visits_total,2,2021-09-01,2021-09-02
+clinic_survey_referrals,1,2021-09-01,2021-09-01
+outreach_log_households_reached,2,2021-09-01,2021-09-03

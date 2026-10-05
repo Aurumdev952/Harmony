@@ -1,0 +1,237 @@
+{
+  "content_type": "text/html",
+  "headers": [],
+  "id": "graphql.CreateCalculationIndicatorViewMutation.copy",
+  "pinned": {},
+  "response_schema": {
+    "properties": {
+      "data": {
+        "properties": {
+          "insert_field": {
+            "properties": {
+              "returning": {
+                "items": {
+                  "properties": {
+                    "calculation": {
+                      "properties": {
+                        "type": {
+                          "type": "string"
+                        }
+                      },
+                      "required": [
+                        "type"
+                      ],
+                      "type": "object"
+                    },
+                    "copiedFromFieldId": {
+                      "type": "string"
+                    },
+                    "copied_from_field_id": {
+                      "type": "string"
+                    },
+                    "description": {
+                      "type": "string"
+                    },
+                    "fieldPipelineDatasourceMappings": {
+                      "maxItems": 0,
+                      "type": "array"
+                    },
+                    "field_category_mappings": {
+                      "items": {
+                        "properties": {
+                          "category": {
+                            "properties": {
+                              "childrenCategoryAggregate": {
+                                "properties": {
+                                  "aggregate": {
+                                    "properties": {
+                                      "count": {
+                                        "type": "integer"
+                                      }
+                                    },
+                                    "required": [
+                                      "count"
+                                    ],
+                                    "type": "object"
+                                  }
+                                },
+                                "required": [
+                                  "aggregate"
+                                ],
+                                "type": "object"
+                              },
+                              "fieldCategoryMappingsAggregate": {
+                                "properties": {
+                                  "aggregate": {
+                                    "properties": {
+                                      "count": {
+                                        "type": "integer"
+                                      }
+                                    },
+                                    "required": [
+                                      "count"
+                                    ],
+                                    "type": "object"
+                                  }
+                                },
+                                "required": [
+                                  "aggregate"
+                                ],
+                                "type": "object"
+                              },
+                              "field_category_mappings": {
+                                "items": {
+                                  "properties": {
+                                    "field": {
+                                      "properties": {
+                                        "id": {
+                                          "type": "string"
+                                        }
+                                      },
+                                      "required": [
+                                        "id"
+                                      ],
+                                      "type": "object"
+                                    },
+                                    "id": {
+                                      "type": "string"
+                                    }
+                                  },
+                                  "required": [
+                                    "field",
+                                    "id"
+                                  ],
+                                  "type": "object"
+                                },
+                                "type": "array"
+                              },
+                              "id": {
+                                "type": "string"
+                              }
+                            },
+                            "required": [
+                              "childrenCategoryAggregate",
+                              "fieldCategoryMappingsAggregate",
+                              "field_category_mappings",
+                              "id"
+                            ],
+                            "type": "object"
+                          },
+                          "field": {
+                            "properties": {
+                              "field_category_mappings": {
+                                "items": {
+                                  "properties": {
+                                    "category": {
+                                      "properties": {
+                                        "id": {
+                                          "type": "string"
+                                        }
+                                      },
+                                      "required": [
+                                        "id"
+                                      ],
+                                      "type": "object"
+                                    },
+                                    "id": {
+                                      "type": "string"
+                                    },
+                                    "visibilityStatus": {
+                                      "type": "string"
+                                    }
+                                  },
+                                  "required": [
+                                    "category",
+                                    "id",
+                                    "visibilityStatus"
+                                  ],
+                                  "type": "object"
+                                },
+                                "type": "array"
+                              },
+                              "id": {
+                                "type": "string"
+                              }
+                            },
+                            "required": [
+                              "field_category_mappings",
+                              "id"
+                            ],
+                            "type": "object"
+                          },
+                          "id": {
+                            "type": "string"
+                          }
+                        },
+                        "required": [
+                          "category",
+                          "field",
+                          "id"
+                        ],
+                        "type": "object"
+                      },
+                      "type": "array"
+                    },
+                    "field_dimension_mappings": {
+                      "maxItems": 0,
+                      "type": "array"
+                    },
+                    "id": {
+                      "type": "string"
+                    },
+                    "name": {
+                      "type": "string"
+                    },
+                    "serializedCalculation": {
+                      "properties": {
+                        "type": {
+                          "type": "string"
+                        }
+                      },
+                      "required": [
+                        "type"
+                      ],
+                      "type": "object"
+                    },
+                    "short_name": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "calculation",
+                    "copiedFromFieldId",
+                    "copied_from_field_id",
+                    "description",
+                    "fieldPipelineDatasourceMappings",
+                    "field_category_mappings",
+                    "field_dimension_mappings",
+                    "id",
+                    "name",
+                    "serializedCalculation",
+                    "short_name"
+                  ],
+                  "type": "object"
+                },
+                "type": "array"
+              }
+            },
+            "required": [
+              "returning"
+            ],
+            "type": "object"
+          }
+        },
+        "required": [
+          "insert_field"
+        ],
+        "type": "object"
+      }
+    },
+    "required": [
+      "data"
+    ],
+    "type": "object"
+  },
+  "route": "POST /api/graphql",
+  "status": 200
+}

@@ -1,0 +1,16 @@
+{
+  "description": "Policy: one state (hierarchical) and all sources.",
+  "endpoint": "bar_graph",
+  "policy": {
+    "query_policies": [
+      {
+        "dimension": "StateName",
+        "dimension_value": "Acre"
+      },
+      {
+        "dimension": "source",
+        "dimension_value": null
+      }
+    ]
+  }
+}

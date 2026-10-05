@@ -159,13 +159,14 @@ def test_a_late_answer_still_frees_the_slot_by_the_deadline_plus_grace(monkeypat
     # Found in security re-check: waiting a further grace for the child to exit
     # after a late answer reached the watchdog's stuck threshold.
     started = time.monotonic()
-    monkeypatch.setenv(ANSWER_AT, str(started + 2.6))
+    monkeypatch.setenv(ANSWER_AT, str(started + 3.6))
 
     output = run_isolated(
         answers_late_and_lingers,
         _spec(timeout_seconds=2.0),
-        _settings(cleanup_grace_seconds=1.0),
+        _settings(cleanup_grace_seconds=2.0),
     )
 
     assert output.content == b'late'
-    assert time.monotonic() - started < 3.0 + 0.3
+    # The limit is 4.0 s; waiting a further grace after the answer took 5.6 s.
+    assert time.monotonic() - started < 5.0

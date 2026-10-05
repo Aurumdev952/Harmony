@@ -10,3 +10,4 @@
 - [Config import hook](config_import_hook.md) — alias semantics, PathFinder precedence, __spec__ restore, lazy DATASOURCE
 - [Druid expression aggregator](druid_expression_aggregator.md) — traps replacing extensions with the native expression aggregator (0.23 and 38), LAST_VALUE N3
 - [Settings import boundary](settings_import_boundary.md) — no module-level config.settings import below query_builder; toolchain suite catches it, core suite does not
+- [Alembic migration runs](alembic_migration_runs.md) — cheap env.py runs (stamp on SQLite), full upgrade needs a Druid stub on :8081, flask db current broken

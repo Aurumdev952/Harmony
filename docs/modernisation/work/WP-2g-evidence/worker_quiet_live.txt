@@ -1,0 +1,7 @@
+celery: 10 JSON lines; plain-text lines: 13 while running, 1 on SIGTERM
+     -------------- celery@NHIC-PC-15 v5.4.0 (opalescent)
+    --- ***** ----- 
+    -- ******* ---- Linux-7.0.0-38-generic-x86_64-with-glibc2.39 2026-10-05 18:33:42
+    - *** --- * --- 
+    - ** ---------- [config]
+celery -q: 6 JSON lines; plain-text lines: 0 while running, 1 on SIGTERM

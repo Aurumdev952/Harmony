@@ -5,6 +5,7 @@ import collections
 import concurrent.futures
 import json
 import sys
+import time
 import urllib.request
 
 base, log_path = sys.argv[1], sys.argv[2]
@@ -14,15 +15,16 @@ def call(n):
     headers = {'X-Request-ID': f'client-{n}'} if n % 2 == 0 else {}
     if n % 5 == 0:
         headers = {'X-Request-ID': 'bad id with spaces'}
-    req = urllib.request.Request(f'{base}/work/{n}?token=sekrit{n}', headers=headers)
-    with urllib.request.urlopen(req) as resp:
+    # base is the local gunicorn URL that unit4_run_live.sh passes.
+    url = f'{base}/work/{n}?token=sekrit{n}'
+    req = urllib.request.Request(url, headers=headers)  # noqa: S310
+    with urllib.request.urlopen(req) as resp:  # noqa: S310
         return n, resp.headers['X-Request-ID']
 
 
 with concurrent.futures.ThreadPoolExecutor(20) as pool:
     responses = dict(pool.map(call, range(40)))
 
-import time  # noqa: E402
 
 time.sleep(1)
 entries = [json.loads(line) for line in open(log_path) if line.startswith('{')]

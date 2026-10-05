@@ -43,12 +43,12 @@ REDACTED = '[REDACTED]'
 # quadratic. So each pattern starts only at the start of a run (a lookbehind), and
 # the key pattern scans its run once: Python never backtracks into a lookahead, and
 # the backreference re-matches what the lookahead captured.
-_SECRET_WORD = (
+_SENSITIVE_WORD = (
     r'(?:password|passwd|secret|token|api[_-]?key|access[_-]?key|private[_-]?key'
     r'|authorization)'
 )
 # A whole run of word characters and hyphens that names a secret.
-_SECRET_KEY = r'(?<![\w-])(?=[\w-]*?' + _SECRET_WORD + r')(?=([\w-]+))\2'
+_SENSITIVE_KEY = r'(?<![\w-])(?=[\w-]*?' + _SENSITIVE_WORD + r')(?=([\w-]+))\2'
 _REDACTIONS = (
     # scheme://user:password@host
     (
@@ -60,7 +60,7 @@ _REDACTIONS = (
     # key=value, key: value, 'key': 'value' and "key": "Basic value"
     (
         re.compile(
-            r'(?i)(["\']?' + _SECRET_KEY + r'["\']?\s*[:=]\s*["\']?)'
+            r'(?i)(["\']?' + _SENSITIVE_KEY + r'["\']?\s*[:=]\s*["\']?)'
             r'(?:(?:bearer|basic|digest|token)\s+)?(?!\[REDACTED\])[^\s"\',;&)}\]]+'
         ),
         r'\1' + REDACTED,

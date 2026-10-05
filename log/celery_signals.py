@@ -11,7 +11,7 @@ from celery import signals
 from log import context
 
 _HEADER = 'request_id'
-_TOKEN_ATTRIBUTE = '_log_context_token'
+_CONTEXT_RESET_ATTRIBUTE = '_log_context_token'
 
 
 def connect_celery_logging() -> None:
@@ -47,10 +47,10 @@ def _bind_task_context(task_id: str, task: Any, **_kwargs: Any) -> None:
     # An eager task runs in the caller's context and already has its request id.
     if context.is_well_formed_request_id(request_id):
         fields['request_id'] = request_id
-    setattr(task.request, _TOKEN_ATTRIBUTE, context.bind(**fields))
+    setattr(task.request, _CONTEXT_RESET_ATTRIBUTE, context.bind(**fields))
 
 
 def _reset_task_context(task: Any, **_kwargs: Any) -> None:
-    token = getattr(task.request, _TOKEN_ATTRIBUTE, None)
+    token = getattr(task.request, _CONTEXT_RESET_ATTRIBUTE, None)
     if token is not None:
         context.reset(token)

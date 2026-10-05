@@ -15,12 +15,11 @@ def install_request_logging(app: Any) -> None:
 
 def _loaded_user_id() -> Optional[context.UserId]:
     # pylint: disable=import-outside-toplevel
-    from flask import _request_ctx_stack, has_request_context
+    from flask.globals import _request_ctx_stack
 
-    if not has_request_context():
-        return None
     # Only a user Flask-Login has already loaded, read from the instance dict: a log
     # call must never run the user loader or refresh an expired SQLAlchemy row.
+    # Outside a request, the stack's top is None.
     user = getattr(_request_ctx_stack.top, 'user', None)
     user_id = getattr(user, '__dict__', {}).get('id')
     return user_id if isinstance(user_id, (int, str)) else None

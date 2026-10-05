@@ -9,7 +9,7 @@ HERE="$WT/docs/modernisation/work/WP-2g-evidence"
 REQS=${REQS:-/tmp/reqs.txt}
 OUT=${OUT:-/tmp/wp2g_be_live}
 mkdir -p "$OUT"
-cd "$WT"
+cd "$WT" || exit 1
 PORT=18761
 env LOG_FORMAT=json LOG_STREAM=stdout ZEN_ENV=rw PYTHONPATH="$WT" \
   uv run --no-project -p 3.8 --with-requirements "$REQS" \

@@ -1,7 +1,9 @@
 '''Run web/gunicorn_server.py for real (or the file given as the second argument,
 for the baseline), with create_app stubbed by a tiny Flask app, so gunicorn's own
 config, including logconfig_dict, is what the module sets.'''
+
 import runpy
+import tempfile
 import sys
 import types
 
@@ -13,7 +15,11 @@ def create_app():
 
     from log.flask_request import install_request_logging
 
-    app = Flask('wp2g_backend_live', root_path='/tmp', instance_path='/tmp')
+    app = Flask(
+        'wp2g_backend_live',
+        root_path=tempfile.gettempdir(),
+        instance_path=tempfile.gettempdir(),
+    )
     install_request_logging(app)
 
     @app.route('/ping')

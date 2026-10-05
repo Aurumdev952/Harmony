@@ -1,0 +1,71 @@
+[
+  {
+    "aggregations": [
+      {
+        "aggregator": {
+          "fieldName": "sum",
+          "name": "broken_formula",
+          "type": "doubleSum"
+        },
+        "filter": {
+          "dimension": "field",
+          "type": "selector",
+          "value": "NON_EXISTANT_FIELD"
+        },
+        "type": "filtered"
+      },
+      {
+        "aggregator": {
+          "fieldName": "count",
+          "name": "broken_formula__count",
+          "type": "longSum"
+        },
+        "filter": {
+          "dimension": "field",
+          "type": "selector",
+          "value": "NON_EXISTANT_FIELD"
+        },
+        "type": "filtered"
+      }
+    ],
+    "context": {
+      "resultAsArray": true
+    },
+    "dataSource": "harmony_demo_20260101",
+    "dimensions": [
+      "StateName"
+    ],
+    "filter": {
+      "fields": [
+        {
+          "dimension": "__time",
+          "intervals": [
+            "2024-01-01/2024-04-01"
+          ],
+          "type": "interval"
+        },
+        {
+          "dimension": "field",
+          "type": "selector",
+          "value": "NON_EXISTANT_FIELD"
+        },
+        {
+          "field": {
+            "dimension": "StateName",
+            "type": "selector",
+            "value": ""
+          },
+          "type": "not"
+        }
+      ],
+      "type": "and"
+    },
+    "granularity": "all",
+    "having": null,
+    "intervals": [
+      "2024-01-01/2024-04-01"
+    ],
+    "postAggregations": [],
+    "queryType": "groupBy"
+  }
+]

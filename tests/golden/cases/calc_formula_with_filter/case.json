@@ -1,0 +1,5 @@
+{
+  "description": "FORMULA with its own filter, which wraps every constituent.",
+  "endpoint": "table",
+  "policy": null
+}

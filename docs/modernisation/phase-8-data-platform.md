@@ -20,7 +20,8 @@ Back to [overview](overview.md). Evidence: [02-architecture-deep-dive.md](02-arc
 - **Changes.**
   - Upgrade in steps through the documented upgrade path, testing each step on the demo deployment.
   - Replace the removed GC flags with `-Xlog:gc*`.
-  - Drop ZooKeeper if targeting 38.
+  - ZooKeeper stays (Druid 38 still needs it for leader election and discovery outside Kubernetes; decision 0007), pinned by digest on the internal network.
+  - Decision 0007 constraints: basic-security authentication with credentials from secrets, no published ports, JavaScript off with a permanent test, LAST_VALUE native with the extension deleted, extensions and images pinned, the WP-8a policy probe re-run.
   - Update `druid_setup/` single and cluster configs and the extension versions.
   - pydruid stays for building native queries. Transport already went through `harmony.core.druid` in phase 4c.
 - **Verification.**

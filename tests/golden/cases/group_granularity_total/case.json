@@ -1,0 +1,5 @@
+{
+  "description": "A granularity with a total: it becomes a __time extraction in a subtotalsSpec.",
+  "endpoint": "table",
+  "policy": null
+}

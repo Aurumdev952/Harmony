@@ -1,0 +1,32 @@
+{
+  "data": [
+    {
+      "dimensions": {},
+      "key": "",
+      "timestamp": "2024-01-01",
+      "yellow_fever_cases": 182.64
+    },
+    {
+      "dimensions": {},
+      "key": "",
+      "timestamp": "2024-02-01",
+      "yellow_fever_cases": 210.0
+    },
+    {
+      "dimensions": {},
+      "key": "",
+      "timestamp": "2024-03-01",
+      "yellow_fever_cases": 139.0
+    }
+  ],
+  "dates": [
+    "2024-01-01",
+    "2024-02-01",
+    "2024-03-01"
+  ],
+  "totals": {
+    "": {
+      "yellow_fever_cases": 118.0
+    }
+  }
+}

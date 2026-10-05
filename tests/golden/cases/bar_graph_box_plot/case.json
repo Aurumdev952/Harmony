@@ -1,0 +1,5 @@
+{
+  "description": "BOX_PLOT (BoxPlotQueryEngine): totals unset, state and municipality groups.",
+  "endpoint": "bar_graph",
+  "policy": null
+}

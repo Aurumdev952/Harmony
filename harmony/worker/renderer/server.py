@@ -14,7 +14,7 @@ from collections.abc import Iterator
 from contextlib import contextmanager
 from dataclasses import dataclass
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
-from typing import Any, Callable, Optional
+from typing import Any, Callable, NamedTuple, Optional
 
 from harmony.worker.renderer.errors import OutputTooLarge, RenderError
 from harmony.worker.renderer.spec import RenderSpec, parse_render_request
@@ -57,6 +57,13 @@ class RenderOutput:
 
 
 Render = Callable[[RenderSpec, RendererSettings], RenderOutput]
+
+
+class Reply(NamedTuple):
+    status: int
+    content_type: str
+    body: bytes
+    headers: dict[str, str]
 
 
 class Busy(RenderError):
@@ -154,14 +161,14 @@ def build_server(settings: RendererSettings, render: Render) -> RendererServer:
                 return
             started = time.monotonic()
             entry: dict[str, Any] = {'event': 'render'}
-            status, content_type, body, extra = self._render(entry)
+            reply = self._render(entry)
             entry['duration_ms'] = int((time.monotonic() - started) * 1000)
-            entry['status'] = status
-            extra['Server-Timing'] = f'render;dur={entry["duration_ms"]}'
+            entry['status'] = reply.status
+            reply.headers['Server-Timing'] = f'render;dur={entry["duration_ms"]}'
             LOG.info(json.dumps(entry))
-            self._send(status, content_type, body, extra)
+            self._send(reply.status, reply.content_type, reply.body, reply.headers)
 
-        def _render(self, entry: dict):
+        def _render(self, entry: dict[str, Any]) -> Reply:
             length = self.headers.get('Content-Length')
             if length is None or not (length.isascii() and length.isdecimal()):
                 self.close_connection = True
@@ -187,18 +194,24 @@ def build_server(settings: RendererSettings, render: Render) -> RendererServer:
                 return self._error(500, 'internal', entry)
             entry['bytes'] = len(output.content)
             entry['blocked_hosts'] = sorted(output.blocked_hosts)
-            return 200, CONTENT_TYPES[spec.format], output.content, {}
+            return Reply(200, CONTENT_TYPES[spec.format], output.content, {})
 
         @staticmethod
-        def _error(status: int, code: str, entry: dict):
+        def _error(status: int, code: str, entry: dict[str, Any]) -> Reply:
             entry['error'] = code
             body = json.dumps({'error': code}).encode()
-            return status, 'application/json', body, {}
+            return Reply(status, 'application/json', body, {})
 
         def _send_error(self, status: int, code: str) -> None:
             self._send(status, 'application/json', json.dumps({'error': code}).encode())
 
-        def _send(self, status, content_type, body, extra=None) -> None:
+        def _send(
+            self,
+            status: int,
+            content_type: str,
+            body: bytes,
+            extra: Optional[dict[str, str]] = None,
+        ) -> None:
             self.send_response(status)
             self.send_header('Content-Type', content_type)
             self.send_header('Content-Length', str(len(body)))
@@ -207,7 +220,7 @@ def build_server(settings: RendererSettings, render: Render) -> RendererServer:
             self.end_headers()
             self.wfile.write(body)
 
-        def log_message(self, format, *args) -> None:  # pylint: disable=redefined-builtin
+        def log_message(self, format: str, *args: Any) -> None:  # pylint: disable=redefined-builtin
             # One JSON line per render is logged instead of the access log.
             return
 

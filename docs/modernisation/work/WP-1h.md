@@ -151,6 +151,8 @@ C-5 (session and JWT format, owned by backend). Old: a render token was a plain 
 - [x] infra: add the `render-egress` service, the `render-egress` network, and `RENDERER_EGRESS_PROXY` and `RENDERER_MAP_ORIGINS` on `renderer` (and `depends_on`), from `WP-1h-evidence/infra-request/compose.render-egress.yaml`, with a `tests/infra/test_renderer.py` check that `render-egress` is the only service on both `render` and a network with a route out. Without it the renderer starts with no map origins, and every dashboard with a map fails fast with `egress_blocked`: an INV-1 regression for map exports. So this blocks deploying WP-1h, not merging it. Verified by hand in `WP-1h-evidence/unit-8-maps-egress.md`. Done in 0618f25; see the 2026-10-05 infra log line.
 - [x] infra: in `.github/workflows/renderer.yml`, run `pytest tests/worker/renderer` inside the image just built, on pull requests too, under `--network none`, the seccomp profile, `--cap-drop ALL --cap-add SYS_CHROOT --init --read-only --tmpfs /tmp` (the command is in `unit-8-maps-egress.md`). Today the browser tests (egress fence, sandbox flags, maps) are skipped in every CI suite because the uv 3.9 environment has no Playwright (interrogate, Opus). Blocks nothing. Done in f4c02e2; see the 2026-10-05 infra log line.
 - [ ] human: render a dashboard with a map tile on a staging deployment once `render-egress` is deployed. Agents have no Mapbox access token, so the real Mapbox path is proven only up to the TLS session (unit 8c). Blocks nothing in code.
+- [ ] infra: type-check the renderer against Playwright's real types in CI (reviewer round 1, finding 5). The project lane now runs `harmony/worker` under strict per-module flags, with `playwright.*` as a missing import. Suggested: in `ci/tools313/pyproject.toml` add `playwright==1.63.0` to the lane's dependencies (the Python package only; no browsers are needed to type-check), and add `harmony/worker` to its strict `files`. The command that passes today is `uv run --no-project -p 3.12 --with playwright==1.63.0 --with mypy==1.3.0 mypy --config-file /dev/null --strict --explicit-package-bases --python-version 3.12 harmony/worker`. This blocks nothing in WP-1h.
+- [ ] infra: give `renderer` a restart policy outside prod too (for example `restart: unless-stopped` in `docker-compose.yaml`). Since R2-2, the renderer exits with status 70 when a render slot is stuck past its deadline plus two clean-up grace periods, and only prod's `restart: always` brings it back. This blocks nothing in WP-1h.
 
 ## Follow-ups (recorded, not done here)
 
@@ -230,6 +232,16 @@ C-5 (session and JWT format, owned by backend). Old: a render token was a plain 
   - WP-0i's `test_production_cache_backends_are_told_apart` became two tests of `claim` behind the real flask_caching wrappers;
   - `uv run --locked pytest tests/web tests/worker`: 473 passed, 1 skipped, 1 xfailed;
   - ruff check and format: clean.
+- 2026-10-05 backend-8 R2-5 (reviewer 5): mypy now covers `harmony` (`pyproject.toml` `files`), and `harmony.*` gets mypy's strict flags per module, because mypy takes `strict` only globally. Annotations added:
+  - Playwright's `Page`, `Request`, `Response` and `FloatRect`;
+  - a `Reply` NamedTuple for `Handler._render`;
+  - typed `_send` and `log_message`.
+
+  `_capture` now passes typed screenshot arguments instead of an options dict. `playwright.*` is a missing import in the project lane, and an infra request covers type-checking against Playwright's real types in CI. check:
+  - `uv run --locked mypy` gave 14 errors in 3 files with the new config, then no issues in 528 files;
+  - the strict run on CPython 3.12 with `playwright==1.63.0` (command in the request) found the `clip` dict mismatch, fixed with `FloatRect`, then gave no issues in 10 files;
+  - in-image browser tests: 28 passed;
+  - ruff: clean.
 
 ## Evidence
 

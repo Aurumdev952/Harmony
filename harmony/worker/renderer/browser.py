@@ -27,12 +27,16 @@ host off the list exports as a blank frame.
 
 import asyncio
 import re
+from typing import Optional
 from urllib.parse import urlsplit
 
 from playwright.async_api import Error as PlaywrightError
 from playwright.async_api import (
+    FloatRect,
+    Page,
     ProxySettings,
     Request,
+    Response,
     Route,
     WebSocketRoute,
     async_playwright,
@@ -79,28 +83,33 @@ window.addEventListener('resize', () => {
 '''
 
 
-async def _capture(page, spec: RenderSpec, settings: RendererSettings) -> bytes:
+async def _capture(page: Page, spec: RenderSpec, settings: RendererSettings) -> bytes:
     if spec.format == 'pdf':
         await page.emulate_media(media='screen')
         await page.add_style_tag(content=PDF_CSS)
-        return await page.pdf(
+        pdf: bytes = await page.pdf(
             format=spec.pdf_page_size,
             landscape=spec.pdf_landscape,
             print_background=True,
         )
-    options = {'type': spec.format, 'full_page': spec.full_page}
-    if spec.format == 'jpeg':
-        options['quality'] = 100
+        return pdf
+    clip: Optional[FloatRect] = None
     if spec.full_page:
         height = await page.evaluate('document.documentElement.scrollHeight')
         if height > settings.max_page_height:
-            options['clip'] = {
+            clip = {
                 'x': 0,
                 'y': 0,
                 'width': spec.viewport.width,
                 'height': settings.max_page_height,
             }
-    return await page.screenshot(**options)
+    image: bytes = await page.screenshot(
+        type='jpeg' if spec.format == 'jpeg' else 'png',
+        quality=100 if spec.format == 'jpeg' else None,
+        full_page=spec.full_page,
+        clip=clip,
+    )
+    return image
 
 
 def _host(url: str) -> str:
@@ -132,7 +141,9 @@ def _is_map_url(url: str, settings: RendererSettings) -> bool:
     return origin is not None and origin in {origin_of(m) for m in settings.map_origins}
 
 
-async def _wait_until_ready(page, egress_failed: asyncio.Event, needed, grace) -> None:
+async def _wait_until_ready(
+    page: Page, egress_failed: asyncio.Event, needed: set[str], grace: float
+) -> None:
     '''Waits for the ready signal. Once the page needed something it could not
     get, it has `grace` seconds left, then the render fails.
     '''
@@ -153,7 +164,9 @@ async def _wait_until_ready(page, egress_failed: asyncio.Event, needed, grace) -
             task.cancel()
 
 
-async def _render(spec: RenderSpec, settings: RendererSettings, blocked: set[str]):
+async def _render(
+    spec: RenderSpec, settings: RendererSettings, blocked: set[str]
+) -> bytes:
     origin = settings.allowed_origin
     needed: set[str] = set()
     egress_failed = asyncio.Event()
@@ -184,12 +197,12 @@ async def _render(spec: RenderSpec, settings: RendererSettings, blocked: set[str
         blocked.add(_host(web_socket.url))
         await web_socket.close()
 
-    def map_request_failed(request) -> None:
+    def map_request_failed(request: Request) -> None:
         # The egress proxy refused or could not reach a map origin.
         if _is_map_url(request.url, settings) and request.failure != CANCELLED:
             refused(request)
 
-    def map_response(response) -> None:
+    def map_response(response: Response) -> None:
         # A map style or tile that answers with an error never loads; a 404 is a
         # tile outside the map's coverage, which the map draws without.
         if _is_map_url(response.url, settings) and response.status >= 400:

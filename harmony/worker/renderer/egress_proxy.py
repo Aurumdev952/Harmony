@@ -16,7 +16,7 @@ import selectors
 import socket
 from dataclasses import dataclass
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
-from typing import Optional
+from typing import Any, Optional
 from urllib.parse import urlsplit
 
 from harmony.worker.renderer.egress import origin_of, parse_origins
@@ -229,7 +229,7 @@ def build_proxy(settings: EgressProxySettings) -> ThreadingHTTPServer:
         do_DELETE = _not_a_fetch  # noqa: N815
         do_OPTIONS = _not_a_fetch  # noqa: N815
 
-        def log_message(self, format, *args) -> None:  # pylint: disable=redefined-builtin
+        def log_message(self, format: str, *args: Any) -> None:  # pylint: disable=redefined-builtin
             # One JSON line per decision instead: request lines carry map access
             # tokens in their query strings.
             return

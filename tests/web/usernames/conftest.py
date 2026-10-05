@@ -16,7 +16,7 @@ from flask_jwt_extended import JWTManager
 
 from config.loader import import_configuration_module
 from models.alchemy.user import User
-from tests.web.usernames.accounts import ACCOUNTS, PASSWORD
+from tests.web.usernames.accounts import ACCOUNTS, ACCOUNTS_CREATED, PASSWORD
 from web.server.app_db import create_db
 from web.server.database.setup import initialize_user_manager
 from web.server.security.signal_handlers import install_login_manager_signal_handlers
@@ -115,8 +115,9 @@ def _create_users(db, password_hash):
             connection.execute(
                 sqlalchemy.text(
                     'INSERT INTO "user" (id, username, password, reset_password_token, '
-                    'first_name, last_name, phone_number, status_id) '
-                    "VALUES (:id, :username, :password, :token, 'First', 'Last', '', :status)"
+                    'first_name, last_name, phone_number, status_id, created) '
+                    "VALUES (:id, :username, :password, :token, 'First', 'Last', '', "
+                    ':status, :created)'
                 ),
                 {
                     'id': user_id,
@@ -124,6 +125,7 @@ def _create_users(db, password_hash):
                     'password': password_hash,
                     'status': status,
                     'token': token,
+                    'created': ACCOUNTS_CREATED,
                 },
             )
 

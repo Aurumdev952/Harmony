@@ -1,4 +1,5 @@
 import itertools
+from datetime import datetime, timezone
 from typing import Optional
 from logging import LoggerAdapter
 from uuid import uuid4
@@ -8,6 +9,7 @@ from flask_jwt_extended import (
     get_jwt_identity,
     verify_jwt_in_request_optional,
     get_jwt_claims,
+    get_raw_jwt,
 )
 from flask_user import user_logged_in, user_logged_out, current_user, user_registered
 from flask_potion.signals import before_create, before_update, before_delete
@@ -296,13 +298,29 @@ def api_token_user_id(token_id: str) -> Optional[int]:
     return token.user_id if token and not token.is_revoked else None
 
 
+def issued_before_account(user, issued_at: Optional[int]) -> bool:
+    '''Whether a token issued at `issued_at` (its `iat`) predates `user`'s
+    account, so it was issued to an earlier account with the same username.
+
+    `iat` has whole seconds, so `created` is compared to the second. An account
+    with no `created` (older than the column) is given the benefit of the doubt.
+    '''
+    if user.created is None:
+        return False
+    if issued_at is None:
+        return True
+    issued = datetime.fromtimestamp(issued_at, timezone.utc).replace(tzinfo=None)
+    return issued < user.created.replace(microsecond=0)
+
+
 def install_login_manager_signal_handlers(app, login_manager):
     memoized_api_token_user_id = app.cache.memoize()(api_token_user_id)
 
-    def user_for_token(username, claims):
+    def user_for_token(username, claims, issued_at):
         # The account the token was issued to: an API token's through its row,
         # a session's through its user_id claim since WP-0k. A token with
-        # neither (an older session, a render token) has only its username.
+        # neither (an older session, a render token) has only its username and
+        # the time it was issued.
         if 'id' in claims:
             issued_to = memoized_api_token_user_id(claims['id'])
             if issued_to is None:
@@ -311,6 +329,8 @@ def install_login_manager_signal_handlers(app, login_manager):
             issued_to = claims.get(USER_ID_CLAIM)
         user = find_user_by_username(username)
         if user is None or issued_to not in (None, user.id):
+            return None
+        if issued_to is None and issued_before_account(user, issued_at):
             return None
         return user
 
@@ -329,7 +349,11 @@ def install_login_manager_signal_handlers(app, login_manager):
             pass
 
         auth_email = get_jwt_identity()
-        user = user_for_token(auth_email, get_jwt_claims()) if auth_email else None
+        user = (
+            user_for_token(auth_email, get_jwt_claims(), get_raw_jwt().get('iat'))
+            if auth_email
+            else None
+        )
         if user:
             # NOTE: if we found JWT then we don't need the session
             session.permanent = False

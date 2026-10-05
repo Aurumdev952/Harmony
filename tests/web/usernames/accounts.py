@@ -5,6 +5,8 @@ from models.alchemy.user import UserStatusEnum
 ACTIVE = UserStatusEnum.ACTIVE.value
 PENDING = UserStatusEnum.PENDING.value
 PASSWORD = 'correct horse battery staple 1A!'
+# `user.created` of every account below, in UTC as the database writes it.
+ACCOUNTS_CREATED = '2026-01-01 00:00:00.000000'
 
 # (id, username, status, invitation token). Ids give insertion order, which is
 # what `first()` returned for an ILIKE pattern before WP-0k.

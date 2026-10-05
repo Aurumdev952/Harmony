@@ -5,10 +5,14 @@ named their account only by username. Once an account was deleted (or renamed)
 and another took its username, the old token signed in the new account. A
 session now carries the account id, and an API token is tied to its row's
 `user_id`, even while the app's cache still remembers the deleted token.
+A session minted before WP-0k carries no id, so it signs in only an account
+created no later than the second it was issued.
 """
 
-import pytest
+from datetime import datetime, timedelta, timezone
+
 import sqlalchemy
+from flask_jwt_extended import decode_token
 
 from tests.web.usernames.tokens import (
     api_token,
@@ -29,17 +33,34 @@ def _run(app, sql, **params):
             connection.execute(sqlalchemy.text(sql), params)
 
 
-def _delete_and_recreate(app, username, old_id, new_id):
+def _delete_and_recreate(app, username, old_id, new_id, created=None):
     _run(app, 'DELETE FROM api_token WHERE user_id = :id', id=old_id)
     _run(app, 'DELETE FROM "user" WHERE id = :id', id=old_id)
     _run(
         app,
         'INSERT INTO "user" (id, username, password, reset_password_token, '
-        "first_name, last_name, phone_number, status_id) "
-        "VALUES (:id, :username, '', '', 'New', 'Owner', '', 1)",
+        "first_name, last_name, phone_number, status_id, created) "
+        "VALUES (:id, :username, '', '', 'New', 'Owner', '', 1, :created)",
         id=new_id,
         username=username,
+        # As the database writes it: UTC, with microseconds.
+        created=created or datetime.now(timezone.utc).replace(tzinfo=None),
     )
+
+
+def _set_created(app, user_id, created):
+    _run(
+        app,
+        'UPDATE "user" SET created = :created WHERE id = :id',
+        id=user_id,
+        created=created,
+    )
+
+
+def _issued_at(app, token):
+    with app.app_context():
+        issued_at = decode_token(token)['iat']
+    return datetime.fromtimestamp(issued_at, timezone.utc).replace(tzinfo=None)
 
 
 def _rename(app, user_id, username):
@@ -100,19 +121,51 @@ def test_session_issued_after_a_rename_signs_in_the_renamed_account(app):
     assert signed_in_id(app, login(app, 'john.renamed@moh.gov.rw')) == 1
 
 
-@pytest.mark.parametrize('change', ['recreate', 'rename'])
-def test_session_minted_before_wp0k_still_follows_its_username(app, change):
-    """The residual risk, until a decision on sessions with no account id
-    (WP-0k file, questions for the human)."""
+def test_session_minted_before_wp0k_does_not_sign_in_a_recreated_account(app):
     token = session_token_without_account_id(app, JOHN_DOT_DOE)
     assert signed_in_id(app, token) == 1
 
-    if change == 'recreate':
-        _delete_and_recreate(app, JOHN_DOT_DOE, old_id=1, new_id=12)
-        new_owner = 12
-    else:
-        _rename(app, 1, 'john.doe.old@moh.gov.rw')
-        _rename(app, 3, JOHN_DOT_DOE)
-        new_owner = 3
+    # In the next second at the earliest: `iat` has whole seconds.
+    _delete_and_recreate(
+        app,
+        JOHN_DOT_DOE,
+        old_id=1,
+        new_id=12,
+        created=_issued_at(app, token) + timedelta(seconds=1),
+    )
 
-    assert signed_in_id(app, token) == new_owner
+    assert signed_in_id(app, token) is None
+
+
+def test_session_minted_before_wp0k_signs_in_its_account(app):
+    """Issued in the same second the account was created: `iat` has whole
+    seconds and `created` has microseconds."""
+    token = session_token_without_account_id(app, JOHN_DOT_DOE)
+    _set_created(app, 1, _issued_at(app, token).replace(microsecond=999999))
+
+    assert signed_in_id(app, token) == 1
+
+
+def test_session_minted_before_wp0k_signs_in_an_account_with_no_created_time(app):
+    """Accounts older than the `created` column have none to compare."""
+    token = session_token_without_account_id(app, JOHN_DOT_DOE)
+    _set_created(app, 1, None)
+
+    assert signed_in_id(app, token) == 1
+
+
+def test_session_minted_before_wp0k_is_refused_by_an_account_created_after_it(app):
+    token = session_token_without_account_id(app, JOHN_DOT_DOE)
+    _set_created(app, 1, _issued_at(app, token) + timedelta(seconds=1))
+
+    assert signed_in_id(app, token) is None
+
+
+def test_session_minted_before_wp0k_follows_its_username_to_a_renamed_account(app):
+    """The residual: an account created before the session and renamed to its
+    username after it. `user` records no rename time (WP-0k file, INV-3)."""
+    token = session_token_without_account_id(app, JOHN_DOT_DOE)
+    _rename(app, 1, 'john.doe.old@moh.gov.rw')
+    _rename(app, 3, JOHN_DOT_DOE)
+
+    assert signed_in_id(app, token) == 3

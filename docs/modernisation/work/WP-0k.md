@@ -4,6 +4,9 @@ title: "Build outgoing links from the configured origin; match usernames exactly
 status: review
 owner_role: "backend"
 instances:
+  - name: "lead-1"
+    files:
+      - scripts/create_user.py
   - name: "backend-0k"
     files:
       - web/server/util/deployment_links.py
@@ -161,7 +164,7 @@ Security asks the human to accept:
   - (d) new, U-1: a look-alike account (`<x>_doe` beside `<x>.doe`) signing in through `POST /api2/authentication/login` gets the older account today, and its own after;
   - (e) new, D-1 to D-3: a deactivated account's password login (200 today, 400 `invalid_login_credentials` after), header login and earlier API token (200 today, 401 after).
   - The never-used-token control stays 401.
-- [ ] lead: `scripts/create_user.py` still looks usernames up with `ILIKE` (`-o john_doe@…` overwrites `john.doe@…`). The change and its check are in `WP-0k-evidence/requests/create_user.md`; the tests are strict xfails until it lands.
+- [x] lead: `scripts/create_user.py` still looks usernames up with `ILIKE` (`-o john_doe@…` overwrites `john.doe@…`). The change and its check are in `WP-0k-evidence/requests/create_user.md`. Done by the lead on 2026-10-05: the script finds the account with `find_user_by_username` and refuses a username another account equals ignoring case; the two strict xfails became passes (test_account_targets.py 9 passed); ruff and the 3.8 compile clean.
 - [ ] core (optional, not blocking): a migration giving `user.created` a server default, and making it `timestamptz` (`USING created AT TIME ZONE current_setting('TimeZone')`), so rows written outside the ORM are checked and a `TimeZone` change cannot shift T-3. `signal_handlers.database_time_from_epoch` then becomes `to_timestamp(iat)`.
 - [ ] infra (optional): run `tests/web/usernames -m stack` in a CI job with docker, or split a `postgres` marker from `stack`.
 - [ ] lead: land WP-0i, then WP-0j and WP-0k together (section "Merging with WP-0j"). The merge applies `WP-0k-evidence/merge-with-0j/privilege_escalation.patch`.

@@ -149,15 +149,6 @@ def fixture_create_user(app):
     return run
 
 
-# scripts/create_user.py belongs to the lead. The change is requested in the
-# WP-0k file (WP-0k-evidence/requests/create_user.md). Strict, so these fail
-# once it lands, and the marks go with it.
-PENDING_SCRIPT_CHANGE = pytest.mark.xfail(
-    strict=True, reason='scripts/create_user.py still looks usernames up with ILIKE'
-)
-
-
-@PENDING_SCRIPT_CHANGE
 def test_create_user_script_overwrites_only_the_exact_account(app, create_user):
     create_user('john_doe@moh.gov.rw', overwrite=True)
 
@@ -165,9 +156,7 @@ def test_create_user_script_overwrites_only_the_exact_account(app, create_user):
     assert _column(app, 2, 'first_name') == 'Script'
 
 
-@pytest.mark.parametrize(
-    'overwrite', [pytest.param(True, marks=PENDING_SCRIPT_CHANGE), False]
-)
+@pytest.mark.parametrize('overwrite', [True, False])
 def test_create_user_script_refuses_a_username_two_accounts_equal(
     app, create_user, overwrite
 ):

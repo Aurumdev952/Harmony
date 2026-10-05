@@ -13,6 +13,7 @@ from models.alchemy.user import User, UserRoles, UserStatusEnum
 from util.credentials.generate import generate_secure_password
 from util.credentials.provider import CredentialProvider
 from web.server.data.data_access import Transaction
+from web.server.security.usernames import find_user_by_username, username_taken
 from web.server.configuration.instance import load_instance_configuration_from_file
 
 # Imported for their side effect: the `User` model's relationships name these
@@ -102,7 +103,18 @@ def create_user(
 
     hashed_password = hash_password(plaintext_password)
 
-    existing_user = transaction.find_one_by_fields(User, False, {'username': username})
+    # Equality ignoring case, never a LIKE pattern: `-o john_doe@…` must not
+    # overwrite `john.doe@…`. A username two accounts equal, neither exactly,
+    # names none of them, and a new account may not add a third.
+    session = transaction.run_raw()
+    existing_user = find_user_by_username(username, session)
+    if not existing_user and username_taken(username, session):
+        message = (
+            'Another account has username \'%s\' in another case. '
+            'Use its exact username.' % username
+        )
+        LOG.error(message)
+        raise ValueError(message)
 
     if existing_user and overwrite_user:
         LOG.info('User \'%s\' already exists but will be overwritten.', username)

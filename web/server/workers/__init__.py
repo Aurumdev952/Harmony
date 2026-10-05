@@ -5,7 +5,6 @@ from celery.signals import worker_process_init
 from flask import current_app as flask_app
 from sqlalchemy import create_engine
 
-import config as zen_config
 from log.celery_signals import connect_celery_logging
 from web.server.configuration.celery import CeleryConfig
 from web.server.configuration.instance import load_instance_configuration_from_file
@@ -43,14 +42,12 @@ def create_celery(instance_configuration: Optional[Dict[str, Any]] = None) -> Ce
     instance_configuration = (
         instance_configuration or load_instance_configuration_from_file()
     )
-    config = CeleryConfig()
-
     with CredentialProvider(instance_configuration) as provider:
-        config.SQLALCHEMY_DATABASE_URI = provider.get('SQLALCHEMY_DATABASE_URI')
+        database_uri = provider.get('SQLALCHEMY_DATABASE_URI')
 
     # NOTE: there's no need in engine any more, flask_app can be used instead
     engine = create_engine(
-        config.SQLALCHEMY_DATABASE_URI,
+        database_uri,
         pool_size=2,
         max_overflow=0,
         connect_args={'application_name': 'worker'},

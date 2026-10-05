@@ -25,7 +25,9 @@ WORKER_TIMEOUT_ENV_VAR = 'ZEN_GUNICORN_WORKER_TIMEOUT'
 LISTEN_ADDRESS_ENV_VAR = 'ZEN_GUNICORN_LISTEN_ADDRESS'
 LISTEN_PORT_ENV_VAR = 'ZEN_GUNICORN_LISTEN_PORT'
 
-DEFAULT_LISTEN_ADDRESS = '0.0.0.0'
+# Inside the container nginx reaches gunicorn over the Compose network, so it
+# listens on every interface; Compose publishes no port for it in production.
+DEFAULT_LISTEN_ADDRESS = '0.0.0.0'  # noqa: S104
 DEFAULT_LISTEN_PORT = 5000
 DEFAULT_WORKER_THREAD_COUNT = cpu_count()
 DEFAULT_WORKER_TIMEOUT = 60
@@ -110,7 +112,7 @@ def main() -> None:
         type=str,
         required=False,
         default=os.getenv('GUNICORN_WORKER_CLASS', 'gevent'),
-        help=(('The type of workers to use. Defaults to "gevent"')),
+        help=('The type of workers to use. Defaults to "gevent"'),
     )
     parser.add_argument(
         '-t',

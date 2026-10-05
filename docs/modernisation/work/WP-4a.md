@@ -18,7 +18,22 @@ instances:
       - pyproject.toml
       - uv.lock
       - docs/modernisation/work/WP-4a.md
+  - name: "infra-4a"
+    branch: "mig/WP-4a-settings-loading-infra"
+    files:
+      - docker/web/Dockerfile_web-server
+      - docker/pipeline/Dockerfile
+      - requirements.txt
+      - requirements-web.txt
+      - requirements-pipeline.txt
+      - requirements-dev.txt
+      - tests/infra/test_dockerfiles.py
+  - name: "lead-1"
+    branch: "mig/WP-4a-settings-loading"
+    files:
+      - harmony/__init__.py
 branch: "mig/WP-4a-settings-loading"
+# BE-2 is partial here: see "BE-2 status" under Scope.
 requirements: [BE-1, BE-2, SEC-3, INV-1, INV-2, INV-3]
 contracts_consumed: []
 contracts_changed: []
@@ -52,6 +67,26 @@ Units, in order. Each line names the change and the check that ends it.
   - WP-1h (`mig/WP-1h-export-renderer-core`) deletes `RENDERBOT_EMAIL` and `URLBOX_API_KEY` from `config/settings.py` and reads `RENDERER_URL` / `RENDER_WEB_ORIGIN` through `settings.getenv`. `Settings` gets neither removed name. The facade keeps the two legacy `getenv` lines verbatim until WP-1h deletes them, because `page_renderer.py` on `mig/integration` still reads them.
   - WP-2g's `LOG_FORMAT` and `LOG_LEVEL` stay read by `log/` (infra), which configures logging before settings load so that a settings failure can be logged. `Settings` does not define them.
 
+### BE-2 status: partial
+
+This WP moves `config.settings` and the core-owned deployment modules onto `harmony.core.settings`, and the deployment modules do no I/O at import. Other environment reads remain outside `Settings`. Each is listed with the WP that moves it (the lead adds BE-2 to those SPEC rows):
+
+| Read | Variables | Target WP |
+|---|---|---|
+| `web/server/configuration/celery.py:13-16` | `REDIS_HOST`, `BROKER_URL` | 4f / 5a |
+| `web/server/configuration/redis_connection.py:10-23` | `REDIS_PASSWORD`, `REDIS_HOST` | 4f / 5a |
+| `web/server/configuration/flask.py:144-159` | `EMAIL_*`, `MAILGUN_SMTP_ACCOUNT_ID`, `TWILIO_*` | 4f / 5a |
+| `web/server/configuration/flask.py:193-197` | `HASURA_HOST`, `HASURA_ADMIN_SECRET` | 4f / 5a |
+| `web/server/configuration/flask.py` (other `getenv` lines: 57, 60, 75, 79, 177, 186) | `ZEN_ENV`, `DATABASE_URL`, `SEND_FILE_MAX_AGE_DEFAULT`, `MAX_CONTENT_LENGTH`, `REDIS_HOST` and the rest of `FlaskConfiguration` | 4f / 5a |
+| `web/server/environment.py:4-12` | `ZEN_PROD`, `ZEN_TEST`, `ZEN_OFFLINE`, `SEND_EMAILS`, `BUILD_TAG` | 4f / 5a |
+| `web/server/app_druid.py:24` | `DRUID_HOST` (overrides `druid.DRUID_HOST`) | 4f / 5a |
+| `util/dataprep/api.py:40,68` | `ZEN_ENV`, `DATAPREP_API_TOKEN` | 4c |
+| `util/credentials/provider.py:8` | any key the provider is asked for | 4c |
+| `util/druid.py:12-13`, `db/druid/config.py:52` (`guess_druid_host`) | `DRUID_USERNAME`, `DRUID_PASSWORD`, `DRUID_PRIVATE_KEY_PATH`, `DRUID_HOST` | 4c |
+| `db/postgres/common.py:19,26,93`, `util/flask.py:22-29` | `DATABASE_URL`, `SQLALCHEMY_DATABASE_URI`, `POSTGRES_USER`, `POSTGRES_HOST` (and the runtime write of `DATABASE_URL`) | 4b |
+| `config/__init__.py`, `config/loader.py` | `ZEN_ENV` (the import hook runs before settings load) | 4f |
+| `log/` | `LOG_FORMAT`, `LOG_LEVEL` (logging is configured before settings load) | stays in `log/` (infra), by design |
+
 ## Contract changes
 
 None. C-1 (`AppContext`) arrives in WP-4f and will hold `Settings` and `Deployment`.
@@ -61,6 +96,9 @@ None. C-1 (`AppContext`) arrives in WP-4f and will hold `Settings` and `Deployme
 - [x] infra: run `make requirements` on this branch (or in WP-3b) so `requirements.txt` picks up `pydantic==2.10.6` and `pydantic-settings==2.8.1`, `requirements-web.txt` and `requirements-pipeline.txt` pick up `typing_extensions==4.12.2`, and `requirements-dev.txt` picks up `import-linter==2.5.2` and `grimp==3.13` (unit 5). The images install from those files, and CI's sync check fails until they match `pyproject.toml`. Blocks merge (INV-1, INV-8), not the build units.
 - [x] infra: add `COPY harmony harmony` to `docker/web/Dockerfile_web-server` (next to `COPY config config`) and `COPY harmony ./harmony` to `docker/pipeline/Dockerfile` (next to `COPY config ./config`). Both images copy an explicit list of top-level directories, and `config/__init__.py` and `config/settings.py` now import `harmony.core`. Without this, the web server, the worker and every pipeline step fail at `import config` with `ModuleNotFoundError: harmony`. The dev image mounts the repo (`.:/app`) and needs nothing. Blocks merge (INV-1).
 - [ ] lead: merging with WP-1h conflicts on the last lines of `config/settings.py`. WP-1h deletes `RENDERBOT_EMAIL` and `URLBOX_API_KEY`, and this WP changed the `DRUID_HOST` line above them. Resolve by keeping this branch's file without those two lines. `tests/core/test_settings_facade.py` passes either way, and WP-1h's `tests/core/test_settings_render.py` passes on the result (simulated, see Evidence).
+
+- [ ] infra: in `docker/pipeline/Dockerfile`, put the removal note on the `pypy-wheels` stage's own comment: delete the stage, its `--find-links` use and the drift test when PyPy leaves the image (WP-3b, or WP-8d if first). In `tests/infra/test_dockerfiles.py`, make the drift test assert that the stage exists exactly while the Dockerfile creates `venv_pypy3`, so removing PyPy without removing the stage, or the reverse, fails. Reviewer finding (low); does not block review.
+- [ ] lead: `task_gate.py` still reports `harmony/__init__.py (owner: lead)` under "files outside the owner role". Its `ROLES` pattern (`scripts/agents/task_gate.py:65`) has no `lead`, so the `lead-1` instance clears the SPEC 7.2 claim check but not the role check. Either add `lead` to the gate's roles or accept this line when closing.
 
 ## Log
 
@@ -76,7 +114,7 @@ None. C-1 (`AppContext`) arrives in WP-4f and will hold `Settings` and `Deployme
   check: `tests/core/test_core_deployment.py` failed at collection first, then 13 passed. `harmony_demo` and `template` load with socket connect, `getaddrinfo` and `create_connection` refused. Each field is the same object that the legacy `__import__(..., fromlist=...)` loader returned and that the `config.<name>` alias resolves to. Bad codes are refused. All 8 CI suites green.
 - 2026-10-05 core-4a unit 5 `48ee251`: import-linter 2.5.2 (dev group) with a forbidden contract in `pyproject.toml`: `harmony.core` must not import `flask`, `fastapi` or `starlette`. The graph includes the legacy packages (`config`, `data`, `db`, `log`, `models`, `util`, `web`), so an import path through them also counts (872 files, 0.4 s). check: `tests/core/test_core_boundaries.py` 6 passed. The contract is KEPT on the tree. It is BROKEN on a copy of `harmony/core` that adds `import flask`, `from flask import current_app`, `from fastapi import FastAPI` or `import starlette.requests`, and on one that adds `from web.server import app_base` (transitive). `uv lock --check` clean.
 - 2026-10-05 core-4a unit 6 `9e9aab9`: invariant runs (see Evidence). The parity test now ignores `RENDERBOT_EMAIL` and `URLBOX_API_KEY` on both sides, so it passes before and after WP-1h merges. Status set to review.
-- 2026-10-05 infra (branch `mig/WP-4a-settings-loading-infra`) `429a2b1`: both infra requests done.
+- 2026-10-05 infra-4a (branch `mig/WP-4a-settings-loading-infra`) `429a2b1`: both infra requests done.
   - **Images copy `harmony`.** `COPY harmony harmony` in `docker/web/Dockerfile_web-server` and `COPY harmony ./harmony` in `docker/pipeline/Dockerfile`, next to `config`. A new test in `tests/infra/test_dockerfiles.py` walks the module-level imports from every file under `config/` and fails when a Python image does not copy a package they reach. It failed first on both images, naming only `harmony`. The reached set is `config data db harmony log models util web`.
   - **`make requirements`.** `requirements.txt` gains `pydantic==2.10.6` and `pydantic-settings==2.8.1`. `requirements-web.txt` and `requirements-pipeline.txt` move to `typing_extensions==4.12.2`. `requirements-dev.txt` gains `import-linter==2.5.2`. `grimp` is transitive, so it stays in `uv.lock` only, like every other transitive dependency. Before this, `tests/infra/test_requirements_export.py::test_committed_requirements_match_pyproject` failed. It passes now, and `uv lock --check` is clean.
   - **The new pins broke the PyPy pipeline image (fixed).** Jammy's `pypy3` is 7.3.9, which is Python 3.8. pydantic-core 2.27.2 has PyPy wheels only for 3.9 and 3.10. pip therefore took the sdist, which needs maturin and Rust, and the build stopped at `ModuleNotFoundError: No module named 'maturin'`. The local PyPy 3.8 run in unit 1 passed only because uv compiled the sdist with the host's cargo. The fix is a `pypy-wheels` stage that builds the pp38 wheel with Rust 1.83 (`rust:1.83.0-slim-bookworm`, pinned by digest) and maturin 1.8.1. The PyPy install then uses it through `--find-links`. Rust stays out of the runtime image. A test pins the stage's `PYDANTIC_CORE_VERSION` to the `uv.lock` version. Old numpy (1.15.4) still builds on PyPy.
@@ -90,6 +128,15 @@ None. C-1 (`AppContext`) arrives in WP-4f and will hold `Settings` and `Deployme
   - **Not run:** a dev image build and `make up DEV=1` (the dev image installs the same files on CPython 3.9 and PyPy 3.9, which have wheels). QA's stack smoke covers the gunicorn path.
   - **Pre-existing, not caused by this WP:** the pipeline image has no `requirements-web.txt`, so `web.server.app` (and `flask_jwt_extended`) cannot be imported there. `web.server.app_base` can be.
 - 2026-10-05 core-4a: fast-forwarded to infra's `314496e`, then merged `mig/integration` at `1c8578e` (merge `a9a8436`): ruff now targets py38, plus decisions 0005/0006. The merge was clean; WP-1h is not on integration yet, so `config/settings.py` did not conflict. Invariant runs repeated on the merge (see Evidence, "After the infra and integration merge"). Status stays review.
+- 2026-10-05 core-4a review round 1 (reviewer changes-requested at `9775724`):
+  - **(1) BE-1 blind spot.** The lead committed `harmony/__init__.py` (`256464a`), and `root_packages` now starts with `harmony` (`1409450`). New test `test_contract_breaks_on_an_import_through_a_sibling_harmony_package`: a core module imports `harmony.api.router`, which imports `fastapi`. It reported KEPT before the change (red, as the reviewer found) and BROKEN after. The boundary tests copy the whole `harmony` tree. 7 passed.
+  - **(2)** Front matter gains an `infra-4a` instance (the two Dockerfiles, four requirements files, `tests/infra/test_dockerfiles.py`) and a `lead-1` instance (`harmony/__init__.py`). The infra log line is renamed to `infra-4a`.
+  - **(3)** BE-2 is marked partial, with every remaining environment read and its target WP (Scope, "BE-2 status").
+  - **(4), (5)** Notes for WP-4f: deployment-module constants, facade removal, and why `setting()` stays.
+  - **(6)** Deleted the dead `get_configuration_module` from `config/loader.py`, the only `flask` import under `config/` (`1f93aab`).
+  - **(7)** Request to infra for the Dockerfile comment and the drift-test tie to `venv_pypy3`.
+  - **(8)** `test_refuses_a_missing_druid_host_without_exposing_the_key` pins the exact message and no `__cause__`/`__context__` for a real key plus a missing `DRUID_HOST` (`1f93aab`). Import cost recorded as difference 6.
+  - check: Evidence, "After review round 1".
 
 ### Recorded differences (INV-1, for reviewer acceptance)
 
@@ -104,11 +151,18 @@ No query result or authorisation decision changes: golden shows 0 drift, and no 
    - A deployment missing one of the 11 modules now fails at load instead of at first attribute access. No in-tree deployment lacks one.
    - `config.<code>.calculated_indicator_defs` is no longer an attribute. Nothing read it, and `calculated_indicators` still imports it.
 5. **Log records.** For the four optional settings and the two deployment-module settings, the record now names `setting` as its function instead of `getenv` (`settings.py:setting:NN`). Level and message are unchanged.
+6. **Import cost.** Every process that imports `config` now imports pydantic and pydantic-settings, which pull in `ssl` and `asyncio`.
+   - Measured (7 fresh interpreters, import `harmony.core.settings` plus `get_settings()`): CPython 3.9 median 118 ms (114-137); PyPy 3.8 median 290 ms (281-474). The reviewer measured 0.3-0.65 s on PyPy.
+   - This is paid once per process. The web workers import it after gevent's early monkey-patch, so `ssl` is already patched. Celery uses prefork, so the parent imports it once before forking.
+   - It does not affect query paths.
 
 ### Notes for later WPs
 
 - The phase file lists a `calendar` module for `Deployment`. There is none: calendar settings are `aggregation.CALENDAR_SETTINGS`.
 - `ZEN_ENV` stays a call-time read in `config/__init__.py` and in `config.loader`. The import hook runs before settings can load, and scripts import `config` without secrets. WP-4f should build `AppContext.deployment` from an explicit code.
+- **WP-4f: deployment modules read the process-wide settings.** `config/<code>/druid.py` (`DRUID_HOST`), `general.py` (`SUPPORT_EMAIL`, `OBJECT_STORAGE_ALIAS`) and `ui.py` (`MAPBOX_ACCESS_TOKEN`) copy values from `get_settings()` when they are imported. An `AppContext` built from an explicit `Settings` (a test, or a `model_validate` override) can therefore disagree with its `Deployment`, which holds whatever the process settings were at first import. WP-4c moves the readers of `druid.DRUID_HOST` onto `Settings.DRUID_HOST`. WP-4f moves the readers of `general.SUPPORT_EMAIL`, `general.OBJECT_STORAGE_ALIAS` and `ui.MAPBOX_ACCESS_TOKEN` onto the context's `Settings` fields, then deletes those four module constants.
+- **Removing the facade: WP-4f (proposed).** WP-4f moves the last `config.settings` readers onto `AppContext.settings`. It then deletes `config/settings.py`, `tests/core/legacy/config_settings_ea33d9d.py` and `tests/core/test_settings_facade.py` together. `tests/core/test_settings_secret_key.py` moves its import to `harmony.core.settings` at the same time.
+- **`setting(name)` stays in the facade, not in `harmony.core.settings`.** It exists only to keep the legacy warning ("Environment variable X not set") on the legacy logger. That logger is `log.LOG`, and `log/log.py` imports `web.server.environment` and runs `dictConfig` at import, so `harmony.core` must not import it (BE-1 and no-I/O-at-import). The helper is also a string-keyed lookup, which typed `Settings` readers make unnecessary. Its readers are the facade and the four deployment-module constants above, so WP-4f deletes it with them.
 - **WP-3b removal item.** Remove the pipeline image's `pypy-wheels` build stage when the images move to CPython 3.13. That covers the Rust 1.83 base pinned by digest, maturin 1.8.1, the `--find-links` install of the pp38 pydantic-core wheel, and the version-drift test that ties the stage's `PYDANTIC_CORE_VERSION` to `uv.lock` (in `tests/infra/test_dockerfiles.py`). The stage exists only because pydantic-core 2.27.2 has no PyPy 3.8 wheel and Jammy's `pypy3` is 7.3.9 (Python 3.8). If PyPy goes first (WP-8d), it can go then.
 - `tests/authz` does not exist on this base (`mig/integration` at `8638861`). So INV-3 rests on two facts: no authorisation code changed, and `tests/web` (95 tests, including the JWT and render-route guards) passes unchanged.
 
@@ -141,6 +195,19 @@ All results are on head `9e9aab9` unless stated. The base for comparisons is `ea
 - **Golden:** `record.py --check` reports "85 cases, 0 fixture files would change".
 - **Lint and types:** `ruff check --select E9,F63,F7,F82 .` passes, and `ruff check` / `ruff format --check` pass on the WP's 15 changed Python files under the new py38 target. `mypy` reports "no issues found in 520 source files". `lint-imports --no-cache` reports "1 kept, 0 broken". `uv lock --check` is clean.
 - **Startup digest:** same script, same base tree. The diff against `ea33d9d` is still only `zen_config_type` (`module` before, `Deployment` after). Routes (314), renderer modules, locales and the query-data digest are identical.
+
+### After review round 1 (code head `1409450`)
+
+- **CI suites:** all 8 passed: core 104, druid 1, druid_setup 79, golden 269, graphql 22, pipeline 129 + 1 skipped, toolchain 10, web 95. The infra lane passed 164.
+- **Golden:** `record.py --check` reports "85 cases, 0 fixture files would change".
+- **Lint and types:**
+  - `ruff check --select E9,F63,F7,F82 .` passes, and `ruff check` / `ruff format --check` pass on the WP's 16 changed Python files.
+  - `mypy` reports "no issues found in 520 source files".
+  - `lint-imports --no-cache` reports "Analyzed 873 files", "1 kept, 0 broken".
+  - `uv lock --check` is clean.
+- **Startup digest:** the diff against `ea33d9d` is still only `zen_config_type`.
+- **Import cost:** see difference 6. Script: 7 fresh interpreters per runtime timing `from harmony.core.settings import get_settings; get_settings()`.
+- **Gate:** `task_gate.py WP-4a` reports only the status, the verdicts, and `harmony/__init__.py (owner: lead)` (see the lead request on the gate's `ROLES`).
 
 ## Verdicts
 

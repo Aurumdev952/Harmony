@@ -682,3 +682,33 @@ def test_builds_use_the_default_network_unless_perf_build_network_is_set(
     assert result.returncode == 0, result.stderr
     assert len(builds) == 2
     assert all(' --network host ' in f' {b} ' for b in builds)
+
+
+def _image_tag(tree: Path) -> str:
+    result = subprocess.run(
+        ['bash', '-c', f'source {STACK_SH}\nimage_tag {tree}\n'],
+        capture_output=True,
+        text=True,
+        check=True,
+    )
+    return result.stdout.strip()
+
+
+def test_the_image_tag_follows_pyproject_and_uv_lock_when_present(tmp_path: Path):
+    # Since WP-2f the requirements files are exported from pyproject.toml and
+    # uv.lock; a lock change that misses the export must still rebuild.
+    (tmp_path / 'docker/web').mkdir(parents=True)
+    for name in ('requirements.txt', 'requirements-web.txt'):
+        (tmp_path / name).write_text('flask==1.0.1\n')
+    (tmp_path / 'docker/web/Dockerfile_web-server').write_text('FROM python\n')
+    without_lock = _image_tag(tmp_path)
+    (tmp_path / 'pyproject.toml').write_text('[project]\n')
+    (tmp_path / 'uv.lock').write_text('version = 1\n')
+    with_lock = _image_tag(tmp_path)
+    (tmp_path / 'uv.lock').write_text('version = 2\n')
+    lock_changed = _image_tag(tmp_path)
+    (tmp_path / 'pyproject.toml').write_text('[project]\nname = "x"\n')
+    pyproject_changed = _image_tag(tmp_path)
+    tags = [without_lock, with_lock, lock_changed, pyproject_changed]
+    assert all(len(tag) == 12 for tag in tags)
+    assert len(set(tags)) == 4

@@ -120,10 +120,19 @@ placeholder_env() {
   done
 }
 
-# image_tag <repo root>: the web image's inputs from that tree.
+# image_tag <repo root>: the web image's inputs from that tree. Since WP-2f the
+# requirements files are exported from pyproject.toml and uv.lock, so those
+# count too where the tree has them: a lock change the export missed still
+# rebuilds.
 image_tag() {
-  cat "$1/requirements.txt" "$1/requirements-web.txt" \
-    "$1/docker/web/Dockerfile_web-server" "${HERE}/stack/Dockerfile" | sha256sum | cut -c1-12
+  local inputs=("$1/requirements.txt" "$1/requirements-web.txt"
+    "$1/docker/web/Dockerfile_web-server" "${HERE}/stack/Dockerfile") name
+  for name in pyproject.toml uv.lock; do
+    if [[ -f "$1/${name}" ]]; then
+      inputs+=("$1/${name}")
+    fi
+  done
+  cat "${inputs[@]}" | sha256sum | cut -c1-12
 }
 
 # build_image <repo root>: build the web image of that tree; prints its name.

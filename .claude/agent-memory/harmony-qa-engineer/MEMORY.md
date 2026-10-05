@@ -4,3 +4,4 @@
 - [Golden suite harness](golden-suite-harness.md) — offline bootstrap of the legacy query engine, hash-seed traps, mutation-check approach
 - [Golden contract vs layout](golden_contract_vs_layout.md) — goldens guarding a rewrite: store-level contract layer, typed round-trip test, consumed files are contract
 - [Perf stack on real Druid](perf_stack_real_druid.md) — WP-1a stack traps: loader race, reboots, secrets, shared-host load breaking the 10% p95 gate
+- [Paired perf statistics](perf_paired_statistics.md) — why PERF-7 judges p95 and per-round median ratios; power and small-n bootstrap traps

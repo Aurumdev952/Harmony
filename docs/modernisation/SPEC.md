@@ -1,6 +1,6 @@
 # Harmony modernisation specification
 
-Version 1.6, 2026-10-05 (decisions 0001, 0003, 0004, 0005, 0006). Status: approved for execution.
+Version 1.7, 2026-10-05 (decisions 0001, 0003, 0004, 0005, 0006, 0007). Status: approved for execution.
 
 This is the binding guide for every agent and engineer working on the Harmony migration. Where this spec and another document disagree, this spec wins. The other documents explain why and describe the work in detail:
 

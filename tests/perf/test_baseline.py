@@ -528,6 +528,23 @@ def test_a_uniform_fifteen_percent_slowdown_fails_every_case_on_a_loaded_host():
         assert result.regressed, result
 
 
+def test_a_median_ratio_over_the_limit_inside_the_noise_does_not_fail():
+    # Per-round ratios spread wide: 16 of 30 rounds at 1.5, 14 at 0.6. The
+    # median ratio is 1.5, but a resample of the rounds lands on 0.6 often, so
+    # the bound is far below 1 and the case passes. Judging the ratio alone
+    # would fail it. The reference is slow where the candidate is fast, so
+    # the p95 ratio is 0.6 and cannot fail it either.
+    reference = [60.0] * 16 + [200.0] * 14
+    candidate = [90.0] * 16 + [120.0] * 14
+    result = baseline.paired_result('c', reference, candidate, baseline.case_alpha(24))
+    assert result.shift == pytest.approx(1.5)
+    assert result.shift_lower <= 1
+    assert result.ratio == pytest.approx(0.6)
+    assert not result.shift_regressed
+    assert not result.regressed
+    assert baseline.paired_verdict(result) == 'over the limit, within noise'
+
+
 def test_a_tail_regression_fails_on_p95_even_when_the_typical_request_is_unchanged():
     # A slow path one request in ten takes leaves the paired median at 1 and
     # triples p95; the p95 check still fires on its own.

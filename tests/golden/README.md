@@ -22,7 +22,7 @@ Each case is POSTed through the real Flask-Potion `QueryResource` routes, on a b
 - the production `DruidQueryClient_`:
   - `prepare()` and request serialisation (`requests` with `json=`, which refuses NaN);
   - status handling;
-  - gzip and `ijson` decoding of streamed responses, or `r.json()` otherwise;
+  - gzip and `db/druid/json_stream.py` decoding of streamed responses, or `r.json()` otherwise;
   - response parsing, strict-null handling and subtotal detection;
 - the shaping code for each visualization and data quality endpoint, and the response serialisation.
 

@@ -1,0 +1,5 @@
+# Added by stack.sh once the checked-out code reads REDIS_PASSWORD (WP-0b):
+# from then on the app refuses to start without it, and Redis must ask for it.
+services:
+  redis:
+    command: ["redis-server", "--requirepass", "${REDIS_PASSWORD:?}"]

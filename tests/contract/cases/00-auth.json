@@ -1,0 +1,136 @@
+{
+  "cases": [
+    {
+      "id": "auth.user_manager_info",
+      "route": "GET /api2/authentication/user_manager_info",
+      "session": "anonymous"
+    },
+    {
+      "id": "auth.registration_data.unknown_token",
+      "route": "GET /api2/authentication/registration_data",
+      "query": {
+        "token": "not-a-real-invite-token"
+      },
+      "session": "anonymous"
+    },
+    {
+      "id": "auth.login.wrong_password",
+      "route": "POST /api2/authentication/login",
+      "query": {
+        "set_cookie": "true"
+      },
+      "body": {
+        "email": "{env:CONTRACT_USERNAME}",
+        "password": "not-the-password",
+        "remember_me": false
+      },
+      "session": "anonymous"
+    },
+    {
+      "id": "auth.login.unknown_user",
+      "route": "POST /api2/authentication/login",
+      "query": {
+        "set_cookie": "true"
+      },
+      "body": {
+        "email": "nobody@contract.invalid",
+        "password": "not-the-password",
+        "remember_me": false
+      },
+      "session": "anonymous"
+    },
+    {
+      "id": "auth.login.token",
+      "route": "POST /api2/authentication/login",
+      "body": {
+        "email": "{env:CONTRACT_USERNAME}",
+        "password": "{env:CONTRACT_PASSWORD}"
+      },
+      "session": "anonymous-token-login"
+    },
+    {
+      "id": "auth.login.cookie",
+      "route": "POST /api2/authentication/login",
+      "query": {
+        "set_cookie": "true"
+      },
+      "body": {
+        "email": "{env:CONTRACT_USERNAME}",
+        "password": "{env:CONTRACT_PASSWORD}",
+        "remember_me": false
+      },
+      "session": "anonymous-cookie-login",
+      "cookies": true
+    },
+    {
+      "id": "auth.login.cookie.remember_me",
+      "route": "POST /api2/authentication/login",
+      "query": {
+        "set_cookie": "true"
+      },
+      "body": {
+        "email": "{env:CONTRACT_USERNAME}",
+        "password": "{env:CONTRACT_PASSWORD}",
+        "remember_me": true
+      },
+      "session": "anonymous-remember-login",
+      "cookies": true,
+      "note": "remember_me makes the accessKey cookie persistent (Max-Age); without it, a session cookie."
+    },
+    {
+      "id": "auth.api_rejects_anonymous",
+      "route": "GET /api2/dashboard",
+      "session": "anonymous"
+    },
+    {
+      "id": "auth.forgot_password.unknown_email",
+      "route": "POST /api2/authentication/forgot_password",
+      "body": {
+        "email": "nobody@contract.invalid"
+      },
+      "session": "anonymous"
+    },
+    {
+      "id": "auth.reset_password.unknown_token",
+      "route": "POST /api2/authentication/reset_password",
+      "body": {
+        "password": "not-the-password-either",
+        "token": "not-a-real-reset-token"
+      },
+      "session": "anonymous"
+    },
+    {
+      "id": "auth.register.unknown_invite",
+      "route": "POST /api2/authentication/register",
+      "body": {
+        "email": "nobody@contract.invalid",
+        "password": "not-the-password-either",
+        "firstname": "No",
+        "lastname": "Body",
+        "invite_token": "not-a-real-invite-token"
+      },
+      "session": "anonymous"
+    },
+    {
+      "id": "client.login_attempt",
+      "route": "POST /authentication/login",
+      "body": {
+        "username": "{env:CONTRACT_USERNAME}",
+        "password": "not-the-password"
+      },
+      "session": "anonymous",
+      "note": "web/python_client posts here first; the 405 is what makes it fall back to header credentials."
+    },
+    {
+      "id": "auth.timeout",
+      "route": "POST /api/timeout",
+      "pin": [
+        "/data/timeout"
+      ],
+      "body": {},
+      "session": "admin-timeout",
+      "cookies": true,
+      "note": "Since WP-0c a timed-out session's response also clears the JWT and CSRF cookies."
+    }
+  ]
+}

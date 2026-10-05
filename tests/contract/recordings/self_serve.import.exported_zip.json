@@ -1,0 +1,21 @@
+{
+  "content_type": "application/json",
+  "headers": [],
+  "id": "self_serve.import.exported_zip",
+  "pinned": {
+    "/success": true
+  },
+  "response_schema": {
+    "properties": {
+      "success": {
+        "type": "boolean"
+      }
+    },
+    "required": [
+      "success"
+    ],
+    "type": "object"
+  },
+  "route": "POST /api/import_self_serve",
+  "status": 200
+}

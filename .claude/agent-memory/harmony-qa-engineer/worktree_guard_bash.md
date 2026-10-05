@@ -10,6 +10,7 @@ In an isolated worktree, the guard refuses Bash commands it cannot verify:
 - heredocs that create files outside the worktree;
 - compound `cd /tmp && ...` chains;
 - a variable used as the command name (`C=/x; $C/run.sh`);
+- any text with the substring `git` inside another word or argument (`github.com`, `.github/`, a python heredoc mentioning it) chained with other commands, and `curl -w '%{...}'`; run them alone or reword;
 - `uv run python - <<EOF` fed scripts containing f-string braces, when chained with other commands;
 - `git` with `A..B` plus pipes in loops;
 - any computed value fed to `uv` or `git` (`uv run ... $(cat list)`, `xargs -a list uv run ...`, `git diff $(git merge-base ...)`), and long `cd && sed && cat <<EOF && git -C` chains. Pass paths and SHAs literally.

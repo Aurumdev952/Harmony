@@ -5,11 +5,11 @@ status: review
 owner_role: "data-platform"
 instances:
   - name: "data-platform-4"
-    files: ["druid_setup/**", "db/druid/indexing/**", "scripts/druid/null_audit/**", "tests/druid/**", "docs/modernisation/work/WP-8a.md", "docs/modernisation/work/WP-8a-evidence/**", "docs/modernisation/decisions/*-wp-8a-*.md", ".claude/agent-memory/harmony-data-platform-engineer/**"]
+    files: ["druid_setup/**", "db/druid/indexing/**", "scripts/druid/null_audit/**", "tests/druid/epi_week.py", "tests/druid/test_epi_week_native.py", "tests/druid/test_ingest_empty_to_null.py", "tests/druid/test_javascript_disabled.py", "tests/druid/test_last_value_live.py", "tests/druid_setup/test_druid_compose.py", "docs/modernisation/work/WP-8a.md", "docs/modernisation/work/WP-8a-evidence/**", "docs/modernisation/decisions/*-wp-8a-*.md", ".claude/agent-memory/harmony-data-platform-engineer/**"]
   - name: "core-8a-c"
     files: ["data/query/models/dimension.py", "data/query/models/granularity/**", "db/druid/aggregations/exact_unique_count_aggregation.py", "db/druid/util.py", "db/druid/post_aggregation_builder.py", "db/druid/js_formulas/**", "web/server/data/dimension_metadata_util/compute_sketch_sizes.py", "db/druid/aggregations/last_value_aggregation.py", "tests/core/test_null_selectors.py", "tests/core/test_negation_keeps_nulls.py", "tests/core/test_last_value_native.py", "tests/core/test_policy_exclusion_keeps_nulls.py", "data/query/models/query_filter/query_filter.py", "data/query/models/query_filter/selector_filter.py", "data/query/models/query_filter/in_filter.py", "db/druid/query_builder_util/optimization/filter_optimizations.py", "tests/core/test_empty_value_filters.py", "tests/core/test_exact_unique_count_merge.py", ".claude/agent-memory/harmony-core-engineer/**"]
   - name: "qa-8a"
-    files: ["tests/golden/cases/*/druid_query.json", ".claude/agent-memory/harmony-qa-engineer/**"]
+    files: ["tests/golden/cases/*/druid_query.json", "tests/golden/cases/filter_empty_value/**", ".claude/agent-memory/harmony-qa-engineer/**"]
   - name: "lead-1"
     files: ["data/pydruid_query/**", "scripts/data_catalog/compute_enabled_dimensions.py", "tests/druid/test_compute_enabled_dimensions_null.py"]
   - name: "pipeline-8a"
@@ -294,6 +294,7 @@ None. Note for WP-8c (C-8 owner is this role): the Parquet ingest schema must st
 
 ## Evidence
 
+- 2026-10-05 data-platform-4 merged pipeline-2 (9a81f2a) at 8a1836d and moved the lead-1 log line from below the Verdicts table into the Log. Claims: `tests/druid/**` is replaced by the five `tests/druid` files this instance owns (it overlapped lead-1), plus the compose test, and `qa-8a` claims `filter_empty_value/**`. Checks: `ci/lint_python.sh main` exits 0 (120 files formatted); the 3.8 guard (CI paths plus `tests/druid`, `tests/druid_setup` and `tests/alerts`) finds 0 problems in 859 files; the suites pass (449 passed, 8 skipped); `task_gate.py` fails only on the qa and reviewer verdicts. Note for core-r3: `tests/druid/test_last_value_live.py` is core-authored but claimed by data-platform-4; if core claims it, drop it here.
 - Unit 3, native epi week:
   - `tests/druid/test_epi_week_native.py`. Six hand-worked dates pin the formula's quirks: week 0 on the ISO year start, week -1 for 1 to 3 January that still sit in the previous ISO year, restart at 0 on 29 to 31 December, week 52. The map is then checked against the Python port on every day from 1900 to 2400, which spans a full 400-year Gregorian cycle.
   - [parity-0.23-legacy.txt](WP-8a-evidence/parity-0.23-legacy.txt) and [parity-0.23-sqlnull.txt](WP-8a-evidence/parity-0.23-sqlnull.txt): `run_audit.py parity --js` groups a one-row-per-day datasource by the JavaScript and the native extraction in the same query. [parity-38-nojs.txt](WP-8a-evidence/parity-38-nojs.txt) and [parity-0.23-nojs.txt](WP-8a-evidence/parity-0.23-nojs.txt): the native extraction on Druid 38 and on 0.23, both with JavaScript disabled.

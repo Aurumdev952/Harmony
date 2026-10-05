@@ -134,6 +134,7 @@ Seeded roles with no difference: `admin` (a superuser), and every other role exc
 
 - **Coupling with WP-0k.** WP-0k rebuilds the reset link from `DEPLOYMENT_BASE_URL` and changes username matching at login. This WP's mailer fixture patches `admin.url_for`; whichever lands second updates the fixture. WP-0j still allows renames to look-alike usernames of users the caller holds no less than; the login-side matching that makes look-alikes dangerous is WP-0k's.
 - **Destructive user routes on administrators (reviewer round 1, finding 3).** Delete, force-delete, deactivate and demote reached administrators through a group; decision 0010 closed them here (rows 3 to 5). The Low residuals for WP-5d are listed under the `UserResourceManager` section. The deactivated-accounts High is WP-0k's.
+- **A username over 50 characters is a 500 (pre-existing; route to WP-5d).** `USERNAME_SCHEMA` (`web/server/api/model_schemas.py`) has no `max_length`, so Potion accepts the body and the database rejects the write. Found by qa and security in round 1. It is the same on `488e482` and on this branch, and it is reached only after the guard passes. WP-5d's user schema should cap the length at the column's and answer 400.
 - **`change_password` paths.** `/api2/user/<id>/password` and `/generate_api_token` hand over an account directly and are gated only by `change_password` on user. No seeded non-superuser role holds it, so nothing changes here. A custom role holding it would be a takeover path this rule does not cover; the WP-5d port should apply the same rule to every account-handover route.
 
 ## Human acceptance
@@ -149,7 +150,7 @@ None.
 
 ## Requests
 
-- [ ] qa: WP-2b has no live pin for the rename-and-reset takeover; its H5 entry covers only the user-list visibility, which does not change here. In this WP's stack, add and flip, in `tests/authz/http`: (a) `manager` + `user_admin` `PATCH /api2/user/<id>` changing the `username` of a user who is admin through a group, 200 with the username changed today, 403 with nothing changed after; (b) `user_admin` `POST /api2/user/<id>/reset_password` on the same user, 204 with a mail today (mailpit on the WP-2c stack), 403 and no mail after; (c) the unchanged controls, a rename and a reset of a user holding no more than the caller (200, 204). The `decisions.yaml` row `[reset_password, user, 43]` stays as it is: that check is still the gate, and the new refusal is a second check after it. `test_user_list_hides_admins_but_shows_everyone_else` is unchanged.
+- [x] qa: WP-2b has no live pin for the rename-and-reset takeover; its H5 entry covers only the user-list visibility, which does not change here. In this WP's stack, add and flip, in `tests/authz/http`: (a) `manager` + `user_admin` `PATCH /api2/user/<id>` changing the `username` of a user who is admin through a group, 200 with the username changed today, 403 with nothing changed after; (b) `user_admin` `POST /api2/user/<id>/reset_password` on the same user, 204 with a mail today (mailpit on the WP-2c stack), 403 and no mail after; (c) the unchanged controls, a rename and a reset of a user holding no more than the caller (200, 204). The `decisions.yaml` row `[reset_password, user, 43]` stays as it is: that check is still the gate, and the new refusal is a second check after it. `test_user_list_hides_admins_but_shows_everyone_else` is unchanged.
 - [ ] qa (decision 0010, supersedes parts of the request above): (a) and (b) now end in 404, not 403, with nothing written and no mail; add (d) a rename and a reset of a user who holds more without being an administrator (for example in a group carrying `exporter`): 200/204 today, 403 after; (e) flip the WP-2b list-visibility pin (`test_user_list_hides_admins_but_shows_everyone_else`): an administrator through a group is listed today and not after; (f) pin and flip the four destructive paths on an administrator through a group: `user_admin` `DELETE` 204, `manager` `DELETE /force` 204, `manager` + `user_admin` `PATCH` status inactive 200 and groups `[]` 200 today; 404 with nothing changed after; (g) check whether `authorUsername` on dashboards written by an administrator through a group goes null for non-superusers (the field's description says it is null when the author is not visible; whether it reads through `UserResourceManager` is the question), and whether the dashboard sharing, alert recipient and group editor pickers still load.
 
 ## Log
@@ -172,6 +173,7 @@ None.
 - 2026-10-05 backend-0j round 2 unit 4 (reviewer finding 4): three tests pin the order and the exact comparison at `user_api_models.py:152-155`, each on a target in a group carrying `exporter`: `manager` alone renaming gets 403 from Potion's check with nothing written and no refusal line; a rename that also adds `group_admin` (not held) logs exactly one line, the username-change refusal; a case-only rename is 403 with one refusal. Check: 73 passed; mutants rename check before `can_update_item`, rename check after the grant checks, and a case-insensitive comparison each pass the file at `b090396` (46 passed) and fail one new test each; ruff clean.
 - 2026-10-06 backend-0j round 2 unit 5 (reviewer finding 5): breadth note corrected. It now covers alert authors, with a test target where the caller holds the `alert_admin` role and the target an `alert_admin` ACL: refused on rename and on reset by all three callers. It names `user_moderator`, and says that narrowed admin tokens reached direct administrators before decision 0010 and get 404 now. It also says a bare reset mails the target's own address (C1, WP-0k). The interrogate note's alert claim is corrected too. `_resent_body` now sends each ACL's own resource type. Check: 78 passed; ruff clean.
 - 2026-10-06 backend-0j round 2 unit 6 (reviewer finding 6): `grants.held_role_ids()` and `grants.member_group_ids()` hold the two rules (admin role, and groups carrying it, never held by a non-superuser identity). `held_roles_from_uris`, `member_groups_from_uris`, the guard, `RoleResourceManager` and `GroupResourceManager` all call them. The guard's group set now also leaves out admin-carrying groups; only narrowed tokens see a difference, and only in the audit line, because those targets already fail on the admin role. `_holds_acl` builds needs from `current_user`, which drops the third `type: ignore`. Check: harness 164 passed; `uv run --locked mypy` no issues in 518 files; `web.server.potion.managers` imports on its own (no cycle); ruff clean.
+- 2026-10-06 backend-0j round 2 unit 7 (reviewer finding 7): the over-50-character 500 recorded under Findings, routed to WP-5d. A QA-4 evidence line maps each phase-0j verification bullet to its evidence; the WP-2b pin flip and the acceptance of rows 3 to 5 are the open items. The mutation table was rerun in full at `773fbcb` (21 mutants, every one killed by this file or by the whole harness). Check: this file.
 
 ## Interrogate (unit 6)
 
@@ -186,27 +188,39 @@ The three-model panel did not run (concurrent subagent limit). The reviewer prom
 
 ## Evidence
 
+- **QA-4 (phase 0j verification, one line per bullet).**
+  - *Failing test first, then 403 with nothing written and no mail:* round 1's 26 refusal tests fail on `488e482` on status codes only (QA-1 below). Under decision 0010 the admin-through-group case answers 404, not 403 (`test_user_editor_cannot_take_over_an_admin_through_a_group`, and the five destructive routes in `test_user_routes_cannot_reach_an_admin_through_a_group`). Every other higher target answers 403 with username, last name, roles, groups, ACLs and status unchanged and the stub mailer empty (`test_user_editor_cannot_take_over_a_user_holding_more`, `..._cannot_rename_a_user_holding_more`, `..._cannot_reset_the_password_of_a_user_holding_more`).
+  - *Equal-or-lesser targets unchanged:* `test_user_editor_renames_and_resets_a_user_holding_no_more` (5 targets), `test_user_editor_resets_its_own_password`, `test_users_holding_more_but_not_admin_stay_listed_and_reachable`, and the superuser tests, all passing on base and branch.
+  - *WP-2b pins flip in the same stack; security and the human accept the INV-3 rows:* open. qa's side branch `mig/WP-0j-rename-reset-guard-qa` adds and flips the pins (Requests), and is merged here when the lead reports its head. Security approved rows 1 and 2 in round 1; rows 3 to 5 (decision 0010) and the human item are pending.
+  - *Phase 0 exit check (every page renders):* qa's round 1 browser check at three widths. The admin user list under decision 0010 is in qa's request (g).
 - **QA-1.** The refusal tests fail on the base for H5's reason: `assert 204 == 403` (18 reset cases), `assert 200 == 403` (6 rename cases), and `(200, 204) == (403, 403)` for the end-to-end takeover and the narrowed-token case.
 - **Unchanged behaviour** passes on base and branch: renames and resets of users holding no grants, the same roles, fewer roles one of them through a shared group, the same ACL, and an ACL covered by a sitewide role; a reset of one's own password; a profile edit of an admin through a group that keeps the username; a superuser renaming and resetting an admin through a group; `manager` alone resetting (401, no audit line); a full admin session through the token path.
 - **Audit line.** `test_user_editor_cannot_take_over_an_admin_through_a_group` checks two refusal lines naming the caller; each refusal case checks exactly one.
-- **Mutation pass** (`/tmp/wp0j-mutate.py`, each mutant run against the new file):
+- **Mutation pass, round 2** (`/tmp/wp0j-r2/mutate.py`, at `773fbcb`). Each mutant is applied to a copy of the tree and run against `test_rename_and_reset.py` (78 tests) unless the row says otherwise. Round 1's table claimed every clause was pinned; the first two ACL rows and the ordering rows show it was not.
 
   | Mutant | Result |
   |---|---|
-  | rename check removed | 8 failed |
-  | reset check removed | 20 failed |
+  | rename check removed | 20 failed |
+  | reset check removed | 32 failed |
   | rename check on every edit, username kept or not | 1 failed (`still_edits_the_profile...`) |
+  | case-insensitive username comparison | 1 failed (`a_rename_that_changes_only_case_is_a_rename`); passed the file at `b090396` |
+  | rename check before Potion's `can_update_item` | 1 failed (`a_rename_without_edit_resource...`); passed at `b090396` |
+  | rename check after the grant checks | 1 failed (`a_rename_is_judged_before_what_the_body_grants`); passed at `b090396` |
+  | rename judged on the written user (guard after the writes) | 20 failed |
+  | rename judged on the request body (the body's groups set, then the guard) | 3 failed (`a_rename_is_judged_on_the_user_before_the_request[exporter]`, `[group_admin]`, `..._before_what_the_body_grants`); passed the round-1 file |
   | superuser early return removed | 2 failed |
-  | admin role counted as held | 1 failed (`narrowed`) |
-  | roles ignored | 13 failed |
-  | groups ignored | 2 failed (`group_not_joined`) |
-  | ACLs ignored | 4 failed (`dashboard_acl`) |
+  | roles ignored | 15 failed |
+  | groups ignored | 3 failed (`group_not_joined`) |
+  | ACLs ignored | 20 failed |
   | no sitewide cover for ACLs | 1 failed (`acl_covered_by_a_held_role`) |
   | no exact cover for ACLs | 1 failed (`acl_the_caller_holds_too`) |
-  | any need of an ACL covers it (`all` to `any`) | round 1 tests: 36 passed; round 2: 4 failed (`dashboard_acl_the_caller_only_views`, rename and the three reset callers) |
-  | resource id ignored (an ACL on one dashboard covers another) | round 1 tests: 36 passed; round 2: 4 failed (`dashboard_acl_on_another_dashboard`) |
-  | rename judged on the request body (groups resolved from the body, then the guard) | round 1 tests: 36 passed; round 2: 2 failed (`a_rename_is_judged_on_the_user_before_the_request[admin]`, `[exporter]`) |
-  | rename judged on the written user (guard after the writes) | round 1 tests: 8 failed; round 2: 11 failed |
+  | any need of an ACL covers it (`all` to `any`) | 10 failed (`dashboard_acl_the_caller_only_views`, `alert_acl_and_a_caller_with_the_alert_admin_role`); passed the round-1 file |
+  | resource id ignored (an ACL on one dashboard covers another) | 5 failed (`dashboard_acl_on_another_dashboard`); passed the round-1 file |
+  | administrators through a group not hidden (`UserResourceManager`) | 11 failed |
+  | direct administrators not hidden | 4 failed |
+  | hiding decided by the account, not the identity | 3 failed (the narrowed-token cases) |
+  | `held_role_ids()` counts the admin role | this file: 78 passed, because no reachable target holds admin since decision 0010. Whole harness: 4 failed (WP-0h's narrowed-token tests) |
+  | `member_group_ids()` counts groups carrying admin | this file: 78 passed (same reason). Whole harness: 2 failed (WP-0h's narrowed-token tests) |
 
 ## Verdicts
 

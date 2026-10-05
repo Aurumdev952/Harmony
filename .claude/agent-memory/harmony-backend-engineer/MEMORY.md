@@ -9,4 +9,4 @@
 - [Template render diff](template_render_diff.md) — prove Jinja template edits without a running app; known baseline failures
 - [Flask web tests](flask_web_tests.md) — run tests/web on py3.8, call handlers directly, worktree-guard and auth/policy traps
 - [Post-WP-2f tooling](post_wp2f_tooling.md) — dev env py3.9 but prod 3.8 until WP-3b, lint-gate and noqa traps, guard workarounds, graphql stub
-- [Account handover guard](account_handover_guard.md) — WP-0j rename/reset rule (roles by id, groups, ACL needs with sitewide cover); port to every handover route in WP-5d
+- [Account handover guard](account_handover_guard.md) — WP-0j rename/reset subset rule, decision 0010 admin hiding, WP-5d residuals, temp-script name trap

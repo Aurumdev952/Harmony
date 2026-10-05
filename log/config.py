@@ -11,6 +11,10 @@ Environment:
                 only long-running services, whose stdout carries no data, use stdout.
     LOG_LEVEL   Root level, default INFO. The old production config logged
                 ZenysisLogger at DEBUG; set LOG_LEVEL=DEBUG to get those lines.
+                DEBUG also applies to every library that leaves its own logger's
+                level unset (urllib3 and kombu among them), whose debug lines can
+                carry URLs with query strings and message payloads that redaction
+                does not catch. Use it briefly, not as a production setting.
     ZEN_ENV     Written as `deployment` on JSON lines.
 
 Every line passes through `redact` first. That is a backstop for secrets that reach
@@ -70,10 +74,15 @@ _SEPARATOR = r'(?:["\']?\s*[:=]|["\']\s*,)\s*'
 # A quoted value runs to its closing quote; `b` prefixes a bytes literal.
 _QUOTED = r'b?"(?:[^"\\\r\n]|\\.)*|b?\'(?:[^\'\\\r\n]|\\.)*'
 _OPENING_QUOTE = re.compile(r'b?["\']', re.IGNORECASE)
+# The value after a separator, unless an earlier pattern already redacted it.
+_VALUE = (
+    r'(?!b?["\']?\[REDACTED\])(?P<value>' + _QUOTED + r'|'
+    r'(?:(?:bearer|basic|digest|token)\s+)?[^\s"\',;&)}\]]+)'
+)
 
 
 def _redact_value(match: Match[str]) -> str:
-    opening = _OPENING_QUOTE.match(match.group(3))
+    opening = _OPENING_QUOTE.match(match.group('value'))
     return match.group(1) + (opening.group() if opening else '') + REDACTED
 
 
@@ -93,11 +102,7 @@ _REDACTIONS: Tuple[
     # scheme://user:password@host, whatever the scheme is glued to.
     (re.compile(r'(://[^\s/:@]*:)[^\s/@]+@'), r'\1' + REDACTED + '@'),
     (
-        re.compile(
-            r'(?i)(["\']?' + _SENSITIVE_KEY + _SEPARATOR + r')(?!b?["\']?\[REDACTED\])'
-            r'(' + _QUOTED + r'|(?:(?:bearer|basic|digest|token)\s+)?'
-            r'[^\s"\',;&)}\]]+)'
-        ),
+        re.compile(r'(?i)(["\']?' + _SENSITIVE_KEY + _SEPARATOR + r')' + _VALUE),
         _redact_value,
     ),
     # Cookie headers in any form, including the WSGI environ's HTTP_COOKIE.
@@ -108,10 +113,12 @@ _REDACTIONS: Tuple[
         ),
         r'\1' + REDACTED,
     ),
-    # Flask's session cookie outside a Cookie header. The app's other cookies
-    # (accessKey, remember_token, csrf_access_token) name a key or token, so the
-    # key pattern above already redacts them.
+    # Flask's session cookie outside a Cookie header: session=..., a quoted dict or
+    # JSON key, or a (name, value) tuple. An unquoted `session:` is prose. The app's
+    # other cookies (accessKey, remember_token, csrf_access_token) name a key or
+    # token, so the key pattern above already redacts them.
     (re.compile(r'\bsession=[^;\s&"\']+'), 'session=' + REDACTED),
+    (re.compile(r'(["\']session["\']\s*[:,]\s*)' + _VALUE), _redact_value),
     (
         re.compile(r'(?i)\b(bearer\s+)(?!\[REDACTED\])[A-Za-z0-9._~+/=-]+'),
         r'\1' + REDACTED,

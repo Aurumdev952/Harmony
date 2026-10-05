@@ -150,6 +150,11 @@ _SECRETS = [
     ('Cookie: theme=dark; sid=s3cr3t', 's3cr3t'),
     ('set accessKey=abc123; Path=/', 'abc123'),
     ('redirect with session=abc123&next=/', 'abc123'),
+    # Flask's session cookie as a dict or JSON key, or a (name, value) tuple.
+    ("cookies {'session': 'abc123', 'theme': 'dark'}", 'abc123'),
+    ('{"session": "abc123"}', 'abc123'),
+    ("[('session', 'abc123')]", 'abc123'),
+    ('{"session": abc123}', 'abc123'),
     ('remember_token=rem123; Path=/', 'rem123'),
     ('csrf_access_token=csrf123&next=/', 'csrf123'),
     ("kwargs {'email_host_password': 'hunter2', 'port': 25}", 'hunter2'),
@@ -221,6 +226,8 @@ def test_stack_info_is_redacted(formatter):
         # Only a Basic value that decodes to user:password is a credential.
         'Basic auth is disabled',
         'basic configuration loaded',
+        # Only a quoted session key names the cookie.
+        'Database session: rolled back',
         # Query strings are stripped only from gunicorn's client URIs.
         'Fetching http://druid:8082/druid/v2/?pretty',
     ],
@@ -365,6 +372,7 @@ _HOSTILE = {
     'tuples': "'token', " * 800,
     'basic': 'Basic ' + 'A' * 8000,
     'cookies': 'HTTP_COOKIE_' * 666,
+    'sessions': "'session', " * 727,
     # 64 KB: a pattern that is quadratic only in a short prefix needs a long input
     # to show it. gunicorn reads request bodies far longer than its header limit.
     'chunk terminators': 'Invalid chunk terminator' * 2731,

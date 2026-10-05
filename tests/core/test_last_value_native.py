@@ -57,9 +57,9 @@ def _last_value(operation=AggregationOperation.SUM):
     ).to_druid(FIELD)
 
 
-def _latest(time: str, value: str, combine: str) -> str:
-    acc_time = 'array_offset(__acc, 0)'
-    acc_value = 'array_offset(__acc, 1)'
+def _latest(time: str, value: str, combine: str, accumulator: str) -> str:
+    acc_time = f'array_offset({accumulator}, 0)'
+    acc_value = f'array_offset({accumulator}, 1)'
     return (
         f'if({time} > {acc_time}, array({time}, {value}), '
         f'if({time} == {acc_time}, '
@@ -68,16 +68,27 @@ def _latest(time: str, value: str, combine: str) -> str:
     )
 
 
-def _expected_native(name: str, metric: str, combine: str) -> dict:
+def _expected_native(
+    name: str, metric: str, combine: str, accumulator: str = '__acc'
+) -> dict:
     partial = f'"{name}"'
     return {
         'type': 'expression',
         'name': name,
         'fields': ['__time', metric],
+        'accumulatorIdentifier': accumulator,
         'initialValue': 'array(-9007199254740992.0, 0.0)',
-        'fold': _latest('cast("__time", \'DOUBLE\')', f'nvl("{metric}", 0.0)', combine),
+        'fold': _latest(
+            'cast("__time", \'DOUBLE\')',
+            f'nvl("{metric}", 0.0)',
+            combine,
+            accumulator,
+        ),
         'combine': _latest(
-            f'array_offset({partial}, 0)', f'array_offset({partial}, 1)', combine
+            f'array_offset({partial}, 0)',
+            f'array_offset({partial}, 1)',
+            combine,
+            accumulator,
         ),
         'isNullUnlessAggregated': False,
         'shouldCombineAggregateNullInputs': False,
@@ -167,3 +178,19 @@ def test_unknown_setting_is_rejected(monkeypatch):
     monkeypatch.setenv(LAST_VALUE_SETTING, 'javascript')
     with pytest.raises(ValueError, match=LAST_VALUE_SETTING):
         _posted(_last_value())
+
+
+@pytest.mark.parametrize(
+    ('name', 'metric', 'accumulator'),
+    [
+        ('__acc', 'sum', '___acc'),
+        ('___acc', '__acc', '____acc'),
+        ('__time', 'sum', '__acc'),
+    ],
+)
+def test_native_accumulator_never_shadows_a_binding(name, metric, accumulator):
+    '''`combine` binds the partial result to the aggregator's name and `fold`
+    binds the fields. Either one named like the accumulator would hide it, and
+    Druid would drop partial results.'''
+    built = native_last_value(name, {'type': 'doubleSum', 'fieldName': metric})
+    assert built == _expected_native(name, metric, '{} + {}', accumulator)

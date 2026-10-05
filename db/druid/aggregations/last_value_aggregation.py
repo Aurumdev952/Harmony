@@ -55,14 +55,20 @@ def native_last_value(name: str, inner: dict) -> dict:
     if inner['type'] not in _COMBINE:
         raise ValueError(f'LAST_VALUE cannot wrap a {inner["type"]} aggregator')
     combine = _COMBINE[inner['type']]
+    # `fold` binds the accumulator next to the fields, and `combine` next to the
+    # aggregator's own name. A field or name equal to the accumulator would
+    # shadow it, and Druid would silently drop partial results.
+    accumulator = '__acc'
+    while accumulator in (name, '__time', inner['fieldName']):
+        accumulator = f'_{accumulator}'
 
     def latest(time: str, value: str) -> str:
-        '''`[time, value]` if it is later than `__acc`, the two combined at the
-        same time, else `__acc`. Arrays are only ever read through
-        `array_offset`: Druid 0.23 rejects an expression that also uses an
-        array variable as a bare value.'''
-        acc_time = 'array_offset(__acc, 0)'
-        acc_value = 'array_offset(__acc, 1)'
+        '''`[time, value]` if it is later than the accumulator, the two
+        combined at the same time, else the accumulator. Arrays are only ever
+        read through `array_offset`: Druid 0.23 rejects an expression that also
+        uses an array variable as a bare value.'''
+        acc_time = f'array_offset({accumulator}, 0)'
+        acc_value = f'array_offset({accumulator}, 1)'
         return (
             f'if({time} > {acc_time}, array({time}, {value}), '
             f'if({time} == {acc_time}, '
@@ -74,12 +80,13 @@ def native_last_value(name: str, inner: dict) -> dict:
     # the extension read it as 0.
     row_value = f'nvl({_identifier(inner["fieldName"])}, 0.0)'
     # `combine` merges a partial result, bound to the aggregator's own name,
-    # into `__acc`.
+    # into the accumulator.
     partial = _identifier(name)
     return {
         'type': 'expression',
         'name': name,
         'fields': ['__time', inner['fieldName']],
+        'accumulatorIdentifier': accumulator,
         'initialValue': f'array({_BEFORE_ALL_TIME}, 0.0)',
         'fold': latest('cast("__time", \'DOUBLE\')', row_value),
         'combine': latest(f'array_offset({partial}, 0)', f'array_offset({partial}, 1)'),

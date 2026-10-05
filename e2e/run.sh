@@ -41,6 +41,9 @@ PYTHON_IMAGE="python:3.12-slim@sha256:f77ac9e44ae96ef2c90b8053ea08c31f8be030f824
 PLAYWRIGHT_IMAGE="mcr.microsoft.com/playwright@sha256:f1e7e01021efd65dd1a2c56064be399f3e4de00fd021ac561325f2bfbb2b837a"
 
 build_client() {
+  if [[ ! -d "${ROOT}/node_modules" ]]; then
+    (cd "${ROOT}" && yarn install --frozen-lockfile)
+  fi
   (cd "${ROOT}" && yarn build)
 }
 

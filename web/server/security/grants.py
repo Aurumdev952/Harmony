@@ -78,6 +78,29 @@ def _exports_data() -> bool:
     return any(role.enable_data_export for role in current_user.get_all_roles())
 
 
+def held_role_ids() -> set[int]:
+    '''The roles the caller's account holds, direct or through a group. A
+    non-superuser identity on an admin account (a narrowed token) does not hold
+    the admin role.
+    '''
+    return {
+        role.id
+        for role in current_user.get_all_roles()
+        if role.name != SUPERUSER_ROLENAME
+    }
+
+
+def member_group_ids() -> set[int]:
+    '''The groups the caller's account belongs to, except those carrying the
+    admin role, as in `held_role_ids`.
+    '''
+    return {
+        group.id
+        for group in current_user.groups
+        if all(role.name != SUPERUSER_ROLENAME for role in group.roles)
+    }
+
+
 def _ids_from_uris(uris: Iterable[str], kind: str) -> set[int]:
     try:
         return {get_id_from_uri(uri) for uri in uris}
@@ -97,13 +120,7 @@ def held_roles_from_uris(
     roles = sorted(requested, key=lambda role: role.id)
     if current_user_is_superuser():
         return roles
-    allowed_ids = {role.id for role in existing} | {
-        role.id
-        for role in current_user.get_all_roles()
-        # An admin account whose identity is not a superuser (a narrowed token)
-        # must not pass the admin role on.
-        if role.name != SUPERUSER_ROLENAME
-    }
+    allowed_ids = {role.id for role in existing} | held_role_ids()
     not_held = [role for role in roles if role.id not in allowed_ids]
     if not_held:
         refuse_grant(
@@ -125,13 +142,7 @@ def member_groups_from_uris(
     groups = sorted(requested, key=lambda group: group.id)
     if current_user_is_superuser():
         return groups
-    allowed_ids = {group.id for group in existing} | {
-        group.id
-        for group in current_user.groups
-        # As in `held_roles_from_uris`: a narrowed token on an admin account
-        # must not pass on a group carrying the admin role.
-        if all(role.name != SUPERUSER_ROLENAME for role in group.roles)
-    }
+    allowed_ids = {group.id for group in existing} | member_group_ids()
     not_member = [group for group in groups if group.id not in allowed_ids]
     if not_member:
         refuse_grant(
@@ -277,30 +288,26 @@ def _verify_holds_all_grants_of(user: User, action: str, description: str) -> No
     '''
     if current_user_is_superuser():
         return
-    held_role_ids = {
-        role.id
-        for role in current_user.get_all_roles()
-        if role.name != SUPERUSER_ROLENAME
-    }
-    member_group_ids = {group.id for group in current_user.groups}
+    held_roles = held_role_ids()
+    member_groups = member_group_ids()
     account_needs = _account_needs()
     roles = sorted(
         {
             (role.id, role.name)
             for role in user.get_all_roles()
-            if role.id not in held_role_ids
+            if role.id not in held_roles
         }
     )
     # sqlmypy types an untyped `relationship` as one object.
     groups = [
         (group.id, group.name)
         for group in user.groups  # type: ignore[attr-defined]
-        if group.id not in member_group_ids
+        if group.id not in member_groups
     ]
     acls = [
         (acl.resource_role.name, acl.resource_id)
         for acl in user.acls  # type: ignore[attr-defined]
-        if not _holds_acl(user, acl, account_needs)
+        if not _holds_acl(acl, account_needs)
     ]
     if roles or groups or acls:
         _refuse(
@@ -310,14 +317,12 @@ def _verify_holds_all_grants_of(user: User, action: str, description: str) -> No
         )
 
 
-def _holds_acl(user: User, acl: UserAcl, account_needs: set[Need]) -> bool:
+def _holds_acl(acl: UserAcl, account_needs: set[Need]) -> bool:
     '''Whether the caller's account holds what `acl` allows, on that resource
     or on every resource of its type.
     '''
-    # `User` gains the web mixin at import time, out of mypy's sight.
-    needs = user._build_acl_needs(  # type: ignore[attr-defined]
-        acl.resource_role.permissions, acl.resource
-    )
+    # pylint: disable=protected-access
+    needs = current_user._build_acl_needs(acl.resource_role.permissions, acl.resource)
     return all(
         need in account_needs or ItemNeed(need.method, None, need.type) in account_needs
         for need in needs

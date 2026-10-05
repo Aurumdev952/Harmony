@@ -18,6 +18,7 @@ from models.alchemy.permission import Role
 from models.alchemy.query_policy import QueryPolicyRole
 from models.alchemy.security_group import Group
 from web.server.data.data_access import Transaction
+from web.server.security.grants import held_role_ids, member_group_ids
 from web.server.security.permissions import SUPERUSER_ROLENAME, SuperUserPermission
 
 from models.alchemy.base import Base, Pagination as SAPagination
@@ -317,12 +318,7 @@ class RoleResourceManager(SQLAlchemyManager):
         query = super()._query()
         if SuperUserPermission().can():
             return query
-        role_ids = [
-            role.id
-            for role in current_user.get_all_roles()
-            if role.name != SUPERUSER_ROLENAME
-        ]
-        return query.filter(getattr(self.model, 'id').in_(role_ids))
+        return query.filter(getattr(self.model, 'id').in_(held_role_ids()))
 
 
 class GroupResourceManager(SQLAlchemyManager):
@@ -330,12 +326,7 @@ class GroupResourceManager(SQLAlchemyManager):
         query = super()._query()
         if SuperUserPermission().can():
             return query
-        group_ids = [
-            group.id
-            for group in current_user.groups
-            if all(role.name != SUPERUSER_ROLENAME for role in group.roles)
-        ]
-        return query.filter(getattr(self.model, 'id').in_(group_ids))
+        return query.filter(getattr(self.model, 'id').in_(member_group_ids()))
 
 
 class UserResourceManager(SQLAlchemyManager):

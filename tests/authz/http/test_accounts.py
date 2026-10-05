@@ -616,3 +616,37 @@ def test_a_pending_twin_of_a_registered_account_cannot_complete_a_reset(stack):
     assert response.status_code == 400, response.text[:300]
     assert 'invalid_reset_link' in response.text
     assert _account_row(stack, shell) == before
+
+
+@pytest.mark.parametrize('status', ['inactive', 'pending'])
+def test_forgot_password_for_an_account_not_active_answers_like_an_unknown_one(
+    stack, status
+):
+    '''WP-0k (0e49324). The anonymous forgot-password form, for a deactivated
+    account or a pending invitee.
+    Before WP-0k: 200 and a reset link mailed.
+    After: the answer an unknown username gets (400 `non_existent_user`), and
+    nothing is mailed: a deactivated account may not reset, and an invitee
+    completes its invitation, whose token a reset would replace.'''
+    username = _name(f'forgot-{status}')
+    account = stack.create_account(username, _password())
+    _set_status(stack, account, status)
+    stack.clear_mail()
+    anonymous = new_session()
+
+    unknown = stack.request(
+        anonymous,
+        'POST',
+        '/api2/authentication/forgot_password',
+        {'email': _name('forgot-nobody')},
+    )
+    response = stack.request(
+        anonymous, 'POST', '/api2/authentication/forgot_password', {'email': username}
+    )
+
+    assert (response.status_code, response.json()) == (
+        unknown.status_code,
+        unknown.json(),
+    )
+    assert unknown.status_code == 400, unknown.text[:300]
+    assert stack.mail() == []

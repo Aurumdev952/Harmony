@@ -263,3 +263,27 @@ def test_shared_analysis_link_is_the_advanced_query_page_on_the_configured_origi
 
     assert response.status_code == 200, response.text[:300]
     assert _mailed_links(mailbox) == [[f'{ORIGIN}/advanced-query#h=0123abcd']]
+
+
+@pytest.mark.parametrize('forgery', sorted(FORGERIES))
+def test_flask_user_reset_page_sends_the_browser_to_the_configured_origin(
+    stack, forgery
+):
+    '''Row L-1, flask-user's own `/user/reset-password/<token>` (WP-0k
+    0e49324 onwards: `open_reset_page`).
+    Before WP-0k: flask-user's view served its own reset form on the request's
+    host.
+    After: a redirect to Harmony's reset page on the configured origin, the
+    one place a reset token sets a password.'''
+    headers, prefix = FORGERIES[forgery]
+    response = new_session().get(
+        f'{stack.base_url}{prefix}/user/reset-password/authz-token',
+        headers=headers,
+        allow_redirects=False,
+        timeout=TIMEOUT_SECONDS,
+    )
+
+    assert response.status_code in (301, 302, 303, 307), response.status_code
+    assert response.headers['Location'] == (
+        f'{ORIGIN}/user/reset-password?token=authz-token'
+    )

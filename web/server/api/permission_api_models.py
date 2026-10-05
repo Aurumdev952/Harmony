@@ -563,10 +563,9 @@ class RoleResource(PrincipalResource):
         rel='updateUsers',
     )
     def update_users(self, role, usernames):
-        with (
-            AuthorizedOperation('edit_resource', 'role', role.id),
-            Transaction() as transaction,
-        ):
+        with AuthorizedOperation(
+            'edit_resource', 'role', role.id
+        ), Transaction() as transaction:
             update_role_users(role, usernames, transaction)
             return StandardResponse('Role usernames has been updated', OK, True)
         return None, UNAUTHORIZED

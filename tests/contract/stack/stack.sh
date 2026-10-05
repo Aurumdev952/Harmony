@@ -11,6 +11,9 @@
 #   CONTRACT_WEB_PORT  loopback port for web, default 58650
 # e.g. CONTRACT_PROJECT=contract-$CI_JOB_ID CONTRACT_WEB_PORT=$((40000 + RANDOM % 20000)).
 #
+# CONTRACT_OVERLAYS, a colon-separated list of compose files, is added after
+# the stack's own; the e2e suite uses it to swap the Druid stand-in.
+#
 # Every secret (admin password, Postgres, Redis, Hasura admin, session and JWT
 # keys) is generated per stack into a mode-600 file outside the repository, so
 # none lands in fixtures, logs or git (SPEC INV-6).
@@ -35,6 +38,11 @@ compose_files() {
   if grep -q HASURA_ADMIN_SECRET "${ROOT}/web/server/configuration/flask.py"; then
     files+=(-f "${HERE}/compose.hasura-secret.yaml")
   fi
+  local overlays overlay
+  IFS=: read -ra overlays <<<"${CONTRACT_OVERLAYS:-}"
+  for overlay in "${overlays[@]}"; do
+    files+=(-f "${overlay}")
+  done
   printf '%s\n' "${files[@]}"
 }
 

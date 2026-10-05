@@ -1,17 +1,9 @@
-import type { Page } from '@playwright/test';
-
+import { SIGNED_OUT, signIn } from '../support/auth';
 import { USERNAME, adminPassword } from '../support/env';
 import { expect, test } from '../support/fixtures';
 
 // These cases type the admin password, which a trace would record.
-test.use({ storageState: { cookies: [], origins: [] }, trace: 'off' });
-
-async function signIn(page: Page, password: string): Promise<void> {
-  await page.goto('/login');
-  await page.getByLabel('Email Address').fill(USERNAME);
-  await page.getByLabel('Password', { exact: true }).fill(password);
-  await page.getByRole('button', { name: 'sign in' }).click();
-}
+test.use({ storageState: SIGNED_OUT, trace: 'off' });
 
 test.describe('login @smoke @login', () => {
   test('a signed-out visit to a page redirects to the login page', async ({ page }) => {
@@ -25,7 +17,7 @@ test.describe('login @smoke @login', () => {
     context,
     page,
   }) => {
-    await signIn(page, adminPassword());
+    await signIn(page, USERNAME, adminPassword());
 
     await expect(page).toHaveURL(/\/overview$/);
     await expect(page.getByText('Welcome, Contract', { exact: false })).toBeVisible();
@@ -34,7 +26,7 @@ test.describe('login @smoke @login', () => {
   });
 
   test('a wrong password keeps the user on the login page', async ({ context, page }) => {
-    await signIn(page, 'not-the-password');
+    await signIn(page, USERNAME, 'not-the-password');
 
     await expect(page.getByText('Incorrect username and/or password.')).toBeVisible();
     await expect(page).toHaveURL(/\/login/);
@@ -43,7 +35,7 @@ test.describe('login @smoke @login', () => {
   });
 
   test('signing out ends the session', async ({ page }) => {
-    await signIn(page, adminPassword());
+    await signIn(page, USERNAME, adminPassword());
     await expect(page).toHaveURL(/\/overview$/);
 
     await page.getByRole('button', { name: /Contract/ }).click();

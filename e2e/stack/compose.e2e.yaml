@@ -1,0 +1,50 @@
+# e2e overlay on tests/contract/stack/compose.yaml, added by e2e/run.sh
+# through CONTRACT_OVERLAYS. It changes three things:
+#
+# - Queries: the mock query client is off and the metadata stub is replaced by
+#   druid_broker.py, so queries take the production Druid client and get
+#   deterministic, Druid-shaped answers.
+# - Dashboard export: URLBOX_API_URL points at renderer.py, a stand-in for
+#   Urlbox that checks the minted cookie opens the dashboard.
+# - Data upload: the source tree is mounted read-only, so the upload folder
+#   (uploads/, relative to the working directory) is a tmpfs. run.sh creates
+#   its mount point, which the repository ignores.
+#
+# Relative paths resolve against tests/contract/stack, the first file's
+# directory.
+x-e2e-web-env: &e2e-web-env
+  ZEN_OFFLINE: ""
+  URLBOX_API_URL: http://renderer:8000
+  URLBOX_API_KEY: e2e-renderer
+
+services:
+  druid-stub:
+    image: ${CONTRACT_WEB_IMAGE:?}
+    working_dir: /zenysis
+    volumes:
+      - ../../..:/zenysis:ro
+    environment:
+      PYTHONPATH: /zenysis
+      PYTHONDONTWRITEBYTECODE: "1"
+      ZEN_ENV: harmony_demo
+    command: ["python", "-u", "e2e/stack/druid_broker.py"]
+
+  renderer:
+    image: python:3.12-slim@sha256:f77ac9e44ae96ef2c90b8053ea08c31f8be030f824196b0ae4db6d462c84e51f
+    networks: [internal]
+    volumes:
+      - ../../../e2e/stack/renderer.py:/renderer/renderer.py:ro
+    environment:
+      PYTHONDONTWRITEBYTECODE: "1"
+    command: ["python", "-u", "/renderer/renderer.py"]
+
+  web-init:
+    environment: *e2e-web-env
+
+  web:
+    environment: *e2e-web-env
+    tmpfs:
+      - /zenysis/uploads
+    depends_on:
+      renderer:
+        condition: service_started

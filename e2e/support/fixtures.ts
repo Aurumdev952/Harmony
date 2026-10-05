@@ -1,5 +1,5 @@
 import { expect, test as base } from '@playwright/test';
-import type { Page } from '@playwright/test';
+import type { BrowserContext, Page } from '@playwright/test';
 
 import { BASE_URL } from './env';
 
@@ -20,11 +20,13 @@ export class AppErrors {
 
   private readonly allowances: Allowance[] = [];
 
-  constructor(page: Page) {
+  /** Starts collecting from a page; the test fixture watches its own page. */
+  async watch(page: Page): Promise<void> {
     page.on('pageerror', error => this.seen.push(`page error: ${error.message}`));
     page.on('response', response => {
       if (response.status() >= 500) {
-        this.seen.push(`HTTP ${response.status()} ${response.request().method()} ${response.url()}`);
+        const method = response.request().method();
+        this.seen.push(`HTTP ${response.status()} ${method} ${response.url()}`);
       }
     });
     page.on('requestfailed', request => {
@@ -34,9 +36,6 @@ export class AppErrors {
         this.seen.push(`request failed: ${request.method()} ${request.url()} ${failure}`);
       }
     });
-  }
-
-  async blockExternalRequests(page: Page): Promise<void> {
     await page.route(
       url => url.origin !== STACK_ORIGIN && url.protocol.startsWith('http'),
       route => {
@@ -57,16 +56,33 @@ export class AppErrors {
   }
 }
 
-export const test = base.extend<{ appErrors: AppErrors }>({
+type Fixtures = {
+  appErrors: AppErrors;
+  // A page in a new signed-out browser context, watched like `page`.
+  signedOutPage: () => Promise<Page>;
+};
+
+export const test = base.extend<Fixtures>({
   appErrors: [
     async ({ page }, use) => {
-      const errors = new AppErrors(page);
-      await errors.blockExternalRequests(page);
+      const errors = new AppErrors();
+      await errors.watch(page);
       await use(errors);
       expect(errors.unexpected(), 'page errors, 5xx responses or failed requests').toEqual([]);
     },
     { auto: true },
   ],
+  signedOutPage: async ({ appErrors, browser }, use) => {
+    const contexts: BrowserContext[] = [];
+    await use(async () => {
+      const context = await browser.newContext({ storageState: { cookies: [], origins: [] } });
+      contexts.push(context);
+      const page = await context.newPage();
+      await appErrors.watch(page);
+      return page;
+    });
+    await Promise.all(contexts.map(context => context.close()));
+  },
 });
 
 export { expect };

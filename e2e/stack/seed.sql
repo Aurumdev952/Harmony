@@ -17,3 +17,11 @@ ON CONFLICT (id) DO NOTHING;
 INSERT INTO field_category_mapping (field_id, category_id, visibility_status, created, last_modified)
 VALUES ('e2e_yellow_fever_deaths', 'yellow-fever', 'VISIBLE', now(), now())
 ON CONFLICT (field_id, category_id) DO NOTHING;
+
+-- The contract stack seeds an unpublished field whose calculation is only
+-- {"type": "SUM"}, a shape the pipeline never writes
+-- (scripts/field_setup/populate_unused_fields.py always adds the field
+-- filter), and Indicator Setup throws on it. Give it the pipeline's shape.
+UPDATE unpublished_field
+SET calculation = '{"type": "SUM", "filter": {"type": "FIELD", "fieldId": "contract_unpublished_field"}, "metric": "sum"}'
+WHERE id = 'contract_unpublished_field';

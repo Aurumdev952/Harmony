@@ -115,7 +115,7 @@ def _demo_field_ids() -> List[str]:
     return sorted(VALID_FIELDS)
 
 
-def _facts() -> List[Fact]:
+def _facts(extra_fields: Sequence[str] = ()) -> List[Fact]:
     facts = []
     for location, sex, age, death, source, field in product(
         LOCATIONS,
@@ -123,7 +123,7 @@ def _facts() -> List[Fact]:
         CATEGORICAL_VALUES['Age'],
         CATEGORICAL_VALUES['Death'],
         CATEGORICAL_VALUES['source'],
-        _demo_field_ids(),
+        _demo_field_ids() + list(extra_fields),
     ):
         fact = dict(zip(LOCATION_DIMENSIONS, location))
         fact.update(Sex=sex, Age=age, Death=death, source=source, field=field)
@@ -252,11 +252,14 @@ def _aggregator_filter(aggregator: dict) -> Optional[dict]:
 
 
 class _Metrics:
-    def __init__(self, query: dict, rng: random.Random, special_values: bool):
+    def __init__(
+        self, query: dict, rng: random.Random, special_values: bool, dense: bool
+    ):
         self.aggregations = query.get('aggregations', [])
         self.post_aggregations = query.get('postAggregations', [])
         self.rng = rng
         self.special_values = special_values
+        self.dense = dense
 
     @property
     def names(self) -> List[str]:
@@ -271,8 +274,9 @@ class _Metrics:
 
     def row(self, facts: Sequence[Fact]) -> List[Any]:
         '''One row's metric values. An aggregator whose filter no fact passes is
-        empty; so, at random, is any other filter, as a bucket with no reports.
-        Aggregators sharing a filter (a value and its `__count`) share emptiness.'''
+        empty; so, at random unless `dense`, is any other filter, as a bucket with
+        no reports. Aggregators sharing a filter (a value and its `__count`) share
+        emptiness.'''
         empty: Dict[str, bool] = {}
         values: Dict[str, Any] = {}
         for aggregator in self.aggregations:
@@ -280,9 +284,8 @@ class _Metrics:
             agg_filter = _aggregator_filter(aggregator)
             key = json.dumps(agg_filter, sort_keys=True)
             if key not in empty:
-                empty[key] = (
-                    not any(_matches(agg_filter, fact) for fact in facts)
-                    or self.rng.random() < 0.15
+                empty[key] = not any(_matches(agg_filter, fact) for fact in facts) or (
+                    not self.dense and self.rng.random() < 0.15
                 )
             kind = _inner_aggregator(aggregator)['type']
             if name.endswith(COUNT_SUFFIX) or kind in INT_AGGREGATORS:
@@ -305,18 +308,30 @@ def _sort_key(values: Sequence[Optional[str]]) -> Tuple:
 
 def synthesize(case_name: str, query: dict, options: Optional[dict] = None) -> list:
     '''Answer `query` (the JSON body the app posts to Druid) with a raw Druid
-    response.'''
+    response.
+
+    Options: `empty` answers no rows; `special_values` puts NaN, infinities and
+    nulls into post-aggregations; `extra_fields` adds field ids to the deployment's
+    own (the e2e stack's Data Catalog has an indicator harmony_demo lacks);
+    `dense` reports every aggregator whose filter matches, so no bucket is empty
+    by chance.'''
     options = options or {}
     if options.get('empty'):
         return []
     rng = random.Random(_seed(case_name, query))
-    metrics = _Metrics(query, rng, bool(options.get('special_values')))
+    metrics = _Metrics(
+        query, rng, bool(options.get('special_values')), bool(options.get('dense'))
+    )
     granularity = query['granularity']
     if not isinstance(granularity, str):
         raise NotImplementedError(f'synth cannot bucket granularity {granularity!r}')
     granularity = None if granularity == 'all' else granularity
     days = list(_days(query['intervals']))
-    facts = [f for f in _facts() if _matches(query.get('filter'), f)]
+    facts = [
+        f
+        for f in _facts(options.get('extra_fields', ()))
+        if _matches(query.get('filter'), f)
+    ]
     if not facts:
         return []
 

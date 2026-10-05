@@ -13,6 +13,9 @@ instances:
       - "tests/privilege_escalation/test_rename_and_reset.py"
       - "tests/privilege_escalation/test_group_and_role_grants.py"
       - "docs/modernisation/work/WP-0j.md"
+  - name: "qa-0j-pins"
+    files:
+      - "tests/authz/http/test_account_handover.py"
 branch: "mig/WP-0j-rename-reset-guard"
 requirements: [INV-3, QA-1, QA-4]
 contracts_consumed: []
@@ -191,6 +194,12 @@ None.
   - WP-2b pure layer: 4675 passed on `488e482`, `dc8989a` and `429bf96`. Lint: `ci/lint_python.sh mig/WP-0j-rename-reset-guard` clean. 3.8: `check_py38_syntax.py tests/authz` 0 problems, `py_compile` under CPython 3.8.20 passes. On the branch alone, `pytest tests/authz` gives 1 skipped (exit 5, which `ci/pytest_suites.sh` reports as no tests selected). Leftovers after each run: 0 test users, groups, dashboards and handover roles.
   - Mail is counted per address before and after each request, because creating a dashboard also mails its author. `test_rename_and_reset.py:247-263` needed no request: the owner's round 2 unit 2 (`b090396`) changes `lastName` and asserts the five holdings unchanged. Evidence: `/tmp/wp0jqa/final-429bf96/`, `/tmp/wp0jqa/final-488e482/` (`handover.txt`, `live-all.txt`, `refusals.txt`, `web.log`), `/tmp/wp0jqa/pure-*.txt`, `/tmp/wp0jqa/run-xfail-0j/`.
 - 2026-10-06 backend-0j round 2 unit 10: merged qa's pin branch `07c219b` (`tests/authz/http/test_account_handover.py`). One conflict, in this file's Requests; kept both sides. The qa merge and the security (g) items are closed: (g) was fixed here in unit 9. The authorUsername flip goes back to qa.
+- 2026-10-06 backend-0j round 2 unit 11: merged `mig/integration` `bc5cb2d` (WP-0i, 2b, 2c, 2g, 4a, 8a, 0h) as the lead asked. Merge commit `ff5325c`. The one conflict was the backend memory index; both sides kept. `user_api_models.py` merged cleanly, with `issue_api_token` and `replace_user_acls` kept. The `importorskip` bridge in `tests/authz/http/test_account_handover.py` is left to qa: the file is qa's, and I reverted my edit. The qa-0j-pins instance now claims that file. Checks on `ff5325c`:
+  - `ci/pytest_suites.sh` exit 0: alerts 9, authz 4681 + 629 skipped (live layer, no stack), contract 60, core 185, db 26, druid 17 + 11 skipped, druid_setup 83, golden 272, graphql 22, pipeline 129 + 1 skipped, privilege_escalation 167 (with the propagating logger), toolchain 12, web 283 + 1 xfailed;
+  - `ci/lint_python.sh mig/integration`: ruff clean, 7 changed files formatted; `uv run --locked mypy`: no issues in 519 files;
+  - `check_py38_syntax.py` under CPython 3.8.20 (with `tests/authz`): 888 files, 0 problems;
+  - CPython 3.8.20 (`/tmp/wp2g-be3-py38`, plus integration's new `pydantic` 2.10.6, `pydantic-settings` 2.8.1 and `typing_extensions` 4.12.2 installed with `pip --target /tmp/wp0j-r2/py38extra` on `PYTHONPATH`): `tests/privilege_escalation` 167 passed;
+  - `task_gate.py WP-0j`: only status `review` and the reviewer's changes-requested verdict remain. WP-0h's files no longer show, because 0h came in through integration.
 
 ## Interrogate (unit 6)
 

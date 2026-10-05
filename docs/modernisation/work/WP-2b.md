@@ -100,6 +100,15 @@ None. The suite is written against today's Flask path and later re-pointed at `h
   - Checks: `ruff check` and `ruff format --check` clean. On a fresh stack (`harmony-wp2b-qafinal`, port 58780, trial merge of WP-2c 2e58b75, aborted afterwards), `-m authz_http -k test_api_tokens` gave 2 passed.
   - Mutant: a copy that uses the bearer once before the delete gets 200 at the 401 assert, so the assert catches a row-less token being accepted. The mutant was untracked and deleted after the run.
   - That mutant also exposed T1 (below, for security triage).
+- 2026-10-05 qa T1/T2: security triaged T1 as one Medium root cause with T2, owner WP-0k, and asked for both pins now. WP-0k flips them. Added to `test_api_tokens.py`:
+  - `test_used_api_token_of_a_deleted_user_signs_in_as_the_recreated_username` (T1). The token is used once, then its user is deleted and the username recreated. The old token gets 200 and lands on the recreated user. The docstring names the bound: Redis caches the validity for 10 minutes, and the test takes seconds.
+  - `test_login_token_of_a_deleted_user_signs_in_as_the_recreated_username` (T2). The token comes from `POST /api2/authentication/login` without a cookie. It gets 200 after the delete and recreate and lands on the recreated user. This pin does not depend on timing.
+  - The L3 case stays as the control: a token never used before the delete gets 401.
+  - The pins assert outcomes only:
+    - the probe's status;
+    - the signed-in user's URI, which `_signed_in_as` reads from the `/overview` layout's `__JSON_FROM_BACKEND.user.id`.
+  - Each test also asserts the original URI before the delete and a different URI after it, so the helper is not constant.
+  - Checks: `ruff check` and `ruff format --check` clean. On a fresh stack (`harmony-wp2b-qafinal`, port 58780, trial merge of WP-2c 2e58b75, aborted afterwards), `-m authz_http -k test_api_tokens` gave 4 passed, twice. Afterwards the stack held 0 `@authz.invalid` users and 0 `api_token` rows.
 
 ## Evidence
 
@@ -184,11 +193,16 @@ Two more, found by calling the production functions, pinned as today:
 
 - **Alert `read_via`.** `AlertNotificationResource` read: the SQL list filter joins on the parent alert definition's `authorization_resource_id` (correct), but the item-level check (`HybridRelationshipNeed.__call__`) reads the parent's own primary key. No HTTP path evaluates the item check today. Owner accept until WP-5f; WP-4e's `can()` models it as the parent alert's resource. Pinned by `test_alert_notification_item_check_uses_the_parent_primary_key`.
 - **Superuser tokens ignore their own `query_needs`.** A `needs: ['*']` token keeps `RoleNeed('admin')`, so its `query_needs` never reach the filter and the query is unfiltered. Owner WP-4e; issuance WP-5d. Pinned by `superuser_token_ignores_its_own_query_needs` and `..._via_group_...`.
-- **T1 (found 2026-10-05, not yet triaged). A deleted user's recently used API token stays valid for up to 10 minutes, and it signs in as anyone who gets the same username.**
-  - **Cause:** `login_from_request` memoises `check_token_validity` by token id (`CACHE_DEFAULT_TIMEOUT` is 10 minutes). Only `update_user_api_tokens` clears that memo. Deleting the user cascades the `api_token` rows but leaves a cached `True`.
-  - **Effect:** the JWT identity is the username, so if an account with the same username is created within the window, the old token authenticates as the new account.
-  - **Reproduce:** the memo-warming mutant of `test_api_token_without_a_row_is_refused_for_a_recreated_username`, which uses the bearer once before the delete, gets 200 instead of 401.
-  - **Not pinned:** the outcome depends on cache timing. Suggested owner: WP-5d (tokens). Security to triage.
+Two token findings, found 2026-10-05. Security triaged them together as one Medium root cause: JWTs name their user by username alone. Owner WP-0k, which flips both pins.
+
+- **T1. A deleted user's recently used API token keeps working for up to 10 minutes. It signs in as whoever is later created with the same username.**
+  - **Cause:** `login_from_request` memoises `check_token_validity` by token id, and `CACHE_DEFAULT_TIMEOUT` is 10 minutes. Only `update_user_api_tokens` clears that memo. Deleting the user cascades the `api_token` rows but leaves a cached `True`.
+  - **Pinned by:** `test_used_api_token_of_a_deleted_user_signs_in_as_the_recreated_username`. The token is used once, then its user is deleted and the username recreated. The old token gets 200, and the overview page's user id is the recreated account's.
+  - **Bound:** the pin holds only while the validity is cached (Redis, 10 minutes). The test takes seconds.
+  - **Control:** `test_api_token_without_a_row_is_refused_for_a_recreated_username`. A token never used before the delete gets 401.
+- **T2. A login access token outlives its user and signs in as the recreated username, with no time limit.**
+  - **Cause:** `POST /api2/authentication/login` without `set_cookie` returns a 365-day JWT with no `id` claim. `login_from_request` checks nothing but the username.
+  - **Pinned by:** `test_login_token_of_a_deleted_user_signs_in_as_the_recreated_username`. The old token gets 200 and lands on the recreated user's URI. This pin does not depend on timing.
 
 ### Security triage (from the WP-2b security review, 2026-10-05)
 
@@ -230,6 +244,7 @@ Owners are the WPs that resolve each finding; "accept until phase N" means recor
 | N6 | Medium | lead ruled no change (decision 0004 rule 1) | `PATCH /api2/role/<id>/users` grants a held role to others (reproduced); pinned as current behaviour; residual on WP-0h's human acceptance list |
 | Roles empty map | Medium | 0h (row 6) | `PATCH .../roles {}` deletes `Role` rows for every holder; `group_moderator` (member) and `user_admin` reach it (reproduced) |
 | Superuser token | Low | 4e (issuance 5d) | `needs: ['*']` tokens ignore their own `query_needs` |
+| T1, T2 | Medium (one root cause) | 0k | JWTs name the user by username alone. A deleted user's login token (T2, 365 days) or recently used API token (T1, while its validity is cached for 10 minutes) signs in as the recreated username. Pinned as today; flips in WP-0k |
 
 ## Verdicts
 
@@ -243,4 +258,4 @@ After these verdicts, 7933e17 changed one live pin (`test_api_tokens.py`) to fol
 
 - Security acknowledged 7933e17 (approval stands) and raised one Low: no pin covered a row-less token. That pin is now added (log, 2026-10-05).
 - Reviewer acknowledgement is pending.
-- T1 still needs security triage.
+- Security triaged T1 as a Medium root cause owned by WP-0k and asked for the T1 and T2 pins. Both are added (log, 2026-10-05 T1/T2).

@@ -8,14 +8,40 @@ memoised; `update_user_api_tokens` clears the memo when it saves or revokes).
 save inserts with ON CONFLICT DO NOTHING and adds no second row. Only admin can
 issue tokens today (it needs `change_password`, finding I3), so the admin
 issues one for a provisioned user. Owner WP-5d.
+
+Both kinds of JWT name their user by username alone. T1 and T2 pin, as today,
+that a token issued to a deleted user signs in as whoever is later created with
+the same username. Both flip in WP-0k.
 '''
 
 from __future__ import annotations
 
-from tests.authz.http.stack import new_session
+import json
+import re
+
+from tests.authz.http.stack import new_session, outcome
 
 # Any signed-in user may list roles (sitewide view_resource); anonymous gets 401.
 PROBE = '/api2/role'
+# Every signed-in user gets this page, and it carries the signed-in user's id.
+WHOAMI_PAGE = '/overview'
+_BACKEND_JSON = re.compile(r'window\.__JSON_FROM_BACKEND = (.*?);\s*\n')
+
+
+def _signed_in_as(stack, session) -> str:
+    '''The URI of the user the page layout says is signed in, or the outcome
+    of the page request when it is not the overview page.'''
+    response = stack.request(session, 'GET', WHOAMI_PAGE)
+    if outcome(response) != 'page:overviewPage':
+        return outcome(response)
+    user = json.loads(_BACKEND_JSON.search(response.text).group(1))['user']
+    return f'/api2/user/{user["id"]}'
+
+
+def _bearer(token: str):
+    session = new_session()
+    session.headers['Authorization'] = f'Bearer {token}'
+    return session
 
 
 def _save_tokens(stack, user_session, tokens) -> None:
@@ -68,7 +94,7 @@ def test_api_token_without_a_row_is_refused_for_a_recreated_username(stack):
     (the username) resolves to a live user. Deleting the user cascades its token
     rows; recreating the username gives the old token a user but no row. The
     bearer is never used before the delete, so no memoised validity hides the
-    missing row.'''
+    missing row. This is the control for T1, where the token was used first.'''
     original = stack.ensure_user('token-orphan', [])
     issued = stack.admin_json('POST', f'{original.user_uri}/generate_api_token')
     stack.admin_json('DELETE', original.user_uri)
@@ -87,3 +113,52 @@ def test_api_token_without_a_row_is_refused_for_a_recreated_username(stack):
     bearer = new_session()
     bearer.headers['Authorization'] = f'Bearer {fresh["token"]}'
     assert stack.request(bearer, 'GET', PROBE).status_code == 200
+
+
+def test_used_api_token_of_a_deleted_user_signs_in_as_the_recreated_username(stack):
+    '''T1: defect pinned as today; flips in WP-0k. An API token used before its
+    user is deleted keeps authenticating, and signs in as the account later
+    created with the same username. Holds while the token's validity stays
+    cached: the Redis cache keeps it for 10 minutes and this test takes
+    seconds.'''
+    original = stack.ensure_user('token-reused', [])
+    issued = stack.admin_json('POST', f'{original.user_uri}/generate_api_token')
+    bearer = _bearer(issued['token'])
+    assert _signed_in_as(stack, bearer) == original.user_uri
+
+    stack.admin_json('DELETE', original.user_uri)
+    recreated = stack.ensure_user('token-reused', [])
+    assert recreated.user_uri != original.user_uri
+    assert _stored_tokens(stack, recreated) == []
+
+    assert stack.request(bearer, 'GET', PROBE).status_code == 200
+    assert _signed_in_as(stack, bearer) == recreated.user_uri
+
+
+def test_login_token_of_a_deleted_user_signs_in_as_the_recreated_username(stack):
+    '''T2: defect pinned as today; flips in WP-0k. The access token from
+    `POST /api2/authentication/login` (no cookie) carries no `id` claim and
+    lives 365 days, so nothing is cached and nothing is checked but the
+    username: after the user is deleted and the username recreated, the old
+    token signs in as the new account.'''
+    original = stack.ensure_user('login-reused', [])
+    login = stack.request(
+        new_session(),
+        'POST',
+        '/api2/authentication/login',
+        {
+            'email': original.headers['X-Username'],
+            'password': original.headers['X-Password'],
+            'remember_me': False,
+        },
+    )
+    assert login.status_code == 200, login.text[:300]
+    bearer = _bearer(login.json()['access_token'])
+    assert _signed_in_as(stack, bearer) == original.user_uri
+
+    stack.admin_json('DELETE', original.user_uri)
+    recreated = stack.ensure_user('login-reused', [])
+    assert recreated.user_uri != original.user_uri
+
+    assert stack.request(bearer, 'GET', PROBE).status_code == 200
+    assert _signed_in_as(stack, bearer) == recreated.user_uri

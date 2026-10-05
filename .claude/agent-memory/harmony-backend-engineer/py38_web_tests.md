@@ -13,4 +13,9 @@ Flask 1.0 cannot build an app from a module loaded by pytest's rewrite hook: pas
 
 A container's bridge IP is not reachable from this host's shell; publish throwaway services on `127.0.0.1:<high port>` (6379 and 5432 are already taken on the host).
 
-**`tests.` imports break on the web image's 3.8 stack** (WP-0i, 2026-10-05). The editable Flask-Potion install puts its checkout on sys.path, and that checkout ships a regular `tests` package (which imports `flask_testing`). A regular package beats the repo's `tests` namespace package wherever it sits on the path, so `from tests.web.x import ...` fails to collect there. The WP-0c sed recipe installs Flask-Potion non-editable and hides this. Import test helpers by a unique basename instead (pytest puts a directory with no `__init__.py` on sys.path). To reproduce, put a dir containing `tests/__init__.py` with `import flask_testing` after the repo on PYTHONPATH.
+**`tests.` imports can break on a 3.8 env with a develop install of Flask-Potion** (WP-0i, 2026-10-05).
+- **Which installs shadow.** A pip develop install (`pip install -e` of the git checkout, the `-e git+` lines in `requirements*.txt` as pip runs them) adds the checkout root to sys.path through an `easy-install.pth`/`.egg-link`. That checkout ships a regular `tests` package, which imports `flask_testing`.
+- **Why it breaks.** A regular package beats the repo's `tests` namespace package wherever it sits on the path, so `from tests.web.x import ...` fails to collect. QA hit this on its 3.8 env.
+- **Which installs do not.** `uv --with-editable` does not expose the checkout's `tests`, and neither does the non-editable WP-0c sed recipe. Both pass.
+- **What to do.** Import test helpers by a unique basename (pytest puts a directory with no `__init__.py` on sys.path), so the suite works on any install.
+- **To reproduce,** put a directory containing `tests/__init__.py` with `import flask_testing` after the repo on PYTHONPATH.

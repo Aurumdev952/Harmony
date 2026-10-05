@@ -1,7 +1,7 @@
 ---
 wp: "0i"
 title: "Guard the dashboard render and thumbnail routes"
-status: review
+status: blocked
 owner_role: "backend"
 instances:
   - name: "lead-1"
@@ -31,6 +31,18 @@ security_review: true
 ---
 
 # WP-0i: Guard the dashboard render and thumbnail routes
+
+## Blocked: human acceptance of the INV-3 table (decision 0004)
+
+QA, reviewer and security have all approved (rounds 3 and 4, at `b5248bf`). INV-3 says authorisation decisions change only on purpose, in a security-reviewed WP, so this WP needs your explicit acceptance before it can be marked ready. The draft PR lists the same items.
+
+**Do you accept the "INV-3: who could do what, before and after" table below?** It includes these items, which need your attention:
+
+1. **Public PDF download is lost.** On deployments with public access, anonymous visitors now get 401 on `/pdf`; `/jpeg` already failed with a 500. The alternative is a follow-up that adds a dedicated non-admin public render account.
+2. **Existing render-bot accounts.** Deployments set up before this WP still have a `renderbot@zenysis.com` site-admin account, which nothing uses any more and which now shows in the Admin user list. Should those accounts be deactivated or demoted on each deployment?
+3. **`DEPLOYMENT_BASE_URL` per deployment.** Each deployment needs its real public https origin, with no path, userinfo, query or fragment. Otherwise the app refuses to start (INV-1 note).
+
+Answer by ticking the "human" requests below, or say what to change.
 
 Decision 0004, phase 0 section 0i. This WP closes three exposures:
 
@@ -267,6 +279,7 @@ These are WP-2c API contract recordings (`tests/contract`, owned by qa), not one
 - [x] **lead:** remove the render-bot line from `scripts/create_bot_accounts.sh:5`. Done on this branch (`e6a90bf`, instance `lead-1`). Whether to deactivate the existing accounts is a human question (above).
 - [x] **core:** remove the unused `RENDERBOT_EMAIL` from `config/settings.py:39`. This is done on WP-1h's core branch.
 - [ ] **infra:** remove `RENDERBOT_EMAIL` from `docker-compose.yaml:145` and `:179` (`:143` and `:178` on WP-1h's core branch).
+- [ ] **infra:** when WP-2b merges, add `tests/authz` to the path list of the 3.8 syntax guard (`ci/check_py38_syntax.py` in `.github/workflows/integration.yml`). The flipped overlay that qa-2b copies there is 3.8-safe today, but nothing would catch a regression.
 - [ ] **infra (WP-3b):** upgrade gunicorn from 20.0.4 (`uv.lock`), so that a `SCRIPT_NAME` request header no longer reaches the WSGI environ (carried risk 11). Not blocking: the render paths no longer read it.
 - [x] **qa (qa-2c):** acknowledge the two contract changes above (done at `bf08a36`). The `seed_cache.py` rework belongs to whichever of WP-0i and WP-2c merges second.
 - [ ] **human:** remove `RENDERBOT_EMAIL` from `.env.example` (a human item; agents do not read `.env*`).
@@ -288,8 +301,9 @@ These are WP-2c API contract recordings (`tests/contract`, owned by qa), not one
 - 2026-10-05 backend-7 round 3: the Redis claim race is closed, and tests are added for thumbnail args, redaction of a 500, the hash seed and the bounded claim loop (`03acb20`). Check: each new test kills its mutant (dropping `request_args={}`, logging `res.url`, an unsorted canonical policy, no deadline, an unconditional delete). `tests/web` 237 passed plus 1 strict xfail; the lint gate is clean.
 - 2026-10-05 backend-7 round 3: flipped N7 in the WP-2b overlay, and brought this file up to date (INV-1 note, INV-3 rows, contract changes, risks, requests, evidence). Check: the WP-2b pure layer is 4681 passed with the overlay, 4675 on base, and 4663 plus 12 errors with today's pins; the non-render outcomes are identical to base.
 - 2026-10-05 backend-7 round-3 rework: merged `mig/integration` `61db9f8` (`fc3d8de`: py38 ruff target, 3.8 syntax guard, gate fix for lead-owned paths). Check: the 3.8 syntax guard passes 852 files.
-- 2026-10-05 backend-7 round-3 rework: the render fakes are now `render_fakes.py`, imported by basename. A new test checks that a gunicorn `create_app` refuses a hostile `DEPLOYMENT_BASE_URL` before any database access (`d5c3d23`). Check: tests/web gives 238 passed and 1 xfail on 3.9 (CI way) and on 3.8 (requirements*.txt). With a regular `tests` package placed after the repo on the 3.8 path, as the editable Flask-Potion install does, the round-3 head fails collection (`flask_testing`) and this head passes. The startup test fails ("the database was touched") when `validate_deployment_base_url` is removed.
+- 2026-10-05 backend-7 round-3 rework: the render fakes are now `render_fakes.py`, imported by basename. A new test checks that a gunicorn `create_app` refuses a hostile `DEPLOYMENT_BASE_URL` before any database access (`d5c3d23`). Check: tests/web gives 238 passed and 1 xfail on 3.9 (CI way) and on 3.8 (requirements*.txt). With a regular `tests` package placed after the repo on the 3.8 path, as a pip develop install of Flask-Potion does, the round-3 head fails collection (`flask_testing`) and this head passes. The startup test fails ("the database was touched") when `validate_deployment_base_url` is removed.
 - 2026-10-05 backend-7 round-3 rework: the overlay now uses `ExitStack` instead of a parenthesised `with`. Stale lead, render-bot and qa-2c items updated, with the evidence refreshed. Check: the old overlay fails the 3.8 guard at line 159 and the new one passes. The lint gate is clean. The WP-2b pure layer (`7933e17`) is 4681 passed with the overlay against 4675 on base, with identical non-render outcomes.
+- 2026-10-05 backend-7: QA, reviewer and security approved at `b5248bf`. The status is set to blocked on the human's acceptance of the INV-3 table (decision 0004). Also corrected the shadowing note (only a pip develop install shadows), requested the 3.8 guard for `tests/authz`, and pushed the branch with a draft PR. Check: `task_gate` reports only the status.
 
 ## Evidence
 
@@ -299,7 +313,7 @@ Round-3 rework head, after merging `mig/integration` `61db9f8`. Commands are run
   - `tests/web/render` alone gives 143 passed and 1 xfailed.
   - `docs/modernisation/work/WP-0i-evidence/tests-web-render.txt` lists every case by name.
 - **`tests/web` on the web image's stack.** CPython 3.8.20 with `requirements.txt` and `requirements-web.txt`, using the WP-0c rewrite of the `-e git+` lines, gives 238 passed and 1 xfailed.
-  - That rewrite installs Flask-Potion from git, not as an editable checkout, so it does not ship the checkout's `tests` package.
+  - That rewrite installs Flask-Potion from git, not as an editable checkout, so the checkout's `tests` package is not on the path. `uv --with-editable` does not expose it either. Only a pip develop install, which adds the checkout root to `sys.path`, does.
   - To reproduce QA's environment, a regular `tests` package that imports `flask_testing` is put after the repo on `PYTHONPATH`.
   - With it, the round-3 head (`cc01fa0`) fails collection with `ModuleNotFoundError: flask_testing`, and this head gives 238 passed and 1 xfailed.
 - **3.8 syntax.** `uv run --no-project -p cpython-3.8.20 python ci/check_py38_syntax.py config data db log models graphql util web scripts tests/web` gives 852 files checked and 0 problems.

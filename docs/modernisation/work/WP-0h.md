@@ -15,7 +15,7 @@ instances:
       - "web/server/routes/views/groups.py"
       - "web/server/routes/views/permission.py"
       - "web/server/routes/views/users.py"
-      - "tests/web/privilege_escalation/**"
+      - "tests/privilege_escalation/**"
       - "docs/modernisation/work/WP-0h.md"
 branch: "mig/WP-0h-privilege-escalations"
 requirements: [INV-3, QA-1, QA-4]
@@ -57,7 +57,8 @@ Units, in order. Each line names the change and the check that ends it.
    - pylint E1101, types, the INV-3 rows for superuser-visible changes, and the doc fixes.
 
    Check: the tests pass here and the new ones fail on integration; a mutation pass over every guard; CI pylint and black on the changed files; WP-2b pure layer identical and live layer differing only in the pinned escalations.
-9. Rework after security round 2 (`dc65f70`): `member_groups_from_uris` excludes admin-holding groups for a non-superuser identity, as `GroupResourceManager` does, failing test first. Check: the new narrowed-token case fails on `a615058` and passes here; WP suite, CI pylint and black, WP-2b pure layer.
+9. Rework after security round 2 (`dc65f70`): `member_groups_from_uris` excludes admin-holding groups for a non-superuser identity, as `GroupResourceManager` does, failing test first. Check: the new narrowed-token case fails on `a615058` and passes here; WP suite, WP-2b pure layer.
+10. Rework after the round-2 verdicts (reviewer, qa): merge `mig/integration` and pass WP-2f's CI gates on the merged tree (suite moved to `tests/privilege_escalation` so it runs in its own process; mypy and ruff findings), pin the two surviving guards, remove the dead `QueryNeed` filter, and correct the evidence. Check: `ci/lint_python.sh`, `uv run --locked mypy` and `ci/pytest_suites.sh` pass on the merged head; mutation of each new pin's guard fails its test; WP-2b pure layer identical.
 
 ### How each escalation works (unit 1)
 
@@ -109,17 +110,13 @@ A non-superuser may give a group, a user or a role only grants it already holds.
 
 ### How to run the tests
 
-`tests/web/privilege_escalation/` drives the real Flask app: `create_app_base`, Flask-User, Flask-Principal with the production signal handlers, header login or the `accessKey` JWT cookie, and `_register_potion_routes` (query resources are left out because they read Druid). The database is a throwaway `postgres:15.2-alpine` container on a free loopback port, built with `db.create_all()` and seeded with the harmony_demo roles the tests use. Set `HARMONY_TEST_DATABASE_URL` to use an existing empty database instead.
+`tests/privilege_escalation/` drives the real Flask app: `create_app_base`, Flask-User, Flask-Principal with the production signal handlers, header login or the `accessKey` JWT cookie, and `_register_potion_routes` (query resources are left out because they read Druid). The database is a throwaway `postgres:15.2-alpine` container on a free loopback port, built with `db.create_all()` and seeded with the harmony_demo roles the tests use. Set `HARMONY_TEST_DATABASE_URL` to use an existing empty database instead.
 
 ```bash
-sed -E 's/^-e (git\+.*#egg=(.*))$/\2 @ \1/; s/#egg=.*$//' requirements.txt requirements-web.txt \
-  | grep -v 'segment-analytics\|google-cloud-logging\|Flask-Admin\|graphene\|Flask-GraphQL' > /tmp/wp0h-reqs.txt
-PYTHONPATH=$PWD uv run --no-project -p 3.8 --with-requirements /tmp/wp0h-reqs.txt \
-  --with 'pytest<8' --with 'bcrypt<4.1' \
-  python -m pytest tests/web/privilege_escalation -q -p no:cacheprovider -W ignore
+uv run --locked pytest tests/privilege_escalation -q
 ```
 
-`bcrypt<4.1` keeps passlib's password hashing working, as in `scripts/create_user.py`.
+It is its own directory under `tests/` because it builds a Flask app and registers the Potion resources for the whole process; `ci/pytest_suites.sh` runs each directory in its own process. Before the unit 10 merge the branch predated WP-2f and ran on a Python 3.8 environment built from `requirements*.txt`.
 
 ## INV-3 difference table
 
@@ -254,6 +251,19 @@ Three reviewers ran: opus (A), fable (B), and sonnet (C; it reported to the lead
 | `member_groups_from_uris` allowed every group of the caller's account, so an admin account in an admin-holding group, on a token narrowed to `edit_user` and `edit_resource`, could add a user to that group through `PATCH /api2/user/<id>` (200, no audit line) | security, Medium | Closed in `e58c67a`: a non-superuser identity is refused groups carrying the admin role, the same exclusion as `GroupResourceManager` and `held_roles_from_uris`. Failing first: `test_a_narrowed_admin_token_cannot_grant_through_any_path[narrowed-user_patch_admin_group]` got `assert 200 in (403, 404)` on `a615058`; its full-session half (200, granted) passes on both. F4 and INV-3 row 12 now hold as written: every grant path, user groups included, refuses a narrowed admin token. Only `PATCH /api2/user/<id>` writes a user's groups (`update_user_groups`), so no other route needed the change. |
 | H5 | security | Moved to WP-0j (decision 0005). Requests updated. |
 
+## Rework after the round-2 verdicts (unit 10)
+
+| Finding | From | Closure |
+|---|---|---|
+| `member_groups_from_uris` keeps admin-holding groups for narrowed tokens | reviewer, qa (same as security's) | Closed in unit 9. QA's probe (`/tmp/qa0h-r2-evidence/test_qa_probe.py`, copied in temporarily) passes on `98e77fc`: 6 passed, including an account that is admin only through the group. |
+| CI gates red on the merge with integration | reviewer (high), qa (high) | Merged `mig/integration` (`df01179` at `56deb80`, `044a457` at `1697a7a`). The suite moved to `tests/privilege_escalation`, so `tests/web/test_graphql_endpoint_removed.py` no longer shares its process. mypy: `users.py` `user.roles.remove` and `grants.py` `role.permissions` carry `# type: ignore[attr-defined]` (sqlmypy types an untyped `relationship` as one object; the models are core's). ruff: the unused `create_dashboard_permission_updates` import removed, `APIToken.is_revoked.is_(False)`, three files formatted. Evidence now cites `ci/lint_python.sh`, mypy and `ci/pytest_suites.sh`. |
+| `member_groups_from_uris`'s superuser early return survives deletion | reviewer (medium) | Pinned by `test_admin_adds_a_user_to_a_group_it_is_not_in` (200, membership written); deleting the return fails it. |
+| `QueryNeed` filter in `holds_everything_in` is dead | reviewer (low) | Removed with the import. The role's query needs already passed `verify_role_grants` against the same account needs. |
+| `try_get_role_and_resource`'s `resource_type_id` comparison unpinned | reviewer (low) | `test_an_unknown_resource_role_name_is_not_found` now also sends `alert_admin` on a dashboard through a user and a group ACL: 404, no ACL written on either. Removing the comparison fails both. |
+| Live layer pins 10 escalations at `f2e04ac`, not 6 | qa (low) | Evidence and the qa request list all ten. |
+| Static-check evidence cites pylint and black | qa (low) | Replaced for this round by ruff and mypy through the CI scripts; the unit 6 and unit 8 static checks are marked as pre-WP-2f. |
+| Unit 8 log date | reviewer (nit) | 2026-10-05. |
+
 ## Findings for the lead
 
 Outside this WP's scope. Each needs its own decision.
@@ -290,8 +300,9 @@ None.
   - **N5**, `group_moderator` attaches `_default_role` to its group: 403 unless it holds `_default_role`.
   - **N6**, `PATCH /api2/role/<id>/users`: unchanged, 200 on a held role and 404 otherwise. See the INV-3 table.
   - **`/users` self-add**: unchanged, 404 for a non-member.
-  - **`/roles` with `{}`**: 200, and the `Role` rows survive.
-  - At `ca58b7d` the live layer already pins H1-H3, N3, N4 and N5. All six fail on this branch with `assert 403 == 200` and nothing else changes (Evidence).
+  - **N4 on update**, `test_role_editor_attaches_all_values_policies_and_data_export_to_a_held_role[role_administrator]` and `[role_moderator]`: 403.
+  - **Empty role maps**, `test_group_moderator_empty_role_map_deletes_the_group_roles_for_everyone` and `test_user_admin_empty_role_map_deletes_the_user_roles_for_everyone`: 200, the target's roles unlinked and the `Role` rows kept.
+  - At `f2e04ac` the live layer pins ten of these: H1-H3, N3, N4 (create, and update by `role_administrator` and `role_moderator`), N5 and both empty role maps. QA's run on a trial merge: all ten fail on this branch and nothing else changes (Evidence).
   - **F1**, if the suite pins it: `manager` + `user_admin` on `PATCH /api2/user/<id>` adding admin, an unheld group, or a `dashboard_admin` ACL gets 403. `test_user_admin_cannot_change_roles_through_the_user_form` (`user_admin` alone) is unchanged.
 - [x] lead: routed by decision 0005 to WP-0j (backend, Sec yes); not this WP's scope. Original request: security's H5 (WP-2b) is not fixed here. `manager` + `user_admin` can rename a user who is an admin through a group, keeping the group by the resend rule, then pass the reset-password check, so the reset goes to an address the caller chose. That is a possible account takeover, unconfirmed. F1 does not reach it, because it is a profile edit, not a grant. Candidate rules are refusing a non-superuser's edit to the username of a user holding grants the caller does not hold, or checking the reset target's roles. Needs its own decision; suggested owner backend, Sec yes.
 
@@ -303,19 +314,30 @@ None.
 - 2026-10-04 backend-6 unit 4: INV-3 table; WP-2b suite at `d1e809a` against integration and this branch. Check: pure layer identical (2517 passed each); live layer differs only in the three pinned escalations.
 - 2026-10-05 backend-6 unit 5: `pstack:interrogate` with opus, fable and sonnet; triage above.
 - 2026-10-05 backend-6 unit 6: decision 0004 scope and the interrogate fixes. Check: 36 passed here; the same file against integration `3780c8c` gives `22 failed, 14 passed`.
-- 2026-10-04 backend-7 unit 8 (resumed from backend-6's uncommitted rework after the host reboot): F1, one superuser definition on every grant path including the role and group managers, generic 403 bodies, the reviewer's guard and type fixes, INV-3 rows 4-6, 9, 12-19. Commits `e1d065b`, `a23f729`. Check: 81 passed here; the same file against integration `3780c8c` gives `49 failed, 32 passed`. Mutation pass killed every guard but one (recorded). CI pylint has no errors and black 22.6.0 is clean on the changed files. WP-2b pure layer identical. Live layer: integration 575 passed; this branch 569 passed, and the 6 failures are exactly the pinned escalations.
+- 2026-10-05 backend-7 unit 8 (resumed from backend-6's uncommitted rework after the host reboot): F1, one superuser definition on every grant path including the role and group managers, generic 403 bodies, the reviewer's guard and type fixes, INV-3 rows 4-6, 9, 12-19. Commits `e1d065b`, `a23f729`. Check: 81 passed here; the same file against integration `3780c8c` gives `49 failed, 32 passed`. Mutation pass killed every guard but one (recorded). CI pylint has no errors and black 22.6.0 is clean on the changed files. WP-2b pure layer identical. Live layer: integration 575 passed; this branch 569 passed, and the 6 failures are exactly the pinned escalations.
 - 2026-10-05 backend-8 unit 9: `member_groups_from_uris` admin-group exclusion after security round 2, commit `e58c67a`; H5 pointed at WP-0j (decision 0005). Check: the new narrowed-token case failed first (200); 83 passed here; the file on integration `3780c8c` gives `50 failed, 33 passed`; CI pylint no errors and black 22.6.0 clean on the WP's 11 changed Python files; WP-2b pure layer (`09a7581`) `4675 passed, 580 skipped` on both, outcomes byte-identical.
+- 2026-10-05 backend-8 unit 10: merged `mig/integration` (`1697a7a`), suite moved to `tests/privilege_escalation`, mypy and ruff fixes, two guards pinned, dead `QueryNeed` filter removed, evidence corrected; commits `df01179`, `98e77fc`, `044a457`. Check: `ci/lint_python.sh mig/integration` and `uv run --locked mypy` pass; `ci/pytest_suites.sh` all 9 suites pass (86 here); the file on integration `1697a7a` gives `50 failed, 36 passed`; the new pins kill their guards; WP-2b pure layer byte-identical.
 
 ## Evidence
+
+**Unit 10 (merged head `044a457`; code at `98e77fc`):**
+- `ci/lint_python.sh mig/integration` (the 11 Python files this WP changes): `All checks passed!`, `11 files already formatted`.
+- `uv run --locked mypy`: `Success: no issues found in 518 source files`.
+- `ci/pytest_suites.sh`: `all 9 suites passed`. `tests/core` 25, `tests/druid` 1, `tests/druid_setup` 79, `tests/golden` 269, `tests/graphql` 22, `tests/pipeline` 129 (1 skipped), `tests/privilege_escalation` 86, `tests/toolchain` 9, `tests/web` 95 (including `test_graphql_endpoint_removed.py`).
+- QA-1: the file on integration `1697a7a` gives `50 failed, 36 passed`. The three new pins (`test_admin_adds_a_user_to_a_group_it_is_not_in`, the two `alert_admin` cases) hold behaviour that is unchanged, so they pass on both.
+- Mutation, each applied alone and restored: deleting `member_groups_from_uris`'s superuser return fails `test_admin_adds_a_user_to_a_group_it_is_not_in`; disabling the `resource_type_id` comparison fails `test_an_unknown_resource_role_name_is_not_found[user-alert_admin]` and `[group-alert_admin]`; deleting the admin-group exclusion fails `[narrowed-user_patch_admin_group]`.
+- QA's probe (`test_qa_probe.py`): 6 passed.
+- WP-2b pure layer, suite at `09a7581`, scratch copies of integration `1697a7a` and `044a457`: `4675 passed, 580 skipped` on both; sorted outcomes (4687 lines each) identical.
+- WP-2b live layer: not re-run by this unit. QA's round-2 run on a trial merge of `dc65f70` with `8638861` gave `580 passed` on base and `570 passed` on the merge, the 10 failures being exactly the pinned escalations listed under Requests. Since then, the code changes are the admin-group exclusion (narrowed admin tokens only), the `is_(False)` rewrite of an equivalent filter, formatting and type ignores.
 
 **Unit 9 (`e58c67a`):**
 - WP tests: `83 passed` (81 plus both halves of the `user_patch_admin_group` path). Before the fix: `1 failed, 19 passed` under `-k narrowed_admin_token`, the failure `assert 200 in (403, 404)` on the narrowed half.
 - QA-1: the file on integration `3780c8c` gives `50 failed, 33 passed`.
-- CI pylint 2.17.4 over the 11 changed Python files under `tests/web/privilege_escalation` and `web/server`: 0 errors (38 convention, 5 warning, 4 refactor; `grants.py` has only the existing `duplicate-code` notes). black 22.6.0 `-S -t py39 --check` clean on `grants.py` and the test file.
+- Static checks: superseded by unit 10's CI gates on the merged tree.
 - WP-2b pure layer, suite from `mig/WP-2b-authz-suite` at `09a7581`, scratch copies of `3780c8c` and `e58c67a` built with `git archive`: `4675 passed, 580 skipped` on both; sorted `-rA` outcomes (4687 lines each) byte-identical.
-- Live layer not re-run: unit 9 changes outcomes only for a token narrowed on an admin account. The render token is the only one issued, and it fails the route's `edit_user` gate.
+- Live layer: see unit 10.
 
-**This WP's tests** (`tests/web/privilege_escalation/`, command under "How to run the tests"):
+**This WP's tests** (then `tests/web/privilege_escalation/`, command under "How to run the tests"):
 - this branch at `a23f729`: `81 passed`.
 - **QA-1.** Integration `3780c8c` with this branch's test file copied in gives `49 failed, 32 passed`. Each failing case is an escalation, a narrowed-token grant, a destructive path or a validation change this WP makes (INV-3 rows). The 32 passes are the behaviours that must not change: N6, the `/users` 404s, the resend cases, removals, and the full-admin-session halves of the narrowed-token tests.
   - At unit 6 (`c3a256f`) the file gave `22 failed, 14 passed` on integration.
@@ -330,7 +352,7 @@ None.
   - this branch: `6 failed, 569 passed`. The outcome diff is exactly the six pinned escalations, each `assert 403 == 200`: `test_group_admin_becomes_site_admin_by_creating_a_group_with_the_admin_role`, `test_group_moderator_becomes_site_admin_through_a_group_it_belongs_to`, `test_group_moderator_gains_all_values_policies_by_attaching_a_role`, `test_role_administrator_attaches_all_values_policies_and_data_export`, `test_role_administrator_grants_itself_any_permission_through_a_new_role`, `test_role_moderator_adds_a_permission_to_a_role_it_holds`.
   - **QA-4 ("every page renders").** `tests/authz/http/test_requests.py` requests every page and API row in `requests.yaml` for every seeded role and an anonymous visitor: 375 passed on both stacks with identical outcomes. List filtering (162), saved queries (26) and seed drift (2) are unchanged too. The live harness creates every principal through admin `PATCH /api2/user/<id>`, the route F1 changed.
 
-**Static checks (unit 8):**
+**Static checks (unit 8, before WP-2f was merged in; superseded by unit 10):**
 - CI's pylint 2.17.4 over every changed Python file reports no errors. It reports E1101 at `0bb2525`'s `grants.py:72`. The remaining warnings are pre-existing.
 - black 22.6.0 `-S -t py39 --check` (CI's) is clean on all changed files.
 - `uvx ruff check web/server/security/grants.py tests/web/privilege_escalation` passes.
@@ -348,7 +370,7 @@ None.
   - Every other live case is unchanged: seed drift, per-role page and API status codes, Potion list filtering, saved queries, and the admin self-delete guard.
   - The N3 to N6 pins were not yet on the suite branch at `e835c77`. qa flips or adds them on this branch (Requests).
 
-**Static checks (unit 6):** `uvx ruff check web/server/security/grants.py tests/web/privilege_escalation` passes; `uvx black -S --check` is clean on both. Edits elsewhere keep each file's existing formatting, and black-version differences in untouched lines are left alone.
+**Static checks (unit 6, superseded by unit 10):** `uvx ruff check web/server/security/grants.py tests/web/privilege_escalation` passes; `uvx black -S --check` is clean on both. Edits elsewhere keep each file's existing formatting, and black-version differences in untouched lines are left alone.
 
 ## Verdicts
 

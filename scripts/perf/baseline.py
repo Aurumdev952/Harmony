@@ -2,24 +2,39 @@
 
 Replays a fixed set of `/api2/query/*` requests against the perf stack
 (scripts/perf/stack.sh) and records, per case, p50 and p95 latency, response
-bytes and Druid-side query time:
+bytes and Druid-side query time. After the query cases it runs dashboards.mjs
+(unless --no-dashboards), which loads the reference dashboards of
+dashboards.json in headless Chromium and records time to last tile and bytes
+transferred; those rows have endpoint `dashboard`.
 
+Paired mode, the default and the PERF-7 check. The stack runs two copies of
+the app against the same Druid: the reference (old code, `stack.sh reference
+<git ref>`) and the candidate (this checkout). Every case alternates between
+them request by request, the reference first in even rounds and the candidate
+first in odd ones, so both sides see the same host load. The run fails when a
+case's candidate p95 is more than 10% above its reference p95:
+
+    scripts/perf/stack.sh up && scripts/perf/stack.sh ui
+    scripts/perf/stack.sh reference main
     eval "$(scripts/perf/stack.sh env)"
-    uv run --no-project --with requests python scripts/perf/baseline.py
-    uv run --no-project --with requests python scripts/perf/baseline.py --compare
+    uv run --no-project --with requests python scripts/perf/baseline.py --label WP-1b
+
+It writes under docs/modernisation/perf/paired/, named
+<date>-<reference sha>-vs-<candidate sha>[-<label>]: `.reference.jsonl` and
+`.candidate.jsonl` (one PerfSample per case), `.meta.json` (hardware, host load
+at start and end, versions, dataset, method) and `.md` (the paired ratios, then
+both sides' absolute numbers). The absolute numbers are evidence only: on a
+shared host they move with its load, and the ratio does not.
+
+Committed mode (`--committed`, or `--compare [BASE]`) measures the candidate
+alone and writes <date>-<git sha>[-<label>] `.jsonl`, `.meta.json` and `.md`
+directly under docs/modernisation/perf/. `--compare` then holds each p95 to
+10% above BASE's (default: the newest `.jsonl` there), as does
+
     uv run --no-project python scripts/perf/baseline.py compare BASE.jsonl NEW.jsonl
 
-After the query cases it runs dashboards.mjs (unless --no-dashboards), which
-loads the reference dashboards of dashboards.json in headless Chromium and
-records time to last tile and bytes transferred; those rows have endpoint
-`dashboard`, and their p95 is held to the same limit.
-
-A run writes three files under docs/modernisation/perf/, named
-<date>-<git sha>[-<label>]: `.jsonl` (one PerfSample per case), `.meta.json`
-(hardware, versions, dataset, method) and `.md` (both, as tables).
-
-`--compare [BASE]` and `compare` fail when any case's p95 is more than 10% above
-the base's (PERF-7). Without a path, the base is the newest committed `.jsonl`.
+Absolute numbers only agree from run to run on a quiet, dedicated host, so
+this mode is for such a machine.
 
 The cases are WP-2a golden request bodies (tests/golden/cases), sent as the
 frontend sends them, with every INTERVAL filter widened to the dataset's three
@@ -31,9 +46,9 @@ Requests run one at a time from one client, after warm-up rounds, so Druid's
 and the app's caches are warm: the numbers are steady-state latency for a
 repeated query, not cold-start latency.
 
-A case gets 100 timed requests and a dashboard 30 loads. Of 100 requests,
-p95 lies between the fifth- and sixth-slowest; of 30, between the second- and
-third-slowest, so two stalls on a shared host would set it.
+A case gets 100 timed requests per side and a dashboard 30 loads. Of 100
+requests, p95 lies between the fifth- and sixth-slowest; of 30, between the
+second- and third-slowest, so two stalls would set it.
 """
 
 from __future__ import annotations
@@ -49,9 +64,9 @@ import statistics
 import subprocess
 import sys
 import time
-from collections.abc import Iterable, Iterator
+from collections.abc import Callable, Iterable, Iterator
 from pathlib import Path
-from typing import Any
+from typing import Any, TypeVar
 
 HERE = Path(__file__).resolve().parent
 REPO_ROOT = HERE.parents[1]
@@ -59,6 +74,7 @@ DASHBOARD_SCRIPT = HERE / 'dashboards.mjs'
 DASHBOARD_SPECS = HERE / 'dashboards.json'
 GOLDEN_CASES = REPO_ROOT / 'tests/golden/cases'
 RESULTS_DIR = REPO_ROOT / 'docs/modernisation/perf'
+SIDES = ('reference', 'candidate')
 DATASET_START = '2023-01-01'
 DATASET_END = '2026-01-01'
 P95_REGRESSION_LIMIT = 0.10
@@ -147,6 +163,29 @@ def percentile(values: Iterable[float], fraction: float) -> float:
     return ordered[low] + (ordered[high] - ordered[low]) * (rank - low)
 
 
+T = TypeVar('T')
+
+
+def interleaved_order(round_index: int, sides: tuple[str, ...]) -> tuple[str, ...]:
+    """The order of the sides in one round: as given in even rounds, reversed
+    in odd ones, so neither side always runs right after the other."""
+    return sides if round_index % 2 == 0 else tuple(reversed(sides))
+
+
+def run_interleaved(
+    sides: tuple[str, ...], rounds: int, warmup: int, measure: Callable[[str], T]
+) -> dict[str, list[T]]:
+    """Call measure(side) for every side in every round, warm-up rounds first,
+    and return each side's results from the timed rounds."""
+    results: dict[str, list[T]] = {side: [] for side in sides}
+    for index in range(warmup + rounds):
+        for side in interleaved_order(index, sides):
+            result = measure(side)
+            if index >= warmup:
+                results[side].append(result)
+    return results
+
+
 def summarise(
     case_id: str,
     endpoint: str,
@@ -194,6 +233,16 @@ def summarise_dashboard(record: dict[str, Any]) -> PerfSample:
         max_ms=round(max(latencies), 1),
         druid_queries=None,
     )
+
+
+def dashboard_samples_by_side(lines: Iterable[str]) -> dict[str, list[PerfSample]]:
+    """Summarise dashboards.mjs output, one JSON line per dashboard and target."""
+    grouped: dict[str, list[PerfSample]] = {}
+    for line in lines:
+        if line.strip():
+            record = json.loads(line)
+            grouped.setdefault(record['target'], []).append(summarise_dashboard(record))
+    return grouped
 
 
 def dashboard_slugs() -> list[str]:
@@ -278,9 +327,11 @@ def read_samples(path: Path) -> list[PerfSample]:
     ]
 
 
-def comparison_table(results: list[Comparison]) -> str:
+def comparison_table(
+    results: list[Comparison], base: str = 'base', new: str = 'new'
+) -> str:
     rows = [
-        '| case | base p95 ms | new p95 ms | change | verdict |',
+        f'| case | {base} p95 ms | {new} p95 ms | change | verdict |',
         '|---|---:|---:|---:|---|',
     ]
     for c in results:
@@ -303,6 +354,10 @@ def report_comparison(base_path: Path, new_path: Path) -> int:
         f'p95 of {new_path.name} against {base_path.name} (limit +{P95_REGRESSION_LIMIT:.0%}):'
     )
     print(comparison_table(results))
+    return verdict(results)
+
+
+def verdict(results: list[Comparison]) -> int:
     failed = [c.case_id for c in results if c.regressed or c.missing]
     if failed:
         print(f'FAIL: {", ".join(failed)}')
@@ -354,38 +409,65 @@ def login(base_url: str):
     return session
 
 
-def measure_case(session, base_url, request_log, case_id, rounds, warmup) -> PerfSample:
+@dataclasses.dataclass(frozen=True)
+class Target:
+    """One copy of the app: its side, API and browser URLs and a logged-in session."""
+
+    side: str
+    url: str
+    ui_url: str
+    session: Any
+
+
+def measure_case(
+    targets: list[Target], request_log, case_id, rounds, warmup
+) -> dict[str, PerfSample]:
+    """Time one case on every target, interleaved; return each side's sample.
+
+    Requests run one at a time, so the broker's request-log lines since the
+    last drain belong to the request just made, whichever side made it."""
     endpoint, body = load_case(case_id)
-    url = f'{base_url}/api2/query/{endpoint}'
     payload = json.dumps(body)
     headers = {'Content-Type': 'application/json'}
-    latencies: list[float] = []
-    sizes: list[int] = []
-    druid: list[tuple[float, int]] = []
-    for index in range(warmup + rounds):
+    by_side = {t.side: t for t in targets}
+
+    def request(side: str) -> tuple[float, int, tuple[float, int] | None]:
+        target = by_side[side]
         if request_log:
             request_log.drain()
         started = time.perf_counter()
-        response = session.post(url, data=payload, headers=headers, timeout=600)
+        response = target.session.post(
+            f'{target.url}/api2/query/{endpoint}',
+            data=payload,
+            headers=headers,
+            timeout=600,
+        )
         content = response.content
         elapsed_ms = (time.perf_counter() - started) * 1000
         if response.status_code != 200:
             raise RuntimeError(
-                f'{case_id}: HTTP {response.status_code}: {content[:500]!r}'
+                f'{case_id} ({side}): HTTP {response.status_code}: {content[:500]!r}'
             )
-        if index < warmup:
-            continue
-        latencies.append(elapsed_ms)
-        sizes.append(len(content))
+        druid = None
         if request_log:
             # The broker logs a query after streaming its result, so give the
             # line a moment to land; this wait is outside the timed window.
             time.sleep(REQUEST_LOG_SETTLE_SECONDS)
             times = list(druid_times(request_log.drain()))
-            druid.append((sum(times), len(times)))
-    return summarise(
-        case_id, endpoint, latencies, sizes, druid if request_log else None
-    )
+            druid = (sum(times), len(times))
+        return elapsed_ms, len(content), druid
+
+    results = run_interleaved(tuple(by_side), rounds, warmup, request)
+    return {
+        side: summarise(
+            case_id,
+            endpoint,
+            [ms for ms, _, _ in measured],
+            [size for _, size, _ in measured],
+            [d for _, _, d in measured if d is not None] if request_log else None,
+        )
+        for side, measured in results.items()
+    }
 
 
 def git(*args: str) -> str:
@@ -400,7 +482,11 @@ def http_json(url: str) -> Any:
     return requests.get(url, timeout=30).json()
 
 
-def measure_dashboards(slugs: list[str], rounds: int, warmup: int) -> list[PerfSample]:
+def measure_dashboards(
+    targets: list[Target], slugs: list[str], rounds: int, warmup: int
+) -> dict[str, list[PerfSample]]:
+    if not slugs:
+        return {}
     command = [
         'node',
         str(DASHBOARD_SCRIPT),
@@ -411,13 +497,14 @@ def measure_dashboards(slugs: list[str], rounds: int, warmup: int) -> list[PerfS
     ]
     for slug in slugs:
         command += ['--dashboard', slug]
-    # stderr (progress) passes through; stdout is one JSON line per dashboard.
+    for target in targets:
+        command += ['--target', f'{target.side}={target.ui_url}']
+    # stderr (progress) passes through; stdout is one JSON line per dashboard
+    # and target.
     output = subprocess.run(
         command, stdout=subprocess.PIPE, text=True, check=True
     ).stdout
-    return [
-        summarise_dashboard(json.loads(line)) for line in output.splitlines() if line
-    ]
+    return dashboard_samples_by_side(output.splitlines())
 
 
 def environment(rounds: int, warmup: int) -> dict[str, Any]:
@@ -480,14 +567,35 @@ def write_results(stem: Path, samples: list[PerfSample], meta: dict[str, Any]) -
 
 
 def markdown(title: str, samples: list[PerfSample], meta: dict[str, Any]) -> str:
+    return (
+        '\n'.join(
+            [
+                f'# Performance baseline {title}',
+                '',
+                *method_lines(meta),
+                '',
+                *sample_table(samples),
+            ]
+        )
+        + '\n'
+    )
+
+
+def method_lines(meta: dict[str, Any]) -> list[str]:
     host = meta['host']
     method = meta['method']
     end = host.get('load_average_at_end')
     end_load = f', {end} at end' if end else ''
+    dirty = ' (dirty)' if meta['git_dirty'] else ''
+    if 'reference_sha' in meta:
+        code = (
+            f'- Code: reference `{meta["reference_sha"]}`, candidate '
+            f'`{meta["candidate_sha"]}`{dirty}, run {meta["started_utc"]}'
+        )
+    else:
+        code = f'- Code: `{meta["git_sha"]}`{dirty}, run {meta["started_utc"]}'
     lines = [
-        f'# Performance baseline {title}',
-        '',
-        f'- Code: `{meta["git_sha"]}`{" (dirty)" if meta["git_dirty"] else ""}, run {meta["started_utc"]}',
+        code,
         (
             f'- Host: {host["cpu"]}, {host["logical_cpus"]} logical CPUs, {host["memory_gib"]} GiB, '
             f'Linux {host["kernel"]}, load {host["load_average_at_start"]} at start'
@@ -513,10 +621,15 @@ def markdown(title: str, samples: list[PerfSample], meta: dict[str, Any]) -> str
             f'{dashboards["view"]}; ends at the {dashboards["end"]}; bytes are the '
             f'{dashboards["bytes"]}'
         )
+    if 'pairing' in method:
+        lines.append(f'- Pairing: {method["pairing"]}')
     if 'dataset' in meta:
         lines.append(f'- Dataset: {meta["dataset"]}')
-    lines += [
-        '',
+    return lines
+
+
+def sample_table(samples: list[PerfSample]) -> list[str]:
+    lines = [
         '| case | endpoint | p50 ms | p95 ms | min ms | max ms | bytes | Druid ms | Druid queries |',
         '|---|---|---:|---:|---:|---:|---:|---:|---:|',
     ]
@@ -526,15 +639,91 @@ def markdown(title: str, samples: list[PerfSample], meta: dict[str, Any]) -> str
             f'| {s.bytes} | {s.druid_ms if s.druid_ms is not None else "n/a"} '
             f'| {s.druid_queries if s.druid_queries is not None else "n/a"} |'
         )
-    return '\n'.join(lines) + '\n'
+    return lines
+
+
+def paired_stem(
+    out: Path, date: str, reference_sha: str, candidate_sha: str, label: str
+) -> Path:
+    suffix = f'-{label}' if label else ''
+    return (
+        out / 'paired' / f'{date}-{reference_sha[:10]}-vs-{candidate_sha[:10]}{suffix}'
+    )
+
+
+def finish_paired(
+    stem: Path,
+    reference: list[PerfSample],
+    candidate: list[PerfSample],
+    meta: dict[str, Any],
+) -> int:
+    """Write a paired run's files, print the ratio table, return the verdict."""
+    stem.parent.mkdir(parents=True, exist_ok=True)
+    for side, samples in (('reference', reference), ('candidate', candidate)):
+        Path(f'{stem}.{side}.jsonl').write_text(
+            ''.join(json.dumps(dataclasses.asdict(s)) + '\n' for s in samples)
+        )
+    Path(f'{stem}.meta.json').write_text(json.dumps(meta, indent=2) + '\n')
+    results = compare(reference, candidate)
+    table = comparison_table(results, 'reference', 'candidate')
+    limit = f'+{P95_REGRESSION_LIMIT:.0%}'
+    Path(f'{stem}.md').write_text(
+        '\n'.join(
+            [
+                f'# Paired performance run {stem.name}',
+                '',
+                *method_lines(meta),
+                '',
+                f'## Candidate p95 against reference p95 (limit {limit})',
+                '',
+                table,
+                '',
+                '## Reference, absolute (evidence only)',
+                '',
+                *sample_table(reference),
+                '',
+                '## Candidate, absolute (evidence only)',
+                '',
+                *sample_table(candidate),
+            ]
+        )
+        + '\n'
+    )
+    print(f'wrote {stem}.{{reference,candidate}}.jsonl, .meta.json and .md')
+    print(f'candidate p95 against reference p95 (limit {limit}):')
+    print(table)
+    return verdict(results)
 
 
 def run(args: argparse.Namespace) -> int:
-    base_url = require_env('PERF_BASE_URL').rstrip('/')
     log_dir = os.environ.get('PERF_REQUEST_LOG_DIR')
     request_log = RequestLog(Path(log_dir)) if log_dir else None
-    session = login(base_url)
+    candidate = Target(
+        'candidate',
+        require_env('PERF_CANDIDATE_URL').rstrip('/'),
+        require_env('PERF_CANDIDATE_UI_URL').rstrip('/'),
+        None,
+    )
+    targets = [candidate]
+    if args.mode == 'paired':
+        reference = Target(
+            'reference',
+            require_env('PERF_REFERENCE_URL').rstrip('/'),
+            require_env('PERF_REFERENCE_UI_URL').rstrip('/'),
+            None,
+        )
+        targets = [reference, candidate]
+    targets = [dataclasses.replace(t, session=login(t.url)) for t in targets]
     meta = environment(args.rounds, args.warmup)
+    if args.mode == 'paired':
+        meta['reference_sha'] = require_env('PERF_REFERENCE_SHA')
+        meta['candidate_sha'] = meta.pop('git_sha')
+        meta['method']['pairing'] = (
+            'reference and candidate apps on one host against one Druid; each '
+            'round sends the case to both, reference first in even rounds and '
+            'candidate first in odd ones; the limit applies to candidate p95 '
+            'over reference p95'
+        )
     if args.dataset:
         meta['dataset'] = args.dataset
     names, slugs = split_cases(args.case)
@@ -549,51 +738,49 @@ def run(args: argparse.Namespace) -> int:
             'end': 'first frame with every query tile rendered',
             'bytes': 'median of headers plus encoded bodies received before the last tile',
         }
-    samples = []
+    samples: dict[str, list[PerfSample]] = {t.side: [] for t in targets}
     for name in names:
-        sample = measure_case(
-            session, base_url, request_log, name, args.rounds, args.warmup
-        )
-        print(
-            f'{name:40} p50 {sample.p50_ms:8.1f}  p95 {sample.p95_ms:8.1f} ms  '
-            f'{sample.bytes:>9} B  druid {sample.druid_ms} ms',
-            flush=True,
-        )
-        samples.append(sample)
-    for sample in measure_dashboards(
-        slugs, args.dashboard_rounds, args.dashboard_warmup
-    ):
-        print(
-            f'{sample.case_id:40} p50 {sample.p50_ms:8.1f}  p95 {sample.p95_ms:8.1f} ms  '
-            f'{sample.bytes:>9} B  (time to last tile)',
-            flush=True,
-        )
-        samples.append(sample)
+        for side, sample in measure_case(
+            targets, request_log, name, args.rounds, args.warmup
+        ).items():
+            print(
+                f'{name:40} {side:9} p50 {sample.p50_ms:8.1f}  p95 {sample.p95_ms:8.1f} ms  '
+                f'{sample.bytes:>9} B  druid {sample.druid_ms} ms',
+                flush=True,
+            )
+            samples[side].append(sample)
+    dashboards = measure_dashboards(
+        targets, slugs, args.dashboard_rounds, args.dashboard_warmup
+    )
+    for side, side_samples in dashboards.items():
+        for sample in side_samples:
+            print(
+                f'{sample.case_id:40} {side:9} p50 {sample.p50_ms:8.1f}  p95 {sample.p95_ms:8.1f} ms  '
+                f'{sample.bytes:>9} B  (time to last tile)',
+                flush=True,
+            )
+        samples[side].extend(side_samples)
     meta['host']['load_average_at_end'] = [round(x, 2) for x in os.getloadavg()]
     meta['finished_utc'] = dt.datetime.now(dt.timezone.utc).isoformat(
         timespec='seconds'
     )
+    date = dt.datetime.now(dt.timezone.utc).date().isoformat()
+    if args.mode == 'paired':
+        stem = paired_stem(
+            args.out, date, meta['reference_sha'], meta['candidate_sha'], args.label
+        )
+        return finish_paired(stem, samples['reference'], samples['candidate'], meta)
     label = f'-{args.label}' if args.label else ''
-    stem = (
-        args.out
-        / f'{dt.datetime.now(dt.timezone.utc).date().isoformat()}-{meta["git_sha"][:10]}{label}'
-    )
+    stem = args.out / f'{date}-{meta["git_sha"][:10]}{label}'
     base = None
     if args.compare is not None:
         base = Path(args.compare) if args.compare else newest_baseline()
-    write_results(stem, samples, meta)
+    write_results(stem, samples['candidate'], meta)
     print(f'wrote {stem}.jsonl, .meta.json and .md')
     return report_comparison(base, stem.with_suffix('.jsonl')) if base else 0
 
 
-def main(argv: list[str] | None = None) -> int:
-    argv = sys.argv[1:] if argv is None else argv
-    if argv[:1] == ['compare']:
-        parser = argparse.ArgumentParser(prog='baseline.py compare')
-        parser.add_argument('base', type=Path)
-        parser.add_argument('new', type=Path)
-        parsed = parser.parse_args(argv[1:])
-        return report_comparison(parsed.base, parsed.new)
+def parse_args(argv: list[str]) -> argparse.Namespace:
     parser = argparse.ArgumentParser(description=__doc__.split('\n')[0])
     parser.add_argument('--rounds', type=int, default=100)
     parser.add_argument('--warmup', type=int, default=3)
@@ -613,14 +800,33 @@ def main(argv: list[str] | None = None) -> int:
         '--dataset', default='', help='dataset description for the report'
     )
     parser.add_argument(
+        '--committed',
+        action='store_true',
+        help='measure the candidate alone and record a committed baseline '
+        '(needs a quiet, dedicated host)',
+    )
+    parser.add_argument(
         '--compare',
         nargs='?',
         const='',
         default=None,
         metavar='BASE',
-        help='compare p95 against BASE (default: the newest committed .jsonl)',
+        help='committed mode: compare p95 against BASE (default: the newest .jsonl)',
     )
-    return run(parser.parse_args(argv))
+    args = parser.parse_args(argv)
+    args.mode = 'committed' if args.committed or args.compare is not None else 'paired'
+    return args
+
+
+def main(argv: list[str] | None = None) -> int:
+    argv = sys.argv[1:] if argv is None else argv
+    if argv[:1] == ['compare']:
+        parser = argparse.ArgumentParser(prog='baseline.py compare')
+        parser.add_argument('base', type=Path)
+        parser.add_argument('new', type=Path)
+        parsed = parser.parse_args(argv[1:])
+        return report_comparison(parsed.base, parsed.new)
+    return run(parse_args(argv))
 
 
 if __name__ == '__main__':

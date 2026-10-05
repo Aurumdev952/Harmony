@@ -6,6 +6,7 @@
 #   scripts/perf/stack.sh up        # build web, start Druid, index the dataset if Druid has none, start web
 #   scripts/perf/stack.sh index [--force]   # re-index, register the datasource with web, restart web
 #   scripts/perf/stack.sh ui        # build the production client and serve it on PERF_UI_PORT
+#   scripts/perf/stack.sh reference <git ref>   # start that commit beside this checkout, for paired runs
 #   scripts/perf/stack.sh down      # stop everything, delete volumes, scratch and secrets
 #   scripts/perf/stack.sh env       # what baseline.py and dashboards.mjs read
 #   scripts/perf/stack.sh logs druid|web [service]
@@ -14,6 +15,7 @@
 # Concurrent stacks need their own PERF_PROJECT and ports:
 #   PERF_PROJECT          default harmony-wp1a-perf (Compose projects <name>-druid, <name>-web)
 #   PERF_WEB_PORT         default 58700, PERF_UI_PORT 58701 (nginx in front of web)
+#   PERF_REFERENCE_WEB_PORT default 58702, PERF_REFERENCE_UI_PORT 58703 (the reference copy)
 #   PERF_COORDINATOR_PORT default 58981, PERF_BROKER_PORT 58982, PERF_ROUTER_PORT 58988
 #   PERF_SCRATCH          default ${TMPDIR:-/tmp}/<project>: dataset, pipeline output, broker request log
 # Every port is published on 127.0.0.1 only. Secrets are generated per stack into a
@@ -28,11 +30,18 @@ ROOT="$(cd "${HERE}/../.." && pwd -P)"
 export PERF_PROJECT="${PERF_PROJECT:-harmony-wp1a-perf}"
 export PERF_WEB_PORT="${PERF_WEB_PORT:-58700}"
 export PERF_UI_PORT="${PERF_UI_PORT:-58701}"
+export PERF_REFERENCE_WEB_PORT="${PERF_REFERENCE_WEB_PORT:-58702}"
+export PERF_REFERENCE_UI_PORT="${PERF_REFERENCE_UI_PORT:-58703}"
 export PERF_COORDINATOR_PORT="${PERF_COORDINATOR_PORT:-58981}"
 export PERF_BROKER_PORT="${PERF_BROKER_PORT:-58982}"
 export PERF_ROUTER_PORT="${PERF_ROUTER_PORT:-58988}"
 export PERF_SCRATCH="${PERF_SCRATCH:-${TMPDIR:-/tmp}/${PERF_PROJECT}}"
 export PERF_REQUEST_LOG_DIR="${PERF_SCRATCH}/broker-requests"
+# `stack.sh reference` unpacks the reference commit here (src/, client/, sha).
+export PERF_REFERENCE_DIR="${PERF_SCRATCH}/reference"
+# Compose interpolates every service, so the reference image needs a value
+# even when no reference runs.
+export PERF_REFERENCE_IMAGE="${PERF_REFERENCE_IMAGE:-no-reference-image}"
 export PERF_USERNAME="${PERF_USERNAME:-perf-admin@harmony.invalid}"
 export PERF_REPO_ROOT="${ROOT}"
 export PERF_STACK_DIR="${HERE}/stack"
@@ -110,26 +119,33 @@ placeholder_env() {
   done
 }
 
+# image_tag <repo root>: the web image's inputs from that tree.
 image_tag() {
-  cat "${ROOT}/requirements.txt" "${ROOT}/requirements-web.txt" \
-    "${ROOT}/docker/web/Dockerfile_web-server" "${HERE}/stack/Dockerfile" | sha256sum | cut -c1-12
+  cat "$1/requirements.txt" "$1/requirements-web.txt" \
+    "$1/docker/web/Dockerfile_web-server" "${HERE}/stack/Dockerfile" | sha256sum | cut -c1-12
+}
+
+# build_image <repo root>: build the web image of that tree; prints its name.
+build_image() {
+  local tag
+  tag="$(image_tag "$1")"
+  docker build --platform linux/amd64 \
+    --build-context "python:3.8=docker-image://${PYTHON_38}" \
+    -f "$1/docker/web/Dockerfile_web-server" \
+    -t "harmony-perf-web-server:${tag}" "$1" >&2
+  docker build --platform linux/amd64 \
+    --build-arg "BASE_IMAGE=harmony-perf-web-server:${tag}" \
+    -t "harmony-perf-web:${tag}" "${HERE}/stack" >&2
+  echo "harmony-perf-web:${tag}"
 }
 
 build_images() {
-  local tag
-  tag="$(image_tag)"
-  docker build --platform linux/amd64 \
-    --build-context "python:3.8=docker-image://${PYTHON_38}" \
-    -f "${ROOT}/docker/web/Dockerfile_web-server" \
-    -t "harmony-perf-web-server:${tag}" "${ROOT}"
-  docker build --platform linux/amd64 \
-    --build-arg "BASE_IMAGE=harmony-perf-web-server:${tag}" \
-    -t "harmony-perf-web:${tag}" "${HERE}/stack"
-  export PERF_WEB_IMAGE="harmony-perf-web:${tag}"
+  PERF_WEB_IMAGE="$(build_image "${ROOT}")"
+  export PERF_WEB_IMAGE
 }
 
 use_built_image() {
-  PERF_WEB_IMAGE="harmony-perf-web:$(image_tag)"
+  PERF_WEB_IMAGE="harmony-perf-web:$(image_tag "${ROOT}")"
   export PERF_WEB_IMAGE
 }
 
@@ -178,6 +194,11 @@ web_answers() {
 
 ui_answers() {
   curl -fsS -o /dev/null "http://127.0.0.1:${PERF_UI_PORT}/build/dashboardBuilder.bundle.js"
+}
+
+reference_answers() {
+  curl -fsS -o /dev/null "http://127.0.0.1:${PERF_REFERENCE_WEB_PORT}/login" &&
+    curl -fsS -o /dev/null "http://127.0.0.1:${PERF_REFERENCE_UI_PORT}/build/dashboardBuilder.bundle.js"
 }
 
 apply_hasura_metadata() {
@@ -278,18 +299,19 @@ index() {
   wait_for "web is up at http://127.0.0.1:${PERF_WEB_PORT}" 120 web_answers
 }
 
-# The production client (`yarn build`, as WP-0e's checks build it on the host's
-# Node 24), staged for ui.nginx.conf: web/public/build/min as /build/min/, plus
-# every sourcemap.json name (`bundle.css`, `navbar.bundle.js`) at /build/<name>,
-# where the non-production templates ask for it.
+# client <repo root> <staged dir>: the production client of that tree (`yarn
+# build`, as WP-0e's checks build it on the host's Node 24), staged for
+# ui.nginx.conf: web/public/build/min as /build/min/, plus every sourcemap.json
+# name (`bundle.css`, `navbar.bundle.js`) at /build/<name>, where the
+# non-production templates ask for it.
 client() {
-  ( cd "${ROOT}"
+  local root="$1" staged="$2"
+  ( cd "${root}"
     NODE_OPTIONS=--dns-result-order=ipv4first yarn install --frozen-lockfile --ignore-scripts
     yarn build )
-  local staged="${PERF_SCRATCH}/client"
   rm -rf "${staged}"
   mkdir -p "${staged}"
-  cp -a "${ROOT}/web/public/build/min" "${staged}/min"
+  cp -a "${root}/web/public/build/min" "${staged}/min"
   uv run --no-project python - "${staged}" <<'PY'
 import json, os, sys
 staged = sys.argv[1]
@@ -302,14 +324,56 @@ PY
 ui() {
   load_secrets
   use_built_image
-  client
+  client "${ROOT}" "${PERF_SCRATCH}/client"
   web_compose --profile ui up -d ui
   wait_for "the client is served at http://127.0.0.1:${PERF_UI_PORT}" 24 ui_answers
 }
 
+# Paths no client build reads. When the reference and this checkout differ
+# only here, the reference reuses this checkout's built client.
+SERVER_ONLY=(web/server web/python_client scripts docs tests e2e db data config models
+  util harmony pipeline druid_setup docker prod .claude .github lint log
+  requirements.txt requirements-web.txt requirements-dev.txt requirements-pipeline.txt
+  pyproject.toml uv.lock mypy.ini Makefile CLAUDE.md README.md)
+
+client_unchanged_since() {
+  local excludes=(. "${SERVER_ONLY[@]/#/:!}")
+  git -C "${ROOT}" diff --quiet "$1" -- "${excludes[@]}" &&
+    [[ -z "$(git -C "${ROOT}" ls-files --others --exclude-standard -- "${excludes[@]}")" ]]
+}
+
+# Start <git ref> beside this checkout, against the same Druid, Postgres and
+# Redis, for baseline.py's paired mode: web-reference on PERF_REFERENCE_WEB_PORT
+# and ui-reference on PERF_REFERENCE_UI_PORT. The migrations are this
+# checkout's (web-init), so a reference must run on the schema they leave.
+reference() {
+  local ref="${1:?usage: stack.sh reference <git ref>}" sha src="${PERF_REFERENCE_DIR}/src"
+  sha="$(git -C "${ROOT}" rev-parse --verify "${ref}^{commit}")"
+  load_secrets
+  use_built_image
+  web_compose --profile reference rm -fs web-reference ui-reference
+  rm -rf "${PERF_REFERENCE_DIR}"
+  mkdir -p "${src}"
+  git -C "${ROOT}" archive --format=tar "${sha}" | tar -x -C "${src}"
+  PERF_REFERENCE_IMAGE="$(build_image "${src}")"
+  if client_unchanged_since "${sha}"; then
+    if [[ ! -d "${PERF_SCRATCH}/client/min" ]]; then
+      echo 'perf stack: no built client to share; run stack.sh ui first' >&2
+      exit 1
+    fi
+    echo "perf stack: the client is unchanged since ${sha}; sharing this checkout's build"
+    cp -a "${PERF_SCRATCH}/client" "${PERF_REFERENCE_DIR}/client"
+  else
+    client "${src}" "${PERF_REFERENCE_DIR}/client"
+  fi
+  echo "${sha}" > "${PERF_REFERENCE_DIR}/sha"
+  web_compose --profile reference up -d --no-deps web-reference ui-reference
+  wait_for "the reference ${sha} is up at http://127.0.0.1:${PERF_REFERENCE_UI_PORT}" 120 reference_answers
+}
+
 down() {
   placeholder_env
-  web_compose --profile index --profile ui down --volumes --remove-orphans
+  web_compose --profile index --profile ui --profile reference down --volumes --remove-orphans
   druid_compose --profile init down --volumes --remove-orphans
   rm -rf "${PERF_SCRATCH}"
   rm -f "${SECRETS}"
@@ -320,10 +384,16 @@ case "${1:-}" in
   up) up ;;
   index) index "${@:2}" ;;
   ui) ui ;;
+  reference) reference "${@:2}" ;;
   down) down ;;
   env)
-    echo "export PERF_BASE_URL=http://127.0.0.1:${PERF_WEB_PORT}"
-    echo "export PERF_UI_URL=http://127.0.0.1:${PERF_UI_PORT}"
+    echo "export PERF_CANDIDATE_URL=http://127.0.0.1:${PERF_WEB_PORT}"
+    echo "export PERF_CANDIDATE_UI_URL=http://127.0.0.1:${PERF_UI_PORT}"
+    echo "export PERF_REFERENCE_URL=http://127.0.0.1:${PERF_REFERENCE_WEB_PORT}"
+    echo "export PERF_REFERENCE_UI_URL=http://127.0.0.1:${PERF_REFERENCE_UI_PORT}"
+    if [[ -f "${PERF_REFERENCE_DIR}/sha" ]]; then
+      echo "export PERF_REFERENCE_SHA=$(cat "${PERF_REFERENCE_DIR}/sha")"
+    fi
     echo "export PERF_USERNAME=${PERF_USERNAME}"
     echo "export PERF_CREDENTIALS_FILE=${SECRETS}"
     echo "export PERF_REQUEST_LOG_DIR=${PERF_REQUEST_LOG_DIR}"
@@ -334,7 +404,7 @@ case "${1:-}" in
     placeholder_env
     case "${2:-}" in
       druid) druid_compose --profile init config ;;
-      web) web_compose --profile index --profile ui config ;;
+      web) web_compose --profile index --profile ui --profile reference config ;;
       *) echo "usage: $0 config druid|web" >&2; exit 2 ;;
     esac
     ;;
@@ -347,7 +417,7 @@ case "${1:-}" in
     esac
     ;;
   *)
-    echo "usage: $0 dataset|up|index|ui|down|env|config druid|web|logs druid|web [service]" >&2
+    echo "usage: $0 dataset|up|index|ui|reference <ref>|down|env|config druid|web|logs druid|web [service]" >&2
     exit 2
     ;;
 esac

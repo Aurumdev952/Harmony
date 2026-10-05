@@ -271,3 +271,133 @@ def test_every_reference_dashboard_tile_is_a_query_tile():
     for slug, spec in specs.items():
         assert spec['items'], slug
         assert all(h['item']['type'] == 'QUERY_ITEM' for h in spec['items']), slug
+
+
+# --- paired runs: reference and candidate interleaved on one host --------------
+
+rounds = st.integers(min_value=1, max_value=60)
+
+
+@given(rounds)
+def test_each_round_runs_every_side_once_and_the_lead_alternates(n):
+    order = [baseline.interleaved_order(i, baseline.SIDES) for i in range(n)]
+    assert all(sorted(sides) == sorted(baseline.SIDES) for sides in order)
+    leads = [sides[0] for sides in order]
+    assert leads.count('reference') - leads.count('candidate') in (0, 1)
+    assert all(a != b for a, b in zip(leads, leads[1:]))
+
+
+def test_warm_up_rounds_run_on_both_sides_and_are_dropped():
+    calls = []
+
+    def measure(side):
+        calls.append(side)
+        return len(calls)
+
+    results = baseline.run_interleaved(baseline.SIDES, 2, 1, measure)
+    assert calls == [
+        'reference',
+        'candidate',
+        'candidate',
+        'reference',
+        'reference',
+        'candidate',
+    ]
+    assert results == {'reference': [4, 5], 'candidate': [3, 6]}
+
+
+@given(
+    st.floats(min_value=1, max_value=1e4),
+    st.lists(st.floats(min_value=-0.1, max_value=0.1), min_size=2, max_size=400),
+)
+def test_an_a_a_run_passes_while_host_load_drifts_up_to_ten_percent_per_request(
+    intrinsic_ms, steps
+):
+    # Host load as a multiplier per request slot, changing by at most 10% from
+    # one request to the next: the two sides of a round see nearly the same
+    # load, so identical code stays within the limit however far load wanders.
+    load = [1.0]
+    for step in steps:
+        load.append(load[-1] * (1 + step))
+    slot = iter(load)
+    n = len(load) // 2
+
+    def measure(side):
+        return intrinsic_ms * next(slot)
+
+    latencies = baseline.run_interleaved(baseline.SIDES, n, 0, measure)
+    reference, candidate = (
+        sample('c', baseline.percentile(latencies[side], 0.95))
+        for side in baseline.SIDES
+    )
+    (result,) = baseline.compare([reference], [candidate])
+    assert not result.regressed
+
+
+def test_dashboard_lines_are_summarised_per_target():
+    def line(target, ms):
+        return json.dumps(
+            {
+                'case_id': 'd',
+                'target': target,
+                'tiles': 1,
+                'latencies_ms': [ms, ms],
+                'bytes': [5, 5],
+                'query_requests': [1, 1],
+            }
+        )
+
+    grouped = baseline.dashboard_samples_by_side(
+        [line('reference', 100.0), line('candidate', 120.0), '']
+    )
+    assert {side: [s.p95_ms for s in samples] for side, samples in grouped.items()} == {
+        'reference': [100.0],
+        'candidate': [120.0],
+    }
+
+
+def _paired_meta():
+    return {
+        'reference_sha': 'a' * 40,
+        'candidate_sha': 'b' * 40,
+        'git_dirty': False,
+        'started_utc': 'now',
+        'host': {
+            'cpu': 'x',
+            'logical_cpus': 16,
+            'memory_gib': 1,
+            'kernel': 'k',
+            'load_average_at_start': [40.0, 1, 1],
+            'load_average_at_end': [20.0, 1, 1],
+        },
+        'method': {
+            'rounds': 100,
+            'warmup_rounds': 3,
+            'concurrency': 1,
+            'interval': 'i',
+            'caches': 'warm',
+        },
+    }
+
+
+def test_a_paired_run_writes_both_sides_and_fails_on_the_ratio(tmp_path: Path, capsys):
+    stem = baseline.paired_stem(tmp_path, '2026-10-05', 'a' * 40, 'b' * 40, 'aa')
+    assert stem == tmp_path / 'paired' / '2026-10-05-aaaaaaaaaa-vs-bbbbbbbbbb-aa'
+    reference = [sample('q', 100.0), sample('perf-mixed-6', 1000.0)]
+    within = [sample('q', 110.0), sample('perf-mixed-6', 900.0)]
+    assert baseline.finish_paired(stem, reference, within, _paired_meta()) == 0
+    assert baseline.read_samples(Path(f'{stem}.reference.jsonl')) == reference
+    assert baseline.read_samples(Path(f'{stem}.candidate.jsonl')) == within
+    text = Path(f'{stem}.md').read_text()
+    assert '| q | 100.0 | 110.0 | +10.0% | ok |' in text
+    assert 'load [40.0, 1, 1] at start, [20.0, 1, 1] at end' in text
+    slower = [sample('q', 100.0), sample('perf-mixed-6', 1101.0)]
+    assert baseline.finish_paired(stem, reference, slower, _paired_meta()) == 1
+    assert 'FAIL: perf-mixed-6' in capsys.readouterr().out
+
+
+def test_paired_is_the_default_and_compare_selects_the_committed_baseline():
+    assert baseline.parse_args([]).mode == 'paired'
+    assert baseline.parse_args(['--committed']).mode == 'committed'
+    committed = baseline.parse_args(['--compare'])
+    assert (committed.mode, committed.compare) == ('committed', '')

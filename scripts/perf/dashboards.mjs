@@ -5,6 +5,13 @@
 //   eval "$(scripts/perf/stack.sh env)"
 //   npm ci --prefix scripts/perf
 //   node scripts/perf/dashboards.mjs [--rounds 30] [--warmup 2] [--dashboard SLUG]
+//       [--target SIDE=UI_URL ...]
+//
+// Without --target it loads PERF_CANDIDATE_UI_URL as the side `candidate`.
+// With several targets (baseline.py's paired mode passes `reference` and
+// `candidate`) every round loads the dashboard once on each, in the order
+// given in even rounds and reversed in odd ones, so the sides share the
+// host's load.
 //
 // It makes sure every reference dashboard in dashboards.json exists with that
 // specification (created, or patched back to it), then loads each one in
@@ -22,8 +29,8 @@
 // leaves the stack (Mapbox styles, the GeoJSON CDN) is aborted, so runs never
 // depend on the internet; map tiles render their data layer without a basemap.
 //
-// Prints one JSON line per dashboard on stdout:
-//   {"case_id", "tiles", "latencies_ms": [...], "bytes": [...], "query_requests": [...]}
+// Prints one JSON line per dashboard and target on stdout:
+//   {"case_id", "target", "tiles", "latencies_ms": [...], "bytes": [...], "query_requests": [...]}
 // where bytes is everything the page transferred (headers and encoded bodies)
 // until the last tile rendered. Progress goes to stderr.
 
@@ -160,17 +167,38 @@ async function loadOnce(browser, baseUrl, storageState, slug, tiles) {
   }
 }
 
+function parseTargets(specs) {
+  if (!specs) {
+    return [{ side: 'candidate', url: requireEnv('PERF_CANDIDATE_UI_URL') }];
+  }
+  return specs.map(spec => {
+    const separator = spec.indexOf('=');
+    if (separator < 1) throw new Error(`--target ${spec}: expected SIDE=URL`);
+    return { side: spec.slice(0, separator), url: spec.slice(separator + 1) };
+  });
+}
+
+async function logIn(browser, url, password) {
+  const context = await browser.newContext({ baseURL: url });
+  const response = await context.request.post(
+    '/api2/authentication/login?set_cookie=true',
+    { data: { email: requireEnv('PERF_USERNAME'), password } },
+  );
+  await checked(response, `login at ${url}`);
+  return context;
+}
+
 async function main() {
   const { values } = parseArgs({
     options: {
       rounds: { type: 'string', default: '30' },
       warmup: { type: 'string', default: '2' },
       dashboard: { type: 'string', multiple: true },
+      target: { type: 'string', multiple: true },
     },
   });
   const rounds = Number(values.rounds);
   const warmup = Number(values.warmup);
-  const baseUrl = new URL(requireEnv('PERF_UI_URL')).origin;
   const password = readSecret(
     requireEnv('PERF_CREDENTIALS_FILE'),
     'PERF_PASSWORD',
@@ -178,58 +206,73 @@ async function main() {
 
   const browser = await chromium.launch();
   try {
-    const login = await browser.newContext({ baseURL: baseUrl });
-    const response = await login.request.post(
-      '/api2/authentication/login?set_cookie=true',
-      {
-        data: { email: requireEnv('PERF_USERNAME'), password },
-      },
-    );
-    await checked(response, 'login');
-    const storageState = await login.storageState();
+    const targets = [];
+    for (const { side, url } of parseTargets(values.target)) {
+      const origin = new URL(url).origin;
+      const context = await logIn(browser, origin, password);
+      targets.push({ side, origin, context });
+    }
 
+    // Every target shares one database, so the dashboards are set up once.
     const slugs = values.dashboard ?? Object.keys(SPECS);
     for (const slug of slugs) {
       const specification = SPECS[slug];
       if (!specification) throw new Error(`${slug} is not in dashboards.json`);
       process.stderr.write(
         `${slug}: ${await ensureDashboard(
-          login.request,
+          targets[0].context.request,
           slug,
           specification,
         )}\n`,
       );
     }
-    await login.close();
+    for (const target of targets) {
+      target.storageState = await target.context.storageState();
+      await target.context.close();
+    }
 
     for (const slug of slugs) {
       const tiles = SPECS[slug].items.filter(
         holder => holder.item.type === 'QUERY_ITEM',
       ).length;
-      const result = {
-        case_id: slug,
-        tiles,
-        latencies_ms: [],
-        bytes: [],
-        query_requests: [],
-      };
-      for (let index = 0; index < warmup + rounds; index += 1) {
-        const load = await loadOnce(
-          browser,
-          baseUrl,
-          storageState,
-          slug,
-          tiles,
-        );
-        if (index < warmup) continue;
-        result.latencies_ms.push(load.ms);
-        result.bytes.push(load.bytes);
-        result.query_requests.push(load.queryRequests);
-      }
-      process.stderr.write(
-        `${slug}: ${result.latencies_ms.map(Math.round).join(' ')} ms\n`,
+      const results = new Map(
+        targets.map(({ side }) => [
+          side,
+          {
+            case_id: slug,
+            target: side,
+            tiles,
+            latencies_ms: [],
+            bytes: [],
+            query_requests: [],
+          },
+        ]),
       );
-      process.stdout.write(`${JSON.stringify(result)}\n`);
+      for (let index = 0; index < warmup + rounds; index += 1) {
+        const order = index % 2 === 0 ? targets : [...targets].reverse();
+        for (const target of order) {
+          const load = await loadOnce(
+            browser,
+            target.origin,
+            target.storageState,
+            slug,
+            tiles,
+          );
+          if (index < warmup) continue;
+          const result = results.get(target.side);
+          result.latencies_ms.push(load.ms);
+          result.bytes.push(load.bytes);
+          result.query_requests.push(load.queryRequests);
+        }
+      }
+      for (const result of results.values()) {
+        process.stderr.write(
+          `${slug} ${result.target}: ${result.latencies_ms
+            .map(Math.round)
+            .join(' ')} ms\n`,
+        );
+        process.stdout.write(`${JSON.stringify(result)}\n`);
+      }
     }
   } finally {
     await browser.close();

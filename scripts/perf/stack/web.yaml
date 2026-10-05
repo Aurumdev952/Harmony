@@ -12,6 +12,9 @@
 #   measured path, so it sits on a routable network.
 # - no mail sink: nothing in the baseline sends mail.
 # - a `ui` nginx in front of web for the browser measurements.
+# - with the `reference` profile, a second copy of web and ui running another
+#   commit (stack.sh reference) on the same database, Redis and Druid, for
+#   baseline.py's paired runs.
 name: ${PERF_PROJECT:?run scripts/perf/stack.sh}-web
 
 x-web-env: &web-env
@@ -123,13 +126,45 @@ services:
     image: nginx:1.27-alpine@sha256:65645c7bb6a0661892a8b03b89d0743208a18dd2f3f17a54ef4b76fb8e2f2a10
     profiles: [ui]
     networks: [internal, edge]
+    environment:
+      PERF_UPSTREAM: web
     volumes:
-      - ${PERF_STACK_DIR:?}/ui.nginx.conf:/etc/nginx/conf.d/default.conf:ro
+      - ${PERF_STACK_DIR:?}/ui.nginx.conf:/etc/nginx/templates/default.conf.template:ro
       - ${PERF_SCRATCH:?}/client:/srv/build:ro
       - ${PERF_REPO_ROOT:?}/web/public:/srv/public:ro
     ports:
       - 127.0.0.1:${PERF_UI_PORT:?}:8080
     depends_on: [web]
+
+  # The reference commit (stack.sh reference <ref>), unpacked under
+  # PERF_REFERENCE_DIR, as web and ui run this checkout.
+  web-reference:
+    image: ${PERF_REFERENCE_IMAGE:?}
+    profiles: [reference]
+    networks: [internal, druid, edge]
+    working_dir: /zenysis
+    volumes:
+      - ${PERF_REFERENCE_DIR:?}/src:/zenysis:ro
+    environment:
+      <<: *web-env
+      ZEN_GUNICORN_WORKER_THREADS: "4"
+    command: ["python", "web/gunicorn_server.py", "--timeout=600"]
+    ports:
+      - 127.0.0.1:${PERF_REFERENCE_WEB_PORT:?}:5000
+
+  ui-reference:
+    image: nginx:1.27-alpine@sha256:65645c7bb6a0661892a8b03b89d0743208a18dd2f3f17a54ef4b76fb8e2f2a10
+    profiles: [reference]
+    networks: [internal, edge]
+    environment:
+      PERF_UPSTREAM: web-reference
+    volumes:
+      - ${PERF_STACK_DIR:?}/ui.nginx.conf:/etc/nginx/templates/default.conf.template:ro
+      - ${PERF_REFERENCE_DIR:?}/client:/srv/build:ro
+      - ${PERF_REFERENCE_DIR:?}/src/web/public:/srv/public:ro
+    ports:
+      - 127.0.0.1:${PERF_REFERENCE_UI_PORT:?}:8080
+    depends_on: [web-reference]
 
   # One-off: `stack.sh index` runs the pipeline's index step with this.
   indexer:

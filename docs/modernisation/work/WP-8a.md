@@ -83,6 +83,11 @@ The five audit cases (`scripts/druid/null_audit/cases/`) cover shapes the golden
 | sqlnull, real builder | 1 (`calc_last_value`) | 0 | [diff-10](WP-8a-evidence/diff-10-sqlnull-real-builder.txt) |
 | druid38, real builder | 1 (`calc_last_value`) | 0 | [diff-11](WP-8a-evidence/diff-11-druid38-real-builder.txt) |
 | nojs (0.23, legacy nulls, JavaScript off), real builder | 0 | 0 | [diff-12](WP-8a-evidence/diff-12-nojs-real-builder.txt) |
+| nojs, final head, LAST_VALUE `extension` (default) | 0 | 0 | [diff-16](WP-8a-evidence/diff-16-nojs-head.txt) |
+| sqlnull, final head, `extension` | 1 (`calc_last_value`) | 0 | [diff-17](WP-8a-evidence/diff-17-sqlnull-head.txt) |
+| sqlnull, final head, `native` | 0 | 0 | [diff-18](WP-8a-evidence/diff-18-sqlnull-head-native.txt) |
+| druid38, final head, `extension` | 1 (`calc_last_value`) | 0 | [diff-19](WP-8a-evidence/diff-19-druid38-head.txt) |
+| druid38, final head, `native` | 0 | 0 | [diff-20](WP-8a-evidence/diff-20-druid38-head-native.txt) |
 | nojs, real builder + native LAST_VALUE (6d3a35f) | 0 | 0 | [diff-13](WP-8a-evidence/diff-13-nojs-native-last-value.txt) |
 | sqlnull, real builder + native LAST_VALUE | 0 | 0 | [diff-14](WP-8a-evidence/diff-14-sqlnull-native-last-value.txt) |
 | druid38, real builder + native LAST_VALUE | 0 | 0 | [diff-15](WP-8a-evidence/diff-15-druid38-native-last-value.txt) |
@@ -232,6 +237,7 @@ None. Note for WP-8c (C-8 owner is this role): the Parquet ingest schema must st
   - mypy 1.3.0 clean on `db/druid/aggregations/last_value_aggregation.py` and `db/druid/util.py`.
 - 2026-10-05 core-8a-c (supporting) N2 policy check, 6d3a35f: `tests/core/test_policy_exclusion_keeps_nulls.py` 5 passed, all 5 fail with the N2 rewrite removed. N1b is reassigned to the lead (path is outside core). The `''` question is answered from the server side.
 - 2026-10-05 core-8a-c merged the WP branch at c9f7d8e (qa's regenerated fixtures) into `mig/WP-8a-druid-js-null-audit-core`; check: `uv run pytest tests/core tests/druid tests/golden tests/alerts` 329 passed, 8 skipped (live LAST_VALUE tests, no ports set), 0 failed. `calc_last_value`'s fixture still matches, because `extension` is the default.
+- 2026-10-05 data-platform-4 merged core's N3 (through f1fd768) and declared the qa instance for the 76 regenerated fixtures. Final replays at this head (diff-16 to diff-20): nojs with the default `extension` has 0 result differences; sqlnull and druid38 have 0 with `HARMONY_DRUID_LAST_VALUE=native`, and only `calc_last_value` with `extension`, as expected until WP-8b switches the default. Checks: `uv run pytest tests/golden tests/druid tests/alerts tests/core` 329 passed, 8 skipped (live tests, no ports set); `check_fixture_drift.py` `0 cases post changed queries; 0 other differences`; `task_gate.py` fails only on status and the three pending verdicts. Stopped `wp8a-nojs`, `wp8a-sqlnull` and `wp8a-druid38` and removed their volumes and networks (`wp8a-legacy` earlier); no `wp8a` containers, volumes or networks remain.
 
 ## Evidence
 

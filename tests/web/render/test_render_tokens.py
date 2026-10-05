@@ -195,12 +195,9 @@ EDIT_DASHBOARD = ItemNeed('edit_resource', RESOURCE_ID, 'dashboard')
 
 @contextmanager
 def _signed_in(app: Flask, provides):
-    with (
-        app.test_request_context('/'),
-        mock.patch(
-            'web.server.security.signal_handlers.SuperUserPermission',
-            lambda: NOT_SUPERUSER,
-        ),
+    with app.test_request_context('/'), mock.patch(
+        'web.server.security.signal_handlers.SuperUserPermission',
+        lambda: NOT_SUPERUSER,
     ):
         g.identity = Identity(USERNAME)
         g.identity.provides = set(provides)
@@ -218,11 +215,8 @@ def _page_load(app: Flask, provides, policy) -> set:
     """
     with _minted(app, policy=policy) as token:
         claims = _claims(app, token)['user_claims']
-    with (
-        _signed_in(app, provides) as identity,
-        mock.patch(
-            'web.server.security.signal_handlers.get_jwt_claims', lambda: claims
-        ),
+    with _signed_in(app, provides) as identity, mock.patch(
+        'web.server.security.signal_handlers.get_jwt_claims', lambda: claims
     ):
         _install_token_needs(identity)
         return identity.provides
@@ -288,11 +282,8 @@ def test_a_caller_on_a_narrowed_token_gets_no_render(app):
         'needs': ['*'],
         'query_needs': [{STATE: {'include_values': ['North']}}],
     }
-    with (
-        _signed_in(app, account) as identity,
-        mock.patch(
-            'web.server.security.signal_handlers.get_jwt_claims', lambda: narrowed_token
-        ),
+    with _signed_in(app, account) as identity, mock.patch(
+        'web.server.security.signal_handlers.get_jwt_claims', lambda: narrowed_token
     ):
         _install_token_needs(identity)
         digest = query_policy_fingerprint()

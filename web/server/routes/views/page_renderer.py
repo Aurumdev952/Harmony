@@ -222,12 +222,9 @@ def render_dashboard(
     }
     policy = query_policy_fingerprint() if _is_signed_in_as(auth_user_email) else None
     ttl_seconds = RENDER_TIMEOUT_SECONDS + RESPONSE_MARGIN_SECONDS
-    with (
-        _render_slot(ttl_seconds),
-        render_token(
-            auth_user_email, resource_id, policy=policy, ttl_seconds=ttl_seconds
-        ) as token,
-    ):
+    with _render_slot(ttl_seconds), render_token(
+        auth_user_email, resource_id, policy=policy, ttl_seconds=ttl_seconds
+    ) as token:
         try:
             response = requests.post(
                 f'{RENDERER_URL}/render',

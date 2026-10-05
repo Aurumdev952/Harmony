@@ -1,6 +1,6 @@
 ---
 name: post-wp2f-tooling
-description: After WP-2f (uv, ruff, mypy CI) tests/web run with plain uv on py3.9; lint-gate traps, worktree-guard workarounds, graphql namespace trap
+description: After WP-2f (uv, ruff, mypy CI) tests/web run with plain uv (py3.9, 3.13 from WP-3b via uvx uv 0.12.23); lint-gate traps, worktree-guard workarounds, dead-worktree branch switch, graphql namespace trap
 metadata:
   type: reference
 ---
@@ -11,4 +11,7 @@ Since WP-2f merged (mig/integration 4be8451, 2026-10-04) the project is uv-manag
 - `ruff check --fix` deletes side-effect imports such as `import web.dev_reloader` in `web/runserver.py`; mark those `# noqa: F401` before running it.
 - S310 cannot be satisfied by a scheme check alone (ruff does no flow analysis): validate, then `# noqa: S310` naming the validator. It flags `urllib.request.Request(...)` and `urlopen(...)`, but not `opener.open(...)` from `build_opener`. Security wants secret-bearing calls to refuse redirects (`allow_redirects=False`, or a `HTTPRedirectHandler` whose `redirect_request` returns None). Test that with a local server sending a 302: urllib already refuses a 307 on POST, so a 307 test passes on unfixed code too.
 - The worktree guard refuses `$(cat list)` and `xargs -a` as arguments to uv, and multi-step heredoc scripts in the agent-memory dir. Pass long file lists through `uv run python -c` with `subprocess.run([...])`, or write them out literally; use the Write tool for memory files.
+- The guard also refuses loops, `$(...)`, variables used as commands, `cd` into another worktree, and any python heredoc whose text contains "git". Edit WP files with the Edit tool.
+- From WP-3b (CPython 3.13) the root `pyproject.toml` needs uv 0.12.16 or later. While the host uv is older, run `uvx --from uv==0.12.23 uv run --locked ...`. `ci/lint_python.sh` calls bare `uv`, so run its ruff steps by hand. The 3.13 image import sweep runs on the full `harmony-web` image. The `-server` image alone has 3 extra `No module named 'scripts'` errors.
+- If a supporting branch is still checked out in a locked worktree whose lock pid is dead (`ps -p <pid>`), diff the dead worktree's uncommitted files first. Then run `git switch --ignore-other-worktrees <branch>` in your own worktree and note the switch in the WP log. See [[lead-redispatch-after-restart]].
 - In the project env, `import graphql` resolves to the repo's `graphql/` folder (namespace package), not graphql-core. Tests that load `scripts/db/hasura/check_role_permissions.py` stub `sys.modules['graphql']` (see `tests/graphql/test_hasura_scripts.py`).

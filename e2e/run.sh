@@ -51,6 +51,10 @@ ensure_playwright() {
   if [[ ! -x "${ROOT}/e2e/node_modules/.bin/playwright" ]]; then
     (cd "${ROOT}/e2e" && yarn install --frozen-lockfile)
   fi
+  # The a11y and e2e projects run on this machine's Chromium; a no-op once
+  # the pinned Playwright's build is in its cache. CI runners also need
+  # `playwright install-deps chromium` once.
+  "${ROOT}/e2e/node_modules/.bin/playwright" install chromium
 }
 
 ensure_client() {

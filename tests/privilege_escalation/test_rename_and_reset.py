@@ -869,3 +869,146 @@ def test_the_dashboard_page_names_its_author_only_to_callers_who_see_the_author(
     shown = author.username if kind == 'not_admin' else None
     assert dashboard_page(viewer, slug) == shown
     assert dashboard_page(superuser, slug) == author.username
+
+
+# Group membership: a non-superuser's group editor lists only the users it can
+# see, so saving a member list must keep the members hidden from the caller, and
+# the caller can neither add nor remove them (qa round 2, Medium 1).
+
+
+def _members(db, group_id: int) -> set[int]:
+    db.session.expire_all()
+    return {user.id for user in db.session.query(Group).get(group_id).users}
+
+
+def _group_editing(db, make_user, kind: str, caller_roles=('group_admin',)):
+    actor = make_user(list(caller_roles))
+    member = make_user()
+    hidden = _admin_target(db, make_user, kind)
+    group_id = _make_group(db, users=[actor, member, hidden])
+    db.session.expire_all()
+    name = db.session.query(Group).get(group_id).name
+    return actor, member, hidden, group_id, name
+
+
+def _set_members_by_patch(actor, group_id, name, users):
+    return actor.request(
+        'PATCH',
+        f'/api2/group/{group_id}',
+        {'$uri': '', 'name': name, 'roles': [], 'users': users, 'acls': []},
+    )
+
+
+def _set_members_by_users_route(actor, group_id, _name, users):
+    return actor.request('PATCH', f'/api2/group/{group_id}/users', users)
+
+
+_SET_MEMBERS = pytest.mark.parametrize(
+    'set_members',
+    [_set_members_by_patch, _set_members_by_users_route],
+    ids=['patch_group', 'patch_users'],
+)
+
+
+@_SET_MEMBERS
+@pytest.mark.parametrize('kind', [_DIRECT_ADMIN, _GROUP_ADMIN])
+def test_saving_a_member_list_keeps_members_the_caller_cannot_see(
+    db, make_user, kind, set_members
+):
+    actor, member, hidden, group_id, name = _group_editing(db, make_user, kind)
+
+    response = set_members(actor, group_id, name, [actor.username])
+
+    assert response.status_code == 200
+    assert _members(db, group_id) == {actor.id, hidden.id}
+
+
+@_SET_MEMBERS
+@pytest.mark.parametrize('kind', [_DIRECT_ADMIN, _GROUP_ADMIN])
+def test_a_member_list_cannot_add_a_user_the_caller_cannot_see(
+    db, make_user, kind, set_members
+):
+    actor, member, hidden, group_id, name = _group_editing(db, make_user, kind)
+    outsider = _admin_target(db, make_user, kind)
+
+    response = set_members(
+        actor, group_id, name, [actor.username, member.username, outsider.username]
+    )
+
+    assert response.status_code == 404
+    assert _members(db, group_id) == {actor.id, member.id, hidden.id}
+
+
+@pytest.mark.parametrize('kind', [_DIRECT_ADMIN, _GROUP_ADMIN])
+def test_resending_a_hidden_member_keeps_it(db, make_user, kind):
+    actor, member, hidden, group_id, name = _group_editing(db, make_user, kind)
+
+    response = _set_members_by_patch(
+        actor, group_id, name, [actor.username, hidden.username]
+    )
+
+    assert response.status_code == 200
+    assert _members(db, group_id) == {actor.id, hidden.id}
+
+
+@pytest.mark.parametrize('method', ['POST', 'DELETE'])
+@pytest.mark.parametrize('kind', [_DIRECT_ADMIN, _GROUP_ADMIN])
+def test_a_user_the_caller_cannot_see_is_not_found_by_the_group_users_route(
+    db, make_user, kind, method
+):
+    actor, member, hidden, group_id, _ = _group_editing(db, make_user, kind)
+    target = hidden if method == 'DELETE' else _admin_target(db, make_user, kind)
+
+    response = actor.request(method, f'/api2/group/{group_id}/users', target.username)
+
+    assert response.status_code == 404
+    assert _members(db, group_id) == {actor.id, member.id, hidden.id}
+
+
+@_SET_MEMBERS
+@pytest.mark.parametrize('kind', [_DIRECT_ADMIN, _GROUP_ADMIN])
+def test_a_superuser_still_sets_any_member_list(db, make_user, kind, set_members):
+    superuser = _admin_target(db, make_user, _GROUP_ADMIN)
+    _, member, hidden, group_id, name = _group_editing(db, make_user, kind)
+    outsider = _admin_target(db, make_user, kind)
+
+    response = set_members(
+        superuser, group_id, name, [member.username, outsider.username]
+    )
+
+    assert response.status_code == 200
+    assert _members(db, group_id) == {member.id, outsider.id}
+
+
+@_SET_MEMBERS
+def test_a_member_list_still_removes_and_adds_users_the_caller_sees(
+    db, make_user, set_members
+):
+    actor, member, hidden, group_id, name = _group_editing(db, make_user, _DIRECT_ADMIN)
+    newcomer = make_user()
+
+    response = set_members(actor, group_id, name, [actor.username, newcomer.username])
+
+    assert response.status_code == 200
+    assert _members(db, group_id) == {actor.id, newcomer.id, hidden.id}
+
+
+def test_a_narrowed_admin_token_still_joins_the_group_it_creates(app, db, make_user):
+    '''A non-superuser creating a group joins it. The caller always sees
+    itself, even a token narrowed on an admin account, which is otherwise
+    hidden like any administrator.
+    '''
+    admin = make_user(['admin'])
+    caller = _token_caller(app, admin.username, [['create_resource', None, 'group']])
+    name = _name('group')
+
+    response = caller.request(
+        'POST',
+        '/api2/group',
+        {'$uri': '', 'name': name, 'roles': [], 'users': [], 'acls': []},
+    )
+
+    assert response.status_code == 200
+    db.session.expire_all()
+    group = db.session.query(Group).filter_by(name=name).one()
+    assert [user.id for user in group.users] == [admin.id]

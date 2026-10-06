@@ -34,7 +34,7 @@ from web.server.configuration.bots import BOT_USERS
 from web.server.data.data_access import Transaction
 from web.server.errors import NotificationError
 from web.server.potion.filters import UserFilter
-from web.server.potion.managers import visible_username
+from web.server.security.hidden_users import visible_username
 from web.server.query.request import QueryRequest
 from web.server.routes.views.authorization import (
     AuthorizedOperation,

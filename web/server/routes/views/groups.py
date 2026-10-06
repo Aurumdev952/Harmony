@@ -10,6 +10,7 @@ from web.server.data.data_access import (
     Transaction,
 )
 from web.server.errors import ItemNotFound
+from web.server.security.hidden_users import is_hidden_from_caller
 from web.server.potion.signals import after_user_group_change
 from web.server.routes.views.users import try_get_user
 from web.server.routes.views.core import try_get_role_and_resource
@@ -245,12 +246,20 @@ def update_group_roles_from_map(
     return new_role_entities
 
 
+def _visible_user(username):
+    '''The user named `username`, as a missing user when it is hidden from the
+    caller (decision 0010): a caller neither adds nor removes members it cannot
+    see.
+    '''
+    user = try_get_user(username)
+    if not user or is_hidden_from_caller(user):
+        raise ItemNotFound('user', {'username': username})
+    return user
+
+
 def add_group_user(group, username, session=None, flush=True, commit=True):
     session = session or get_db_adapter().session
-    user = try_get_user(username)
-
-    if not user:
-        raise ItemNotFound('user', {'username': username})
+    user = _visible_user(username)
 
     entity = try_get_group_user(group.id, user.id)
     exists = True
@@ -265,10 +274,7 @@ def add_group_user(group, username, session=None, flush=True, commit=True):
 
 def delete_group_user(group, username, session=None, flush=True, commit=True):
     session = session or get_db_adapter().session
-    user = try_get_user(username)
-
-    if not user:
-        raise ItemNotFound('user', {'username': username})
+    user = _visible_user(username)
 
     entity = try_get_group_user(group.id, user.id)
     exists = False
@@ -281,15 +287,24 @@ def delete_group_user(group, username, session=None, flush=True, commit=True):
 
 
 def update_group_users(group, new_users, session=None, flush=True, commit=True):
+    '''Replaces the members the caller can see with `new_users`. Members hidden
+    from the caller stay, whether or not `new_users` names them: the group
+    editor lists only the users the caller sees.
+    '''
     session = session or get_db_adapter().session
     updated_users = []
-    group_user_relations = list_group_users(group)
+    kept = set()
 
-    for group_user in group_user_relations:
+    for group_user in list_group_users(group):
+        if is_hidden_from_caller(group_user.user):
+            kept.add(group_user.user.username.lower())
+            continue
         session.delete(group_user)
         updated_users.append(group_user.user)
 
     for username in new_users:
+        if username.lower() in kept:
+            continue
         # Do not flush or commit these changes. We want to perform the update in a transacted
         # fashion.
         (result, _) = add_group_user(

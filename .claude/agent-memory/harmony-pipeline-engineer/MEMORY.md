@@ -1,1 +1,2 @@
-- [Test and filter traps](test-and-filter-traps.md) — run tests/pipeline via run.sh from /tmp; SelectorFilter rejects None (use RawFilter); lint
+- [Test and filter traps](test-and-filter-traps.md) — run tests/pipeline from the 3.13 lock; SelectorFilter rejects None (use RawFilter); lint
+- [Supporting-role traps](supporting-role-traps.md) — tests/pipeline is qa; worktree guard; container-owned files; old PyPy image; venv symlink

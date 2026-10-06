@@ -3,8 +3,6 @@ set -o pipefail
 
 source "${PIPELINE_UTILS_DIR}/bash/common.sh"
 
-SetupEnvForPyPy
-
 pushd "${PIPELINE_TMP_DIR}" &> /dev/null
 
 "${PIPELINE_SRC_ROOT}/data/pipeline/scripts/process_csv.py" \

@@ -1,12 +1,8 @@
 #!/bin/bash -eu
 set -o pipefail
 
-# Load the utilities file to use the 'SetupEnvForPyPy', 'TagLines', and 'WaitMultipleThreads'
-# commands.
+# Load the utilities file to use the 'TagLines' and 'WaitMultipleThreads' commands.
 source "${PIPELINE_UTILS_DIR}/bash/common.sh"
-
-# Enters the pypy virtual environment for better performance.
-SetupEnvForPyPy
 
 # Use the 'generate_pipeline_sources.py' script to get a list of all sources
 # that go through this fill_dimension_data step.

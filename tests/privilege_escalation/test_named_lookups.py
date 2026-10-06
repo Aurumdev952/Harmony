@@ -27,7 +27,6 @@ from models.alchemy.permission import (
 )
 from models.alchemy.security_group import Group, GroupAcl
 from models.alchemy.user import User, UserAcl, UserRoles, UserStatusEnum
-from werkzeug.exceptions import BadRequest
 
 from web.server.errors import ItemNotFound
 
@@ -731,34 +730,61 @@ def test_a_legacy_role_map_naming_no_role_still_removes_every_role(
     assert db.session.query(model).get(target_id).roles == []
 
 
-@pytest.mark.parametrize(
-    ('resource_type', 'refusal'), [(None, BadRequest), ('no_such_type', ItemNotFound)]
-)
-def test_an_authorization_check_naming_no_resource_type_is_refused(
-    app, db, make_user, resource_type, refusal
-):
+def _authorization_request(app, actor, handler_name: str, body):
+    '''Runs an `/api/authorization*` handler in a request context: the session
+    app has served requests, so the `/api` blueprint cannot be registered on it
+    any more.'''
     # pylint: disable=import-outside-toplevel
     from web.server.routes.api import ApiRouter
 
-    # The session app has served requests, so the `/api` blueprint cannot be
-    # registered on it any more; the handler runs in a request context instead.
+    with app.test_request_context(
+        f'/api/{handler_name}',
+        method='POST',
+        json=body,
+        headers={'X-Username': actor.username, 'X-Password': _PASSWORD},
+    ):
+        return getattr(ApiRouter(None, None), f'api_is_{handler_name}')()
+
+
+@pytest.mark.parametrize('handler', ['authorized', 'authorized_multi'])
+@pytest.mark.parametrize('resource_type', [None, 7])
+def test_an_authorization_check_without_a_resource_type_is_a_json_400(
+    app, db, make_user, handler, resource_type
+):
     actor = make_user(['admin'])
     name = f'dashboard_{_tag()}'
     _resource(db, name)
-    body = {
+    check = {
         'permission': 'view_resource',
         'resourceType': resource_type,
         'resourceName': name,
     }
 
-    with app.test_request_context(
-        '/api/authorization',
-        method='POST',
-        json=body,
-        headers={'X-Username': actor.username, 'X-Password': _PASSWORD},
-    ):
-        with pytest.raises(refusal):
-            ApiRouter(None, None).api_is_authorized()
+    response, status = _authorization_request(
+        app, actor, handler, check if handler == 'authorized' else [check]
+    )
+
+    assert status == 400
+    assert response.is_json
+    assert response.get_json()['success'] is False
+
+
+def test_an_authorization_check_naming_an_unknown_type_is_not_found(app, db, make_user):
+    actor = make_user(['admin'])
+    name = f'dashboard_{_tag()}'
+    _resource(db, name)
+
+    with pytest.raises(ItemNotFound):
+        _authorization_request(
+            app,
+            actor,
+            'authorized',
+            {
+                'permission': 'view_resource',
+                'resourceType': 'no_such_type',
+                'resourceName': name,
+            },
+        )
 
 
 class _Records(logging.Handler):
@@ -840,12 +866,16 @@ def test_transferring_a_dashboard_moves_only_that_dashboard(app, db, make_user):
 @pytest.fixture(name='no_mail')
 def fixture_no_mail(app, monkeypatch):
     '''Creating or sharing a dashboard mails a link to the dashboard page; this
-    app has neither the page blueprint nor a mailer.'''
+    app has neither the page blueprint nor a mailer. The link comes from
+    `url_for`, or from `deployment_url` once WP-0k lands; whichever name the
+    module has is patched.'''
     for module in ('dashboard_api_models', 'permission_api_models'):
-        monkeypatch.setattr(
-            f'web.server.api.{module}.url_for',
-            lambda *args, **kwargs: 'http://dashboard.invalid/',
-        )
+        for name in ('url_for', 'deployment_url'):
+            monkeypatch.setattr(
+                f'web.server.api.{module}.{name}',
+                lambda *args, **kwargs: 'http://dashboard.invalid/',
+                raising=False,
+            )
     monkeypatch.setattr(app, 'email_renderer', mock.Mock(), raising=False)
     monkeypatch.setattr(app, 'notification_service', mock.Mock(), raising=False)
 
@@ -1028,6 +1058,44 @@ def test_an_acl_on_a_resource_the_caller_cannot_see_looks_like_no_resource(
         hidden_name, 'NAME'
     ) == missing.get_data(as_text=True).replace(missing_name, 'NAME')
     assert _group_acls(db, hidden_id) == set()
+
+
+@pytest.mark.parametrize('named_by', ['uri', 'name'])
+def test_a_grant_on_a_hidden_resource_is_audited_by_id_only(db, make_user, named_by):
+    actor = make_user(['group_moderator'])
+    group_id, group_name = _group_with_acl(
+        db, actor, 'dashboard_viewer', _resource(db, f'dashboard-{_tag()}').id
+    )
+    hidden_name = f'hidden-{_tag()}'
+    hidden_id = _resource(db, hidden_name).id
+    acl = (
+        _acl_by_uri('dashboard_viewer', hidden_id, hidden_name)
+        if named_by == 'uri'
+        else _acl('dashboard_viewer', hidden_name)
+    )
+    handler = _Records()
+    app_logger = logging.getLogger('ZenysisLogger')
+    app_logger.addHandler(handler)
+    try:
+        response = actor.request(
+            'PATCH',
+            f'/api2/group/{group_id}',
+            {
+                '$uri': f'/api2/group/{group_id}',
+                'name': group_name,
+                'roles': [],
+                'users': [actor.username],
+                'acls': [acl],
+            },
+        )
+    finally:
+        app_logger.removeHandler(handler)
+
+    assert response.status_code == 404
+    refusals = [line for line in handler.lines if 'Refused grant' in line]
+    assert len(refusals) == 1
+    assert f'Resource id: {hidden_id}.' in refusals[0]
+    assert hidden_name not in refusals[0]
 
 
 @pytest.mark.parametrize(

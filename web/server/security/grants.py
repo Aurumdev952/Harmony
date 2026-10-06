@@ -49,11 +49,7 @@ if TYPE_CHECKING:
     from web.server.routes.views.permission import RoleFields
 
 
-def refuse_grant(description: str, detail: str) -> NoReturn:
-    '''The 403 body is `description` alone. `detail`, which names what was
-    refused, goes only to the audit line: naming a role, group or policy would
-    tell the caller that an id it cannot list exists.
-    '''
+def _audit_refusal(description: str, detail: str) -> None:
     # The log formatter drops LoggerAdapter extras, so the caller goes in the text.
     g.request_logger.warning(
         'Refused grant by \'%s\': %s %s',
@@ -61,6 +57,14 @@ def refuse_grant(description: str, detail: str) -> NoReturn:
         description,
         detail,
     )
+
+
+def refuse_grant(description: str, detail: str) -> NoReturn:
+    '''The 403 body is `description` alone. `detail`, which names what was
+    refused, goes only to the audit line: naming a role, group or policy would
+    tell the caller that an id it cannot list exists.
+    '''
+    _audit_refusal(description, detail)
     raise Forbidden(description=description)
 
 
@@ -176,15 +180,20 @@ def _resolve_acl(
         )
         not_found = resource_not_found(resource_name, type_name)
 
-    if resource is None or (
-        resource.id not in held_resource_ids
-        and not is_authorized(
-            'view_resource',
-            ResourceTypeEnum(resource.resource_type_id).name,
-            resource.id,
-            False,
-        )
+    if resource is None:
+        raise not_found
+    if resource.id not in held_resource_ids and not is_authorized(
+        'view_resource',
+        ResourceTypeEnum(resource.resource_type_id).name,
+        resource.id,
+        False,
     ):
+        # Audited by id only: the response must not reveal the resource, and
+        # the log line need not repeat a name the caller cannot list.
+        _audit_refusal(
+            'An ACL names a resource the caller cannot see.',
+            f'Resource id: {resource.id}.',
+        )
         raise not_found
     return try_get_resource_role(acl['resourceRole']['name'], resource), resource
 

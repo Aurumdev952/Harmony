@@ -21,6 +21,7 @@ from pylib.file.file_utils import FileUtils
 # pylint: disable=E0611
 # werkzeug does contain the secure_filename function.
 from werkzeug import secure_filename
+from werkzeug.exceptions import BadRequest
 
 import web.server.routes.views.aggregate
 import web.server.routes.views.authorization
@@ -51,13 +52,19 @@ from web.server.routes.views.validate_data_catalog import (
 from web.server.util.data_catalog import populate_fields, zip_data_catalog_metadata
 from web.server.util.authentication import is_session_persisted
 from web.server.util.hasura import build_hasura_headers
-from web.server.util.util import Success, unauthorized_error
+from web.server.util.util import Error, Success, unauthorized_error
 
 # Endpoints in this file should have minimal logic; serialization should happen elsewhere.
 # TODO: move serializing to upstream files
 
 
 MAX_DATA_CATALOG_UPLOAD_SIZE_BYTES = 5 * 1024**2  # disallow files larger than 5 MB
+
+
+def _bad_request(error):
+    '''A malformed authorization check, in the JSON envelope the other answers
+    of these routes use.'''
+    return jsonify(Error({'code': 'BAD_REQUEST', 'message': error.description})), 400
 
 
 class ApiRouter:
@@ -69,9 +76,14 @@ class ApiRouter:
     def api_is_authorized(self):
         request_data = request.get_json(force=True)
         permission = request_data['permission']
-        authorized = is_authorized_api(
-            permission, request_data['resourceType'], request_data.get('resourceName')
-        )
+        try:
+            authorized = is_authorized_api(
+                permission,
+                request_data['resourceType'],
+                request_data.get('resourceName'),
+            )
+        except BadRequest as error:
+            return _bad_request(error)
 
         result = Success() if authorized else unauthorized_error(permission)
         return jsonify(result)
@@ -83,7 +95,10 @@ class ApiRouter:
             permission = auth_request['permission']
             resource_type = auth_request['resourceType']
             resource_name = auth_request.get('resourceName')
-            authorized = is_authorized_api(permission, resource_type, resource_name)
+            try:
+                authorized = is_authorized_api(permission, resource_type, resource_name)
+            except BadRequest as error:
+                return _bad_request(error)
             result.append(
                 {
                     'authorized': authorized,

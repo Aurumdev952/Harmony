@@ -1,7 +1,6 @@
 import json
 from http.client import OK, BAD_REQUEST
 from datetime import timedelta
-from http.client import OK
 
 from flask import current_app, jsonify, make_response, request
 from flask_potion import fields, Resource

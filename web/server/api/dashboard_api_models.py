@@ -583,9 +583,10 @@ class DashboardResource(PrincipalResource):
         schema=USER_URI_SCHEMA,
     )
     def transfer_ownership(self, dashboard, new_author):
-        with AuthorizedOperation(
-            'update_users', 'dashboard', dashboard.resource_id
-        ), AuthorizedOperation('view_resource', 'user', dashboard.author.id):
+        with (
+            AuthorizedOperation('update_users', 'dashboard', dashboard.resource_id),
+            AuthorizedOperation('view_resource', 'user', dashboard.author.id),
+        ):
             new_author = lookup_author(author_id=new_author)
             api_transfer_dashboard_ownership(dashboard, new_author)
             return None, NO_CONTENT
@@ -598,9 +599,10 @@ class DashboardResource(PrincipalResource):
         schema=USERNAME_SCHEMA,
     )
     def transfer_ownership_by_username(self, dashboard, new_author):
-        with AuthorizedOperation(
-            'update_users', 'dashboard', dashboard.resource_id
-        ), AuthorizedOperation('view_resource', 'user', dashboard.author.id):
+        with (
+            AuthorizedOperation('update_users', 'dashboard', dashboard.resource_id),
+            AuthorizedOperation('view_resource', 'user', dashboard.author.id),
+        ):
             new_author = lookup_author(author_username=new_author)
             api_transfer_dashboard_ownership(dashboard, new_author)
             return None, NO_CONTENT
@@ -659,9 +661,10 @@ class DashboardResource(PrincipalResource):
         ),
     )
     def set_favorite(self, dashboard, is_favorite):
-        with AuthorizedOperation(
-            'view_resource', 'dashboard', dashboard.id
-        ), Transaction() as transaction:
+        with (
+            AuthorizedOperation('view_resource', 'dashboard', dashboard.id),
+            Transaction() as transaction,
+        ):
             metadata = get_or_create_metadata(transaction, dashboard.id)
             metadata.is_favorite = is_favorite
             transaction.add_or_update(metadata)

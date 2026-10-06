@@ -103,6 +103,26 @@ def test_jwt_identity_signs_in_the_matching_account(app, sent, expected_id):
     assert _signed_in_id(app, sent) == expected_id
 
 
+@pytest.mark.parametrize(
+    'sent, pending_id', [('jane_doe@moh.gov.rw', 9), ('dup.shell@moh.gov.rw', 11)]
+)
+def test_a_pre_wp0k_session_that_may_name_a_pending_account_with_a_password_signs_in_nobody(
+    app, sent, pending_id
+):
+    """Before WP-0k nothing checked the status, so a pending account given a
+    password could sign in, and a session typed for it may be its own: it must
+    not sign in the active neighbour its pattern also matches."""
+    with app.app_context():
+        engine = app.extensions['sqlalchemy'].db.engine
+        with engine.begin() as connection:
+            connection.execute(
+                sqlalchemy.text("UPDATE \"user\" SET password = 'set' WHERE id = :id"),
+                {'id': pending_id},
+            )
+
+    assert _signed_in_id(app, sent) is None
+
+
 @CASES
 def test_flask_user_lookup_matches_exactly(app, request_ctx, sent, expected_id):
     user = current_app.user_manager.find_user_by_username(sent)

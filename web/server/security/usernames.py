@@ -1,6 +1,6 @@
 from typing import List, Optional
 
-from sqlalchemy import func
+from sqlalchemy import func, or_
 from sqlalchemy.orm import Session
 
 from models.alchemy.user import User, UserStatusEnum
@@ -72,10 +72,12 @@ def find_legacy_token_account(
     Such a session names the string the user typed, and before WP-0k sign-in
     took the first account that string matched as an ILIKE pattern (`_` and
     `%` wildcards, any case). So the session can only be trusted when that
-    pattern matches exactly one account that is not a pending invitation
-    (pending accounts never signed in): typing `john_doe` with `john.doe`'s
-    password made a session naming `john_doe`, which must not sign in a
-    `john_doe` account that never gave a password.
+    pattern matches exactly one account that could have signed in: any account
+    except a pending invitation with no password (nothing checked the status
+    before WP-0k, so a pending account given a password could sign in). Typing
+    `john_doe` with `john.doe`'s password made a session naming `john_doe`,
+    which must not sign in a `john_doe` account that never gave a password.
+    The one account must then be active (`account_for_token`).
     '''
     if not username:
         return None
@@ -84,7 +86,10 @@ def find_legacy_token_account(
         session.query(User)
         .filter(
             User.username.ilike(username),
-            User.status_id != UserStatusEnum.PENDING.value,
+            or_(
+                User.status_id != UserStatusEnum.PENDING.value,
+                func.coalesce(User.password, '') != '',
+            ),
         )
         .limit(2)
         .all()

@@ -16,7 +16,7 @@ from flask_jwt_extended import JWTManager
 
 from config.loader import import_configuration_module
 from models.alchemy.user import User
-from tests.web.usernames.accounts import ACCOUNTS, ACCOUNTS_CREATED, PASSWORD
+from tests.web.usernames.accounts import ACCOUNTS, ACCOUNTS_CREATED, PASSWORD, PENDING
 from web.server.app_db import create_db
 from web.server.configuration.flask import FlaskConfiguration
 from web.server.database.setup import initialize_user_manager
@@ -130,7 +130,8 @@ def _create_users(db, password_hash):
                 {
                     'id': user_id,
                     'username': username,
-                    'password': password_hash,
+                    # Invitations create accounts with no password.
+                    'password': '' if status == PENDING else password_hash,
                     'status': status,
                     'token': token,
                     'created': ACCOUNTS_CREATED,

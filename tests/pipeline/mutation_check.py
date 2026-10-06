@@ -68,7 +68,7 @@ def run_mutant(name: str, scratch: Path) -> list[str]:
     shutil.copytree(
         REPO_ROOT,
         scratch,
-        ignore=shutil.ignore_patterns('.git', 'node_modules', '__pycache__'),
+        ignore=shutil.ignore_patterns('.git', '.venv', 'node_modules', '__pycache__'),
         symlinks=True,
     )
     target = scratch / relative

@@ -11,9 +11,9 @@ The steps run as the Zeus scripts in `pipeline/harmony_demo/process/run/` run th
 ## Run
 
 ```bash
-tests/pipeline/run.sh                       # all tests, CPython 3.9
+tests/pipeline/run.sh                       # all tests, on the root uv.lock (CPython 3.13)
 tests/pipeline/run.sh -k yellow_fever       # any pytest arguments
-PIPELINE_FIXTURE_PYTHON=pypy3.9 tests/pipeline/run.sh   # the interpreter Zeus uses today
+PIPELINE_FIXTURE_PYTHON=pypy3.9 tests/pipeline/run.sh   # another interpreter, e.g. what Zeus ran before WP-3b
 CI=1 tests/pipeline/run.sh                  # hypothesis draws the same examples every run
 ```
 
@@ -22,11 +22,10 @@ You need `uv`, `lz4` and `lz4cat` on `PATH`. If `pigz` is missing, the harness s
 `run.sh` does the following:
 - exports `ZEN_ENV=harmony_demo`, whatever the calling shell has;
 - keeps hypothesis's cache under `$TMPDIR`;
-- installs `requirements.txt`, which pins every direct dependency. `unidecode==1.1.1` matters, because slugified field ids depend on it.
+- runs on the root `uv.lock` environment, the same CPython 3.13 and pins as the pipeline image and `ci/pytest_suites.sh`. `unidecode==1.1.1` matters, because slugified field ids depend on it;
+- with `PIPELINE_FIXTURE_PYTHON` set, runs on that interpreter instead and installs `requirements.txt`, which pins every direct dependency. CPython 3.9 and PyPy 3.9 pass with it.
 
 The harness runs each step with `LC_ALL=C.UTF-8` and `TZ=UTC`. The self-serve merge's `sort -u` depends on that locale.
-
-CPython 3.12 and later cannot import `config/` yet, because `ConfigImporter` implements only `find_module`. The suite therefore runs on 3.9, the pipeline image's CPython.
 
 Formatting and lint, as CI runs them today and as WP-2f will:
 

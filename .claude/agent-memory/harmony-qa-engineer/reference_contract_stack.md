@@ -1,6 +1,6 @@
 ---
 name: reference-contract-stack
-description: Traps when running the WP-2c contract stack (tests/contract/stack) for replay or review
+description: Traps when running the WP-2c contract stack (tests/contract/stack) for replay or review; image tag from the lock files, checkout at /src
 metadata:
   type: reference
 ---
@@ -8,7 +8,8 @@ metadata:
 Current as of the WP-2c rework (2026-10-05):
 
 - Always start it through `tests/contract/stack/stack.sh up`; `compose.yaml` alone no longer works (it needs `CONTRACT_WEB_IMAGE` and six generated secrets). WP-2b's `tests/authz/stack.sh` drove `compose.yaml` directly and must switch to `stack.sh` with its own `CONTRACT_PROJECT`/`CONTRACT_WEB_PORT`/`CONTRACT_USERNAME`.
-- The web image is rebuilt on every `up` (layer cache) and tagged `harmony-contract-web-server:<hash of requirements*.txt and docker/web/Dockerfile_web-server>` (no shim image since WP-0b pinned bcrypt, 2026-10-04), so requirement changes are never masked by a stale image.
+- The web image is rebuilt on every `up` (layer cache) and tagged `harmony-contract-web-server:<hash of docker/web/Dockerfile_web-server, pyproject.toml and uv.lock>` (since WP-3b deleted `requirements*.txt`, 2026-10-06); `stack.sh image-tag` prints it, which is also how to `docker rmi` it by name. `tests/contract/test_stack_image_tag.py` fails if the Dockerfile binds a file the tag does not hash.
+- From WP-3b the image keeps its packages in `/zenysis/.venv`, so the stack mounts the checkout read-only at `/src`, not `/zenysis`: a mount there hides the venv and `web-init` exits 127 (`.venv/bin/flask: cannot execute`). Inside the containers, run checkout scripts from `/src`.
 - Secrets live in `$XDG_RUNTIME_DIR/<project>.env` (else `~/.local/state/harmony-contract/`), mode 600, one `NAME=<64 hex>` line each; `CONTRACT_PASSWORD` is the admin password. `down` deletes it.
 - Overlays switch on Redis `requirepass` and the Hasura admin secret when the checked-out code reads `REDIS_PASSWORD` (WP-0b) / `HASURA_ADMIN_SECRET` (WP-0a).
 - Everything is on an `internal: true` network: no egress (Mailgun, Urlbox fail fast). Only `forward` publishes `127.0.0.1:$CONTRACT_WEB_PORT`.

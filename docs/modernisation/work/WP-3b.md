@@ -84,6 +84,14 @@ instances:
       - harmony/core/settings.py
       - tests/druid/test_druid_response_parsing.py
       - .claude/agent-memory/harmony-core-engineer/druid-response-streaming.md
+  # Supporting role, on mig/WP-3b-followup-backend from integration b8a15f83: the
+  # backend follow-up (reviewer follow-up 3). The drift test was infra-3's; the lead
+  # routed it here with the route change.
+  - name: "backend-2"
+    files:
+      - web/server/routes/views/page_renderer.py
+      - harmony/worker/renderer/spec.py
+      - tests/worker/test_renderer_web_drift.py
 branch: "mig/WP-3b-cpython-313"
 requirements: [INV-1, INV-2, INV-8, SEC-9, QA-4, PERF-7]
 contracts_consumed: []
@@ -179,7 +187,7 @@ Each item names the owner, the change, and what it blocks. Reproduce on this bra
 
 - [x] **core (non-blocking, security F3 residual):** `db/druid/json_stream.py`'s element cap counts characters (64 Mi), so the worst case is about 910 MB as UCS-4. Lower it to 16 Mi characters or count bytes, and give the worst case in the docstring. Done by core-2 in `58974e71`: the cap is 16 Mi characters, and the docstring gives the worst case, 224 MiB (235 MB). It stays a character count, because a cap on UTF-8 bytes would not lower the bound: one astral character makes the buffer UCS-4, and the ASCII after it costs 1 UTF-8 byte but 4 bytes in memory per character.
 - [x] **core (non-blocking, reviewer follow-up 5):** Done by core-2 in `36970de0`, with the suggested wording. `harmony/core/settings.py:8` says every image runs CPython 3.13; since decision 0013 the renderer runs 3.12. Suggested: "Every image that loads these settings runs CPython 3.13 since WP-3b." The ownership hook refused infra's edit.
-- [ ] **backend (non-blocking, reviewer follow-up 3):** `web/server/routes/views/page_renderer.py:58-64` keeps copies of the renderer's `WIDTHS`, `HEIGHTS` and `PDF_PAGE_SIZES` "because this app's image runs Python 3.8". The 3.13 web image imports `harmony.worker.renderer.spec` (sweep: OK), so import the ranges from there and drop the copies; `tests/worker/test_renderer_web_drift.py` can then go or shrink.
+- [x] **backend (non-blocking, reviewer follow-up 3):** `web/server/routes/views/page_renderer.py:58-64` keeps copies of the renderer's `WIDTHS`, `HEIGHTS` and `PDF_PAGE_SIZES` "because this app's image runs Python 3.8". The 3.13 web image imports `harmony.worker.renderer.spec` (sweep: OK), so import the ranges from there and drop the copies; `tests/worker/test_renderer_web_drift.py` can then go or shrink. Done by backend-2 in `1bd0fbbd`: the route imports the three from the spec, and the drift test checks identity instead of equality.
 - [ ] **pipeline (non-blocking, reviewer follow-up 5):** the TODOs "Upgrade the Python version on the pipeline machines to be 3.8 or greater" in `data/pipeline/field_setup/util.py:7-8` and `data/pipeline/self_serve/scripts/process_csv_wrapper.py:19-20` are done; delete them, and the `TYPE_CHECKING` fallbacks they guard if you like. The ownership hook refused infra's edit.
 
 ## Log
@@ -233,6 +241,7 @@ Each item names the owner, the change, and what it blocks. Reproduce on this bra
   - `53d1b40` (security L1, L2): web and worker `cap_drop: [ALL]` and `no-new-privileges` in the base file (dev's web resets `cap_drop`: it runs the dev image as root over the checkout). The mc config moves to `/etc/zenysis/mc/config.json:ro` with a root-owned `~/.mc` symlink. 7 failed before, 14 pass after, and the restart probe checks that the app reads the mounted config through the link. On the `d4` stack, web and worker are healthy as `1000:1000` with `CapDrop [ALL]` and `no-new-privileges`, and the HTTP probe matches.
   - F3 residual to core (Requests).
 - 2026-10-06 core-2 (supporting, `mig/WP-3b-followup-core` from integration `6c61e8f2`), the two core requests. `58974e71`: `_MAX_ELEMENT_CHARS` goes from 64 Mi to 16 Mi characters, and the module docstring gives the worst case (Evidence, "Core-2: element cap"). `36970de0`: the settings docstring says that only the images that load settings run CPython 3.13. INV-2: no parsed value changes. Only an element of 16 Mi to 64 Mi characters changes, and it now fails closed; Druid rows are a few hundred bytes. Check: the new `test_element_cap_bounds_memory_for_astral_text` failed at `6c61e8f2` (899 MiB extrapolated) and passes after (225 MiB, budget 256 MiB); `tests/druid` 258 passed (11 live-Druid skips), `tests/golden` 272, `tests/core` 188; `record.py --check` 86 cases, 0 drift; `ci/lint_python.sh 6c61e8f2` clean; `uv run --locked --isolated --group renderer-types mypy` 533 files, no issues. uv 0.12.23 through `uvx --from uv==0.12.23 uv` and the `/tmp/lead/bin` shim.
+- 2026-10-06 backend-2 (supporting, `mig/WP-3b-followup-backend` from integration `b8a15f83`), reviewer follow-up 3. `1bd0fbbd`: `page_renderer.py` imports `WIDTHS`, `HEIGHTS` and `PDF_PAGE_SIZES` from `harmony.worker.renderer.spec` and drops its copies; the spec's comment names the route instead of the copy. `test_renderer_web_drift.py` shrinks: the three equality asserts become `test_the_route_checks_args_against_the_renderers_own_ranges` (identity), and the other checks (content types, defaults, timeouts, concurrency) stay. Check: the new test failed at `b8a15f83` (copies equal, not the same objects) and passes after; `tests/worker` 152 passed (1 skipped), `tests/web` 425 passed (1 xfail), `tests/authz/test_render_routes.py` 18 passed; `ci/lint_python.sh b8a15f83` clean; `uv run --locked --isolated --group renderer-types mypy` 533 files, no issues; import-linter 1 kept. uv 0.12.23 through the `/tmp/lead/bin` shim.
 
 ## Evidence
 

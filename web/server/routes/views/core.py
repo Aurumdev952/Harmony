@@ -88,6 +88,27 @@ def try_get_resource_role(role_name, resource, session=None):
     raise NotFound({'errors': [error], 'message': _LOOKUP_FAILED})
 
 
+def _missing_resource(resource_name, resource_type):
+    return {
+        'fields': ['resourceName'],
+        'message': (
+            'Resource \'%s\' of type \'%s\' does not exist. '
+            % (resource_name, resource_type)
+        ),
+    }
+
+
+def resource_not_found(resource_name, resource_type):
+    '''The 404 for a resource named by type and name that does not exist, also
+    given for one the caller cannot see, so the two read the same.'''
+    return NotFound(
+        {
+            'errors': [_missing_resource(resource_name, resource_type)],
+            'message': _LOOKUP_FAILED,
+        }
+    )
+
+
 def try_get_resource_type(resource_type):
     return find_one_by_fields(
         ResourceType, case_sensitive=True, search_fields={'name': resource_type}
@@ -158,15 +179,7 @@ def try_get_role_and_resource(
         )
 
     if resource_name and not resource:
-        errors.append(
-            {
-                'fields': ['resourceName'],
-                'message': (
-                    'Resource \'%s\' of type \'%s\' does not exist. '
-                    % (resource_name, resource_type)
-                ),
-            }
-        )
+        errors.append(_missing_resource(resource_name, resource_type))
 
     if resource and role and resource.resource_type_id != role.resource_type_id:
         errors.append(_type_mismatch(role, resource))

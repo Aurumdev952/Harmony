@@ -24,7 +24,7 @@ from flask_login import current_user
 from flask_principal import Need
 from werkzeug.exceptions import BadRequest, Forbidden, NotFound
 
-from models.alchemy.permission import Resource, ResourceRole, Role
+from models.alchemy.permission import Resource, ResourceRole, ResourceTypeEnum, Role
 from models.alchemy.security_group import Group, GroupAcl
 from models.alchemy.user import UserAcl
 from models.alchemy.user.web_base_user import BaseWebUserMixin
@@ -35,7 +35,10 @@ from web.server.routes.views.authorization import (
     is_authorized,
 )
 from web.server.routes.views.core import (
+    find_by_name,
+    resource_not_found,
     try_get_resource_role,
+    try_get_resource_type,
     try_get_role_and_resource,
 )
 from web.server.routes.views.query_policy import construct_query_need_from_policy
@@ -139,31 +142,51 @@ def member_groups_from_uris(
 _RESOURCE_URI = re.compile(r'(?:^|/)api2/resource/(\d+)')
 
 
-def _resolve_acl(acl: Mapping[str, Any]) -> tuple[ResourceRole, Resource]:
+def _resolve_acl(
+    acl: Mapping[str, Any], held_resource_ids: set[int | None]
+) -> tuple[ResourceRole, Resource]:
     '''The resource role and resource an ACL names. The resource's `$uri`
     names exactly one row; its name is used only when the `$uri` is empty, and
     then several resources with that name match none (names are not unique).
+
+    A resource the caller cannot see, and the target does not already hold an
+    ACL on, gets the same 404 as one that does not exist: answering 403 for it
+    would tell the caller that it exists.
     '''
     resource_fields = acl['resource']
-    role_name = acl['resourceRole']['name']
     uri = resource_fields.get('$uri')
-    if not uri:
+    if uri:
+        match = _RESOURCE_URI.search(uri)
+        if not match or match.end() != len(uri):
+            raise BadRequest(description='Expected a resource URI.')
+        resource = get_db_adapter().session.query(Resource).get(int(match.group(1)))
+        not_found = NotFound(description='No resource has that URI.')
+    else:
         resource_name = resource_fields.get('name')
         if not resource_name:
             # An ACL without a resource breaks need building for its holders.
             raise BadRequest(description='Each ACL must name a resource.')
-        resource_role, _, resource = try_get_role_and_resource(
-            role_name, resource_fields.get('resourceType'), resource_name
+        type_name = resource_fields.get('resourceType')
+        resource_type = try_get_resource_type(type_name)
+        if resource_type is None:
+            # Raises the 404 naming the unknown resource type.
+            try_get_role_and_resource(acl['resourceRole']['name'], type_name)
+        resource = find_by_name(
+            Resource, resource_name, resource_type_id=resource_type.id
         )
-        return resource_role, resource
+        not_found = resource_not_found(resource_name, type_name)
 
-    match = _RESOURCE_URI.search(uri)
-    if not match or match.end() != len(uri):
-        raise BadRequest(description='Expected a resource URI.')
-    resource = get_db_adapter().session.query(Resource).get(int(match.group(1)))
-    if resource is None:
-        raise NotFound(description='No resource has that URI.')
-    return try_get_resource_role(role_name, resource), resource
+    if resource is None or (
+        resource.id not in held_resource_ids
+        and not is_authorized(
+            'view_resource',
+            ResourceTypeEnum(resource.resource_type_id).name,
+            resource.id,
+            False,
+        )
+    ):
+        raise not_found
+    return try_get_resource_role(acl['resourceRole']['name'], resource), resource
 
 
 def verify_acl_grants(
@@ -177,12 +200,13 @@ def verify_acl_grants(
     '''
     existing = {(acl.resource_role_id, acl.resource_id) for acl in existing_acls}
     grants = []
+    held_resource_ids = {resource_id for _, resource_id in existing}
     for acl in acls:
-        resource_role, resource = _resolve_acl(acl)
+        resource_role, resource = _resolve_acl(acl, held_resource_ids)
         grants.append((resource_role, resource))
         if (resource_role.id, resource.id) in existing:
             continue
-        resource_type = resource.resource_type.name.name
+        resource_type = ResourceTypeEnum(resource.resource_type_id).name
         if not is_authorized('update_users', resource_type, resource.id):
             refuse_grant(
                 f'Granting \'{resource_role.name}\' on a {resource_type} needs the '

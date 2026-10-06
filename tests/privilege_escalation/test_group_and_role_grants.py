@@ -96,6 +96,18 @@ def _make_dashboard(db) -> Resource:
     return resource
 
 
+def _viewable_dashboard(db, actor) -> Resource:
+    '''A dashboard `actor` can see but not share. A grant on one it cannot see
+    is a 404, like one that does not exist (WP-0l row 7).'''
+    dashboard = _make_dashboard(db)
+    viewer = db.session.query(ResourceRole).filter_by(name='dashboard_viewer').one()
+    db.session.add(
+        UserAcl(user_id=actor.id, resource_role_id=viewer.id, resource_id=dashboard.id)
+    )
+    db.session.commit()
+    return dashboard
+
+
 def _acl(resource_role_name: str, dashboard: Resource) -> dict:
     return {
         '$uri': '',
@@ -276,7 +288,7 @@ def test_group_admin_cannot_create_a_group_holding_a_dashboard_it_cannot_share(
     db, make_user
 ):
     actor = make_user(['group_admin'])
-    dashboard = _make_dashboard(db)
+    dashboard = _viewable_dashboard(db, actor)
     name = _name('group')
 
     response = actor.request(
@@ -578,7 +590,7 @@ def test_group_moderator_cannot_grant_its_group_admin_of_a_dashboard_it_cannot_s
     actor = make_user(['group_moderator'])
     group = _make_group(db, users=[actor])
     group_id, group_name = group.id, group.name
-    dashboard = _make_dashboard(db)
+    dashboard = _viewable_dashboard(db, actor)
 
     response = actor.request(
         'PATCH',
@@ -1103,7 +1115,7 @@ def test_user_editor_cannot_grant_a_user_admin_of_a_dashboard_it_cannot_share(
 ):
     actor = make_user(_USER_EDITOR)
     target = make_user()
-    dashboard = _make_dashboard(db)
+    dashboard = _viewable_dashboard(db, actor)
 
     response = actor.request(
         'PATCH',

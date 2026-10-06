@@ -331,7 +331,8 @@ def test_a_refused_acl_grant_does_not_name_the_resource(db, make_user):
     db.session.commit()
     group_id, group_name = group.id, group.name
     dashboard_name = f'secret-{_tag()}'
-    _resource(db, dashboard_name)
+    # Visible but not shareable: one the caller cannot see is a 404 (row 7).
+    _grant_user(db, actor.id, 'dashboard_viewer', _resource(db, dashboard_name).id)
 
     response = actor.request(
         'PATCH',
@@ -926,6 +927,8 @@ def test_an_acl_uri_is_checked_for_update_users_on_that_resource(db, make_user):
     actor = make_user(['group_moderator'])
     shared_id, other_id, name = _twin_resources(db)
     _grant_user(db, actor.id, 'dashboard_admin', shared_id)
+    # The actor can see the other twin, so refusing it reveals nothing.
+    _grant_user(db, actor.id, 'dashboard_viewer', other_id)
     group_id, group_name = _group_with_acl(db, actor, 'dashboard_viewer', shared_id)
 
     response = actor.request(
@@ -945,6 +948,45 @@ def test_an_acl_uri_is_checked_for_update_users_on_that_resource(db, make_user):
 
     assert response.status_code == 403
     assert _group_acls(db, other_id) == set()
+
+
+@pytest.mark.parametrize('named_by', ['uri', 'name'])
+def test_an_acl_on_a_resource_the_caller_cannot_see_looks_like_no_resource(
+    db, make_user, named_by
+):
+    actor = make_user(['group_moderator'])
+    group_id, group_name = _group_with_acl(
+        db, actor, 'dashboard_viewer', _resource(db, f'dashboard-{_tag()}').id
+    )
+    hidden_name = f'hidden-{_tag()}'
+    hidden_id = _resource(db, hidden_name).id
+    missing_name = f'missing-{_tag()}'
+
+    def patch(acl):
+        return actor.request(
+            'PATCH',
+            f'/api2/group/{group_id}',
+            {
+                '$uri': f'/api2/group/{group_id}',
+                'name': group_name,
+                'roles': [],
+                'users': [actor.username],
+                'acls': [acl],
+            },
+        )
+
+    if named_by == 'uri':
+        hidden = patch(_acl_by_uri('dashboard_viewer', hidden_id, hidden_name))
+        missing = patch(_acl_by_uri('dashboard_viewer', 999999999, missing_name))
+    else:
+        hidden = patch(_acl('dashboard_viewer', hidden_name))
+        missing = patch(_acl('dashboard_viewer', missing_name))
+
+    assert (hidden.status_code, missing.status_code) == (404, 404)
+    assert hidden.get_data(as_text=True).replace(
+        hidden_name, 'NAME'
+    ) == missing.get_data(as_text=True).replace(missing_name, 'NAME')
+    assert _group_acls(db, hidden_id) == set()
 
 
 @pytest.mark.parametrize(

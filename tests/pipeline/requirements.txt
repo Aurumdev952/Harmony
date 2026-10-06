@@ -5,7 +5,7 @@ python-dateutil==2.9.0.post0
 related==0.7.3
 attrs==21.4.0
 six==1.17.0
-future==0.18.3
+future==1.0.0
 contextlib2==21.6.0
 pytest==8.4.2
 hypothesis==6.91.0

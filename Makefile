@@ -35,8 +35,6 @@ format-python: # Ruff: fix and format the Python files changed with respect to m
 build: # Build docker images (for development and production) using docker compose.
 	docker compose --env-file $(ENV_FILE) -f docker-compose.build.yaml build $(SERVICE)
 
-requirements: # Regenerate requirements*.txt from pyproject.toml (the images still install them with pip).
-	uv run docker/export_requirements.py
 
 push: # Push the images built by `make build` to $DOCKER_NAMESPACE (default ghcr.io/zenysis).
 	docker compose --env-file $(ENV_FILE) -f docker-compose.build.yaml push $(or $(SERVICE),web-client web-server web renderer etl-pipeline)
@@ -69,12 +67,10 @@ minio-server-down: # Stop the minio server container.
 	DOCKER_HOST=$(DOCKER_HOST) docker compose --env-file $(ENV_FILE) -f docker-compose.minio.yaml down
 
 mypy: # Type-check with the [tool.mypy] settings in pyproject.toml.
-	uv run --locked mypy
+	uv run --locked --isolated --group renderer-types mypy
 
-test: # Run the Python suites as CI does: each tests/ suite in its own process on the uv.lock environment, tests/infra on the 3.13 tools lane.
+test: # Run the Python suites as CI does: each tests/ suite in its own process on the uv.lock environment.
 	ci/pytest_suites.sh
-	uv run --project ci/tools313 --locked mypy --config-file ci/tools313/pyproject.toml
-	uv run --project ci/tools313 --locked pytest tests/infra
 
 postgres-psql:
 	$(COMPOSE_COMMAND) exec postgres psql -h ${POSTGRES_HOST} -U ${POSTGRES_USER} ${POSTGRES_DB}

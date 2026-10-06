@@ -173,8 +173,13 @@ services:
     # Naming a network drops the implicit default, so list both.
     networks: [default, render]
     volumes:
-      # Map minio config folder
-      - ${MC_CONFIG_PATH}:/root/.mc
+      # The MinIO client config, read-only at a root-owned path; the image's
+      # ~/.mc is a root-owned symlink to its directory.
+      - ${MC_CONFIG_PATH}/config.json:/etc/zenysis/mc/config.json:ro
+    # uid 1000 needs no capability, and nothing in the container may gain one.
+    cap_drop: [ALL]
+    security_opt:
+      - no-new-privileges:true
     healthcheck:
       test: "timeout 10s bash -c ':> /dev/tcp/127.0.0.1/5000'"
       interval: 30s
@@ -205,6 +210,10 @@ services:
       - OBJECT_STORAGE_ALIAS=${OBJECT_STORAGE_ALIAS}
       - LOG_FORMAT=json
       - LOG_STREAM=stdout
+    # uid 1000 needs no capability, and nothing in the container may gain one.
+    cap_drop: [ALL]
+    security_opt:
+      - no-new-privileges:true
     command:
       [
         "celery",
@@ -212,7 +221,10 @@ services:
         "-A",
         "web.background_worker.celery",
         "worker",
-        "--beat"
+        "--beat",
+        # The beat schedule defaults to the working directory, /zenysis, which
+        # the unprivileged app user cannot write.
+        "--schedule=/tmp/celerybeat-schedule"
       ]
     healthcheck:
       test:
@@ -266,6 +278,8 @@ services:
       - seccomp=./docker/renderer/seccomp_profile.json
     mem_limit: 2g
     pids_limit: 512
+    # It exits with status 70 when a render slot is stuck past its deadline.
+    restart: unless-stopped
     # The image's HEALTHCHECK probes GET /healthz.
     logging: *default-logging
   render-egress:
@@ -288,6 +302,7 @@ services:
       - no-new-privileges:true
     mem_limit: 128m
     pids_limit: 128
+    restart: unless-stopped
     healthcheck:
       # Replaces the image's HEALTHCHECK, which probes the renderer's /healthz.
       test: ["CMD", "python", "-c", "import socket; socket.create_connection(('127.0.0.1', 3128), 3).close()"]

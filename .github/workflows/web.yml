@@ -24,9 +24,18 @@ jobs:
               env:
                 REPO_OWNER: ${{ github.repository_owner }}
               run: echo "lowercase_repo_owner=${REPO_OWNER,,}" >> "$GITHUB_OUTPUT"
+            - id: image_tag
+              # A Docker tag allows [A-Za-z0-9_.-] and at most 128 characters; branch
+              # names such as mig/WP-3b-cpython-313 contain '/'.
+              env:
+                REF: ${{ github.head_ref || github.ref_name }}
+              run: |
+                tag=${REF//[^A-Za-z0-9_.-]/-}
+                echo "image_tag=${tag:0:128}" >> "$GITHUB_OUTPUT"
         outputs:
             lowercase_repo_name: ${{ steps.repository_name.outputs.lowercase_repo_name }}
             lowercase_repo_owner: ${{ steps.repository_owner.outputs.lowercase_repo_owner }}
+            image_tag: ${{ steps.image_tag.outputs.image_tag }}
 
     build-web-client:
         runs-on: ubuntu-24.04
@@ -36,7 +45,7 @@ jobs:
             packages: write
         env:
             IMAGE: ghcr.io/${{ needs.prepare.outputs.lowercase_repo_owner }}/${{ needs.prepare.outputs.lowercase_repo_name }}-web-client
-            TAG: ${{ github.head_ref || github.ref_name }}
+            TAG: ${{ needs.prepare.outputs.image_tag }}
         steps:
             - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
               with:
@@ -59,7 +68,7 @@ jobs:
             packages: write
         env:
             IMAGE: ghcr.io/${{ needs.prepare.outputs.lowercase_repo_owner }}/${{ needs.prepare.outputs.lowercase_repo_name }}-web-server
-            TAG: ${{ github.head_ref || github.ref_name }}
+            TAG: ${{ needs.prepare.outputs.image_tag }}
         steps:
             - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
               with:
@@ -84,7 +93,7 @@ jobs:
             NAMESPACE: ghcr.io/${{ needs.prepare.outputs.lowercase_repo_owner }}
             IMAGE_PREFIX: ${{ needs.prepare.outputs.lowercase_repo_name }}
             IMAGE: ghcr.io/${{ needs.prepare.outputs.lowercase_repo_owner }}/${{ needs.prepare.outputs.lowercase_repo_name }}-web
-            TAG: ${{ github.head_ref || github.ref_name }}
+            TAG: ${{ needs.prepare.outputs.image_tag }}
         steps:
             - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
               with:

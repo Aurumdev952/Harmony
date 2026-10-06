@@ -2,11 +2,12 @@
 # Run every suite under tests/ (one directory each) in its own pytest process on
 # the uv.lock environment. Suites from different WPs build Flask apps and register
 # Flask-Potion resources at module level, so sharing one process makes them fail
-# by order. A new directory under tests/ runs with no change here. tests/infra is
-# the CPython 3.13 lane (ci/tools313) and is skipped. Extra arguments go to pytest.
+# by order. A new directory under tests/ runs with no change here. Extra arguments
+# go to pytest.
 #
 #   ci/pytest_suites.sh
 #   ci/pytest_suites.sh -x -q
+#   ci/pytest_suites.sh -m stack   # only the stack-marked tests (the last -m wins)
 set -euo pipefail
 shopt -s nullglob
 cd "$(git rev-parse --show-toplevel)"
@@ -14,7 +15,7 @@ cd "$(git rev-parse --show-toplevel)"
 targets=()
 for suite in tests/*/; do
   suite=${suite%/}
-  [[ $suite == tests/infra || $suite == */__pycache__ ]] && continue
+  [[ $suite == */__pycache__ ]] && continue
   targets+=("$suite")
 done
 loose=(tests/test_*.py)

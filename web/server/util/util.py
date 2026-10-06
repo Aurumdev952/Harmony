@@ -2,6 +2,7 @@ from builtins import str
 from builtins import range
 from past.builtins import basestring
 import collections
+from collections.abc import Iterable, Mapping
 import copy
 import re
 import time
@@ -197,13 +198,13 @@ def deep_update(source_dictionary, merge_dictionary):
     Performs a deep merge on `source_dictionary` from the values in `merge_dictionary`.
 
     1. If values corresponding to the same `key` in `source_dictionary` and `merge_dictionary`
-       are both instances of `collections.Mapping`, they will be deep merged.
+       are both instances of `collections.abc.Mapping`, they will be deep merged.
 
     2. If cyclic references are detected in `source_dictionary` and `merge_dictionary`, cyclic
        references will NOT be merged
 
     3. If values corresponding to the same `key` in `source_dictionary` and `merge_dictionary`
-       are both instances of `collections.Iterable`, they will also be merged via the `extend`
+       are both instances of `collections.abc.Iterable`, they will also be merged via the `extend`
        method.
 
     Parameters
@@ -250,10 +251,10 @@ def deep_update(source_dictionary, merge_dictionary):
         if key in original_dictionary:
             original_value = original_dictionary[key]
             new_value = new_dictionary[key]
-            original_is_mapping = isinstance(original_value, collections.Mapping)
-            new_is_mapping = isinstance(new_value, collections.Mapping)
-            original_is_iterable = isinstance(original_value, collections.Iterable)
-            new_is_iterable = isinstance(new_value, collections.Iterable)
+            original_is_mapping = isinstance(original_value, Mapping)
+            new_is_mapping = isinstance(new_value, Mapping)
+            original_is_iterable = isinstance(original_value, Iterable)
+            new_is_iterable = isinstance(new_value, Iterable)
             original_is_string = isinstance(original_value, basestring)
             new_is_string = isinstance(new_value, basestring)
             mapping_and_iterable_mix = (original_is_mapping and not new_is_mapping) or (
@@ -369,15 +370,11 @@ def assert_enum(value, enum_type, enum_name=None, argument_name=None):
 
 
 def assert_iterable(value, argument_name=None):
-    _assert_type(
-        value, collections.Iterable, 'iterable', basestring, 'string', argument_name
-    )
+    _assert_type(value, Iterable, 'iterable', basestring, 'string', argument_name)
 
 
 def assert_non_string_iterable(value, argument_name=None, element_validator=None):
-    _assert_type(
-        value, collections.Iterable, 'iterable', basestring, 'string', argument_name
-    )
+    _assert_type(value, Iterable, 'iterable', basestring, 'string', argument_name)
 
     if element_validator:
         errors = []
@@ -401,7 +398,7 @@ def assert_non_string_iterable(value, argument_name=None, element_validator=None
 
 
 def assert_mapping(value, argument_name=None, key_value_validator=None):
-    _assert_type(value, collections.Mapping, 'mapping', argument_name=argument_name)
+    _assert_type(value, Mapping, 'mapping', argument_name=argument_name)
 
     if key_value_validator:
         errors = []

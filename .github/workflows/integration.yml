@@ -20,7 +20,7 @@ concurrency:
 
 jobs:
   python:
-    name: Python 3.9 - lint, types, tests
+    name: Python 3.13 - lint, types, tests
     runs-on: ubuntu-24.04
     permissions:
       contents: read
@@ -34,13 +34,13 @@ jobs:
       - name: Set up uv
         uses: astral-sh/setup-uv@c18668ad3cf93ea998bef934396af7bb5c839dc7 # v10.2.0
         with:
-          version: '0.12.5'
+          version: '0.12.23'
+          # sha256 of uv-x86_64-unknown-linux-gnu.tar.gz 0.12.23; setup-uv v10.2.0
+          # has no built-in checksum for this release.
+          checksum: 9167d72b3319674b6303c4cbe071854bba13ebdf3d76b1a7cbdc175471fb66d6
           enable-cache: true
-          cache-suffix: app39
       - name: Lockfiles match pyproject.toml
-        run: |
-          uv lock --check
-          uv lock --check --project ci/tools313
+        run: uv lock --check
       - name: Install
         run: uv sync --locked
       - name: Pipeline suite tools
@@ -53,24 +53,24 @@ jobs:
         env:
           RUFF_OUTPUT_FORMAT: github
         run: ci/lint_python.sh HEAD^1
-      - name: Python 3.8 syntax (web image)
-        # The web image still runs Python 3.8; this job runs 3.9, which accepts
-        # 3.9-only syntax. uv fetches the pinned CPython 3.8. WP-3b removes the step.
-        if: '!cancelled()'
-        run: uv run --no-project -p cpython-3.8.20 python ci/check_py38_syntax.py config data db harmony log models graphql util web scripts tests/web tests/authz tests/privilege_escalation tests/db tests/contract tests/infra tests/core
       - name: Mypy
         # Run it even if ruff fails, so we can see all the errors at once.
         if: '!cancelled()'
-        run: uv run --locked mypy
+        # --isolated: Playwright (the renderer-types group) stays out of the
+        # environment the tests run in.
+        run: uv run --locked --isolated --group renderer-types mypy
       - name: Pytest
-        # Every directory under tests/ runs, each in its own process; tests/infra
-        # runs in the 3.13 job. The contract replay needs the compose stack: it
-        # skips without CONTRACT_BASE_URL, and tests marked `stack` are deselected.
+        # Every directory under tests/ runs, each in its own process. The contract
+        # replay needs the compose stack: it skips without CONTRACT_BASE_URL, and
+        # tests marked `stack` are deselected.
         if: '!cancelled()'
         run: ci/pytest_suites.sh
 
-  python-313:
-    name: Python 3.13 - standalone tools
+  python-stack:
+    name: Python 3.13 - tests that start containers
+    # The runner's Docker daemon starts the containers these tests need, such as
+    # the throwaway Postgres of the WP-0k clock test. Tests that need the whole
+    # compose stack skip themselves without CONTRACT_BASE_URL.
     runs-on: ubuntu-24.04
     permissions:
       contents: read
@@ -82,14 +82,15 @@ jobs:
       - name: Set up uv
         uses: astral-sh/setup-uv@c18668ad3cf93ea998bef934396af7bb5c839dc7 # v10.2.0
         with:
-          version: '0.12.5'
+          version: '0.12.23'
+          # sha256 of uv-x86_64-unknown-linux-gnu.tar.gz 0.12.23; setup-uv v10.2.0
+          # has no built-in checksum for this release.
+          checksum: 9167d72b3319674b6303c4cbe071854bba13ebdf3d76b1a7cbdc175471fb66d6
           enable-cache: true
-          cache-suffix: tools313
-      - name: Mypy (strict)
-        run: uv run --project ci/tools313 --locked mypy --config-file ci/tools313/pyproject.toml
-      - name: Pytest
-        if: '!cancelled()'
-        run: uv run --project ci/tools313 --locked pytest tests/infra
+      - name: Install
+        run: uv sync --locked
+      - name: Pytest (stack)
+        run: ci/pytest_suites.sh -m stack
 
   lint-js:
     name: JS - Lint
@@ -120,8 +121,7 @@ jobs:
           key: ${{ runner.os }}-node-${{ steps.setup-node.outputs.node-version }}-node_modules-${{ hashFiles('package.json', 'yarn.lock') }}
       - name: Install dependencies
         if: steps.cache-node_modules.outputs.cache-hit != 'true'
-        run: |
-          yarn install
+        run: yarn install --frozen-lockfile
       - name: Cache dependencies
         uses: actions/cache/save@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
         if: steps.cache-node_modules.outputs.cache-hit != 'true'

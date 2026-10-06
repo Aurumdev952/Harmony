@@ -10,10 +10,11 @@ A case is a directory under `cases/` holding:
 A case is POSTed through the real `/api2/query` Potion routes on a bare Flask app
 that carries the harmony_demo config. Request validation and conversion, query
 building, the query-policy filter (`AuthorizedQueryClient`), the production
-`DruidQueryClient_` (request serialisation, status handling, gzip and ijson
-decoding, parsing) and shaping all run as in production. The broker is replaced
-at the transport: a requests adapter mounted on the client's pooled session
-answers each POST from `druid_response.json`.
+`DruidQueryClient_` (request serialisation, status handling, gzip decoding,
+streamed JSON decoding with `db.druid.json_stream`, parsing) and shaping all run
+as in production. The broker is replaced at the transport: a requests adapter
+mounted on the client's pooled session answers each POST from
+`druid_response.json`.
 
 The rest of the environment is fixed here, and nothing else is patched:
 - `app.druid_context` is a stub with a fixed datasource, data time boundary and

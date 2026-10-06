@@ -202,7 +202,7 @@ def is_numeric(string: str) -> bool:
 
 
 def get_constituents_from_expression(expression: str) -> List:
-    operations = "/|\^|\-|\*|\+"  # pylint: disable=anomalous-backslash-in-string
+    operations = r"/|\^|\-|\*|\+"
     expression = expression.replace('(', "").replace(")", "")
     constituent_ids = [
         _id.strip() for _id in re.split(operations, expression) if not is_numeric(_id)

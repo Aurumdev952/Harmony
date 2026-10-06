@@ -15,7 +15,27 @@ services:
     volumes:
       - ${DATA_PATH}/output/logs:/logs
     restart: always
+  # One-shot, as root: hands the bind mounts that images before WP-3b wrote as root
+  # to uid 1000, without following symlinks, then exits. web and worker start
+  # after it and never run as root (docker/web/hand_over_data.sh).
+  data-owner:
+    platform: linux/amd64
+    image: ${DOCKER_NAMESPACE:-ghcr.io/zenysis}/${DOCKER_IMAGE_PREFIX:-harmony}-web:${DOCKER_TAG:-latest}
+    user: "0:0"
+    entrypoint: ["/usr/local/bin/hand_over_data"]
+    network_mode: none
+    cap_drop: [ALL]
+    cap_add: [CHOWN, DAC_READ_SEARCH]
+    security_opt: ["no-new-privileges:true"]
+    volumes:
+      - ${DATA_PATH}/output:/data/output
+      - ${DATA_PATH}/ubuntu/uploads:/zenysis/uploads
+    restart: "no"
   web:
+    user: "1000:1000"
+    depends_on:
+      data-owner:
+        condition: service_completed_successfully
     environment:
       - VIRTUAL_HOST=${WEB_VIRTUAL_HOST}
       - LETSENCRYPT_HOST=${WEB_LETSENCRYPT_HOST}
@@ -29,10 +49,14 @@ services:
       - ${DATA_PATH}/ubuntu/uploads:/zenysis/uploads
     restart: always
   worker:
+    user: "1000:1000"
+    depends_on:
+      data-owner:
+        condition: service_completed_successfully
     volumes:
       - ${DATA_PATH}/output:/data/output
       - ${DATA_PATH}/output/logs:/logs
-      - ${DATA_PATH}/ubuntu/.mc/config.json:/root/.mc/config.json
+      - ${DATA_PATH}/ubuntu/.mc/config.json:/etc/zenysis/mc/config.json:ro
     restart: always
   renderer:
     restart: always

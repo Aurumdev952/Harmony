@@ -33,7 +33,7 @@ from dataclasses import asdict, dataclass, field
 from datetime import datetime
 from enum import StrEnum
 from itertools import chain, pairwise
-from typing import cast
+from typing import IO, cast
 
 SESSION_GAP_SECONDS = 30 * 60
 PHASE_7_GATE_PCT = 5
@@ -330,9 +330,10 @@ def read_lines(path: str) -> Iterator[str]:
     """Lines of a plain or gzipped log file, or of stdin when `path` is `-`."""
     stdin = cast(io.BufferedReader, sys.stdin.buffer)
     with stdin if path == "-" else open(path, "rb") as raw:
-        stream: io.BufferedReader | gzip.GzipFile = raw
+        # mypy 1.3's typeshed does not count GzipFile as IO[bytes].
+        stream: IO[bytes] = raw
         if raw.peek(2)[:2] == b"\x1f\x8b":
-            stream = gzip.GzipFile(fileobj=raw)
+            stream = cast(IO[bytes], gzip.GzipFile(fileobj=raw))
         with io.TextIOWrapper(stream, encoding="utf-8", errors="replace") as text:
             yield from text
 

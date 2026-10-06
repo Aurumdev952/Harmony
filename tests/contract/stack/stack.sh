@@ -5,6 +5,7 @@
 #   tests/contract/stack/stack.sh down   # stop, delete containers, tmpfs data and secrets
 #   tests/contract/stack/stack.sh logs [service]
 #   tests/contract/stack/stack.sh env    # print what the recorder and replay need
+#   tests/contract/stack/stack.sh image-tag  # print the web image tag `up` builds
 #   tests/contract/stack/stack.sh seed thumbnail <dashboard resource id>
 #                                        # the runner calls this for a case's `seed`
 #
@@ -86,17 +87,24 @@ load_secrets() {
   done
 }
 
-# Tag by what the image is built from, so stacks from different checkouts never
-# share an image silently; the build itself always runs (the layer cache makes
-# an unchanged rebuild quick).
-build_images() {
+# Tag by what the image installs from (the Dockerfile and the uv project files
+# its build binds in), so stacks from different checkouts never share an image
+# silently; the build itself always runs (the layer cache makes an unchanged
+# rebuild quick).
+image_tag() {
   local hash
-  hash="$(cat "${ROOT}/requirements.txt" "${ROOT}/requirements-web.txt" \
-    "${ROOT}/docker/web/Dockerfile_web-server" | sha256sum | cut -c1-12)"
+  hash="$(cat "${ROOT}/docker/web/Dockerfile_web-server" \
+    "${ROOT}/pyproject.toml" "${ROOT}/uv.lock" | sha256sum | cut -c1-12)"
+  echo "harmony-contract-web-server:${hash}"
+}
+
+build_images() {
+  local tag
+  tag="$(image_tag)"
   docker build --platform linux/amd64 \
     -f "${ROOT}/docker/web/Dockerfile_web-server" \
-    -t "harmony-contract-web-server:${hash}" "${ROOT}"
-  export CONTRACT_WEB_IMAGE="harmony-contract-web-server:${hash}"
+    -t "${tag}" "${ROOT}"
+  export CONTRACT_WEB_IMAGE="${tag}"
 }
 
 wait_for_web() {
@@ -163,6 +171,9 @@ case "${1:-}" in
         ;;
     esac
     ;;
+  image-tag)
+    image_tag
+    ;;
   env)
     echo "export CONTRACT_PROJECT=${CONTRACT_PROJECT}"
     echo "export CONTRACT_BASE_URL=http://127.0.0.1:${CONTRACT_WEB_PORT}"
@@ -170,7 +181,7 @@ case "${1:-}" in
     echo "export CONTRACT_CREDENTIALS_FILE=${SECRETS}"
     ;;
   *)
-    echo "usage: $0 up|down|logs [service]|env|seed thumbnail <id>" >&2
+    echo "usage: $0 up|down|logs [service]|env|image-tag|seed thumbnail <id>" >&2
     exit 2
     ;;
 esac

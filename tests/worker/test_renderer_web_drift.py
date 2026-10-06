@@ -1,8 +1,9 @@
 """WP-1h: what the web app and the renderer service must agree on.
 
-The web app keeps its own copies of the renderer's limits, because its image
-still runs Python 3.8, which cannot import the renderer package (WP-3b moves it
-to 3.13). This host-lane test fails when the two drift apart. It is not under
+The web app keeps its own copies of the renderer's limits, from when its image
+ran Python 3.8 and could not import the renderer package. The 3.13 image can, so
+the copies are due to go (backend request in WP-3b); until then this host-lane
+test fails when the two drift apart. It is not under
 tests/worker/renderer, which also runs inside the renderer image, where the web
 app is not installed.
 """

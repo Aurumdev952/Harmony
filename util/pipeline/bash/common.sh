@@ -1,34 +1,5 @@
 set -euo pipefail
 
-# Switch to the pypy specific virtual environment
-SetupEnvForPyPy () {
-  # pypy3 virtualenv is not compatible with -eu flags!
-  set +eu
-  # Detect if we are in a virtual environment where pypy is *not* the default.
-  if [ -n "${VIRTUAL_ENV:-}" ] ; then
-    # If pypy is already the default for this virtual environment, do nothing
-    if [[ "$(basename $(readlink -f $(which python)))" == 'pypy3' ]] ; then
-      return
-    fi
-
-    # Sometimes an existing python3 virtual env can cause issues with pypy due
-    # to old environment variables that are left around. Unset these so that
-    # our import paths are not corrupted.
-    if [ -n "${__PYVENV_LAUNCHER__:-}" ] ; then
-      unset __PYVENV_LAUNCHER__
-    fi
-    unset VIRTUAL_ENV
-  fi
-
-  ACTIVATE_PATH="${PIPELINE_SRC_ROOT}/venv_pypy3/bin/activate"
-  if [ -f "${ACTIVATE_PATH}" ]; then
-    VIRTUAL_ENV_DISABLE_PROMPT=1 source "${ACTIVATE_PATH}"
-  else
-    echo 'WARNING: Called SetupEnvForPyPy but no venv_pypy3 directory found.'
-  fi
-  set -eu
-}
-
 # Prepend tag to each line being written to stdout
 TagLines () {
   local tag="$1"

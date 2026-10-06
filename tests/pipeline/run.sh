@@ -2,17 +2,16 @@
 # Run the pipeline fixture suite, or regenerate its goldens.
 #   tests/pipeline/run.sh [pytest args]
 #   tests/pipeline/run.sh regenerate [CASE ...] [--print]
-# PIPELINE_FIXTURE_PYTHON picks the interpreter: 3.9 (default, the pipeline image's
-# CPython) or pypy3.9 (what the Zeus steps run today). 3.12+ cannot import config/ yet.
+# The suite runs on the root uv.lock environment (CPython 3.13), as the pipeline
+# image does.
 set -euo pipefail
 
 suite_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 repo_root="$(cd "${suite_dir}/../.." && pwd)"
-python="${PIPELINE_FIXTURE_PYTHON:-3.9}"
 export ZEN_ENV=harmony_demo
 export HYPOTHESIS_STORAGE_DIRECTORY="${HYPOTHESIS_STORAGE_DIRECTORY:-${TMPDIR:-/tmp}/harmony-pipeline-fixtures-hypothesis}"
 
-uv_run=(uv run --no-project --python "${python}" --with-requirements "${suite_dir}/requirements.txt")
+uv_run=(uv run --locked --project "${repo_root}")
 
 if [[ "${1:-}" == "regenerate" ]]; then
   shift

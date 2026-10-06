@@ -11,3 +11,7 @@
 - [Druid expression aggregator](druid_expression_aggregator.md) — traps replacing extensions with the native expression aggregator (0.23 and 38), LAST_VALUE N3
 - [Settings import boundary](settings_import_boundary.md) — no module-level config.settings import below query_builder; toolchain suite catches it, core suite does not
 - [Alembic migration runs](alembic_migration_runs.md) — cheap env.py runs (stamp on SQLite), full upgrade needs a Druid stub on :8081, flask db current broken
+- [pandas 2 INV-2 traps](pandas2-inv2-traps.md) — outer merges always sort, strict to_datetime, to_dict(into); pinned in WP-3b
+- [Differential oracle method](differential-oracle-method.md) — pre-bump tree env + seeded synth fuzz to prove INV-2 beyond golden
+- [Worktree hook workarounds](worktree-isolation-hook-workarounds.md) — script files, uv shim, held branches, one suite per process
+- [Druid responses must stream](druid-response-streaming.md) — whole-body decode rejected in review; use db/druid/json_stream

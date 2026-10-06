@@ -12,9 +12,8 @@ updates:
       actions:
         patterns: ['*']
 
-  # The app's pins are kept on purpose until WP-3a/3b, so a limit of 0 turns off
-  # version updates and leaves only security updates. Those PRs also need
-  # `make requirements`, which CI enforces.
+  # The app's pins move with the phase 3 work packages, so a limit of 0 turns off
+  # version updates and leaves only security updates.
   - package-ecosystem: uv
     directory: /
     schedule:
@@ -22,14 +21,3 @@ updates:
     cooldown:
       default-days: 7
     open-pull-requests-limit: 0
-
-  # Tools for the CPython 3.13 lane.
-  - package-ecosystem: uv
-    directory: /ci/tools313
-    schedule:
-      interval: weekly
-    cooldown:
-      default-days: 7
-    groups:
-      tools313:
-        patterns: ['*']

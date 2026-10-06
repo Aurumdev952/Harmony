@@ -12,8 +12,8 @@ ZERO_VAL = '0.0'
 
 
 def build_map_data_point_generator(dimension_names, numeric_fields, lat_lng_fields):
-    '''Build a dynamic class that DataFrame.to_dict can use to convert the
-    dataframe's intermediary format into the MapDataPoint format.
+    '''Build a dynamic class that converts one `DataFrame.to_dict('records')` row
+    into the MapDataPoint format.
     '''
     (lat_field, lng_field) = lat_lng_fields or (None, None)
 
@@ -69,7 +69,7 @@ def build_map_response(df, dimension_names, numeric_fields, lat_lng_fields):
         data_point_generator = build_map_data_point_generator(
             dimension_names, numeric_fields, lat_lng_fields
         )
-        data = df.to_dict('records', data_point_generator)
+        data = [data_point_generator(row) for row in df.to_dict('records')]
     return {'data': data}
 
 

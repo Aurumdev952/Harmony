@@ -2,7 +2,7 @@
 # Prepares the disposable contract database: schema migrations, then the
 # seeded admin user the recorder logs in as. Runs inside the web-init service.
 set -euo pipefail
-cd /zenysis
+cd /src
 : "${CONTRACT_PASSWORD:?set by tests/contract/stack/stack.sh up}"
 
 echo 'contract-init: flask db upgrade'

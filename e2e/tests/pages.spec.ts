@@ -10,7 +10,9 @@ function pageTest(page: PageCase): void {
     }
 
     test(`${page.path} opens`, async ({ appErrors, page: browser }) => {
-      page.knownErrors?.forEach(({ pattern, reason }) => appErrors.allow(pattern, reason));
+      page.knownErrors?.forEach(({ pattern, reason, times }) =>
+        appErrors.allow(pattern, reason, times),
+      );
 
       const response = await browser.goto(page.path);
 

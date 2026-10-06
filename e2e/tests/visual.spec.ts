@@ -44,8 +44,8 @@ test.describe('pages at three widths @visual', () => {
           }
 
           test(`${pageCase.path} matches its snapshot`, async ({ appErrors, page }) => {
-            pageCase.knownErrors?.forEach(({ pattern, reason }) =>
-              appErrors.allow(pattern, reason),
+            pageCase.knownErrors?.forEach(({ pattern, reason, times }) =>
+              appErrors.allow(pattern, reason, times),
             );
             await openSettled(page, pageCase);
             await expect(page).toHaveScreenshot(`page-${pageCase.name}-${viewport.width}.png`, {

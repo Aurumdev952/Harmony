@@ -3,7 +3,7 @@ import type { BrowserContext, Page } from '@playwright/test';
 
 import { BASE_URL } from './env';
 
-type Allowance = { pattern: RegExp; reason: string };
+type Allowance = { pattern: RegExp; reason: string; times: number };
 
 const STACK = new URL(BASE_URL);
 
@@ -60,14 +60,23 @@ export class AppErrors {
     });
   }
 
-  allow(pattern: RegExp, reason: string): void {
-    this.allowances.push({ pattern, reason });
+  /** Lets messages matching `pattern` pass, at most `times` of them. */
+  allow(pattern: RegExp, reason: string, times = Infinity): void {
+    this.allowances.push({ pattern, reason, times });
   }
 
   unexpected(): string[] {
-    return this.seen.filter(
-      message => !this.allowances.some(({ pattern }) => pattern.test(message)),
-    );
+    const left = this.allowances.map(({ times }) => times);
+    return this.seen.filter(message => {
+      const index = this.allowances.findIndex(
+        ({ pattern }, i) => left[i] > 0 && pattern.test(message),
+      );
+      if (index === -1) {
+        return true;
+      }
+      left[index] -= 1;
+      return false;
+    });
   }
 }
 

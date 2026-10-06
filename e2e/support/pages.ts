@@ -3,7 +3,8 @@ import type { Locator, Page } from '@playwright/test';
 
 export const E2E_DASHBOARD = { slug: 'e2e-dashboard', title: 'E2E dashboard' };
 
-export type KnownError = { pattern: RegExp; reason: string };
+// `times` caps how often the message may occur; unset, it may recur.
+export type KnownError = { pattern: RegExp; reason: string; times?: number };
 
 export type PageCase = {
   // A stable name for reports and snapshot files.
@@ -23,18 +24,26 @@ export type PageCase = {
   knownErrors?: KnownError[];
 };
 
-// Admits exactly two messages: a 500 from /api2/data_digest/, and the uncaught
-// page error `l`. The 500 rejects APIService's promise with a ZenHTTPError,
-// and DataDigestApp/index.jsx:101 has no catch for it (request to
-// frontend-platform); the error's message is the class's minified name. Any
-// other uncaught error on the page, including one whose message differs only
-// because a rebuilt bundle renamed the class, still fails the test.
-const NO_OBJECT_STORAGE: KnownError = {
-  pattern: /^(HTTP 500 GET http:\/\/[^/]+\/api2\/data_digest\/.*|page error: l)$/,
-  reason:
-    'the disposable stack has no object storage, so the data digest API ' +
-    'fails and its rejection goes uncaught (WP-2c deferral; infra request for minio in the stack)',
-};
+// Admits exactly two kinds of message: a 500 from /api2/data_digest/, and one
+// uncaught page error `l`. The 500 rejects APIService's promise with a
+// ZenHTTPError, and DataDigestApp/index.jsx:101 has no catch for it (request
+// to frontend-platform); the error's message is the class's minified name.
+// A second `l`, or any other uncaught error, including one whose message
+// differs only because a rebuilt bundle renamed the class, still fails the
+// test. Drop the page-error entry when the catch lands.
+const NO_OBJECT_STORAGE: KnownError[] = [
+  {
+    pattern: /^HTTP 500 GET http:\/\/[^/]+\/api2\/data_digest\/.*$/,
+    reason:
+      'the disposable stack has no object storage, so the data digest API fails ' +
+      '(WP-2c deferral; infra request for minio in the stack)',
+  },
+  {
+    pattern: /^page error: l$/,
+    reason: 'the failed digest call is not caught (request to frontend-platform)',
+    times: 1,
+  },
+];
 
 /**
  * Every page that existed before the migration, under its legacy URL. This
@@ -128,7 +137,7 @@ export const PAGES: PageCase[] = [
     // navbar proves the page's bundles loaded and ran. Its Dashboards entry
     // stays in the bar at every width (Analyze folds into the menu at 390 px).
     ready: page => page.getByText('Dashboards', { exact: true }).first(),
-    knownErrors: [NO_OBJECT_STORAGE],
+    knownErrors: NO_OBJECT_STORAGE,
   },
   {
     name: 'data-upload',

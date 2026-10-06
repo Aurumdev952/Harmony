@@ -66,7 +66,7 @@ None of these block WP-2e.
   - about 12 minutes, plus about 3 for a client build.
   `run.sh` already handles rootful Docker: it runs the image as the caller's uid. Compare the first CI run's visual results against `e2e/visual/` before making the job required, and report any drift to qa rather than adding tolerance.
 - [ ] frontend-platform: the data digest page leaves its API failure unhandled. `DataDigestApp/index.jsx:101` calls `DataDigestService.getDatasourceDigestTree()` with a `then` and no `catch`, so a failing `/api2/data_digest/` call surfaces as an uncaught `ZenHTTPError` (message `l` in the minified bundle), and the page stays blank with no message. Repro: `/data-digest` on the e2e stack, which has no object storage. Expected: a handled error state. Then drop the `page error: l` half of `NO_OBJECT_STORAGE` in `e2e/support/pages.ts`.
-- [ ] frontend-platform (WP-6e, FE-11): bring the TypeScript under `e2e/` into the ESLint 10 flat config with typescript-eslint, including `@typescript-eslint/no-floating-promises`. Without that rule, a missing `await` before an `expect(...)` or a locator action passes silently. The repository's ESLint today is babel-eslint and Flow over `.js` and `.jsx` only, so strict `tsc` (TypeScript 6) is the only gate on `e2e/`.
+- [ ] frontend-platform (WP-6e, FE-11): bring the TypeScript under `e2e/` into the ESLint 10 flat config with typescript-eslint, including `@typescript-eslint/no-floating-promises`. Without that rule, a missing `await` before an `expect(...)` or a locator action passes silently. Include `vitest.config.ts`, which has no type or lint coverage at all today. The repository's ESLint today is babel-eslint and Flow over `.js` and `.jsx` only, so strict `tsc` (TypeScript 6) is the only gate on `e2e/`.
 
 ## Deferrals
 
@@ -122,6 +122,11 @@ None of these block WP-2e.
   3. The dead `home` entry in the visual masks is deleted; home is an alias row and is not captured.
   4. In a11y update mode, refusals are collected and asserted once in `afterAll`, after the file is written. Before, a refusing test failed on the spot, and in the serial update run it skipped every later page.
   5. Service workers are blocked (`serviceWorkers: 'block'`) until WP-7f. A worker's fetches would bypass the context routes. The fixture comment says so, and `tests/guard.spec.ts` gained "service workers cannot register".
+- 2026-10-06 qa-5t: the QA re-check's Low and Nit, folded in before ready.
+  - Low: an allowance can now cap its matches (`allow(pattern, reason, times)`; `KnownError.times`). The data-digest allowance is split into the 500, which may recur, and `page error: l`, at most once. A second `l` fails the test, and the comment says to drop the entry when the DataDigestApp catch lands.
+  - Nit: the service-worker guard's comment was wrong. Its jQuery control rejected because jQuery needs `window`, not because of the block. The test now registers `/build/cssBundle.bundle.js`, the CSS entry's JavaScript, which webpack emits empty and which is therefore valid in worker scope. A positive-control case with `serviceWorkers: 'allow'` shows it registers, and under the block it resolves to nothing. A page route cannot stand in for the script, because a worker's script fetch bypasses page routes (tried: 404).
+  - The FE-11 request now includes `vitest.config.ts`.
+  - Checks: the counted-allowance case failed first (`[]` instead of `["page error: l"]`) and then passes; `tests/guard.spec.ts` passes 4; the data-digest pages, en and a11y tests pass 3; strict tsc is clean.
 
 ## Evidence
 

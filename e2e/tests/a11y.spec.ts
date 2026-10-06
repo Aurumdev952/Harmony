@@ -78,7 +78,9 @@ test.describe('axe baseline at 1440 px @a11y', () => {
         appErrors,
         page,
       }) => {
-        pageCase.knownErrors?.forEach(({ pattern, reason }) => appErrors.allow(pattern, reason));
+        pageCase.knownErrors?.forEach(({ pattern, reason, times }) =>
+          appErrors.allow(pattern, reason, times),
+        );
         await openSettled(page, pageCase);
 
         const { violations } = await new AxeBuilder({ page }).analyze();

@@ -167,11 +167,28 @@ def test_create_user_script_refuses_a_username_two_accounts_equal(
         assert User.query.filter(User.username == 'ANN@moh.gov.rw').count() == 0
 
 
-def test_create_user_script_overwrites_the_exactly_spelled_pending_account(
+def test_create_user_script_names_the_exactly_spelled_account_not_its_twin(
     app, create_user
 ):
-    create_user('dup.shell@moh.gov.rw', overwrite=True)
+    # The script names account 11 (pending, spelled exactly so), never the
+    # active twin 10; and because 10 is registered it refuses to register 11
+    # as a second account of the pair (see the next test). Either way 10 is
+    # untouched.
+    with pytest.raises(ValueError):
+        create_user('dup.shell@moh.gov.rw', overwrite=True)
 
-    assert _column(app, 11, 'first_name') == 'Script'
     assert _column(app, 10, 'first_name') == 'First'
     assert _column(app, 10, 'username') == 'Dup.Shell@moh.gov.rw'
+
+
+def test_create_user_script_refuses_to_register_a_second_account_of_a_pair(
+    app, create_user
+):
+    # dup.shell (11) is pending and Dup.Shell (10) is registered. Overwriting
+    # the pending one would make it active, leaving two registered accounts
+    # equal ignoring case, which PATCH, register and reset all refuse.
+    with pytest.raises(ValueError):
+        create_user('dup.shell@moh.gov.rw', overwrite=True)
+
+    assert _column(app, 11, 'status_id') == UserStatusEnum.PENDING.value
+    assert _column(app, 11, 'first_name') != 'Script'

@@ -117,6 +117,18 @@ def create_user(
         raise ValueError(message)
 
     if existing_user and overwrite_user:
+        # Overwriting may not register a second account of a case-only pair:
+        # the result would leave two registered accounts equal ignoring case,
+        # which renames, registration and resets all refuse.
+        if status != UserStatusEnum.PENDING and username_taken(
+            username, session, except_user_id=existing_user.id, ignore_pending=True
+        ):
+            message = (
+                'Another registered account has username \'%s\' in another case; '
+                'overwriting would register a second one.' % username
+            )
+            LOG.error(message)
+            raise ValueError(message)
         LOG.info('User \'%s\' already exists but will be overwritten.', username)
     elif existing_user:
         message = (

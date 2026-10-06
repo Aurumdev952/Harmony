@@ -61,6 +61,7 @@ from web.server.security.grants import (
     member_groups_from_uris,
     verify_acl_grants,
 )
+from web.server.security.permission_cache import clear_permission_cache
 from web.server.security.permissions import (
     SuperUserPermission,
     principals,
@@ -406,7 +407,7 @@ def invalidate_user_identity_cache(sender, role=None, group=None):
     '''This will invalidate the user identity role after any
     user role change (deletion, addition)
     '''
-    sender.get_permissions.delete_memoized()
+    clear_permission_cache(sender)
 
 
 RESOURCE_TYPES = [UserAclResource, UserResource]

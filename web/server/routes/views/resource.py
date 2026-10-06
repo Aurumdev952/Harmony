@@ -2,9 +2,8 @@ from slugify import slugify
 from werkzeug.exceptions import NotFound
 
 from models.alchemy.permission import Resource, SitewideResourceAcl, ResourceRole
-from models.alchemy.user import User, UserAcl
-from models.alchemy.security_group import Group, GroupAcl
-from models.alchemy.user import UserRoles
+from models.alchemy.user import User, UserAcl, UserRoles
+from models.alchemy.security_group import Group, GroupAcl, GroupUsers
 from web.server.data.data_access import (
     Transaction,
     find_all_by_fields,
@@ -23,6 +22,10 @@ from web.server.routes.views.users import (
 )
 
 from web.server.potion.signals import after_roles_update, before_roles_update
+from web.server.security.permission_cache import (
+    clear_every_permission_cache,
+    clear_permission_cache,
+)
 
 
 def get_resource_by_type_and_name(resource_type, resource_name):
@@ -212,16 +215,39 @@ def _update_sitewide_resource_acl(resource, new_sitewide_resource_acl):
         transaction.add_or_update(sitewide_acl, flush=True)
 
 
+def _role_holder_ids(resource, session):
+    '''Ids of the users who hold a role on `resource`, directly or through a group.'''
+    user_ids = {
+        acl.user_id
+        for acl in session.query(UserAcl).filter(UserAcl.resource_id == resource.id)
+    }
+    group_ids = session.query(GroupAcl.group_id).filter(
+        GroupAcl.resource_id == resource.id
+    )
+    user_ids.update(
+        member.user_id
+        for member in session.query(GroupUsers).filter(
+            GroupUsers.group_id.in_(group_ids)
+        )
+    )
+    return user_ids
+
+
 def update_resource_roles(
     resource, user_roles=None, group_roles=None, sitewide_acl=None
 ):
     # Update sitewide_acl. This can still be independent of other role updates
+    previous_sitewide_acl = get_sitewide_acl_for_resource_api(resource)
     _update_sitewide_resource_acl(resource, sitewide_acl)
+    if get_sitewide_acl_for_resource_api(resource) != previous_sitewide_acl:
+        # A sitewide role reaches every account, and it is already committed.
+        clear_every_permission_cache()
 
     # TODO: Clean this up to use transactions
     db_adapter = get_db_adapter()
     session = db_adapter.session
     add_roles = True
+    holders_before = _role_holder_ids(resource, session)
     existing_roles = get_current_resource_roles(resource)
     user_roles, group_roles = _mark_existing_roles_for_deletion(
         existing_roles, user_roles, group_roles
@@ -239,6 +265,12 @@ def update_resource_roles(
             resource, existing_roles=existing_roles, new_roles=new_roles
         )
         session.commit()
+        # Everyone who held a role before or holds one now, found by id: a
+        # username lookup is a pattern match and can find a look-alike account.
+        affected_ids = holders_before | _role_holder_ids(resource, session)
+        if affected_ids:
+            for user in session.query(User).filter(User.id.in_(affected_ids)):
+                clear_permission_cache(user)
         after_roles_update.send(
             resource, existing_roles=existing_roles, new_roles=new_roles
         )
@@ -291,12 +323,16 @@ def add_role_user(role, username, session):
 
 
 def update_role_users(role, new_users, session):
-    updated_users = []
+    '''Make `new_users` the role's users. Returns every user whose roles may have
+    changed: those removed and those given the role.'''
+    affected_users = {}
     role_users = session.find_all_by_fields(UserRoles, {'role_id': role.id})
     for role_user in role_users:
+        removed_user = session.find_by_id(User, role_user.user_id)
+        affected_users[removed_user.id] = removed_user
         session.delete(role_user)
 
     for username in new_users:
         (user, _) = add_role_user(role, username, session)
-        updated_users.append(user)
-    return updated_users
+        affected_users[user.id] = user
+    return list(affected_users.values())

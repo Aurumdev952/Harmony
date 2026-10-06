@@ -58,3 +58,7 @@ services:
       - ${DATA_PATH}/output/logs:/logs
       - ${DATA_PATH}/ubuntu/.mc/config.json:/home/zenysis/.mc/config.json:ro
     restart: always
+  renderer:
+    restart: always
+  render-egress:
+    restart: always

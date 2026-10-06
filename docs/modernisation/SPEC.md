@@ -1,6 +1,6 @@
 # Harmony modernisation specification
 
-Version 1.12, 2026-10-06 (decisions 0001, 0003 to 0012). Status: approved for execution.
+Version 1.13, 2026-10-06 (decisions 0001, 0003 to 0013). Status: approved for execution.
 
 This is the binding guide for every agent and engineer working on the Harmony migration. Where this spec and another document disagree, this spec wins. The other documents explain why and describe the work in detail:
 
@@ -175,7 +175,7 @@ Each WP is one pull request, or a short stack of them. Detail lives in the named
 | 2f | uv, ruff, mypy, CI running every suite | infra | qa | 0f | yes |
 | 2g | Structured logging | infra | backend | none | no |
 | 3a | Config import hook on `find_spec` | core | none | 2a | no |
-| 3b | One CPython 3.13 interpreter everywhere | infra | pipeline | 3a, 2f | no |
+| 3b | One CPython 3.13 interpreter everywhere (one interpreter everywhere except the renderer sidecar, decision 0013) | infra | pipeline | 3a, 2f | no |
 | 3c | SQLAlchemy 1.4 with 2.0 warnings | core | none | 2a, 2b | no |
 | 3d | Flask 2.3, jwt-extended 4, PyJWT 2 | backend | none | 2c | yes |
 | 3e | SQLAlchemy 2.1 | core | none | 3c | no |

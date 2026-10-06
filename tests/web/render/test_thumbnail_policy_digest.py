@@ -21,12 +21,12 @@ from pydruid.utils.filters import Filter
 
 from models.python.permissions import DimensionFilter, QueryNeed
 from render_fakes import DASHBOARD_RESOURCE_ID, VIEW_DASHBOARD
-from web.server.redis.thumbnail_storage_service import query_policy_fingerprint
 from web.server.routes.views.query_policy import caller_policy_filter, canonical_policy
 from web.server.security.permissions import SUPERUSER_NEED
 from web.server.security.signal_handlers import (
     RENDER_TOKEN_QUERY_NEEDS,
     _compute_token_provides,
+    query_policy_fingerprint,
 )
 
 STATE, MUNICIPALITY, SOURCE = 'StateName', 'MunicipalityName', 'source'

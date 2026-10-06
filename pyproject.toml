@@ -203,7 +203,7 @@ files = [
     "web/server",
     "models",
     "db",
-    "harmony/core",
+    "harmony",
     "prod/browser_share/browser_share.py",
 ]
 plugins = ["sqlmypy", "pydantic.mypy"]
@@ -235,9 +235,9 @@ module = ["models.python.dashboard.*", "web.server.migrations.*"]
 ignore_errors = true
 
 [[tool.mypy.overrides]]
-# The standalone tool is checked as `mypy --strict` would, minus its two global
-# flags (warn_unused_configs, warn_redundant_casts), which mypy cannot scope.
-module = ["prod.browser_share.browser_share"]
+# New code and the standalone tool are strict. mypy takes `strict` only
+# globally, so these are its per-module flags.
+module = ["harmony.*", "prod.browser_share.browser_share"]
 disallow_any_generics = true
 disallow_subclassing_any = true
 disallow_untyped_calls = true
@@ -245,10 +245,17 @@ disallow_untyped_defs = true
 disallow_incomplete_defs = true
 check_untyped_defs = true
 disallow_untyped_decorators = true
-warn_unused_ignores = true
 warn_return_any = true
-implicit_reexport = false
+warn_unused_ignores = true
+no_implicit_reexport = true
 strict_equality = true
+strict_concatenate = true
+
+[[tool.mypy.overrides]]
+# Only the renderer image installs Playwright; there, browser.py is checked
+# against its real types (WP-1h infra request).
+module = ["playwright.*"]
+ignore_missing_imports = true
 
 [[tool.mypy.overrides]]
 # config.* is loaded dynamically per deployment; the rest ship no type information.

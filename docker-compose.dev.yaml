@@ -110,6 +110,11 @@ services:
         "-c",
         "./docker/dev/scripts/start_pipeline.sh"
       ]
+  renderer:
+    # Build locally when the image is missing instead of pulling it.
+    build:
+      context: .
+      dockerfile: docker/renderer/Dockerfile
 
 volumes:
   pgdata-volume:

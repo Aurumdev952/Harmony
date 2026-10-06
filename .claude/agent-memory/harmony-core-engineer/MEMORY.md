@@ -1,3 +1,4 @@
+- [Lint and type-check commands](lint-typecheck-commands.md) — mypy needs uvx --with sqlalchemy-stubs; never ruff format (no config, single quotes)
 - [Pipeline builds a Flask app](pipeline_builds_flask_app.md) — validate steps construct FlaskConfiguration; put startup checks at settings import
 - [Running legacy Python tests](running-legacy-python-tests.md): uv ephemeral env for Flask 1.0 / py3.8 tests, hook workarounds, Flask-in-pytest trap
 - [WP-0c findings](wp-0c-findings.md): /api/timeout is live; system-client raw queries reachable from /api/field; remember_me JWT claim

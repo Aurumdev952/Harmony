@@ -40,6 +40,8 @@ from web.server.routes.views.authorization import is_authorized
 from web.server.routes.views.feed import add_share_notification
 from web.server.routes.views.users import add_user_acl, get_current_user, try_get_user
 from web.server.routes.views.page_renderer import (
+    EMAIL_SLOT_WAIT_SECONDS,
+    RendersInFlight,
     dashboard_page_args,
     deployment_dashboard_url,
     grid_dashboard_to_pdf,
@@ -392,6 +394,24 @@ class DashboardManager(AuthorizationResourceManager):
         ).first()
 
 
+def _render_for_email(render, locale, slug, auth_user_email, session_hash):
+    '''A render for an email, or None if it failed. It waits a while for the
+    sender's render slot. A share has already sent its notifications, so a
+    sender whose slot stays busy gets a failed render, as any other failure,
+    rather than a 503.
+    '''
+    try:
+        return render(
+            locale,
+            slug,
+            auth_user_email=auth_user_email,
+            session_hash=session_hash,
+            slot_wait_seconds=EMAIL_SLOT_WAIT_SECONDS,
+        )
+    except RendersInFlight:
+        return None
+
+
 def get_email_attachments(
     auth_user_email,
     slug,
@@ -403,31 +423,25 @@ def get_email_attachments(
     image_name = None
     locale, session_hash = dashboard_page_args(dashboard_url)
     if should_attach_pdf:
-        render_response = grid_dashboard_to_pdf(
-            locale,
-            slug,
-            auth_user_email=auth_user_email,
-            session_hash=session_hash,
+        rendered_pdf = _render_for_email(
+            grid_dashboard_to_pdf, locale, slug, auth_user_email, session_hash
         )
-        if render_response is None or render_response.status_code != 200:
-            g.request_logger.error(f'Failed to render dashboard: "{slug}" to PDF')
+        if rendered_pdf is None:
+            LOG.error(f'Failed to render dashboard: "{slug}" to PDF')
             return None, None
         attachments.append(
             (
                 'attachment',
-                (f'{slug}.pdf', base64.encodebytes(render_response.content).decode()),
+                (f'{slug}.pdf', base64.encodebytes(rendered_pdf.content).decode()),
             )
         )
 
     if should_embed_image:
-        image_render_response = grid_dashboard_to_image(
-            locale,
-            slug,
-            auth_user_email=auth_user_email,
-            session_hash=session_hash,
+        rendered_image = _render_for_email(
+            grid_dashboard_to_image, locale, slug, auth_user_email, session_hash
         )
-        if image_render_response is None or image_render_response.status_code != 200:
-            g.request_logger.error(f'Failed to render dashboard: "{slug}" to JPEG')
+        if rendered_image is None:
+            LOG.error(f'Failed to render dashboard: "{slug}" to JPEG')
             return None, None
         image_name = f'{slug}.jpeg'
         attachments.append(
@@ -435,7 +449,7 @@ def get_email_attachments(
                 "inline",
                 (
                     f'{slug}.jpeg',
-                    base64.encodebytes(image_render_response.content).decode(),
+                    base64.encodebytes(rendered_image.content).decode(),
                 ),
             )
         )
@@ -552,7 +566,8 @@ def share_dashboard_via_email(
         ):
             # When user exists but is unregistered on the platform, send email
             # but do not generate dashboard/pdf attachments
-            # NOTE: This prevents urlbox JWT from triggering identifies events
+            # A pending user has not signed up, so no render token is minted
+            # as them.
             kwargs['should_attach_pdf'] = False
             kwargs['should_embed_image'] = False
             send_email(

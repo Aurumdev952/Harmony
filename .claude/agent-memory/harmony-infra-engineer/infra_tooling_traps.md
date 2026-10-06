@@ -22,3 +22,4 @@ metadata:
 - The isolation guard matches "git" as a substring, so `.github/...` in a command with `PATH=...`, pipes or `$(...)` is refused as a git command. Put such commands in a `/tmp/<wp>/*.sh` file and run `bash <file>` with plain arguments.
 - A hook rejects `python3 <script>` and asks for `uv run python <script>`. On a branch whose `required-version` the host uv does not meet, put a shim first on PATH (`exec uvx --from uv==0.12.23 uv "$@"`), or run from `/tmp` with `uv run --no-project`.
 - `mig/integration` keeps moving while a WP merges it. Check `git log <merged-sha>..mig/integration` before the evidence run, and merge again if it moved.
+- Report commit hashes by copying them from `git log` output, never from memory. Twice in WP-3b round 2 I sent the lead a made-up head and had to correct it.

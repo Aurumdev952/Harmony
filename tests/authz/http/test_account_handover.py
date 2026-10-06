@@ -6,7 +6,8 @@ hands the caller the account. Since WP-0j a non-superuser may rename, or reset
 the password of, only a user whose roles, groups and ACLs are among its own
 (403 otherwise). Decision 0010 also hides administrators through a group from
 non-superusers, as direct administrators are: 404 on every user item route and
-left out of the user list.
+left out of the user list. A non-superuser's group member list keeps the
+administrators it cannot see, and naming one is a 404 (INV-3 row 7).
 
 Each refusal below pins the behaviour after WP-0j. Before WP-0j (WP-0h head
 488e482) the same request succeeds: the rename answers 200 and writes the new
@@ -753,3 +754,157 @@ def test_rename_to_more_than_50_characters_is_a_server_error(world, by_superuser
     assert response.status_code == 500
     assert _state(_id(target)) == before_state
     assert response.json()['success'] is False
+
+
+# Group membership (INV-3 row 7, decision 0010, qa round 2 Medium 1). The group
+# editor lists only the users the caller can see, so a member list it saves
+# never names a hidden administrator. Before (dd186b0b), saving that list
+# removed the administrator, and a list or username naming one added or removed
+# them. After, a non-superuser's member list replaces only the members it can
+# see, and naming a hidden user is a 404 as for a missing user.
+
+
+def _members(group_uri: str) -> set:
+    group_id = int(group_uri.rsplit('/', 1)[1])
+    rows = _docker(
+        'exec',
+        '-i',
+        f'{_PROJECT}-postgres-1',
+        'psql',
+        '-U',
+        'postgres',
+        '-d',
+        'harmony_demo-local',
+        '-tA',
+        '-v',
+        f'group_id={group_id}',
+        '-f',
+        '-',
+        stdin='select user_id from security_group_users where group_id = :group_id',
+    )
+    return {int(row) for row in rows.split()}
+
+
+def _hidden_admin(world, kind: str):
+    if kind == 'direct_admin':
+        return world.user(['admin'])
+    return _admin_through_group(world)[1]
+
+
+def _group_with_a_hidden_admin(world, kind: str) -> tuple:
+    '''A group_admin, a visible member and a hidden administrator share a group
+    that carries no role, so the group_admin reaches it.'''
+    editor = world.user(['group_admin'])
+    member = world.user()
+    hidden = _hidden_admin(world, kind)
+    group_uri = world.group([], [editor, member, hidden])
+    return editor, member, hidden, group_uri
+
+
+def _set_members_by_patch(world, caller, group_uri, usernames):
+    '''What the group editor's Save sends.'''
+    name = world.stack.admin_json('GET', group_uri)['name']
+    return world.stack.request(
+        caller,
+        'PATCH',
+        group_uri,
+        {'$uri': '', 'name': name, 'roles': [], 'users': usernames, 'acls': []},
+    )
+
+
+def _set_members_by_users_route(world, caller, group_uri, usernames):
+    return world.stack.request(caller, 'PATCH', f'{group_uri}/users', usernames)
+
+
+_ADMIN_KINDS = pytest.mark.parametrize('kind', ['direct_admin', 'admin_through_group'])
+_SET_MEMBERS = pytest.mark.parametrize(
+    'set_members',
+    [_set_members_by_patch, _set_members_by_users_route],
+    ids=['patch_group', 'patch_group_users'],
+)
+
+
+def _ids(*sessions) -> set:
+    return {_id(session) for session in sessions}
+
+
+@_SET_MEMBERS
+@_ADMIN_KINDS
+def test_a_group_editor_keeps_an_admin_member_it_cannot_see(world, kind, set_members):
+    '''Before: 200 and the administrator removed with the visible member.
+    After: 200, the visible member removed, the administrator kept.'''
+    editor, member, hidden, group_uri = _group_with_a_hidden_admin(world, kind)
+
+    response = set_members(world, editor, group_uri, [_username(editor)])
+
+    assert response.status_code == 200, response.text[:300]
+    assert _members(group_uri) == _ids(editor, hidden)
+
+
+@_SET_MEMBERS
+@_ADMIN_KINDS
+def test_a_group_editor_cannot_add_an_admin_it_cannot_see(world, kind, set_members):
+    '''Before: 200 and the administrator added. After: 404, nothing changed.'''
+    editor, member, hidden, group_uri = _group_with_a_hidden_admin(world, kind)
+    outsider = _hidden_admin(world, kind)
+    usernames = [_username(editor), _username(member), _username(outsider)]
+
+    response = set_members(world, editor, group_uri, usernames)
+
+    assert response.status_code == 404, response.text[:300]
+    assert _members(group_uri) == _ids(editor, member, hidden)
+
+
+@pytest.mark.parametrize('method', ['POST', 'DELETE'])
+@_ADMIN_KINDS
+def test_a_group_editor_cannot_add_or_remove_an_admin_by_username(world, kind, method):
+    '''Before: 200 or 201, the administrator added (POST) or removed (DELETE).
+    After: 404, nothing changed.'''
+    editor, member, hidden, group_uri = _group_with_a_hidden_admin(world, kind)
+    target = hidden if method == 'DELETE' else _hidden_admin(world, kind)
+
+    response = world.stack.request(
+        editor, method, f'{group_uri}/users', _username(target)
+    )
+
+    assert response.status_code == 404, response.text[:300]
+    assert _members(group_uri) == _ids(editor, member, hidden)
+
+
+@pytest.mark.parametrize('method', ['POST', 'DELETE'])
+def test_a_group_editor_adds_and_removes_users_it_sees_by_username(world, method):
+    '''Unchanged: visible users are added and removed by username.'''
+    editor, member, hidden, group_uri = _group_with_a_hidden_admin(
+        world, 'admin_through_group'
+    )
+    newcomer = world.user()
+    target = member if method == 'DELETE' else newcomer
+
+    response = world.stack.request(
+        editor, method, f'{group_uri}/users', _username(target)
+    )
+
+    assert response.status_code in (200, 201), response.text[:300]
+    expected = (
+        _ids(editor, hidden)
+        if method == 'DELETE'
+        else _ids(editor, member, hidden, newcomer)
+    )
+    assert _members(group_uri) == expected
+
+
+@_SET_MEMBERS
+@_ADMIN_KINDS
+def test_a_superuser_still_sets_any_member_list(world, kind, set_members):
+    '''Unchanged: a superuser (here through a group) replaces every member,
+    administrators included.'''
+    superuser = _hidden_admin(world, 'admin_through_group')
+    _, member, hidden, group_uri = _group_with_a_hidden_admin(world, kind)
+    outsider = _hidden_admin(world, kind)
+
+    response = set_members(
+        world, superuser, group_uri, [_username(member), _username(outsider)]
+    )
+
+    assert response.status_code == 200, response.text[:300]
+    assert _members(group_uri) == _ids(member, outsider)

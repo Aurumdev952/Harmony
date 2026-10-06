@@ -24,7 +24,6 @@ from models.alchemy.permission import (
     Role,
     ResourceTypeEnum,
 )
-from models.alchemy.security_group import Group
 from models.alchemy.user import UserRoles
 from web.server.api.api_models import PrincipalResource
 from web.server.api.model_schemas import (
@@ -40,7 +39,7 @@ from web.server.api.permission_api_schemas import (
 )
 from web.server.api.query_api_models import QueryPolicyResource
 from web.server.api.responses import STANDARD_RESPONSE_SCHEMA, StandardResponse
-from web.server.data.data_access import find_by_id, find_one_by_fields, Transaction
+from web.server.data.data_access import find_by_id, Transaction
 from web.server.errors import ItemNotFound, NotificationError
 from web.server.potion.filters import ResourceTypeFilter
 from web.server.potion.managers import RoleResourceManager
@@ -52,7 +51,6 @@ from web.server.routes.views.resource import (
     get_current_resource_roles,
     update_role_users,
 )
-from web.server.routes.views.users import try_get_user
 from web.server.security.permission_cache import clear_permission_cache
 from web.server.security.permissions import SuperUserPermission, principals
 from web.server.util.util import get_resource_string
@@ -554,36 +552,6 @@ class RoleResource(PrincipalResource):
                 clear_permission_cache(user)
             return StandardResponse('Role usernames has been updated', OK, True)
         return None, UNAUTHORIZED
-
-
-# pylint: disable=W0613
-@after_roles_update.connect
-def invalidate_roles_update(sender, existing_roles, new_roles):
-    '''Clear the cached permissions of every user whose roles on `sender` changed:
-    users listed before or after, and members of groups listed before or after.
-    Sent after the commit.'''
-    usernames = {
-        *existing_roles['userRoles'],
-        *(new_roles['userRoles'] or {}),
-    }
-    group_names = {
-        *existing_roles['groupRoles'],
-        *(new_roles['groupRoles'] or {}),
-    }
-    users = {}
-    for username in usernames:
-        user = try_get_user(username)
-        if user:
-            users[user.id] = user
-    for group_name in group_names:
-        group = find_one_by_fields(Group, True, {'name': group_name})
-        if group:
-            users.update((user.id, user) for user in group.users)
-    for user in users.values():
-        clear_permission_cache(user)
-    g.request_logger.info(
-        'Invalidate cache for user ids %s after updating roles', sorted(users)
-    )
 
 
 # TODO: Fix typing of this array

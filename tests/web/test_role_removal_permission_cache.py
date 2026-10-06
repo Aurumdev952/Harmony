@@ -11,6 +11,7 @@ Synthetic data on SQLite; nothing leaves the process.
 
 import contextlib
 import importlib
+import logging
 import os
 import pkgutil
 
@@ -26,6 +27,7 @@ os.environ.setdefault('ZEN_ENV', 'harmony_demo')
 
 # pylint: disable=wrong-import-position
 import models.alchemy
+import web.server.database.setup  # noqa: F401  (SQLite enforces foreign keys)
 import web.server.security.permissions
 from log import LOG
 from models.alchemy.permission import (
@@ -106,11 +108,14 @@ def fixture_app():
         db.Model.metadata.create_all(
             db.engine, tables=[model.__table__ for model in models_used]
         )
+        assert db.session.execute('PRAGMA foreign_keys').scalar() == 1
         db.session.add_all(UserStatus(id=s.value, status=s) for s in UserStatusEnum)
         db.session.add_all(ResourceType(id=t.value, name=t) for t in ResourceTypeEnum)
         db.session.add_all(
             QueryPolicyType(id=t.value, name=t) for t in QueryPolicyTypeEnum
         )
+        # The rows the permissions and policies below point at exist first.
+        db.session.flush()
         dashboard_type = ResourceTypeEnum.DASHBOARD.value
         view = Permission(resource_type_id=dashboard_type, permission='view_resource')
         edit = Permission(resource_type_id=dashboard_type, permission='edit_resource')
@@ -152,6 +157,9 @@ def fixture_app():
 @pytest.fixture(name='api', scope='module')
 def fixture_api(app):
     with app.app_context():
+        # Its signal handlers clear a user's entry on every ACL change, as in
+        # the running app.
+        importlib.import_module('web.server.api.user_api_models')
         return importlib.import_module('web.server.api.permission_api_models')
 
 
@@ -344,3 +352,92 @@ def test_removing_the_sitewide_dashboard_role_clears_every_users_rights(app):
     _set_dashboard_roles(app, {ALICE: ['dashboard_admin']})
 
     assert _dashboard_need(app) not in _permissions(app, eve)
+
+
+def _grant_role_without_clearing(app, user_id, role_name):
+    '''Change the account's rights behind the cache's back: only a clear makes
+    the next read see it.'''
+    db = _db(app)
+    role_id = _one(app, Role, name=role_name).id
+    db.session.add(UserRoles(user_id=user_id, role_id=role_id))
+    db.session.commit()
+
+
+@pytest.mark.usefixtures('request_context')
+def test_a_look_alike_username_neither_hides_nor_takes_the_clear(app):
+    # `_` matches any one character in the username lookup the old handler used,
+    # which then found the look-alike created first.
+    twin = _add_user(app, 'john.doe@example.org')
+    john = _add_user(app, 'john_doe@example.org')
+    alice = _add_user(app, ALICE)
+    _grant_dashboard(app, alice, 'dashboard_admin')
+    _grant_dashboard(app, john, 'dashboard_viewer')
+    assert ADMIN not in _permissions(app, john)
+    assert ADMIN not in _permissions(app, twin)
+    _grant_role_without_clearing(app, john, 'admin')
+    _grant_role_without_clearing(app, twin, 'admin')
+
+    _set_dashboard_roles(app, {ALICE: ['dashboard_admin']})
+
+    assert ADMIN in _permissions(app, john), 'the removed account was not cleared'
+    assert ADMIN not in _permissions(app, twin), 'the look-alike was cleared'
+
+
+class _CacheDown(Exception):
+    pass
+
+
+@pytest.fixture(name='cache_down')
+def fixture_cache_down(app, monkeypatch):
+    def refuse(*_args, **_kwargs):
+        raise _CacheDown('the cache is unreachable')
+
+    monkeypatch.setattr(app.cache, 'delete_memoized', refuse)
+    records = []
+
+    class _Records(logging.Handler):
+        def emit(self, record):
+            records.append(record)
+
+    handler = _Records(level=logging.ERROR)
+    LOG.addHandler(handler)
+    yield records
+    LOG.removeHandler(handler)
+
+
+@pytest.mark.usefixtures('request_context')
+def test_a_cache_outage_does_not_stop_a_role_change(app, cache_down):
+    alice = _add_user(app, ALICE, roles=['admin'])
+    _add_user(app, EVE, roles=['admin'])
+
+    _set_role_users(app, 'admin', [ALICE])
+
+    assert [user.id for user in _one(app, Role, name='admin').users] == [alice]
+    assert cache_down
+    assert {record.exc_info[0] for record in cache_down} == {_CacheDown}
+
+
+@pytest.mark.usefixtures('request_context')
+def test_a_cache_outage_does_not_stop_a_share(app, cache_down):
+    alice = _add_user(app, ALICE)
+    eve = _add_user(app, EVE)
+    _grant_dashboard(app, alice, 'dashboard_admin')
+    # Eve is already listed, so the share sends no invitation email.
+    _grant_dashboard(app, eve, 'dashboard_viewer')
+    registered_viewers = {
+        'registeredResourceRole': 'dashboard_viewer',
+        'unregisteredResourceRole': '',
+    }
+
+    _set_dashboard_roles(
+        app,
+        {ALICE: ['dashboard_admin'], EVE: ['dashboard_admin']},
+        sitewide_acl=registered_viewers,
+    )
+
+    acls = _db(app).session.query(UserAcl).filter_by(user_id=eve).all()
+    assert [acl.resource_role.name for acl in acls] == ['dashboard_admin']
+    sitewide = _db(app).session.query(SitewideResourceAcl).one()
+    assert sitewide.registered_resource_role.name == 'dashboard_viewer'
+    assert cache_down
+    assert {record.exc_info[0] for record in cache_down} == {_CacheDown}

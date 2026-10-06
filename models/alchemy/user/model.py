@@ -164,7 +164,7 @@ class User(Base, UserMixin):
         return self.id
 
     def __repr__(self) -> str:
-        # This is used as a cache key for a user so must include username
+        # Not a cache key: get_permissions keys by __caching_id__ (the id).
         return f'<{self.__class__.__name__} object {self.username}>'
 
 

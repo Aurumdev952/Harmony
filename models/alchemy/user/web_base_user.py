@@ -2,8 +2,9 @@
 Flask-dependent code is here because pipeline servers don't have flask installed and
 flask can't be imported at them
 """
-from flask import current_app
+from flask import current_app, has_app_context
 from flask_principal import ItemNeed, RoleNeed
+from sqlalchemy import event, inspect
 from werkzeug.utils import cached_property
 
 from models.alchemy.permission import SitewideResourceAcl, ResourceTypeEnum
@@ -11,6 +12,11 @@ from web.server.data.data_access import Transaction
 
 
 class BaseWebUserMixin:
+    def __caching_id__(self, _obj):
+        # flask-caching keys get_permissions by this, or by repr() without it.
+        # A username can pass to another account; an id cannot.
+        return f'<{self.__class__.__name__} id={self.id}>'
+
     # NOTE: this hack is necessary because at the moment models
     # are being loaded, we still don't have app context. Is it possible
     # to load them later and thus get rid of it? I'm not sure.
@@ -106,3 +112,21 @@ class BaseWebUserMixin:
         if resource_type.name == ResourceTypeEnum.ALERT:
             resource_id = resource.id if resource else None
             yield ItemNeed(permission.permission, resource_id, 'alert_definitions')
+
+
+# The id key keeps accounts apart. Clearing on delete also covers an id that is
+# used again, which a restore can do. Clearing on rename is belt and braces.
+def _forget_permissions(_mapper, _connection, user):
+    if has_app_context():
+        user.get_permissions.delete_memoized()
+
+
+def _forget_permissions_on_rename(mapper, connection, user):
+    if inspect(user).attrs.username.history.has_changes():
+        _forget_permissions(mapper, connection, user)
+
+
+event.listen(BaseWebUserMixin, 'after_delete', _forget_permissions, propagate=True)
+event.listen(
+    BaseWebUserMixin, 'after_update', _forget_permissions_on_rename, propagate=True
+)

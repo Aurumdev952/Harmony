@@ -19,6 +19,7 @@ from web.server.routes.views.users import (
 )
 
 from web.server.potion.signals import after_roles_update, before_roles_update
+from web.server.security.permission_cache import clear_every_permission_cache
 
 
 def get_resource_by_type_and_name(resource_type, resource_name):
@@ -225,7 +226,11 @@ def update_resource_roles(
     resource, user_roles=None, group_roles=None, sitewide_acl=None
 ):
     # Update sitewide_acl. This can still be independent of other role updates
+    previous_sitewide_acl = get_sitewide_acl_for_resource_api(resource)
     _update_sitewide_resource_acl(resource, sitewide_acl)
+    if get_sitewide_acl_for_resource_api(resource) != previous_sitewide_acl:
+        # A sitewide role reaches every account, and it is already committed.
+        clear_every_permission_cache()
 
     # TODO: Clean this up to use transactions
     db_adapter = get_db_adapter()
@@ -302,12 +307,16 @@ def add_role_user(role, username, session):
 
 
 def update_role_users(role, new_users, session):
-    updated_users = []
+    '''Make `new_users` the role's users. Returns every user whose roles may have
+    changed: those removed and those given the role.'''
+    affected_users = {}
     role_users = session.find_all_by_fields(UserRoles, {'role_id': role.id})
     for role_user in role_users:
+        removed_user = session.find_by_id(User, role_user.user_id)
+        affected_users[removed_user.id] = removed_user
         session.delete(role_user)
 
     for username in new_users:
         (user, _) = add_role_user(role, username, session)
-        updated_users.append(user)
-    return updated_users
+        affected_users[user.id] = user
+    return list(affected_users.values())

@@ -10,6 +10,7 @@
 #
 # The contract stack generates every secret per stack into a mode-600 file
 # outside the repository (SPEC INV-6).
+# CONTRACT_BUILD_NETWORK=host reaches the contract stack's image build too.
 set -euo pipefail
 
 HERE="$(cd "$(dirname "$0")" && pwd -P)"

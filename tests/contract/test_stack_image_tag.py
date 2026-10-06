@@ -76,3 +76,46 @@ def test_a_missing_hash_input_stops_the_script(sandbox, relative):
     done = image_tag(sandbox)
     assert done.returncode != 0
     assert not TAG.search(done.stdout)
+
+
+def build_calls(tmp_path: Path, **env: str) -> list[str]:
+    """Run `stack.sh up` with a fake docker that records each call, builds
+    successfully and fails at the first `compose`, so `up` stops right after
+    building; return the recorded `docker build` argument lines."""
+    calls = tmp_path / "docker-calls"
+    fake = tmp_path / "bin" / "docker"
+    fake.parent.mkdir(parents=True)
+    fake.write_text(
+        f"#!/bin/bash\necho \"$*\" >> {calls}\n[[ $1 == build ]] && exit 0\nexit 1\n"
+    )
+    fake.chmod(0o755)
+    runtime = tmp_path / "runtime"
+    runtime.mkdir(mode=0o700)
+    done = subprocess.run(
+        ["bash", str(STACK_SCRIPT), "up"],
+        env={
+            "PATH": f"{fake.parent}:/usr/bin:/bin",
+            "HOME": str(tmp_path),
+            "XDG_RUNTIME_DIR": str(runtime),
+            "CONTRACT_PROJECT": "contract-build-test",
+            **env,
+        },
+        capture_output=True,
+        text=True,
+        check=False,
+    )
+    assert done.returncode != 0
+    lines = calls.read_text().splitlines()
+    assert any(line.startswith("compose ") for line in lines), done.stderr
+    return [line for line in lines if line.startswith("build ")]
+
+
+def test_the_web_image_builds_on_the_default_network_by_default(tmp_path):
+    (build,) = build_calls(tmp_path)
+    assert "--network" not in build.split()
+
+
+def test_contract_build_network_reaches_the_web_image_build(tmp_path):
+    (build,) = build_calls(tmp_path, CONTRACT_BUILD_NETWORK="host")
+    words = build.split()
+    assert words[words.index("--network") + 1] == "host"

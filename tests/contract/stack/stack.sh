@@ -17,6 +17,9 @@
 # CONTRACT_OVERLAYS, a colon-separated list of compose files, is added after
 # the stack's own; the e2e suite uses it to swap the Druid stand-in.
 #
+# CONTRACT_BUILD_NETWORK, unset by default, is the network the web image builds
+# on: `host` where build containers have no DNS.
+#
 # Every secret (admin password, Postgres, Redis, Hasura admin, session and JWT
 # keys) is generated per stack into a mode-600 file outside the repository, so
 # none lands in fixtures, logs or git (SPEC INV-6).
@@ -99,9 +102,12 @@ image_tag() {
 }
 
 build_images() {
-  local tag
+  local tag network=()
   tag="$(image_tag)"
-  docker build --platform linux/amd64 \
+  if [[ -n "${CONTRACT_BUILD_NETWORK:-}" ]]; then
+    network=(--network "${CONTRACT_BUILD_NETWORK}")
+  fi
+  docker build "${network[@]}" --platform linux/amd64 \
     -f "${ROOT}/docker/web/Dockerfile_web-server" \
     -t "${tag}" "${ROOT}"
   export CONTRACT_WEB_IMAGE="${tag}"

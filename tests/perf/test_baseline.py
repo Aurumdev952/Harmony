@@ -809,6 +809,42 @@ def test_builds_use_the_default_network_unless_perf_build_network_is_set(
     assert all(' --network host ' in f' {b} ' for b in builds)
 
 
+def _druid_build(tmp_path: Path, **env: str) -> dict:
+    """The extension loader's build section, as `stack.sh config druid` renders it."""
+    import yaml
+
+    done = subprocess.run(
+        ['bash', str(STACK_SH), 'config', 'druid'],
+        env={
+            'PATH': os.environ['PATH'],
+            'HOME': str(tmp_path),
+            'PERF_SCRATCH': str(tmp_path / 'scratch'),
+            **env,
+        },
+        capture_output=True,
+        text=True,
+        check=False,
+    )
+    assert done.returncode == 0, done.stderr
+    services = yaml.safe_load(done.stdout)['services']
+    builds = {name: s['build'] for name, s in services.items() if 'build' in s}
+    assert set(builds) == {'extension_loader'}, set(builds)
+    return builds['extension_loader']
+
+
+def test_the_extension_loader_builds_on_the_default_network_by_default(
+    tmp_path: Path,
+):
+    assert _druid_build(tmp_path).get('network', 'default') == 'default'
+
+
+def test_perf_build_network_reaches_the_extension_loader_build(tmp_path: Path):
+    # Where build containers have no DNS, `up` failed at the loader's
+    # `apk add` on a fresh project although the web image built on the host's
+    # network.
+    assert _druid_build(tmp_path, PERF_BUILD_NETWORK='host')['network'] == 'host'
+
+
 def _image_tag(tree: Path) -> str:
     result = subprocess.run(
         ['bash', '-c', f'source {STACK_SH}\nimage_tag {tree}\n'],

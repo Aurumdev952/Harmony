@@ -20,6 +20,8 @@
 # - The broker writes a request log, which is where Druid-side query time
 #   comes from.
 # - A `druid` forwarder joins the web network (see druid_forward.py).
+# - The extension loader builds on PERF_BUILD_NETWORK when it is set, as the
+#   web image does (stack.sh), for hosts whose build containers have no DNS.
 
 x-perf-druid-env: &perf-druid-env
   DRUID_XMS: 512m
@@ -39,6 +41,10 @@ networks:
     internal: true
 
 services:
+  extension_loader:
+    build:
+      network: ${PERF_BUILD_NETWORK:-default}
+
   postgres:
     image: postgres:17.11-bookworm@sha256:639ab7ceb90e13123085b741fb31ef493fba25463002f6da665352e7b534b652
     ports: !reset []

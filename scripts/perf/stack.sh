@@ -20,7 +20,7 @@
 #   PERF_REFERENCE_WEB_PORT default 58702, PERF_REFERENCE_UI_PORT 58703 (the reference copy)
 #   PERF_COORDINATOR_PORT default 58981, PERF_BROKER_PORT 58982, PERF_ROUTER_PORT 58988
 #   PERF_SCRATCH          default ${TMPDIR:-/tmp}/<project>: dataset, pipeline output, broker request log
-#   PERF_BUILD_NETWORK    unset; `host` builds the web image on the host network
+#   PERF_BUILD_NETWORK    unset; `host` builds the web image and Druid's extension loader on the host network
 #   PERF_REBUILD          unset; 1 rebuilds the web image and the client
 # Every port is published on 127.0.0.1 only. Secrets are generated per stack into a
 # mode-600 file outside the repository (SPEC INV-6); compose reads no .env file.

@@ -58,7 +58,7 @@ All commands run from your worktree. Paired mode needs at least 30 rounds per si
    scripts/perf/stack.sh up                      # Druid, web (this checkout) and its data; no re-index if the volumes exist
    scripts/perf/stack.sh ui                      # the production client; rebuilt only when a client input changed
    ```
-   A web image is built only when its inputs changed, and a failed build stops `stack.sh`. If build containers cannot resolve names (`Temporary failure in name resolution` from pip), build on the host's network with `PERF_BUILD_NETWORK=host scripts/perf/stack.sh up` (or `reference`).
+   A web image is built only when its inputs changed, and a failed build stops `stack.sh`. If build containers cannot resolve names (`Temporary failure in name resolution` from pip, or `DNS: transient error` from the extension loader's `apk add`), build on the host's network with `PERF_BUILD_NETWORK=host scripts/perf/stack.sh up` (or `reference`). It covers the web image and Druid's extension loader, the stack's only builds.
 2. **Start the reference and the run.** The reference is your WP's base, `git merge-base HEAD mig/integration` (decision 0011), which `stack.sh reference` picks when given no commit. Never use `main`: it is the pre-migration tree, hundreds of commits behind integration, so a run against it would charge your WP with the cost or gain of every WP merged since. The report says when the reference is not that merge base.
    ```bash
    scripts/perf/stack.sh reference               # the old code, beside yours: git merge-base HEAD mig/integration

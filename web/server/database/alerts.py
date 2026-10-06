@@ -85,7 +85,7 @@ def get_sources_for_field(field_id: str) -> Set[str]:
     with Transaction() as transaction:
         return {
             datasource_id
-            for datasource_id, in transaction.run_raw()
+            for (datasource_id,) in transaction.run_raw()
             .query(FieldPipelineDatasourceMapping.pipeline_datasource_id)
             .filter(FieldPipelineDatasourceMapping.field_id == field_id)
         }

@@ -149,8 +149,6 @@ seed_catalog() {
 
 stack_up() {
   ensure_client
-  # Mount point for the web container's upload tmpfs (ignored by the repo).
-  mkdir -p "${ROOT}/uploads"
   "${STACK}" up
   start_assets
   seed_catalog

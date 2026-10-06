@@ -8,7 +8,7 @@ This suite judges SPEC invariant INV-2: query results do not change silently. Ea
 The suite needs no Druid, Postgres or container. It runs in a few seconds:
 
 ```bash
-uv sync                      # once: CPython 3.9 and the query engine's dependencies
+uv sync --locked             # once: CPython 3.13 and the locked dependencies
 uv run pytest tests/golden
 ```
 
@@ -134,18 +134,9 @@ Commit the regenerated fixtures in the same commit as the code change. That way 
 
 ## Toolchain
 
-`pyproject.toml` and `uv.lock` are interim. This WP added a `golden` dependency group and `testpaths = ["tests/golden"]`. WP-2f takes both files over: its `dev` group replaces `golden`, and it must keep `uv run pytest tests/golden` working.
-
-The Python files here are formatted with the repo's current formatter:
+The Python files here are formatted and linted with the repo's ruff settings in `pyproject.toml`, as CI checks them:
 
 ```bash
-uvx --python 3.9 --from black==22.6.0 --with click==8.0.4 black -S -t py39 tests/golden
+uv run --locked ruff format tests/golden
+uv run --locked ruff check tests/golden
 ```
-
-They are linted with:
-
-```bash
-uvx ruff@0.14.0 check --target-version py39 --select F,E,W,B,SIM --line-length 88 tests/golden
-```
-
-The line length is 88, the limit in WP-2f's coming ruff config.

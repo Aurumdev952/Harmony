@@ -2,10 +2,9 @@
 
 The hook reads ZEN_ENV once, when `config` is first imported, and mutates
 `sys.meta_path` and `sys.modules`, so every case runs in a fresh interpreter.
-Run on each supported CPython, for example:
+Run with the locked environment (CPython 3.13):
 
-    uv run -p 3.9 --no-project --with pytest pytest tests/core
-    uv run -p 3.13 --no-project --with pytest pytest tests/core
+    uv run --locked pytest tests/core
 '''
 
 import json

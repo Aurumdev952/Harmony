@@ -166,7 +166,7 @@ def fixture_render_app(app: Flask) -> Flask:
 
 def _get(render_app, principal, path, headers=None):
     spec = principal_specs()[principal]
-    # ExitStack, not a parenthesised `with`: the web image runs Python 3.8.
+    # The principal's public-access setting, seen by the config and the auth views.
     with ExitStack() as stack:
         stack.enter_context(configuration(spec.public_access))
         stack.enter_context(

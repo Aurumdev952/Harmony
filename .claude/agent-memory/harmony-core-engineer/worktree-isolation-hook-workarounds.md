@@ -14,5 +14,5 @@ As a worktree-isolated subagent the Bash hooks reject: `git -C <other worktree>`
 - One heredoc per Bash call, nothing after it.
 - A branch held by another (locked) worktree cannot be switched to; create `<branch>-2` at the same commit and tell the lead.
 - When the repo pins uv `required-version` above the host uv: `uvx --from uv==<ver> uv ...`; for scripts that call `uv` (ci/*.sh), put a shim `exec uvx --from uv==<ver> uv "$@"` first on PATH inside a wrapper script.
-- After switching to a branch with a newer lock, run `uv sync --locked --all-groups` (exact). `uv run --locked` syncs inexactly and leaves removed packages, so `tests/infra`'s `uv pip check` fails spuriously (seen with `dataclasses`, 2026-10-06).
+- After switching to a branch with a newer lock, run `uv sync --locked` (exact; it installs the default groups). Not `--all-groups`: since WP-3b round 2 that adds the `renderer-types` group, whose Playwright makes the browser tests in `tests/worker` run on the host. `uv run --locked` syncs inexactly and leaves removed packages, so `tests/infra`'s `uv pip check` fails spuriously (seen with `dataclasses`, 2026-10-06).
 - Never run two test suites in one pytest process (`tests/druid tests/golden` together gave 183 false failures); use `ci/pytest_suites.sh`.

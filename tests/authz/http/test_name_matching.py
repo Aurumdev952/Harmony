@@ -132,12 +132,12 @@ def _share(stack, session, dashboard: Dashboard, users: dict, groups: dict):
     )
 
 
-def _acl(role_name: str, resource_name: str) -> dict:
+def _acl(role_name: str, resource_name: str, resource_uri: str = '') -> dict:
     return {
         '$uri': '',
         'resourceRole': {'$uri': '', 'name': role_name, 'resourceType': 'DASHBOARD'},
         'resource': {
-            '$uri': '',
+            '$uri': resource_uri,
             'label': resource_name,
             'name': resource_name,
             'resourceType': 'DASHBOARD',
@@ -434,7 +434,9 @@ def _moderated_group(stack, tag: str, cleanup: ExitStack):
     return actor, name, group_uri
 
 
-def _grant_to_group(stack, actor, name: str, group_uri: str, resource_name: str):
+def _grant_to_group(
+    stack, actor, name: str, group_uri: str, resource_name: str, resource_uri=''
+):
     return stack.request(
         actor,
         'PATCH',
@@ -444,23 +446,73 @@ def _grant_to_group(stack, actor, name: str, group_uri: str, resource_name: str)
             'name': name,
             'roles': [],
             'users': [actor.headers['X-Username']],
-            'acls': [_acl('dashboard_viewer', resource_name)],
+            'acls': [_acl('dashboard_viewer', resource_name, resource_uri)],
         },
     )
 
 
 def test_a_refused_acl_grant_does_not_name_the_dashboard(stack, tag, cleanup):
-    '''Before: 403 "Granting 'dashboard_viewer' on DASHBOARD '<name>' needs
-    ...". After: a 403 that names no dashboard.'''
+    '''Row 10. The actor can view the dashboard but not share it. Before: 403
+    "Granting 'dashboard_viewer' on DASHBOARD '<name>' needs ...". After: a
+    403 that names no dashboard.'''
     private = Dashboard(stack, stack.admin, f'qa0l private {tag}', cleanup)
     actor, name, group_uri = _moderated_group(stack, tag, cleanup)
     resource_name = _resource_name(private.slug)
+    shared = _share(
+        stack,
+        stack.admin,
+        private,
+        {
+            **private.holders(stack)['users'],
+            actor.headers['X-Username']: ['dashboard_viewer'],
+        },
+        {},
+    )
+    assert shared.status_code == 204, shared.text[:500]
 
     response = _grant_to_group(stack, actor, name, group_uri, resource_name)
 
     assert response.status_code == 403
     assert resource_name not in response.text
     assert private.holders(stack)['groups'] == {}
+
+
+@pytest.mark.parametrize('form', ['name', '$uri'])
+def test_a_grant_on_a_dashboard_the_caller_cannot_see_looks_like_no_dashboard(
+    stack, tag, cleanup, form
+):
+    '''Row 7 (WP-0l round 2). Before: an unseen dashboard got 403 and a
+    missing one 404, so the status told the caller which names and ids
+    exist. After: both get the same 404 body, apart from the name the
+    caller sent, which it already knows.'''
+    unseen = Dashboard(stack, stack.admin, f'qa0l unseen {tag}', cleanup)
+    actor, name, group_uri = _moderated_group(stack, tag, cleanup)
+    if form == 'name':
+        sent = {
+            'unseen': (_resource_name(unseen.slug), ''),
+            'missing': (f'qa0l_missing_{tag}', ''),
+        }
+    else:
+        sent = {
+            'unseen': ('', unseen.resource_uri),
+            'missing': ('', '/api2/resource/2147483000'),
+        }
+
+    bodies = {}
+    for case, (resource_name, resource_uri) in sent.items():
+        response = _grant_to_group(
+            stack, actor, name, group_uri, resource_name, resource_uri
+        )
+        assert response.status_code == 404, (case, response.text[:500])
+        text = (
+            response.text.replace(resource_name, '<name>')
+            if resource_name
+            else response.text
+        )
+        bodies[case] = text
+
+    assert bodies['unseen'] == bodies['missing']
+    assert unseen.holders(stack)['groups'] == {}
 
 
 def test_an_acl_naming_a_pattern_does_not_reveal_the_dashboard_it_matches(

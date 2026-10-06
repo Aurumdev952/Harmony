@@ -38,13 +38,24 @@ instances:
       - tests/web/test_dashboard_unauthorized_redirect.py
       - tests/web/server/test_hasura_proxy.py
       - web/server/routes/views/authentication.py
+      - web/server/redis/thumbnail_storage_service.py
+      - web/server/routes/page_renderer.py
+      - tests/web/test_api_token_issue.py
+      - tests/web/test_request_id_logging.py
+      - tests/web/render/test_render_tokens.py
+      - tests/web/render/test_render_failures.py
+      - tests/privilege_escalation/conftest.py
+      - tests/privilege_escalation/test_group_and_role_grants.py
+      - tests/privilege_escalation/test_user_username_case.py
+      - tests/authz/principals.py
+      - tests/authz/http/test_api_tokens.py
       - docs/modernisation/work/WP-0k.md
       - docs/modernisation/work/WP-0k-evidence/**
       - .claude/agent-memory/harmony-backend-engineer/**
 branch: "mig/WP-0k-configured-links-exact-usernames"
 requirements: []          # decision 0006 names no SEC row; INV-1 and INV-3 apply
 contracts_consumed: [C-5]
-contracts_changed: []
+contracts_changed: [C-5]
 security_review: true
 ---
 
@@ -69,105 +80,139 @@ Each unit starts with a failing test.
 11. **INV-3 table, human acceptance list, requests (qa flips WP-2b T1 and T2), carried risks, merge-together rule** (e3a7064).
 12. **Lead round 2, from the interrogate panel.** One rule for every token: load the account by id (the `api_token` row, the `user_id` claim, or for a pre-WP-0k session the one non-pending account its username can mean), and require the exact username and a `created` not after `iat`; render tokens carry `user_id`. Only real renames are checked against other accounts. The admin reset route mails the account it authorised, by id. Registration refuses a pending twin of a registered account. `POST /api2/user` refuses a username equal to another ignoring case. `scripts/create_user.py` is the lead's: requested. Check: each new test fails on e3a7064 and passes after.
 13. **Deactivated accounts sign in nowhere** (decision 0010). Password login, header login, the flask-login session, session, API and render tokens refuse an account whose status is not active; `authentication_required` agrees with the loaders. No validity cache is left to invalidate (unit 8). Check: the tests fail on e3a7064 and pass after.
-14. **Trial merge with WP-0j's head, gates, documents.** Then `status: review`.
+14. **Trial merge with WP-0j's head, gates, documents** (43bebdd, e52c95e, 60e702d).
+15. **Round 3 (qa, reviewer and security verdicts at 299c632; the lead's commit security review of 75f51d4).** Each item test-first, one commit each:
+    - merge `mig/integration` (WP-0h, WP-2c, WP-0i): port `test_api_token_issue.py` to `api_token_user_id` and drop its cache fake; the WP-0h harness mints tokens for the account; `tests/authz` stand-in users answer `is_active`, and its render pin expects `user_id` (qa 1, reviewer 4);
+    - `POST /api2/authentication/register` registers only a pending invitation with a non-empty token, once (reviewer Critical and High 2);
+    - a pre-WP-0k session signs in only when its old ILIKE pattern matches exactly one non-pending account (reviewer High 3);
+    - a named target (group and role membership, transfers, role assignment) is the exact spelling, whatever its status (reviewer High 7);
+    - a PATCH may not activate one account of a case-only pair (reviewer High 8);
+    - reset links: one rule (`may_set_password_from_reset`) for the API, with flask-user's token view redirecting to Harmony's page; a pending account completing a reset is activated, a deactivated one refused with `invalid_reset_link`; `forgot_password` mails only active accounts; the status check moves from `get_user_by_id` to the flask-login loader (qa 2, reviewer 5, security F3, commit review 1 and 2);
+    - the deactivated-account refusal comes after the password check (security F1, reviewer 9);
+    - `POST /api2/user` and `PATCH /api2/user/<id>` pinned through the real routes (qa 6, reviewer 11);
+    - render tokens are minted for the account the caller holds; return types; no narrating comments (reviewer 12);
+    - this file: "Merging with WP-0j", the INV-3 table, C-5 and the WP-1h rule, acceptance (qa 3 to 5, reviewer 6, security F2, I1, I3).
 
 ## Contract changes
 
 **C-5, additive.** I own C-5.
 - Old: a session JWT's `user_claims` are `needs`, `query_needs` and `remember_me`, and `identity` is the username as typed. API tokens add `id` (their `api_token` row). Render tokens carry narrowed `needs`.
-- New: session and render tokens' `user_claims` also carry `user_id`, the account id, and `identity` is the stored `user.username`. API tokens keep their layout.
+- New: session and render tokens' `user_claims` also carry `user_id`, the account id, and `identity` is the stored `user.username`. API tokens keep their layout. WP-1h's render tokens also carry `render` (a live render id) and `policy`.
 - Rules every reader of C-5 must enforce (`account_for_token` in `web/server/security/signal_handlers.py`):
-  1. The account id comes from the `api_token` row named by `user_claims.id` (read on every request; revoked or missing means nobody), else from `user_claims.user_id`, else, for a session issued before WP-0k, from the one account equal to `identity` ignoring case that is not a pending invitation (none, or two, means nobody).
-  2. That account must be active, must have exactly the username in `identity`, and must not have a `created` in a later second than the token's `iat`. The database compares the times in the time zone that wrote `created`. A token with no `iat` signs in nobody.
-- Consumers: the Flask login loader (this WP). No other reader exists today. The FastAPI `PrincipalDep` (WP-5a and later) must port both rules. Cookies issued before WP-0k stay valid under rule 1's last branch, so nothing is reissued.
+  1. A token with no `iat`, or a render token whose render is no longer live (`render_tokens.is_spent_render_token(claims)`, WP-1h), signs in nobody, before any account lookup (single use, SEC-7).
+  2. The account id comes from the `api_token` row named by `user_claims.id` (read on every request; revoked or missing means nobody), else from `user_claims.user_id`, else, for a session issued before WP-0k, from the one account that is not a pending invitation and that `identity`, read as the ILIKE pattern sign-in used before WP-0k, matches (none, or two, means nobody).
+  3. That account must be active, must have exactly the username in `identity`, and must not have a `created` in a later second than the token's `iat` (`active_account`). The database compares the times in the time zone that wrote `created`.
+- Writers: `create_user_access_token(user)` (login, registration, reset) and WP-1h's `render_token(account, …)` both take the account and mint `user_id`.
+- Consumers: the Flask login loader (this WP). The FastAPI `PrincipalDep` (WP-5a and later) must port all three rules. Cookies issued before WP-0k stay valid under rule 2's last branch, so nothing is reissued.
+
+**Merge with WP-1h (security F2), done in this branch's merge of integration efc7abd (7dd2930).** WP-1h.md's Contract changes section records the same rule.
+- `account_for_token` applies rule 1 and replaces WP-1h's `elif is_spent_render_token(claims)` branch in `login_from_request`.
+- Render tokens are minted by WP-1h's `render_token(account, …)`; WP-0k's urlbox renderer is gone. Rows T-1, T-3, U-1 and D-3 hold for render tokens (T-2 is API tokens only).
+- `web/server/routes/views/page_renderer.py` keeps WP-1h's renderer client without its `dashboard_page_args`, `deployment_origin` and `deployment_dashboard_url`; `web/server/util/deployment_links.py` (`page_args`, `deployment_origin`, `deployment_url`, `shared_page_url`) is the one place links are built, and `send_email` again links the dashboard's own page (WP-1h's side mailed the caller's free-form `dashboardUrl`, which unit 3 closed).
+- Tests: WP-1h's `tests/web/render/test_render_tokens.py` now fakes only `signal_handlers.active_account`, so `account_for_token` runs for real, and its ordinary session carries `user_id`; `tests/web/usernames/test_render_token_accounts.py` adds the two the rule asks for (a spent render token for an active account signs in nobody; a live one for a deactivated or renamed account signs in nobody).
 
 ## Merging with WP-0j
 
 **WP-0j and WP-0k merge together, in one step, on one stack.**
 - WP-0j guards renames of higher-privileged accounts, but still lets a caller rename itself or a lesser account to a username that pattern-matches an administrator's (WP-0j security C1). Only WP-0k's exact matching makes that harmless.
 - WP-0k without WP-0j leaves the H5 rename-then-reset takeover open.
-- WP-0k contains WP-0i's head (3b14989), so WP-0i lands first or with them.
+- WP-0i and WP-0h are already on `mig/integration`, which this branch contains.
 
-The trial merge of `mig/WP-0j-rename-reset-guard` into this branch (unit 10 at 19b9f62; repeated in unit 14 with WP-0j b090396 into 73bd66d) has four conflicts:
-- `web/server/api/user_api_models.py` and `permission_api_models.py`: imports only; keep both sides. In `update_user`, keep WP-0k's rename check (`username_taken`, only when the username changes) first, before WP-0j's `can_update_item` and `verify_may_rename`. Its 400 reveals only that a username exists, which `GET /api2/user` shows any signed-in user, and neither refusal writes anything. The reset route merges without a conflict: WP-0j's `verify_may_reset_password(user)` runs first, then WP-0k's `send_reset_password_for_account(user.id)`.
-- `web/server/routes/views/users.py`: take WP-0j's `APIToken.is_revoked.is_(False)` line. WP-0k's removal of the token memo merges cleanly.
-- The backend memory index: keep both lines.
+Trial merge, round 3: `mig/WP-0j-rename-reset-guard` 4c89f5f into this branch at 1a64caf (scratch worktree, not pushed). It merges without a conflict:
+- `web/server/api/user_api_models.py`: `update_user` runs WP-0k's two username checks (a rename to another account's username, and activating one account of a case-only pair) first, then WP-0j's `can_update_item` and `verify_may_rename`. Each 400 reveals only that an account with that username exists, as the change-username page's and invitations' "already in use" answers already do, and no refusal writes anything. The reset route runs WP-0j's `verify_may_reset_password(user)`, then WP-0k's `send_reset_password_for_account(user.id)`.
+- `web/server/routes/views/users.py`: integration's `is_revoked.is_(False)`, `issue_api_token` and `replace_user_acls` stay; WP-0k only removed the token memo.
 
-`tests/privilege_escalation` then needs the three edits in `WP-0k-evidence/merge-with-0j/privilege_escalation.patch`:
+`tests/privilege_escalation/test_rename_and_reset.py` (WP-0j's) then needs the two edits in `WP-0k-evidence/merge-with-0j/privilege_escalation.patch`:
 - the mailer stub patches `admin.deployment_url` instead of `admin.url_for`, as WP-0j predicted;
-- the harness passes the `User` to `create_user_access_token`, which now takes the account, not a username (two helpers and the `make_user` fixture).
+- `_token_caller` passes the `User` to `create_user_access_token`, which takes the account since WP-0k. The WP-0h harness on integration (`conftest.py`, `test_group_and_role_grants.py`) already gets the same change on this branch.
 
-With them, at unit 14, the harness gives 132 passed and `tests/web` 426 passed, 3 xfailed. `conflicted-files-vs-0j.diff` is the resolved diff of the three conflicted Python files against WP-0j b090396.
+With them the joint merge gives `tests/privilege_escalation` 172 passed. (qa's 119 passed, 40 failed at 299c632 came from WP-2g's logger propagation double-counting WP-0j's caplog refusals; WP-0j's 6c7e4d6 counts on a handler of the app logger, and the merge no longer shows it.)
 
 ## INV-3 difference table
 
-Rows L are links (units 2, 3, 5), U usernames (units 4, 6, 9, 12), T tokens (units 6 to 8, 12), D deactivated accounts (unit 13). Every other request answers as before.
+Rows L are links, U usernames typed or named, R registration and resets, T tokens, D accounts that are not active. "Before" is `main`. Every other request answers as before.
 
 | # | Principal | Request | Before | After |
 |---|---|---|---|---|
 | L-1 | anyone, anonymous | `POST /api2/authentication/forgot_password`, and the admin `POST /api2/user/<id>/reset_password`, with a forged `Host` or `SCRIPT_NAME`, or behind TLS termination | the mailed reset link takes the request's scheme, host and script root | the link is on `DEPLOYMENT_BASE_URL`, https. Behind the stock nginx-proxy only a served host ever reached the app (unit 1), so there the visible change is `https://` instead of `http://` |
 | L-2 | a caller allowed to invite | `POST /api2/user/invite` | invite link on the request host | on the configured origin |
-| L-3 | a caller granting dashboard roles | access-granted email | link on the request host, to `/dashboard/<resource name>` | on the configured origin, to `/dashboard/<slug>?source=…`. A dashboard with no slug mails nothing and logs a warning; the role change is still committed |
+| L-3 | a caller granting dashboard roles | access-granted email | link on the request host, to `/dashboard/<resource name>` | on the configured origin, to `/dashboard/<slug>?source=…`. A dashboard with no slug mails nothing and logs an error; the role change is still committed |
 | L-4 | a dashboard creator | new-dashboard email | request host | configured origin, `?source=` before any fragment |
 | L-5 | a signed-in user sharing by email | `POST /api2/dashboard/<id>/share_via_email` (`dashboardUrl`), `POST /api2/share/email` (`queryUrl`) | the caller's free-form URL is mailed as the link | the dashboard's page, or the Advanced Query page, on the configured origin, taking from the caller's link only a locale Harmony has and the last well-formed `#h=` hash. An unparseable link gives the plain page |
-| U-1 | anyone typing a username: password login, registration, `X-Username` and `X-Password`, flask-user pages, role assignment by username, invitations, `forgot_password` | a username containing `_` or `%`, or another case of a stored one | `ILIKE` with `first()`: `john_doe@…` could sign in `john.doe@…` | equality ignoring case. The exact spelling wins; else the only active account equal ignoring case; else the only other one; else nobody. When two accounts differ only by case and neither matches exactly (`ANN@` for `Ann@` and `ann@`), nobody matches, where before the older account did. A password still has to match |
+| U-1 | anyone typing a username: password login, `X-Username` and `X-Password`, flask-user's pages | a username containing `_` or `%`, or another case of a stored one | `ILIKE` with `first()`: `john_doe@…` could sign in `john.doe@…` | equality ignoring case, never a pattern. Active accounts are tried first, then the others: within the first group that has any, the exact spelling wins, else its only account, else nobody. So `ANN@` for active `Ann@` and `ann@` matches nobody, where before the older account did, and `dup.shell@` typed for active `Dup.Shell@` and pending `dup.shell@` matches the active one. A password still has to match, and the account must be active (D rows) |
 | U-2 | a user signing in | login, registration, password reset | JWT `identity` is the string typed | the stored `user.username`, plus `user_id` |
-| U-3 | an inviter | inviting an address equal ignoring case to an active account | a second, pending account | 400, nothing created. Re-inviting a pending account in another case reuses it |
-| U-4 | anyone typing a username | an active and a pending account equal ignoring case | `first()` by id, often the pending shell | the active account |
-| U-5 | any signed-in user on `/user/change-username`; a user editor on `PATCH /api2/user/<id>` | a new username equal ignoring case to another account's | the page refused it ("already in use", through flask-user's `ILIKE`, which also refused pattern matches such as `j_hn.doe`); `PATCH` accepted it | both refuse it: the page shows the form again with "already in use"; `PATCH` answers 400 `Another account has this username.` and writes nothing. Only a changed username is checked, so an account of a case-only pair can still be edited, and can submit its own name on the page. The page now accepts pattern-matching look-alikes, which sign in only the renamed account (unit 9) |
-| U-6 | a caller with `reset_password` on a user | `POST /api2/user/<id>/reset_password` on an account with a case-only twin | the reset was looked up again by username, so the link for a pending `dup.shell@` was stored on and mailed to the active `Dup.Shell@` | the account the route authorised gets it |
-| U-7 | an invitee | `POST /api2/authentication/register` for a pending account equal ignoring case to a registered (active or deactivated) one | 200; a second active account, and sessions named by that username could move to it | 400 `Another account has this email address`; nothing written |
-| U-8 | a caller passing Potion's create check on users | `POST /api2/user` with a username equal ignoring case to another account's | 200 or 201; a case-only twin | 400 `Another account has this username.`; nothing written |
+| U-3 | an inviter | inviting an address equal ignoring case to a registered (active or deactivated) account | a second, pending account | 400, nothing created. Re-inviting a pending account in another case reuses it |
+| U-4 | anyone, anonymous | `POST /api2/authentication/forgot_password` | the exact spelling only (case-sensitive), any status | U-1's rule, then active accounts only: `JOHN.DOE@…` now mails `john.doe@…`; a pending or deactivated account answers `non_existent_user` like an unknown one, and a pending invitee's invitation token is no longer replaced |
+| U-5 | any signed-in user on `/user/change-username`; a user editor on `PATCH /api2/user/<id>` | a new username equal ignoring case to another account's | the page refused it ("already in use", through flask-user's `ILIKE`, which also refused pattern matches such as `j_hn.doe`); `PATCH` accepted it | both refuse it: the page shows the form again with "already in use"; `PATCH` answers 400 `Another account has this username.` and writes nothing. Only a changed username is checked, so an account of a case-only pair can still be edited, and can submit its own name on the page. The page now accepts pattern-matching look-alikes, which sign in only the renamed account |
+| U-6 | a user editor | `PATCH /api2/user/<id>` setting a pending or deactivated account active, when a registered account equals its username ignoring case | 200; two registered accounts equal ignoring case | 400 `Another account has this username.`; nothing written |
+| U-7 | a caller passing Potion's create check on users | `POST /api2/user` with a username another account has exactly, or in another case | exactly: 409 (the unique constraint); another case: 200, a case-only twin | 400 `Another account has this username.`; nothing written |
+| U-8 | a caller naming an account as a target: group membership (`PATCH`/`DELETE` on group users), role users, role assignment by username on resources, dashboard and alert transfers | a username that is a pattern, or another case of a stored one | `ILIKE` with `first()` | the exact spelling, whatever its status; else the only account equal ignoring case; else nobody (the route's not-found answer) |
+| R-1 | anyone, anonymous | `POST /api2/authentication/register` with an empty `invite_token`, or the token of an account that is not pending (a forgot-password token, an old invitation of a registered or deactivated account) | 200: the account named by `email` (with the default empty token, any account never reset) gets the caller's password, becomes active, and the caller is signed in as it | 400 `Invalid invitation link`; nothing written |
+| R-2 | an invitee | registering a second time with the same invitation | 200; the password is replaced again | 400 `Invalid invitation link`: the token is cleared when used |
+| R-3 | an invitee | registering a pending account equal ignoring case to a registered (active or deactivated) one | 200; a second registered account | 400 `Another account has this email address`; nothing written. Of two pending twins, the first to register wins |
+| R-4 | the holder of a reset link for a pending account (an admin's reset sent to an invitee) | `POST /api2/authentication/reset_password` | 200: the password is set and the status stays pending (which signed in on `main`, where nothing checked the status) | 200: the password is set and the account becomes active, as registering makes it: an admin's reset to an invitee is their first password. Registering sets nothing else that is stored (its `firstname`/`lastname` attributes are not columns). Refused (400 `invalid_reset_link`, nothing written) when a registered account equals it ignoring case |
+| R-5 | the holder of a reset link for a deactivated account | `POST /api2/authentication/reset_password` | 200: the password is set and the caller is signed in | 400 `invalid_reset_link`; nothing written |
+| R-6 | the holder of any reset token | flask-user's `GET`/`POST /user/reset-password/<token>` (registered in production) | flask-user's own form set the password for an account of any status | 302 to Harmony's reset page with the same token; the page posts to the API, so R-4 and R-5 apply |
 | T-1 | the holder of a session issued by WP-0k | after its account is deleted, or renamed, and another account takes the username | signed in the other account, for up to 365 days | anonymous |
 | T-2 | the holder of an API token | after its account is deleted and the username recreated, with the token's validity cached | 200 as the new account for up to 10 minutes (WP-2b T1) | 401. The row is read on every request: one primary-key lookup |
 | T-3 | the holder of any token | after an account is created, in a later second than the token was issued, with the id or the username the token names | signed in the new account (WP-2b T2 for sessions without `user_id`) | anonymous. See the rule below the table |
-| T-4 | the holder of a session or API token | after the account's username changes in any way, case included | a session or API token kept working across a case-only change (an `ILIKE` lookup), not across a real rename | anonymous after any change: the token names the exact username. A user who renames themselves on the change-username page signs in again; an integration whose account is renamed needs a new API token |
-| T-5 | the holder of a session issued before WP-0k for an account of a case-only pair (both registered) | any request | `ILIKE` with `first()` picked one account of the pair, not necessarily the one that signed in | anonymous: that username can mean either account. The owners sign in again and get a session bound by id |
-| T-6 | the holder of a session issued before WP-0k whose username matches only pending invitations | any request | the pending account | anonymous; a pending account never signed in |
-| D-1 | the owner of a deactivated account | `POST /api2/authentication/login` with the right password | 200 and a new 365-day token | 400 `invalid_login_credentials`, the same body as a wrong password |
-| D-2 | the owner of a deactivated account | any request with `X-Username` and `X-Password` | 200 as the account | anonymous: 401 on API routes, the sign-in page on pages |
-| D-3 | the holder of any token (session, pre-WP-0k session, API token, render token) issued before the account was deactivated | any request | 200 as the account | anonymous, from the next request: there is no validity cache (unit 8) |
-| D-4 | a browser with a flask-login session cookie of a deactivated account | any request | signed in | anonymous |
+| T-4 | the holder of a WP-0k session or an API token | after its account's username changes in any way, case included | an API token kept working across a case-only change (an `ILIKE` lookup), not across a real rename | anonymous: the token names the exact username. A user who renames themselves signs in again; an integration whose account is renamed needs a new API token. A session issued before WP-0k survives a rename its old pattern still matches uniquely (a case-only change, for instance), as before |
+| T-5 | the holder of a session issued before WP-0k | when the username it names, read as the old `ILIKE` pattern, matches two or more accounts that are not pending (a case-only pair, or `john_doe@…` beside `john.doe@…`) | `first()` picked one, not necessarily the one that signed in | anonymous. The owners sign in again and get a session bound by id |
+| T-6 | the holder of a session issued before WP-0k | when its pattern matches only pending accounts | the pending account (nothing checked the status) | anonymous |
+| D-1 | the owner of an account that is not active (deactivated, or pending with a password) | `POST /api2/authentication/login` with the right password | 200 and a new 365-day token | 400 `invalid_login_credentials`, the same body as a wrong password, after the same password check (no timing difference) |
+| D-2 | the same | any request with `X-Username` and `X-Password` | 200 as the account | anonymous: 401 on API routes, the sign-in page on pages |
+| D-3 | the holder of any token (session, pre-WP-0k session, API token, render token) of an account that is no longer active | any request | 200 as the account | anonymous, from the next request: there is no validity cache |
+| D-4 | a browser with a flask-login session cookie of an account that is not active | any request | signed in | anonymous |
+
+Between units 4 and 12 this branch looked the admin reset's account up again by username, which could mail a pending account's link to its active twin; `main` looked it up case-sensitively and was right. Since unit 12 the route mails the account it authorised, as `main` did, so there is no row for it.
 
 T-3 in detail:
 - **Whole seconds.** `iat` has whole seconds, so a token is refused only when `created` is in a later second. A token issued in the same second as the account is accepted.
-- **One time zone, not one clock.** Postgres writes `created` with `current_timestamp()` in the session time zone, as a naive timestamp. The database compares, `created < CAST(to_timestamp(iat + 1) AS TIMESTAMP)`, so both sides are in the time zone current at the check. Tested at UTC, +02:00 and -05:00. If the server's `TimeZone` setting changes, rows written before the change are misread by the difference: a move to a zone further east accepts a token up to the offset before an account's creation, a move west refuses valid tokens for that long. Making `created` a `timestamptz` removes this (request to core).
+- **One time zone, not one clock.** Postgres writes `created` with `current_timestamp()` in the session time zone, as a naive timestamp. The database compares, `created < CAST(to_timestamp(iat + 1) AS TIMESTAMP)`, so both sides are in the time zone current at the check. Tested at UTC, +02:00 and -05:00 (security checked -05:00 and +05:45). If the server's `TimeZone` setting changes, rows written before the change are misread by the difference: a move east accepts a token up to the offset before an account's creation, a move west refuses valid tokens for that long. In a zone with daylight saving, the hour repeated when clocks go back is ambiguous: an account created in it can be read as up to an hour older or younger. Making `created` a `timestamptz` removes both (request to core).
 - **No `created`.** An account with no `created` is not checked against `iat`. Accounts created before migration 853e0e8aa6a0 (2019-09) have none, and so do rows written outside the ORM: the column has an ORM default, not a server default. Every path in `web/` and `scripts/` writes users through the ORM. A server default needs a migration (request to core); without one, a row written by hand or by SQL can be signed into by an older token naming its id or username.
 - **Residual.** A session issued before WP-0k follows its username to an account created before the session and renamed to that username after it (Human acceptance).
 
 ## Human acceptance
 
 Security asks the human to accept:
-- Rows L-1 to L-5, U-1 to U-8, T-1 to T-6 and D-1 to D-4.
-- **Deactivated accounts lose access at once (decision 0010).** Any integration that relies on a deactivated account's API token, or on its `X-Username`/`X-Password`, stops working at deploy. Before deploying, list them with `SELECT username FROM "user" WHERE status_id <> 1 AND id IN (SELECT user_id FROM api_token WHERE NOT is_revoked)` and reactivate or reissue as needed.
+- Rows L-1 to L-5, U-1 to U-8, R-1 to R-6, T-1 to T-6 and D-1 to D-4.
+- **Accounts that are not active lose access at once (decision 0010).** Any integration that relies on a deactivated account's API token, or on its `X-Username`/`X-Password`, stops working at deploy, and so does a pending account that was given a password. Before deploying, list them with `SELECT username, status_id FROM "user" WHERE status_id <> 1 AND (id IN (SELECT user_id FROM api_token WHERE NOT is_revoked) OR password <> '')`, and reactivate or reissue as needed.
+- **Reactivating an account revives every token issued to it before** that has not expired (365-day sessions, 20-year API tokens), since nothing records when an account was deactivated. Revoke an account's API tokens, and rotate `JWT_SECRET_KEY` if its sessions matter, before reactivating it after a compromise.
+- **A reset link activates a pending account (R-4).** An admin's reset sent to an invitee is their first password, as the invitation's registration would be. The alternative, refusing it, breaks onboarding for invitees an admin sent a reset instead of the invitation.
 - **A rename ends the account's sessions and API tokens (T-4)**, a change of case included.
-- **The rename residual of T-3.** `user` records no rename time, so a session issued before WP-0k follows its username to an older account renamed to that username. It ends when the last pre-WP-0k session expires, 365 days after deploy. The alternative is to rotate `JWT_SECRET_KEY` when deploying WP-0k: every pre-WP-0k session and render token ends at once, every user signs in again, and every API token, signed with the same key, must be reissued. Recommended: accept the residual. Renames are rare, and WP-0j refuses renames of accounts holding more than the caller.
+- **The rename residual of T-3.** `user` records no rename time, so a session issued before WP-0k follows its username to an older account renamed to that username. It ends when the last pre-WP-0k session expires, 365 days after deploy. The alternative is to rotate `JWT_SECRET_KEY` when deploying WP-0k: every pre-WP-0k session ends at once, every user signs in again, and every API token, signed with the same key, must be reissued. Recommended: accept the residual. Renames are rare, and WP-0j refuses renames of accounts holding more than the caller.
 - **Accounts with no `created`** (created before 2019-09, or written outside the ORM) are not checked against `iat` (T-3).
-- **The database's `TimeZone` setting must not change** while pre-WP-0k sessions live, or until `created` becomes a `timestamptz` (T-3).
-- **Case-only duplicates.** Accounts equal ignoring case sign in by typed username only with their exact spelling (U-1), and their pre-WP-0k sessions end (T-5). Before deploying, list them with `SELECT lower(username), count(*) FROM "user" GROUP BY 1 HAVING count(*) > 1`, and merge or rename them.
+- **The database's `TimeZone` setting must not change** while pre-WP-0k sessions live, and in a zone with daylight saving an account created in the repeated autumn hour can be misread by up to an hour (T-3), until `created` becomes a `timestamptz`.
+- **Case-only duplicates.** Accounts equal ignoring case sign in by typed username only as U-1 says, and pre-WP-0k sessions that could mean either end (T-5). Before deploying, list them with `SELECT lower(username), count(*) FROM "user" GROUP BY 1 HAVING count(*) > 1`, and merge or rename them.
 
 ## Carried risks
 
-- **WP-5a and later.** The FastAPI `PrincipalDep` must port both C-5 rules, the active-status check and the login refusal, and its login must mint `user_id`.
+- **WP-5a and later.** The FastAPI `PrincipalDep` must port the three C-5 rules, the active-status check and the login refusal, and its login must mint `user_id`.
 - **WP-5d.**
-  - Reset links are still multi-use (SEC-6; WP-0j security C5).
-  - Usernames compare ignoring case but are unique only as stored. Every write path now checks `username_taken` first, but two concurrent writes can still race. A unique index on `lower(username)` closes that; it belongs with the user-model port, after the legacy case-only pairs are merged.
-- **CI does not run the Postgres clock test.** `tests/web/usernames/test_token_clock_postgres.py` is marked `stack` and CI's unit job deselects `stack`, so only the SQLite form of `database_time_from_epoch` runs in CI (request to infra).
+  - Reset links are still multi-use (SEC-6; WP-0j security C5). Invitations are now single-use (R-2).
+  - Usernames compare ignoring case but are unique only as stored. Every write path checks `username_taken` first, but two concurrent writes can still race. A unique index on `lower(username)` closes that; it belongs with the user-model port, after the legacy case-only pairs are merged.
+  - `EMAIL_PATTERN` accepts a username with a trailing newline (security info); use `fullmatch`.
+  - `register_user` sets `firstname`/`lastname`, which are not columns, so registration never stores the names typed.
+  - flask-user's `/user/forgot-password` page is registered but fails (`KeyError`); it still builds a Host-derived link. Remove it with the flask-user views.
+  - `web/server/routes/views/core.py` matches `Resource.name` with `ILIKE`, so `_` in a dashboard name is a wildcard (qa info).
+- **CI does not run the Postgres clock test.** `tests/web/usernames/test_token_clock_postgres.py` is marked `stack`, and CI's unit job deselects `stack` (request to infra).
 - **Unit 1 severity.** Where gunicorn is reachable without nginx-proxy, or behind a proxy forwarding `$http_host`, reset-link poisoning was High before this WP. Behind the stock nginx-proxy it was Low. Closed in the app either way.
 
 ## Requests
 
-- [ ] qa: in this WP's stack, merged with WP-0j as one step, flip WP-2b's pins in `tests/authz/http/test_api_tokens.py` and add three:
+- [ ] qa: in this WP's stack, merged with WP-0j as one step, flip WP-2b's pins in `tests/authz/http/test_api_tokens.py` and add the new ones:
   - (a) T1 `test_used_api_token_of_a_deleted_user_signs_in_as_the_recreated_username`: 200 as the new account today, 401 after, with no timing bound any more;
   - (b) T2 `test_login_token_of_a_deleted_user_signs_in_as_the_recreated_username`: 200 as the new account today, 401 after;
-  - (c) new, T-3: a token minted the pre-WP-0k way (`identity` and the old `user_claims`, no `user_id`) before a delete and recreate signs in the new account today, and nobody after;
-  - (d) new, U-1: a look-alike account (`<x>_doe` beside `<x>.doe`) signing in through `POST /api2/authentication/login` gets the older account today, and its own after;
-  - (e) new, D-1 to D-3: a deactivated account's password login (200 today, 400 `invalid_login_credentials` after), header login and earlier API token (200 today, 401 after).
+  - (c) T-3: a token minted the pre-WP-0k way (`identity` and the old `user_claims`, no `user_id`) before a delete and recreate signs in the new account today, and nobody after;
+  - (d) U-1: a look-alike account (`<x>_doe` beside `<x>.doe`) signing in through `POST /api2/authentication/login` gets the older account today, and its own after;
+  - (e) D-1 to D-3: a deactivated account's password login (200 today, 400 `invalid_login_credentials` after), header login and earlier API token (200 today, 401 after);
+  - (f) R-1: `POST /api2/authentication/register` with `invite_token: ""` and the username of an account never reset: 200 and signed in as it today, 400 after;
+  - the pins qa-0k listed beyond (a) to (e) for qa-0k-pins.
   - The never-used-token control stays 401.
-- [x] lead: `scripts/create_user.py` still looks usernames up with `ILIKE` (`-o john_doe@…` overwrites `john.doe@…`). The change and its check are in `WP-0k-evidence/requests/create_user.md`. Done by the lead on 2026-10-05: the script finds the account with `find_user_by_username` and refuses a username another account equals ignoring case; the two strict xfails became passes (test_account_targets.py 9 passed); ruff and the 3.8 compile clean.
-- [ ] core (optional, not blocking): a migration giving `user.created` a server default, and making it `timestamptz` (`USING created AT TIME ZONE current_setting('TimeZone')`), so rows written outside the ORM are checked and a `TimeZone` change cannot shift T-3. `signal_handlers.database_time_from_epoch` then becomes `to_timestamp(iat)`.
+- [ ] lead: `scripts/create_user.py -o` should name its target by exact spelling (reviewer 7): the change and its test are in `WP-0k-evidence/requests/create_user.md`, section 2. (Section 1, the `ILIKE` lookup, was done in 299c632.)
+- [ ] core (optional, not blocking): a migration giving `user.created` a server default, and making it `timestamptz` (`USING created AT TIME ZONE current_setting('TimeZone')`), so rows written outside the ORM are checked and neither a `TimeZone` change nor daylight saving can shift T-3. `signal_handlers.database_time_from_epoch` then becomes `to_timestamp(iat)`.
 - [ ] infra (optional): run `tests/web/usernames -m stack` in a CI job with docker, or split a `postgres` marker from `stack`.
-- [ ] lead: land WP-0i, then WP-0j and WP-0k together (section "Merging with WP-0j"). The merge applies `WP-0k-evidence/merge-with-0j/privilege_escalation.patch`.
+- [ ] lead: land WP-0j and WP-0k together (section "Merging with WP-0j"). The merge applies `WP-0k-evidence/merge-with-0j/privilege_escalation.patch`.
 
 ## Log
 
@@ -187,6 +232,18 @@ Security asks the human to accept:
 - 2026-10-05 backend-0k unit 14: trial merge of WP-0j b090396 into 73bd66d (scratch worktree, not pushed): the same four conflicts, resolved as in "Merging with WP-0j"; with the harness patch `tests/privilege_escalation` 132 passed, `tests/web` 426 passed, 3 xfailed, mypy no issues in 520 files, 3.8 guard 871 files 0 problems, ruff E9/F63/F7/F82 clean. On this branch: `ci/lint_python.sh mig/integration` clean (51 files formatted), 3.8 guard 867 files 0 problems, `uv run --locked mypy` no issues in 519 files, `ci/pytest_suites.sh` all 8 suites passed (web 414 + 12 `stack` deselected + 3 xfailed), and with docker `tests/web` 426 passed including the Postgres clock test at three zones.
 
 - 2026-10-05 backend-0k unit 14, integration: merged `mig/integration` 298f9d9 (e52c95e; one conflict, the backend memory index, kept every line). `tests/web/test_request_id_logging.py` (from integration) called `login_user` with a username; it now passes an account. Check: `uv run --locked pytest tests/web` 468 passed, 3 xfailed; mypy no issues in 520 files; `ci/lint_python.sh mig/integration` clean (56 files); 3.8 guard 878 files, 0 problems; `ci/pytest_suites.sh`: every suite passes except `tests/authz`, whose 12 errors are WP-2b's render-route pins patching `page_renderer.Transaction`, which WP-0i removed (the same 12 on a scratch merge of WP-0i's head into integration 298f9d9: 4663 passed, 583 skipped, 12 errors; qa flips them with WP-0i).
+- 2026-10-06 backend-0k round 3, integration (qa 1, reviewer 4): merged `mig/integration` bc5cb2d (9037122: WP-0h, WP-2c, WP-0i; conflicts in imports, users.py took integration's `is_revoked.is_(False)`), then 290cd65 (1a64caf, clean) and efc7abd with WP-1h (7dd2930, below). `tests/web/test_api_token_issue.py` failed collection on `check_token_validity`; its three asserts use `api_token_user_id(...)` and its cache fake is gone (15fb173). The WP-0h harness mints tokens for the account (34f3d98); `tests/authz`'s `StandInUser` answers `is_active` (the WP-0k `authentication_required` check). `tests/web/test_request_id_logging.py` and `test_api_token_issue.py` are claimed in the front matter.
+- 2026-10-06 backend-0k round 3, resets (qa 2, reviewer 5, security F3, the lead's commit review of 75f51d4): 75f51d4 moved the status check from `get_user_by_id` to the flask-login loader and made the API reset activate a pending account and refuse a deactivated one; 0e49324 made `may_set_password_from_reset` the one rule, sent flask-user's `/user/reset-password/<token>` to Harmony's page, and made `forgot_password` mail active accounts only; a2d7f28 pins that flask-user's confirm views are not registered. Check: the reset tests (`test_inactive_accounts.py` reset cases, `test_reset_paths.py`) on the code before each commit: 4 failed (`AttributeError`, the 500), then 10 failed (flask-user's view rendered or set the password; `forgot_password` mailed pending and deactivated accounts); all pass after.
+- 2026-10-06 backend-0k round 3, security F1 and reviewer 9 (1b442f7): the deactivated-account refusal runs after `verify_password`. Check: `test_a_deactivated_account_is_refused_after_the_password_check` failed (`[] == [8]`, no password check), passes after.
+- 2026-10-06 backend-0k round 3, qa 6 and reviewer 11 (34f3d98, 0b8da5a, 3e22301): `POST /api2/user` and `PATCH /api2/user/<id>` case refusals pinned through the real Potion routes on the WP-0h harness (`tests/privilege_escalation/test_user_username_case.py`). Check: the create cases fail with the `before_create` receiver disconnected (`assert 200 == 400`), pass with it.
+- 2026-10-06 backend-0k round 3, reviewer Critical and High 2 (73fe97e): registration needs a non-empty token held by a pending account, and clears it. Check: `test_registration.py` on the code before: 4 failed (the empty token set account 1's password; forgot-password tokens registered active and deactivated accounts; the invitation stayed reusable), 1 passed; 5 passed after.
+- 2026-10-06 backend-0k round 3, reviewer High 3 (5283c7b): a pre-WP-0k session signs in only the one non-pending account its old ILIKE pattern matches. Check: 4 `LEGACY_TOKEN_LOOKUPS` cases failed before (`john_doe@`, `John_Doe@` signed in john_doe; `j_hn.doe@` and `jane_doe@` signed in nobody), pass after.
+- 2026-10-06 backend-0k round 3, reviewer High 7 (49face8): `find_named_account` for named targets. Check: 3 failed before (`dup.shell@` named the active twin 10; a deactivated `ann@` named its active twin 5), pass after. The script half is a request to the lead (`requests/create_user.md`, section 2).
+- 2026-10-06 backend-0k round 3, reviewer High 8 (3e22301): a PATCH may not activate one account of a case-only pair. Check: 2 failed before (the pending twin 11 and the deactivated twin 6 were activated), pass after; reactivating an account with no twin still works.
+- 2026-10-06 backend-0k round 3, reviewer 12 (2a3e11e, 086fdd2): return types on the link helpers and `account_for_token`, the dashboard-URL wrapper inlined, narrating comments gone, render paths take the account. WP-1h's renderer replaced the urlbox renderer in 7dd2930, so 086fdd2's renderer half was superseded; WP-1h's `render_token(account, …)` takes the account.
+- 2026-10-06 backend-0k round 3, WP-1h merge (7dd2930, security F2): integration efc7abd merged as WP-1h.md's rule says (nine conflicting files): WP-1h's renderer client without its link helpers, WP-0k's `deployment_links` and `send_email` link, `account_for_token` refuses a spent render token before any lookup and reads the account through `active_account`. Check: `tests/web/usernames/test_render_token_accounts.py` failed before the rule (`assert 8 is None`: a spent render token still signed in), 3 passed after; WP-1h's `tests/web/render/test_render_tokens.py` 24 passed with only `active_account` faked.
+- 2026-10-06 backend-0k round 3, gates on 7dd2930 and the WP-0j trial merge: see Evidence, round 3.
+- 2026-10-06 backend-0k: corrections to earlier log lines. Units 12 and 13: qa-0k found 29 of the 31 "failed before" were failures of behaviour; the other two failed on test setup on that code. U-6 (admin reset of a pending twin) is not a change from `main`; see the note under the INV-3 table.
 
 ## Interrogate (units 6 to 9)
 
@@ -202,7 +259,15 @@ Security asks the human to accept:
 - **Units 2 and 3, live links:** `unit1-nginx-host/probe-after-unit2.md`, `unit3-share-links/probe-after.md`.
 - **Unit 4, live usernames on Postgres:** `unit4-usernames/probe-before.md`, `probe-after.md`, `legacy-cookies-after.md`.
 - **Units 5 to 9, 12, 13, tests:** `tests/web/links`, `tests/web/usernames` (SQLite, plus `test_token_clock_postgres.py` on a throwaway Postgres at three time zones). Each unit's log line gives the counts on the code before it and after it.
-- **Unit 10, merges and gates:** the log line; `merge-with-0j/` holds the harness patch and the resolved conflicts for the WP-0j merge.
+- **Unit 10, merges and gates:** the log line; `merge-with-0j/` holds the harness patch for the WP-0j merge.
+- **Round 3, gates on 7dd2930** (integration efc7abd merged):
+  - `ci/pytest_suites.sh`: all 14 suites passed, including authz (4681 passed, 583 skipped), privilege_escalation (186 passed) and web (606 passed, 12 `stack` deselected, 1 xfailed);
+  - `uv run --locked pytest tests/web` with docker: 606 passed plus the 12 Postgres clock tests;
+  - `ci/lint_python.sh mig/integration` clean (56 files);
+  - 3.8 guard over `config data db log models graphql util web scripts tests/web tests/privilege_escalation`: 891 files, 0 problems;
+  - `uv run --locked mypy`: no issues in 533 files.
+- **Round 3, joint merge with WP-0j 4c89f5f into 7dd2930** (scratch worktree, not pushed): no conflicts. With the harness patch, `tests/privilege_escalation` 172 passed; `tests/web` 603 passed, 3 skipped, 1 xfailed; mypy no issues in 533 files; 3.8 guard 892 files, 0 problems; ruff E9/F63/F7/F82 clean.
+- The joint merge no longer conflicts, so the old `conflicted-files-vs-0j.diff` is removed.
 
 ## Verdicts
 

@@ -11,6 +11,10 @@ Since WP-0k (2026-10-05) a JWT signs in only the account it was issued to (`acco
 - pre-0k sessions get the one non-pending account equal to the identity ignoring case, else nobody;
 - every token: account active, username exactly the identity, `created` not in a later second than `iat`.
 - Fake users in other suites (SimpleNamespace) need `is_active=True` now that `authentication_required` checks it.
+- Pre-0k sessions resolve by the OLD ILIKE pattern, unique among non-pending accounts (not by equality): typing `john_doe` signed in `john.doe`.
+- Sign-in (`find_user_by_username`, active first) and target lookups (`find_named_account`, exact spelling any status) are different rules; never use the sign-in one where a caller names an account.
+- Render tokens (WP-1h `render_token(account, …)`) are refused in `account_for_token` once spent; tests fake only `signal_handlers.active_account`.
+- Test module basenames must be unique across tests/web (rootdir-less import): `tests/web/usernames/test_render_tokens.py` clashed with `tests/web/render/`.
 
 **Why:** WP-2b T1/T2 showed deleted users' tokens signing in recreated usernames.
 

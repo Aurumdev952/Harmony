@@ -97,6 +97,7 @@ None.
 
   `stack.sh stop` left no perf container running and kept the volumes. Status stays `review`; qa and reviewer verdicts are requested for round 2.
 - 2026-10-06 qa-10 unit R3.1 (reviewer round 2, 1): `tests/perf/conftest.py` registers and loads a Hypothesis profile with `deadline=None`, as `tests/contract/test_schema.py` does. Under load, the default 200 ms deadline failed the bootstrap properties at random (DeadlineExceeded, then Flaky), and `tests/perf` is in the CI gate. Check: `test_hypothesis_runs_without_a_deadline` was seen failing first (`timedelta(milliseconds=200) is None`). With the profile, `uv run --locked pytest tests/perf` gives 47 passed at load average 77 (110 s). `ci/pytest_suites.sh` is rerun at the end of round 3.
+- 2026-10-06 qa-10 unit R3.2 (reviewer round 2, 2): `baseline.py` never overwrites a recorded run. `refuse_existing(stem)` exits non-zero ("refusing to overwrite a recorded run (...); pick a new --label, e.g. WP-<id>-rerun1") when any file of the stem exists. It runs in `finish_paired` and `write_results`, and in `run` before any measuring, so a 30-minute run is not lost at the end. A run is now named by its start date. The README's failing-run policy says so. Check: `test_a_rerun_never_overwrites_a_recorded_run` (paired: the five files stay byte-identical) and `test_a_committed_run_never_overwrites_a_recorded_run` were both seen failing first (DID NOT RAISE). The written-run test reran into its own stem and now uses a second label. 49 pass; ruff clean.
 
 ## Evidence
 

@@ -741,7 +741,21 @@ def environment(rounds: int, warmup: int) -> dict[str, Any]:
     return meta
 
 
+def refuse_existing(stem: Path) -> None:
+    """Exit when any file of this run's stem is already written. A failing run
+    stays beside its rerun (decision 0011, item 4), so a rerun on the same
+    day, commits and label must take a new label rather than replace it."""
+    existing = sorted(stem.parent.glob(f'{stem.name}.*'))
+    if existing:
+        names = ', '.join(path.name for path in existing)
+        raise SystemExit(
+            f'refusing to overwrite a recorded run ({names}); '
+            'pick a new --label, e.g. WP-<id>-rerun1'
+        )
+
+
 def write_results(stem: Path, samples: list[PerfSample], meta: dict[str, Any]) -> None:
+    refuse_existing(stem)
     stem.parent.mkdir(parents=True, exist_ok=True)
     stem.with_suffix('.jsonl').write_text(
         ''.join(json.dumps(dataclasses.asdict(s)) + '\n' for s in samples)
@@ -862,6 +876,7 @@ def finish_paired(
     meta: dict[str, Any],
 ) -> int:
     """Write a paired run's files, print the verdicts, return the exit code."""
+    refuse_existing(stem)
     alpha = case_alpha(len(rounds))
     results = [
         paired_result(case_id, reference_ms, candidate_ms, alpha)
@@ -964,6 +979,15 @@ def run(args: argparse.Namespace) -> int:
         )
     if args.dataset:
         meta['dataset'] = args.dataset
+    date = dt.datetime.now(dt.timezone.utc).date().isoformat()
+    if args.mode == 'paired':
+        stem = paired_stem(
+            args.out, date, meta['reference_sha'], meta['candidate_sha'], args.label
+        )
+    else:
+        label = f'-{args.label}' if args.label else ''
+        stem = args.out / f'{date}-{meta["git_sha"][:10]}{label}'
+    refuse_existing(stem)
     names, slugs = split_cases(args.case)
     if args.no_dashboards:
         slugs = []
@@ -1005,11 +1029,7 @@ def run(args: argparse.Namespace) -> int:
     meta['finished_utc'] = dt.datetime.now(dt.timezone.utc).isoformat(
         timespec='seconds'
     )
-    date = dt.datetime.now(dt.timezone.utc).date().isoformat()
     if args.mode == 'paired':
-        stem = paired_stem(
-            args.out, date, meta['reference_sha'], meta['candidate_sha'], args.label
-        )
         rounds = {
             case: (measured, latencies['candidate'][case])
             for case, measured in latencies['reference'].items()
@@ -1017,8 +1037,6 @@ def run(args: argparse.Namespace) -> int:
         return finish_paired(
             stem, samples['reference'], samples['candidate'], rounds, meta
         )
-    label = f'-{args.label}' if args.label else ''
-    stem = args.out / f'{date}-{meta["git_sha"][:10]}{label}'
     base = None
     if args.compare is not None:
         base = Path(args.compare) if args.compare else newest_baseline()

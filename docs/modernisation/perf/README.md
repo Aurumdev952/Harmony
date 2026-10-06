@@ -42,7 +42,7 @@ Under the heaviest synthetic stalls the run still fails more often than 5%: a bo
 
 **When a run fails** (decision 0011, item 4):
 - Commit the failing run's files beside the passing ones. Never replace or delete them.
-- File a rerun next to the failure with its own label (`--label WP-<id>-rerun1`). Do not rerun until one passes and cite only that pass: the record must show every run.
+- File a rerun next to the failure with its own label (`--label WP-<id>-rerun1`). Do not rerun until one passes and cite only that pass: the record must show every run. `baseline.py` refuses, before measuring and again before writing, to reuse the name of a run already on disk (same start date, commits and label).
 - A failure whose ratio is just above 1.10 goes to the reviewer with the per-case detail: both ratios, both bounds, `detects` and the `.rounds.jsonl`. The reviewer may accept it under PERF-7's text when the case's recorded sensitivity (`detects` below 1.10 in this run or in the A/A run) shows the rule fired on a compliant change. A clear failure (a ratio well above 1.10 with its bound above 1) is a regression to fix.
 
 **Absolute numbers.** p50, p95, bytes, Druid time and host load at start and end are recorded as evidence only.

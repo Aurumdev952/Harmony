@@ -421,12 +421,63 @@ def test_a_paired_run_writes_both_sides_and_fails_on_a_clear_regression(
     )
     assert 'load [40.0, 1, 1] at start, [20.0, 1, 1] at end' in text
     slower = {'q': (ms, ms), 'perf-mixed-6': (ms, [v * 1.2 for v in ms])}
+    rerun = baseline.paired_stem(tmp_path, '2026-10-05', 'a' * 40, 'b' * 40, 'aa2')
     assert (
-        baseline.finish_paired(stem, reference, reference, slower, _paired_meta()) == 1
+        baseline.finish_paired(rerun, reference, reference, slower, _paired_meta()) == 1
     )
     out = capsys.readouterr().out
     assert 'REGRESSED (p95, paired median)' in out
     assert 'FAIL: perf-mixed-6' in out
+
+
+def test_a_rerun_never_overwrites_a_recorded_run(tmp_path: Path, capsys):
+    # Decision 0011, item 4: a failing run stays beside its rerun. A rerun on
+    # the same day, commits and label must refuse rather than replace it.
+    stem = baseline.paired_stem(tmp_path, '2026-10-06', 'a' * 40, 'b' * 40, 'WP-1b')
+    ms = [float(v) for v in range(100, 131)]
+    reference = [sample('q', 128.5)]
+    slower = {'q': (ms, [v * 1.2 for v in ms])}
+    assert baseline.finish_paired(stem, reference, reference, slower, _paired_meta())
+    recorded = {
+        path.name: path.read_bytes() for path in stem.parent.glob(f'{stem.name}.*')
+    }
+    assert len(recorded) == 5
+    with pytest.raises(SystemExit) as refused:
+        baseline.finish_paired(
+            stem, reference, reference, {'q': (ms, ms)}, _paired_meta()
+        )
+    assert refused.value.code != 0
+    assert 'pick a new --label, e.g. WP-<id>-rerun1' in str(refused.value.code)
+    assert {
+        path.name: path.read_bytes() for path in stem.parent.glob(f'{stem.name}.*')
+    } == recorded
+
+
+def test_a_committed_run_never_overwrites_a_recorded_run(tmp_path: Path):
+    meta = {
+        'git_sha': 'abc',
+        'git_dirty': False,
+        'started_utc': 'now',
+        'host': {
+            'cpu': 'x',
+            'logical_cpus': 1,
+            'memory_gib': 1,
+            'kernel': 'k',
+            'load_average_at_start': [0],
+        },
+        'method': {
+            'rounds': 30,
+            'warmup_rounds': 3,
+            'concurrency': 1,
+            'interval': 'i',
+            'caches': 'warm',
+        },
+    }
+    baseline.write_results(tmp_path / 'run', [sample('a', 12.5)], meta)
+    before = (tmp_path / 'run.jsonl').read_text()
+    with pytest.raises(SystemExit, match='pick a new --label'):
+        baseline.write_results(tmp_path / 'run', [sample('a', 99.0)], meta)
+    assert (tmp_path / 'run.jsonl').read_text() == before
 
 
 def test_the_error_budget_is_split_over_both_bounds_of_every_case():

@@ -65,12 +65,16 @@ def fixture_tag() -> str:
 @pytest.fixture(name='no_mail')
 def fixture_no_mail(app, monkeypatch):
     '''Creating or sharing a dashboard mails a link to the dashboard page;
-    this app has neither the page blueprint nor a mailer.'''
+    this app has neither the page blueprint nor a mailer. The link comes from
+    `url_for`, or from `deployment_url` once WP-0k lands; whichever name the
+    module has is patched.'''
     for module in ('dashboard_api_models', 'permission_api_models'):
-        monkeypatch.setattr(
-            f'web.server.api.{module}.url_for',
-            lambda *args, **kwargs: 'http://dashboard.invalid/',
-        )
+        for name in ('url_for', 'deployment_url'):
+            monkeypatch.setattr(
+                f'web.server.api.{module}.{name}',
+                lambda *args, **kwargs: 'http://dashboard.invalid/',
+                raising=False,
+            )
     monkeypatch.setattr(app, 'email_renderer', mock.Mock(), raising=False)
     monkeypatch.setattr(app, 'notification_service', mock.Mock(), raising=False)
 
@@ -470,10 +474,88 @@ def test_group_membership_by_username_still_ignores_case(db, make_user, tag):
     assert _member_names(db, group_id) == [member.username]
 
 
+# Unchanged by WP-0l: group, dashboard and resource role names match whatever
+# their case, as usernames do.
+
+
+def test_a_share_names_a_group_whatever_its_case(db, make_user, no_mail, tag):
+    del no_mail
+    dashboard_id = _dashboard(db, f'shared-{tag}')
+    author = make_user()
+    _grant_user(db, author.id, 'dashboard_admin', dashboard_id)
+    group_name = f'Team-{tag}'
+    _group(db, group_name)
+
+    response = author.request(
+        'POST',
+        f'/api2/resource/{dashboard_id}/roles',
+        _share_body(
+            {author.username: ['dashboard_admin']},
+            {group_name.upper(): ['dashboard_viewer']},
+        ),
+    )
+
+    assert response.status_code == 204, response.get_data(as_text=True)[:500]
+    assert _holders(db, dashboard_id) == {
+        author.username: ['dashboard_admin'],
+        f'group:{group_name}': ['dashboard_viewer'],
+    }
+
+
+def test_a_share_names_a_resource_role_whatever_its_case(db, make_user, no_mail, tag):
+    del no_mail
+    dashboard_id = _dashboard(db, f'shared-{tag}')
+    author = make_user()
+    viewer = make_user()
+    _grant_user(db, author.id, 'dashboard_admin', dashboard_id)
+
+    response = author.request(
+        'POST',
+        f'/api2/resource/{dashboard_id}/roles',
+        _share_body(
+            {
+                author.username: ['dashboard_admin'],
+                viewer.username: ['DASHBOARD_VIEWER'],
+            },
+            {},
+        ),
+    )
+
+    assert response.status_code == 204, response.get_data(as_text=True)[:500]
+    assert _holders(db, dashboard_id) == {
+        author.username: ['dashboard_admin'],
+        viewer.username: ['dashboard_viewer'],
+    }
+
+
+@pytest.mark.parametrize('upper', ['dashboard', 'resource role'])
+def test_an_acl_names_a_dashboard_and_resource_role_whatever_their_case(
+    db, make_user, tag, upper
+):
+    admin = make_user(['admin'])
+    group_name = f'grants-{tag}'
+    group_id = _group(db, group_name)
+    dashboard_name = f'mixed-{tag}'
+    dashboard_id = _dashboard(db, dashboard_name)
+    body = _group_acl_body(
+        group_name,
+        [],
+        dashboard_name.upper() if upper == 'dashboard' else dashboard_name,
+        'DASHBOARD_VIEWER' if upper == 'resource role' else 'dashboard_viewer',
+    )
+
+    response = admin.request('PATCH', f'/api2/group/{group_id}', body)
+
+    assert response.status_code == 200, response.get_data(as_text=True)[:500]
+    assert _holders(db, dashboard_id) == {f'group:{group_name}': ['dashboard_viewer']}
+
+
 # Path C: the 403 for an ACL grant repeated the matched dashboard's real name.
 
 
-def _group_acl_body(group_name: str, users, resource_name: str) -> dict:
+def _group_acl_body(
+    group_name: str, users, resource_name: str, role_name: str = 'dashboard_viewer'
+) -> dict:
     return {
         '$uri': '',
         'name': group_name,
@@ -484,7 +566,7 @@ def _group_acl_body(group_name: str, users, resource_name: str) -> dict:
                 '$uri': '',
                 'resourceRole': {
                     '$uri': '',
-                    'name': 'dashboard_viewer',
+                    'name': role_name,
                     'resourceType': 'DASHBOARD',
                 },
                 'resource': {

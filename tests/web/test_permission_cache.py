@@ -9,6 +9,7 @@ account's cached permissions with it until the entry expired.
 import importlib
 import os
 import pkgutil
+import sys
 
 import pytest
 from flask import Flask
@@ -16,10 +17,18 @@ from flask_caching import Cache
 from flask_caching.utils import get_id
 from flask_principal import RoleNeed
 from flask_user import SQLAlchemyAdapter, UserManager
+from redis.exceptions import RedisError
 
 import models.alchemy
 import web.server.security.permissions
-from models.alchemy.permission import Role, SitewideResourceAcl
+from log import LOG
+from models.alchemy.permission import (
+    Resource,
+    ResourceRole,
+    ResourceType,
+    Role,
+    SitewideResourceAcl,
+)
 from models.alchemy.security_group import Group, GroupUsers
 from models.alchemy.user import User, UserAcl, UserRoles, UserStatus, UserStatusEnum
 from web.server.app_db import create_db
@@ -57,7 +66,12 @@ def fixture_app():
     )
 
     with app.app_context():
+        # Every table these rows reference, for when SQLite enforces foreign
+        # keys: web.server.database.setup turns that on once it is imported.
         models_used = [
+            ResourceType,
+            Resource,
+            ResourceRole,
             UserStatus,
             User,
             Role,
@@ -220,3 +234,66 @@ def test_two_live_accounts_never_share_an_entry(app):
     assert _permissions(app, boss) == ADMIN
     assert _permissions(app, eve) == set()
     assert get_id(_load(app, boss)) != get_id(_load(app, eve))
+
+
+def _rename(app, user_id, new_username):
+    user = _load(app, user_id)
+    user.username = new_username
+    _db(app).session.commit()
+
+
+def test_rename_and_delete_in_an_app_without_a_cache(app, monkeypatch):
+    # Scripts on util/local_script_wrapper.py and some test apps have an app
+    # context but no app.cache.
+    boss = _add_user(app, BOSS)
+
+    with monkeypatch.context() as patch:
+        patch.delattr(app, 'cache')
+        _rename(app, boss, 'boss-renamed@example.org')
+        _delete(app, boss)
+
+    assert _load(app, boss) is None
+
+
+def test_a_cache_outage_does_not_fail_the_rename_or_delete(app, monkeypatch):
+    boss = _add_user(app, BOSS)
+    # Nothing listens on port 1, so every cache call raises a ConnectionError.
+    unreachable = Cache(
+        config={'CACHE_TYPE': 'RedisCache', 'CACHE_REDIS_URL': 'redis://127.0.0.1:1/0'}
+    )
+    # Recorded at the call: how LOG's records reach caplog differs by branch.
+    logged = []
+
+    def record(message, *args, **_kwargs):
+        logged.append((message % args, sys.exc_info()[0]))
+
+    with monkeypatch.context() as patch:
+        patch.setitem(app.extensions, 'cache', dict(app.extensions['cache']))
+        unreachable.init_app(app)
+        patch.setattr(app, 'cache', unreachable)
+        patch.setattr(LOG, 'exception', record)
+        _rename(app, boss, 'boss-renamed@example.org')
+        _delete(app, boss)
+
+    assert _load(app, boss) is None
+    # Once for the rename, once for the delete, each inside the except block.
+    message = f'Could not clear the cached permissions of user {boss}'
+    assert [text for text, _ in logged] == [message, message]
+    assert all(issubclass(error, RedisError) for _, error in logged)
+
+
+def test_an_id_used_again_does_not_inherit_rights_cached_after_the_delete(
+    app, monkeypatch
+):
+    boss = _add_user(app, BOSS, admin=True)
+    _delete(app, boss)
+    # A request that read boss between the delete's flush and its commit
+    # caches boss's admin rights after the delete hook has cleared them.
+    with monkeypatch.context() as patch:
+        patch.setattr(User, 'enumerate_permissions', lambda _user, _txn: iter(ADMIN))
+        assert User(id=boss).get_permissions() == ADMIN
+
+    newcomer = _add_user(app, EVE, id=boss)
+
+    assert newcomer == boss
+    assert _permissions(app, newcomer) == set()

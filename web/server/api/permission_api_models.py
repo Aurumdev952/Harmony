@@ -3,6 +3,7 @@
 Resource APIs Accessible via http://<server_uri>:5000/api2/resource
 Role APIs Accessible via http://<server_uri>:5000/api2/role
 '''
+
 # pylint: disable=C0413
 from collections import defaultdict
 from http.client import METHOD_NOT_ALLOWED, NO_CONTENT, NOT_ACCEPTABLE, OK, UNAUTHORIZED
@@ -44,13 +45,13 @@ from web.server.potion.filters import ResourceTypeFilter
 from web.server.potion.managers import RoleResourceManager
 from web.server.potion.signals import after_roles_update
 from web.server.routes.views.authorization import AuthorizedOperation
-from web.server.routes.views.feed import create_dashboard_permission_updates
 from web.server.routes.views.permission import build_role, add_current_user_to_role
 from web.server.routes.views.resource import (
     update_resource_roles,
     get_current_resource_roles,
     update_role_users,
 )
+from web.server.security.permission_cache import clear_permission_cache
 from web.server.security.permissions import SuperUserPermission, principals
 from web.server.util.util import get_resource_string
 
@@ -543,23 +544,14 @@ class RoleResource(PrincipalResource):
         rel='updateUsers',
     )
     def update_users(self, role, usernames):
-        with AuthorizedOperation(
-            'edit_resource', 'role', role.id
-        ), Transaction() as transaction:
-            update_role_users(role, usernames, transaction)
+        with AuthorizedOperation('edit_resource', 'role', role.id):
+            with Transaction() as transaction:
+                affected_users = update_role_users(role, usernames, transaction)
+            # After the commit, so no request caches the old roles again.
+            for user in affected_users:
+                clear_permission_cache(user)
             return StandardResponse('Role usernames has been updated', OK, True)
         return None, UNAUTHORIZED
-
-
-# pylint: disable=W0613
-@after_roles_update.connect
-def invalidate_roles_update(sender, existing_roles, new_roles):
-    users = set(new_roles['userRoles'])
-    cache = current_app.cache
-    for username in users:
-        if cache.has(username):
-            cache.delete(username)
-    g.request_logger.info('Invalidate cache for users %s after updating roles', users)
 
 
 # TODO: Fix typing of this array

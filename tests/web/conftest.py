@@ -6,6 +6,7 @@ from collections.abc import Callable
 import pytest
 from flask import Flask
 
+from tests.flask_isolation import restored_flask_globals
 from tests.throwaway_postgres import (  # noqa: F401
     fixture_postgres_database,
     fixture_postgres_server,
@@ -18,6 +19,14 @@ os.environ.setdefault('DRUID_HOST', 'http://druid.invalid')
 os.environ.setdefault('ZEN_ENV', 'harmony_demo')
 
 _HERE = os.path.dirname(__file__)
+
+
+@pytest.fixture(autouse=True)
+def _no_flask_state_leaks():
+    # Building the full app binds Potion resources to its Api, and some tests leave
+    # an app context pushed; either breaks later tests in the same process.
+    with restored_flask_globals():
+        yield
 
 
 @pytest.fixture(name='bare_flask_app')

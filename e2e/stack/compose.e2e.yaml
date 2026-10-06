@@ -4,8 +4,8 @@
 # - Queries: the mock query client is off and the metadata stub is replaced by
 #   druid_broker.py, so queries take the production Druid client and get
 #   deterministic, Druid-shaped answers.
-# - Dashboard export: URLBOX_API_URL points at renderer.py, a stand-in for
-#   Urlbox that checks the minted cookie opens the dashboard.
+# - Dashboard export: RENDERER_URL points at renderer.py, a stand-in for the
+#   renderer service that checks the render token opens the dashboard.
 # - Data upload: the source tree is mounted read-only, so the upload folder
 #   (uploads/, relative to the working directory) is a tmpfs. run.sh creates
 #   its mount point, which the repository ignores.
@@ -14,8 +14,8 @@
 # directory.
 x-e2e-web-env: &e2e-web-env
   ZEN_OFFLINE: ""
-  URLBOX_API_URL: http://renderer:8000
-  URLBOX_API_KEY: e2e-renderer
+  RENDERER_URL: http://renderer:8080
+  RENDER_WEB_ORIGIN: http://web:5000
 
 services:
   druid-stub:

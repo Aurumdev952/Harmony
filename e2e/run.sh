@@ -20,7 +20,7 @@
 #
 # The stack is WP-2c's tests/contract/stack (internal network, generated
 # secrets, seeded site admin, mail sink) with its Druid stub swapped for a
-# deterministic broker and a stand-in for Urlbox (stack/compose.e2e.yaml),
+# deterministic broker and a stand-in renderer (stack/compose.e2e.yaml),
 # plus one container that serves the production client build where Flask's
 # dev proxy expects webpack.
 #
@@ -36,7 +36,7 @@ ROOT="$(cd "$(dirname "$0")/.." && pwd -P)"
 export CONTRACT_PROJECT="${E2E_PROJECT:-harmony-wp2e-e2e}"
 export CONTRACT_WEB_PORT="${E2E_WEB_PORT:-58670}"
 export CONTRACT_USERNAME="${E2E_USERNAME:-e2e-admin@harmony.invalid}"
-# Real Druid client on a deterministic broker, and a Urlbox stand-in.
+# Real Druid client on a deterministic broker, and a stand-in renderer.
 export CONTRACT_OVERLAYS="${ROOT}/e2e/stack/compose.e2e.yaml"
 STACK="${ROOT}/tests/contract/stack/stack.sh"
 ASSETS="${CONTRACT_PROJECT}-assets"

@@ -1,28 +1,30 @@
-"""A stand-in for Urlbox, the service that renders dashboard PDFs and images.
+"""A stand-in for Harmony's renderer service (harmony/worker/renderer).
 
-Harmony asks Urlbox to load the dashboard as the requesting user (an
-`accessKey` JWT cookie it mints for the purpose) and return the rendered
-file (web/server/routes/views/page_renderer.py). The e2e stack points
-URLBOX_API_URL here. This server does the part a test can check without a
-browser: it loads the dashboard URL with that cookie from inside the stack and
-refuses unless the page answers 200 and does not redirect to sign-in. Then it
-returns a fixed one-page PDF or a 1x1 JPEG. Thumbnails (png) are not
-served: the stack seeds them (tests/contract/stack/seed_cache.py). It does not render anything.
+Harmony posts `{url, format, token, ...}` to the renderer's `POST /render`, and
+the renderer opens the dashboard URL in Chromium with the token as the
+`accessKey` cookie and answers with the file
+(web/server/routes/views/page_renderer.py). The e2e stack points RENDERER_URL
+here. This server does the part a test can check without a browser: it loads
+the URL with that cookie from inside the stack and refuses unless the page
+answers 200 rather than redirecting to sign-in. Then it returns a fixed
+one-page PDF or a 1x1 JPEG. It renders nothing, and it does not do thumbnails
+(png): those fail with an error code, as a real renderer failure would.
 
-  GET /v1/<api key>/<pdf|jpg>?url=...&cookie=accessKey=...
+  POST /render   {"url": "http://web:5000/...", "format": "pdf"|"jpeg", "token": ...}
+                 -> 200 with the file, else {"error": "<code>"} like the renderer
 """
 
 from __future__ import annotations
 
 import base64
+import json
 import sys
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from urllib.error import HTTPError
-from urllib.parse import parse_qs, urlsplit, urlunsplit
+from urllib.parse import urlsplit, urlunsplit
 from urllib.request import HTTPRedirectHandler, Request, build_opener
 
-# Harmony builds the dashboard URL from the browser's Host header (the
-# loopback forward); inside the stack the web service answers on web:5000.
+# RENDER_WEB_ORIGIN in the web app: the only origin this stand-in loads.
 WEB = "web:5000"
 
 PDF = (
@@ -45,7 +47,7 @@ JPEG = base64.b64decode(
     "hYaHiImKkpOUlZaXmJmaoqOkpaanqKmqsrO0tba3uLm6wsPExcbHyMnK0tPU1dbX2Nna4uPk5ebn6Onq"
     "8vP09fb3+Pn6/9oADAMBAAIRAxEAPwD0CiiigD//2Q=="
 )
-BODIES = {"pdf": (PDF, "application/pdf"), "jpg": (JPEG, "image/jpeg")}
+BODIES = {"pdf": (PDF, "application/pdf"), "jpeg": (JPEG, "image/jpeg")}
 
 
 class _NoRedirect(HTTPRedirectHandler):
@@ -53,11 +55,13 @@ class _NoRedirect(HTTPRedirectHandler):
         return None
 
 
-def load_as_user(url: str, cookie: str) -> int:
+def load_as_user(url: str, token: str) -> int:
     parts = urlsplit(url)
+    if (parts.scheme, parts.netloc) != ("http", WEB):
+        return 0
     inside = urlunsplit(("http", WEB, parts.path, parts.query, ""))
-    # The scheme and host are fixed above; only the path comes from the caller.
-    request = Request(inside, headers={"Cookie": cookie})  # noqa: S310
+    # The scheme and host are checked above; only the path comes from the caller.
+    request = Request(inside, headers={"Cookie": f"accessKey={token}"})  # noqa: S310
     try:
         with build_opener(_NoRedirect).open(request, timeout=30) as response:
             return response.status
@@ -73,32 +77,32 @@ class Handler(BaseHTTPRequestHandler):
         self.end_headers()
         self.wfile.write(body)
 
-    def do_GET(self) -> None:
-        parts = urlsplit(self.path)
-        output_format = parts.path.rstrip("/").rsplit("/", 1)[-1]
-        params = {k: v[0] for k, v in parse_qs(parts.query).items()}
-        if output_format not in BODIES or "url" not in params:
-            self._send(
-                400, b"e2e renderer: need /v1/<key>/<pdf|jpg>?url=", "text/plain"
-            )
+    def _error(self, status: int, code: str) -> None:
+        self._send(status, json.dumps({"error": code}).encode(), "application/json")
+
+    def do_POST(self) -> None:
+        if self.path != "/render":
+            self._error(404, "not_found")
             return
-        status = load_as_user(params["url"], params.get("cookie", ""))
+        length = int(self.headers.get("Content-Length", "0"))
+        spec = json.loads(self.rfile.read(length) or b"{}")
+        output_format = spec.get("format")
+        if output_format not in BODIES or not spec.get("url") or not spec.get("token"):
+            self._error(400, "unsupported_request")
+            return
+        status = load_as_user(spec["url"], spec["token"])
         if status != 200:
-            message = (
-                f"e2e renderer: dashboard answered HTTP {status} to the minted cookie"
-            )
-            self._send(502, message.encode(), "text/plain")
+            sys.stderr.write(f"e2e-renderer: dashboard answered HTTP {status}\n")
+            self._error(502, "page_refused")
             return
         self._send(200, *BODIES[output_format])
 
     def log_request(self, code: int | str = "-", size: int | str = "-") -> None:
-        # The query string carries the minted session cookie; log the path only.
-        sys.stderr.write(
-            f"e2e-renderer {self.command} {urlsplit(self.path).path} {code}\n"
-        )
+        # The body carries the render token; log the path only.
+        sys.stderr.write(f"e2e-renderer {self.command} {self.path} {code}\n")
 
 
 if __name__ == "__main__":
     # All interfaces of the container, which sits on the stack's internal
-    # network only; nothing publishes this port.
-    ThreadingHTTPServer(("0.0.0.0", 8000), Handler).serve_forever()  # noqa: S104
+    # network only; nothing publishes this port. 8080 is RENDERER_URL's default.
+    ThreadingHTTPServer(("0.0.0.0", 8080), Handler).serve_forever()  # noqa: S104

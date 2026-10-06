@@ -1,7 +1,7 @@
 ---
 wp: "2e"
 title: "Frontend unit and end-to-end harness"
-status: review
+status: ready
 owner_role: "qa"
 instances:
   - name: "qa-5"
@@ -132,6 +132,7 @@ None of these block WP-2e.
   - It refuses with `{"error": "page_refused"}` unless the page answers 200, and with `unsupported_request` for png thumbnails.
   - It answers on port 8080, and the overlay sets `RENDERER_URL` and `RENDER_WEB_ORIGIN` instead of the `URLBOX_*` variables.
   Check: `--grep @dashboard` passes 7. From inside the stack, a bogus token gets `502 page_refused`, a foreign origin gets `502 page_refused`, and png gets `400 unsupported_request`. ruff, format and the 3.8 guard are clean on `e2e/stack`.
+- 2026-10-06 qa-5t: all verdicts approved (reviewer at 1af10d6, QA re-check at b54fb17). After the Low and Nit fixes, the merge with `mig/integration` (fa4a13f6) and the renderer stand-in, the full suite from a clean archive of 6d6abaea is green. Status set to ready.
 
 ## Evidence
 
@@ -183,6 +184,9 @@ None of these block WP-2e.
   - a11y update mode, against the stack, with `admin.aria-command-name` removed from the baseline and `admin-roles.color-contrast` raised by 1. Old spec: admin failed, admin-roles "did not run" and kept 95. New spec: both ran, admin-roles shrank to 94, and the run failed once on `admin: aria-command-name 0 -> 1` (`/tmp/wp2e-a11y-refusal-old.log`, `/tmp/wp2e-a11y-refusal-new.log`).
   - Service workers: with `serviceWorkers: 'allow'` the new guard case fails, because the browser fetched and evaluated the script ("ServiceWorker script evaluation failed"). With `'block'` the registration resolves to `undefined` and the case passes.
   - Then on one stack, in order: `run.sh visual` 71 passed, `run.sh a11y` 26 passed, and `run.sh e2e` 78 passed (the 77 plus the service-worker case). Strict tsc and shellcheck are clean.
+- Ready check, from a `git archive` of 6d6abaea, the merge with `mig/integration` fa4a13f6 plus the renderer stand-in (`/tmp/wp2e-final-run.log`). `yarn e2e` built the client in the Node 18.17 image, then passed visual 71, a11y 26 and e2e 80 (the 78, plus the counted-allowance case and the service-worker positive control), exit 0. Afterwards: 0 containers, and nothing for the project in `/run/user/1000` or `/tmp`.
+  - In the same checkout, `yarn test` in `node:18.17.1 --network none` passed 342 with 1 todo.
+  - At the head: strict `tsc` (TypeScript 6.0.3) is clean; shellcheck is clean; `eslint --max-warnings 0 tests/frontend` is clean; `ci/lint_python.sh mig/integration` is clean; the 3.8 guard reports 0 problems in `tests/golden` and `e2e/stack`; `pytest tests/golden` passes 272; `record.py --check` reports 86 cases and 0 fixture files changed.
 
 ## Verdicts
 

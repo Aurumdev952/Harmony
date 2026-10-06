@@ -40,6 +40,15 @@ instances:
       - web/server/util/data_catalog.py
       - web/server/util/util.py
       - tests/web/test_collections_abc_call_paths.py
+  # Supporting role, on mig/WP-3b-cpython-313-qa (merged at 45291b6).
+  - name: "qa-1"
+    files:
+      - tests/contract/stack/compose.yaml
+      - tests/contract/stack/init.sh
+      - tests/contract/stack/stack.sh
+      - tests/contract/test_stack_image_tag.py
+      - tests/golden/README.md
+      - tests/golden/harness.py
 branch: "mig/WP-3b-cpython-313"
 requirements: [INV-1, INV-2, INV-8, SEC-9, QA-4]
 contracts_consumed: []

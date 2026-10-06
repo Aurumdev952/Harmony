@@ -1,0 +1,31 @@
+................................................................F....... [ 30%]
+.................................F...................................... [ 61%]
+........................................................................ [ 92%]
+..............F...                                                       [100%]
+=================================== FAILURES ===================================
+___________ test_replay_matches_recording[user.update_roles.assign] ____________
+tests/contract/test_replay.py:25: in test_replay_matches_recording
+    assert compare(recorded, observed) == []
+E   assert ['status 500 ...key 'status'"] == []
+E     
+E     Left contains 5 more items, first extra item: 'status 500 != 400'
+E     Use -v to get more diff
+_________ test_replay_matches_recording[storage.retrieve.unknown_slug] _________
+tests/contract/test_replay.py:25: in test_replay_matches_recording
+    assert compare(recorded, observed) == []
+E   assert ['status 500 ...key 'status'"] == []
+E     
+E     Left contains 5 more items, first extra item: 'status 500 != 404'
+E     Use -v to get more diff
+___________ test_replay_matches_recording[group.update_roles.assign] ___________
+tests/contract/test_replay.py:25: in test_replay_matches_recording
+    assert compare(recorded, observed) == []
+E   assert ['status 500 ...key 'status'"] == []
+E     
+E     Left contains 5 more items, first extra item: 'status 500 != 400'
+E     Use -v to get more diff
+=========================== short test summary info ============================
+FAILED tests/contract/test_replay.py::test_replay_matches_recording[user.update_roles.assign]
+FAILED tests/contract/test_replay.py::test_replay_matches_recording[storage.retrieve.unknown_slug]
+FAILED tests/contract/test_replay.py::test_replay_matches_recording[group.update_roles.assign]
+3 failed, 231 passed in 40.16s

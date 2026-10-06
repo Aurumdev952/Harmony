@@ -32,6 +32,7 @@ case "${1:-}" in
     echo "export AUTHZ_BASE_URL=${CONTRACT_BASE_URL}"
     echo "export AUTHZ_ADMIN_USERNAME=${CONTRACT_USERNAME}"
     echo "export AUTHZ_CREDENTIALS_FILE=${CONTRACT_CREDENTIALS_FILE}"
+    echo "export AUTHZ_PROJECT=${CONTRACT_PROJECT}"
     ;;
   *)
     echo "usage: $0 up|down|logs [service]|env" >&2

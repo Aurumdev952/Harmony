@@ -116,9 +116,63 @@ def test_no_tooling_config_mentions_pypy():
         assert "pypy" not in code(REPO / name), name
 
 
+# pip, pip3 and pip3.13, with or without `python -m`.
+PIP_INSTALL = re.compile(r"\bpip(?:\d+(?:\.\d+)?)?\s+install\b[^\n]*")
+UV_PYTHON_INSTALL = re.compile(r"\buv\s+python\s+install\s+(\S+)")
+
+
+def pip_installs(body: str) -> list[str]:
+    return PIP_INSTALL.findall(body)
+
+
+def foreign_uv_pythons(body: str, release: str) -> list[str]:
+    """Every `uv python install` that names something other than `release`."""
+    return [v for v in UV_PYTHON_INSTALL.findall(body) if v != release]
+
+
+def lock_release() -> str:
+    (version,) = {
+        interpreter(rel(p)) for p in DOCKERFILES if rel(p) not in EXCEPTIONS
+    } - {None}
+    return version
+
+
+@pytest.mark.parametrize(
+    "line",
+    [
+        "RUN pip install foo",
+        "RUN pip3 install foo",
+        "RUN pip3.13 install foo",
+        "RUN python -m pip install foo",
+        "RUN python3 -m pip3 install --user foo",
+    ],
+)
+def test_every_pip_spelling_counts_as_a_pip_install(line):
+    assert pip_installs(line.lower()) != []
+
+
+@pytest.mark.parametrize(
+    ("line", "foreign"),
+    [
+        ("RUN uv python install 3.13.16", []),
+        ("RUN uv python install 3.12.9", ["3.12.9"]),
+        ("RUN uv python install 3.13", ["3.13"]),
+        ("RUN uv  python  install pypy@3.10", ["pypy@3.10"]),
+    ],
+)
+def test_a_uv_python_install_must_name_the_lock_release(line, foreign):
+    assert foreign_uv_pythons(line, "3.13.16") == foreign
+
+
+def test_no_dockerfile_installs_another_python_with_uv():
+    release = lock_release()
+    for path in DOCKERFILES:
+        assert foreign_uv_pythons(code(path), release) == [], path
+
+
 def test_only_the_renderer_installs_with_pip_and_only_by_hash():
     for path in [*DOCKERFILES, *REPO.glob("docker-compose*.yaml")]:
-        installs = re.findall(r"pip install[^\n]*", code(path))
+        installs = pip_installs(code(path))
         if rel(path) in EXCEPTIONS:
             assert installs, path
             assert all("--require-hashes" in i and "--no-deps" in i for i in installs)

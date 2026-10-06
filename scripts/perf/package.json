@@ -1,0 +1,9 @@
+{
+  "name": "harmony-perf",
+  "private": true,
+  "type": "module",
+  "description": "Browser measurements for the WP-1a performance baseline (dashboards.mjs).",
+  "dependencies": {
+    "playwright": "1.56.1"
+  }
+}

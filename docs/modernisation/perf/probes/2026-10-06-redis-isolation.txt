@@ -1,0 +1,3 @@
+redis-reference has the key: True
+redis has the key: False
+redis-reference has the key: True

@@ -2,7 +2,6 @@ import gzip
 import json
 import logging
 import os
-import ijson
 
 from abc import ABC, abstractmethod
 from typing import Dict, Any
@@ -10,6 +9,7 @@ from typing import Dict, Any
 import requests
 
 from db.druid.errors import DruidQueryError
+from db.druid.json_stream import iter_json_array
 from log import LOG
 from util.druid import get_druid_request_params
 from web.server.util.error_links import get_error_background_link_msg
@@ -162,7 +162,7 @@ class DruidQueryClient_(DruidQueryRunner):
                 if r.headers.get('Content-Encoding', '') == 'gzip'
                 else r.raw
             )
-            return ijson.items(fp, 'item', use_float=True)
+            return iter_json_array(fp)
 
         ret = r.json()
         if LOG.level <= logging.DEBUG and os.getenv('LOG_DRUID_RESPONSES'):
@@ -230,7 +230,7 @@ class DruidQueryClient(DruidQueryRunner):
                 if r.headers.get('Content-Encoding', '') == 'gzip'
                 else r.raw
             )
-            return ijson.items(fp, 'item', use_float=True)
+            return iter_json_array(fp)
         return r.json()
 
     @classmethod

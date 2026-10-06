@@ -1,0 +1,27 @@
+{
+  "content_type": "application/json",
+  "headers": [],
+  "id": "group.update_users",
+  "pinned": {},
+  "response_schema": {
+    "properties": {
+      "code": {
+        "type": "integer"
+      },
+      "message": {
+        "type": "string"
+      },
+      "success": {
+        "type": "boolean"
+      }
+    },
+    "required": [
+      "code",
+      "message",
+      "success"
+    ],
+    "type": "object"
+  },
+  "route": "PATCH /api2/group/<id>/users",
+  "status": 200
+}

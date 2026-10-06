@@ -5,24 +5,10 @@ from datetime import datetime
 
 from log import LOG
 
-# When we are running inside PyPy, we can use the optimized StringBuilder type to
-# help serialize JSON.
-try:
-    from __pypy__.builders import StringBuilder
-    from _pypyjson import raw_encode_basestring_ascii
-except ImportError:
-    StringBuilder = None
 
-    # NOTE: This is the equivalent function in CPython. Since we do not expect
-    # the DruidWriter to be used very often with CPython, it is ok to have this
-    # unoptimized function which slices the string after it is converted to remove the
-    # enclosing quotes.
-    raw_encode_basestring_ascii = lambda s: json.encoder.encode_basestring_ascii(s)[
-        1:-1
-    ]
-
-INFINITY = float('inf')
-NAN = float('nan')
+def raw_encode_basestring_ascii(value: str) -> str:
+    '''JSON-escape a string as ASCII, without the enclosing quotes.'''
+    return json.encoder.encode_basestring_ascii(value)[1:-1]
 
 
 class RowMetaData:
@@ -65,27 +51,32 @@ class ErrorHandler:
         self.failed_matches = defaultdict(int)
 
     def missing_date(self, input_row_str):
-        assert (
-            self.allow_missing_date
-        ), f'All output rows must have a date! Input row: {input_row_str}'
+        if not self.allow_missing_date:
+            raise AssertionError(
+                f'All output rows must have a date! Input row: {input_row_str}'
+            )
         self.missing_date_count += 1
 
     def empty_data(self, input_row_str):
-        assert self.allow_empty_data, (
-            'All input rows must have a non-empty data field! '
-            'Input row: %s' % input_row_str
-        )
+        if not self.allow_empty_data:
+            raise AssertionError(
+                'All input rows must have a non-empty data field! '
+                'Input row: %s' % input_row_str
+            )
         self.empty_data_count += 1
 
     def missing_canonical_match(
         self, input_dimensions, input_row_str, track_failed_matches=True
     ):
-        assert (
-            self.allow_missing_canonical_match
-        ), 'Canonical matching failed for row. ' 'Dimensions: %s\nInput row: %s' % (
-            input_dimensions,
-            input_row_str,
-        )
+        if not self.allow_missing_canonical_match:
+            raise AssertionError(
+                'Canonical matching failed for row. '
+                'Dimensions: %s\nInput row: %s'
+                % (
+                    input_dimensions,
+                    input_row_str,
+                )
+            )
         # NOTE: Multi value dimensions are lists, which cannot be hashed.
         # Convert them to a sorted tuple as the list order doesn't matter.
         key = frozenset(
@@ -113,7 +104,7 @@ class ErrorHandler:
             for key, value in self.failed_matches.items():
                 lines.append(f'{dict(key)}\t{value}')
             LOG.info(
-                'Canonical mapping is missing for these dimension ' 'combinations:\n%s',
+                'Canonical mapping is missing for these dimension combinations:\n%s',
                 '\n'.join(lines),
             )
 
@@ -315,6 +306,7 @@ class Parser:
 
 DATA_MARKER = '"data": {'
 
+
 # Build a minimal BaseRow for the given json string by extracting the raw data
 # and storing it separately. Return both the full row object and the raw data
 # string.
@@ -329,55 +321,8 @@ def parse_row_optimized(row_str, deserialize_fn):
 
 def serialize_dimension_mapping(mapping):
     '''Build a "key": "value" JSON serialized mapping. The returned string can be used
-    inside a JSON object.
-
-    Optimization: We know that the dimension mapping should only be a Dict[str, str], so
-    we can optimize how this string is built. To be safe, we will fallback when other
-    values are encountered.
-
-    NOTE: This is a super optimized version of PyPy's
-    JSONEncoder.__encode_dict. It only is beneficial when PyPy is being used.
-    '''
-    # Safeguard check in case this method was run inside CPython.
-    if not StringBuilder:
-        return json.dumps(mapping)[1:-1]
-
-    builder = StringBuilder()
-    first = True
-    for key, value in mapping.items():
-        # Add the separator at the end of the last key/value pair.
-        if not first:
-            builder.append(', ')
-        first = False
-
-        # Add the key to the string.
-        builder.append('"')
-        builder.append(raw_encode_basestring_ascii(key))
-        builder.append('": ')
-
-        if isinstance(value, str):
-            builder.append('"')
-            builder.append(raw_encode_basestring_ascii(value))
-            builder.append('"')
-        elif isinstance(value, int):
-            builder.append(int.__str__(key))
-        elif isinstance(value, float):
-            # Disallow NaN, Infinity, and -Infinity since those indicate the pipeline
-            # is not producing valid data and should be reviewed.
-            assert value not in (
-                NAN,
-                INFINITY,
-                -INFINITY,
-            ), f'Bad float value passed: {value}'
-            builder.append(float.__repr__(value))
-        else:
-            # Multi value dimensions are type lists so avoid printing error logs
-            if not isinstance(value, list):
-                LOG.error(
-                    'Unexpected dimension value found. Key: %s, Value: %s', key, value
-                )
-            builder.append(json.dumps(value))
-    return builder.build()
+    inside a JSON object.'''
+    return json.dumps(mapping)[1:-1]
 
 
 # Take a row that is ready for output and add the raw data object back in. Write

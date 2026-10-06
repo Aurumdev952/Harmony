@@ -1,0 +1,9 @@
+{
+  "content_type": "application/json",
+  "headers": [],
+  "id": "pipeline_run_metadata.delete.yellow_fever",
+  "pinned": {},
+  "response_schema": null,
+  "route": "DELETE /api2/pipeline_run_metadata/<id>",
+  "status": 204
+}

@@ -1,0 +1,51 @@
+# WP-3b unit 3: run the built web image as web and worker against a throwaway stack.
+# Postgres and a Druid stub join; nginx and the ACME companion stay off; nothing is
+# published; data lives in tmpfs or under /tmp/wp3b/stack/data.
+services:
+  nginx:
+    profiles: [donotstart]
+  nginx-letsencrypt-companion:
+    profiles: [donotstart]
+  postgres:
+    image: postgres:15.19-alpine@sha256:f7d23353e1b15400d22ebe31189f4d314b87a4c129cc400c8c2d8d4ca127bf81
+    environment:
+      POSTGRES_PASSWORD: scratch
+      POSTGRES_DB: zenysis
+    tmpfs: [/var/lib/postgresql/data]
+    healthcheck:
+      test: [CMD-SHELL, pg_isready -U postgres -d zenysis]
+      interval: 2s
+      retries: 30
+  druid:
+    image: python:3.13.16-slim-bookworm@sha256:5024f48ba9441d4b13a95d3945abc6365538e3a31109833367a1923523c6efed
+    command: [python, -u, /stub.py]
+    volumes:
+      - ${STACK_DIR}/druid_stub.py:/stub.py:ro
+  redis:
+    volumes: !reset []
+    tmpfs: [/data]
+  hasura:
+    depends_on:
+      postgres:
+        condition: service_healthy
+  web:
+    pull_policy: never
+    # The Druid stub answers metadata only; offline mode serves queries from mocks.
+    environment:
+      - ZEN_OFFLINE=1
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      hasura:
+        condition: service_healthy
+      druid:
+        condition: service_started
+  worker:
+    pull_policy: never
+    environment:
+      - ZEN_OFFLINE=1
+    depends_on:
+      web:
+        condition: service_healthy

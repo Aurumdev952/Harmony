@@ -1,5 +1,9 @@
-''' Handle initialization and setup of the flask app and all its dependencies.
-'''
+'''Handle initialization and setup of the flask app and all its dependencies.'''
+
+# First, so logging is configured and warnings are captured before any other
+# import can print one.
+from log import LOG
+
 from datetime import datetime
 import queue
 from typing import Optional
@@ -10,7 +14,7 @@ from flask_jwt_extended import JWTManager
 from flask_potion import Api
 from flask_principal import Principal
 from werkzeug.serving import is_running_from_reloader
-from log import LOG
+from log.flask_request import install_request_logging
 
 from data.query.mock import generate_web_query_mock_data
 from models.alchemy.query import DruidDatasource
@@ -18,7 +22,10 @@ from web.server.api_setup import initialize_api_models
 from web.server.app_base import create_app_base, initialize_zenysis_module
 from web.server.app_cache import initialize_cache
 from web.server.app_druid import initialize_druid_context
-from web.server.configuration.flask import FlaskConfiguration
+from web.server.configuration.flask import (
+    FlaskConfiguration,
+    require_jwt_secret_key,
+)
 from web.server.data.data_access import Transaction
 from web.server.database.setup import (
     initialize_user_manager,
@@ -26,6 +33,7 @@ from web.server.database.setup import (
 )
 from web.server.errors.error_handlers import register_for_error_events
 from web.server.migrations.util import RevisionStatus
+from web.server.routes.views.page_renderer import deployment_origin
 from web.server.routes.views.query_policy import AuthorizedQueryClient
 from web.server.security.signal_handlers import register_for_signals
 from web.server.util.template_renderer import (
@@ -58,7 +66,6 @@ def _register_routes(app, register_webpack_proxy=False):
     from web.server.routes.embedded_query import EmbeddedQueryPageRouter
     from web.server.routes.index import PageRouter
     from web.server.routes.page_renderer import PageRendererRouter
-    from web.server.routes.graphql_api import GraphqlPageRouter
     from web.server.routes.user_authentication import UserAuthenticationRouter
     from web.server.routes.util import ListConverter
     from web.server.routes.webpack_dev_proxy import webpack_dev_proxy
@@ -80,7 +87,6 @@ def _register_routes(app, register_webpack_proxy=False):
     embedded_query_router = EmbeddedQueryPageRouter(template_renderer, default_locale)
     api_router = ApiRouter(template_renderer, app.zen_config)
     page_renderer_router = PageRendererRouter()
-    graphql_api_router = GraphqlPageRouter()
     user_authentication_router = UserAuthenticationRouter(
         template_renderer, default_locale
     )
@@ -91,7 +97,6 @@ def _register_routes(app, register_webpack_proxy=False):
     app.register_blueprint(embedded_query_router.generate_blueprint())
     app.register_blueprint(api_router.generate_blueprint())
     app.register_blueprint(page_renderer_router.generate_blueprint())
-    app.register_blueprint(graphql_api_router.generate_blueprint())
     app.register_blueprint(main_page_router.generate_blueprint())
     app.register_blueprint(user_authentication_router.generate_blueprint())
     app.page_router = main_page_router
@@ -204,6 +209,9 @@ def _create_app_internal(
     ):
         # NOTE: Not sure if this is the best way to accomplish this but it will at least
         # prevent errors from being thrown during server start.
+        # Refuses to start on an unusable JWT key, so it runs before slow setup.
+        initialize_jwt_manager(app)
+        validate_deployment_base_url(app)
         # NOTE: Initializing database seed values before app setup
         # so that if new database values are added, app setup won't error.
         initialize_database_seed_values(flask_config.SQLALCHEMY_DATABASE_URI)
@@ -220,7 +228,6 @@ def _create_app_internal(
             _initialize_query_data(app)
             _initialize_celery(app, instance_configuration)
             _initialize_notification_service(app, instance_configuration)
-            initialize_jwt_manager(app)
             _initialize_app(app, db, is_production)
 
     # NOTE: The last thing we need to do when bootstrapping our app is
@@ -297,7 +304,15 @@ def _initialize_notification_service(app, _instance_configuration):
 
 
 def initialize_jwt_manager(app):
+    # flask-jwt-extended signs with SECRET_KEY when JWT_SECRET_KEY is empty, so the
+    # key is set here, checked, before the manager can issue a token.
+    app.config['JWT_SECRET_KEY'] = require_jwt_secret_key(app.config['SECRET_KEY'])
     JWTManager(app)
+
+
+def validate_deployment_base_url(app):
+    # Renders send minted tokens, and emails send links, to this origin.
+    deployment_origin(app.zen_config.general.DEPLOYMENT_BASE_URL)
 
 
 def create_app(
@@ -322,4 +337,6 @@ def create_app(
     app = _create_app_internal(
         flask_config, instance_config, skip_db_check, force_druid_db_update
     )
+    # Last, so the request id middleware wraps every other wsgi_app wrapper.
+    install_request_logging(app)
     return app

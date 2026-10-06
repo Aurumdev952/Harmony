@@ -1,0 +1,26 @@
+# WP-3b unit 5: the dev overlay with this branch's dev image, nothing published,
+# Postgres and Redis in tmpfs, and the WP-2c Druid stub.
+services:
+  postgres:
+    ports: !override []
+    volumes: !reset []
+    tmpfs: [/var/lib/postgresql/data]
+  redis:
+    ports: !override []
+    volumes: !reset []
+    tmpfs: [/data]
+  druid:
+    image: python:3.13.16-slim-bookworm@sha256:5024f48ba9441d4b13a95d3945abc6365538e3a31109833367a1923523c6efed
+    command: [python, -u, /stub.py]
+    volumes:
+      - ${STACK_DIR}/druid_stub.py:/stub.py:ro
+  web:
+    image: local/wp3b-infra3/harmony-dev-web:u5
+    pull_policy: never
+    ports: !override []
+    environment:
+      ZEN_OFFLINE: "1"
+      DRUID_HOST: http://druid
+    depends_on:
+      druid:
+        condition: service_started

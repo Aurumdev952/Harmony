@@ -11,7 +11,7 @@ from web.server.routes.views.query_policy import AuthorizedQueryClient
 
 
 def rewrite_hierarchy_groups(
-    groups: List[Union[GroupingDimension, GroupingGranularity]]
+    groups: List[Union[GroupingDimension, GroupingGranularity]],
 ) -> List[Union[GroupingDimension, GroupingGranularity]]:
     '''Convert the groups sent by the frontend into a version that will allow
     subtotals to be calculated for all group levels. Without conversion, there
@@ -214,7 +214,7 @@ class HierarchyVisualization(QueryBase):
             .reset_index()
             # Sort the results by level then original sort order.
             .sort_values(['level_idx', 'index'])
-            .drop('index', 'columns')
+            .drop(columns='index')
             .set_index('key')
         )
 

@@ -8,7 +8,7 @@ Back to [overview](overview.md). Evidence: [02-architecture-deep-dive.md](02-arc
 
 - **Changes.** Add `scripts/perf/baseline.py`. It replays a fixed set of `QueryRequest` payloads against `/api2/query/*` and records p50 and p95 latency, response bytes and Druid time. Add a Playwright script that loads three reference dashboards and records time to last tile and bytes transferred.
 - **Data structure.** `PerfSample = {case_id, endpoint, p50_ms, p95_ms, bytes, druid_ms}`, written as JSON lines to `docs/modernisation/perf/`.
-- **Verification.** Two consecutive runs agree within 10%. The baseline file is committed.
+- **Verification.** An A/A paired run passes on the development host (decision 0011); the absolute baseline is recorded when a quiet window exists. The run files are committed.
 
 ## 1b. Shared result cache
 
@@ -72,7 +72,7 @@ Back to [overview](overview.md). Evidence: [02-architecture-deep-dive.md](02-arc
 ## 1h. Self-hosted export rendering
 
 - **Changes.**
-  - Replace urlbox (`web/server/routes/views/page_renderer.py`) with a Celery task that drives headless Chromium through Playwright against the existing screenshot route.
+  - Replace urlbox (`web/server/routes/views/page_renderer.py`) with a sandboxed renderer sidecar that drives headless Chromium through Playwright against the existing screenshot route; the Celery task that queues the job arrives with WP-5f (decision 0009).
   - Replace the fixed 10-second delay with a "tiles loaded" signal the screenshot app already knows how to produce.
   - Scope the render JWT to the dashboard being rendered instead of `query_needs: ["*"]`.
 - **Data structure.** `RenderJob = {dashboard_id, format: pdf|png, viewport, requested_by, status}`.

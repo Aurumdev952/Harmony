@@ -1,0 +1,23 @@
+version: 2
+updates:
+  # Keeps the SHA pins in .github/workflows current (WP-0f); the version comment
+  # after each SHA is updated with it.
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: weekly
+    cooldown:
+      default-days: 7
+    groups:
+      actions:
+        patterns: ['*']
+
+  # The app's pins move with the phase 3 work packages, so a limit of 0 turns off
+  # version updates and leaves only security updates.
+  - package-ecosystem: uv
+    directory: /
+    schedule:
+      interval: weekly
+    cooldown:
+      default-days: 7
+    open-pull-requests-limit: 0

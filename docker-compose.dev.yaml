@@ -10,8 +10,11 @@ services:
       HASURA_GRAPHQL_DATABASE_URL: postgresql://postgres:zenysis@postgres:5432/${ZEN_ENV}-local
     volumes:
       - ./graphql/hasura/metadata/versions/latest:/hasura-metadata
+  redis:
+    ports:
+      - "127.0.0.1:6379:6379"
   postgres:
-    image: postgres:15.2-alpine
+    image: postgres:15.19-alpine@sha256:f7d23353e1b15400d22ebe31189f4d314b87a4c129cc400c8c2d8d4ca127bf81
     restart: always
     environment:
       POSTGRES_USER: postgres
@@ -19,7 +22,7 @@ services:
       POSTGRES_DB: postgres
       POSTGRES_HOST_AUTH_METHOD: trust
     ports:
-      - "5432:5432"
+      - "127.0.0.1:5432:5432"
     volumes:
       - pgdata-volume:/var/lib/postgresql/data
     healthcheck:
@@ -32,14 +35,18 @@ services:
     # Currently dev only supports builds on linux/amd64, arm is not supported.
     platform: linux/amd64
     image: harmony-dev-web:latest
+    # The dev image runs as root and writes into the bind-mounted checkout, which
+    # the host user owns, so it keeps the default capabilities.
+    cap_drop: !reset []
     build:
       dockerfile: docker/dev/Dockerfile
     volumes:
       # Map source code to host so that we can edit files and see changes immediately.
       - .:/app
       # Don't map venv and node modules to host. We need to use the container version.
-      - web_venv:/app/venv
-      - web_venv_pypy3:/app/venv_pypy3
+      # The volume name carries the interpreter: a volume filled by an older image would
+      # keep shadowing the image's venv.
+      - web_venv_cp313:/app/venv
       - web_node_modules:/app/node_modules
       # Map minio config folder
       - ${MC_CONFIG_PATH}:/root/.mc
@@ -58,11 +65,15 @@ services:
       POSTGRES_HOST: postgres
       SQLALCHEMY_DATABASE_URI: postgresql://postgres:zenysis@postgres:5432/${ZEN_ENV}-local
       OBJECT_STORAGE_ALIAS: ${OBJECT_STORAGE_ALIAS}
+      LOG_FORMAT: text
     ports:
-      - "5000:5000"
+      - "127.0.0.1:5000:5000"
     depends_on:
       postgres:
         condition: service_healthy
+  worker:
+    environment:
+      LOG_FORMAT: text
   pipeline:
     # Currently dev only supports builds on linux/amd64, arm is not supported.
     platform: linux/amd64
@@ -73,8 +84,7 @@ services:
       # Map source code to host so that we can edit files and see changes immediately.
       - .:/app
       # Don't map venv and node modules to host. We need to use the container version.
-      - web_venv:/app/venv
-      - web_venv_pypy3:/app/venv_pypy3
+      - web_venv_cp313:/app/venv
       - web_node_modules:/app/node_modules
       - ./druid_shared:/home/share
       # Map minio config folder
@@ -88,10 +98,11 @@ services:
       - DRUID_HOST=${DRUID_HOST}
       - COMMAND=${COMMAND-echo Specify a pipeline command, e.g. "./pipeline/harmony_demo/generate/zeus_generate run"}
       - PYTHONPATH=/app
-      - DEFAULT_SECRET_KEY=${DEFAULT_SECRET_KEY:-changeme}
+      - DEFAULT_SECRET_KEY=${DEFAULT_SECRET_KEY:?set DEFAULT_SECRET_KEY to a random value, e.g. openssl rand -hex 32}
       - HASURA_HOST=http://hasura:8080
       - SQLALCHEMY_DATABASE_URI=postgresql://postgres:zenysis@postgres:5432/${ZEN_ENV}-local
       - MAPBOX_ACCESS_TOKEN=${MAPBOX_ACCESS_TOKEN:-}
+      - LOG_FORMAT=text
     depends_on:
       postgres:
         condition: service_healthy
@@ -102,10 +113,14 @@ services:
         "-c",
         "./docker/dev/scripts/start_pipeline.sh"
       ]
+  renderer:
+    # Build locally when the image is missing instead of pulling it.
+    build:
+      context: .
+      dockerfile: docker/renderer/Dockerfile
 
 volumes:
   pgdata-volume:
   redis-volume:
-  web_venv:
-  web_venv_pypy3:
+  web_venv_cp313:
   web_node_modules:

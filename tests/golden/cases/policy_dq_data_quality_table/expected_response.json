@@ -1,0 +1,22 @@
+[
+  {
+    "geographyHierarchy": {
+      "MunicipalityName": "Belém",
+      "StateName": "Pará"
+    },
+    "lastReport": 32.0,
+    "numPeriods": 127.48,
+    "numPeriodsWithReport": 280.93,
+    "silentDays": 89.8677
+  },
+  {
+    "geographyHierarchy": {
+      "MunicipalityName": "Conceição do Araguaia",
+      "StateName": "Pará"
+    },
+    "lastReport": 153.08,
+    "numPeriods": 127.48,
+    "numPeriodsWithReport": 47.1,
+    "silentDays": 198.2617
+  }
+]

@@ -1,0 +1,13 @@
+{
+  "data": [
+    {
+      "StateName": "Pará",
+      "num_outliers": 1,
+      "num_values": 16,
+      "percentage_outliers": 6.25
+    }
+  ],
+  "dimensions": [
+    "StateName"
+  ]
+}

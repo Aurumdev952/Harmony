@@ -1,0 +1,40 @@
+{
+  "content_type": "text/html",
+  "headers": [],
+  "id": "graphql.DeleteFieldModalMutation.copy",
+  "pinned": {},
+  "response_schema": {
+    "properties": {
+      "data": {
+        "properties": {
+          "delete_field_by_pk": {
+            "properties": {
+              "fieldCategoryMapping": {
+                "maxItems": 0,
+                "type": "array"
+              },
+              "id": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "fieldCategoryMapping",
+              "id"
+            ],
+            "type": "object"
+          }
+        },
+        "required": [
+          "delete_field_by_pk"
+        ],
+        "type": "object"
+      }
+    },
+    "required": [
+      "data"
+    ],
+    "type": "object"
+  },
+  "route": "POST /api/graphql",
+  "status": 200
+}

@@ -55,7 +55,7 @@ class OutliersBoxPlot(OutliersBase):
         percentage_outliers_series = 100 * outliers_series / value_counts_series
 
         data = []
-        for index, percentage_outliers in percentage_outliers_series.iteritems():
+        for index, percentage_outliers in percentage_outliers_series.items():
             lowest_granularity_geo_value, aggregation_dimension_value = index
             data.append(
                 {

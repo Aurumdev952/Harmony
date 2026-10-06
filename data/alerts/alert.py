@@ -1,5 +1,5 @@
-'''Entry point for business logic dealing with alerts.
-'''
+'''Entry point for business logic dealing with alerts.'''
+
 from datetime import datetime, timedelta
 from typing import Dict, List, NamedTuple, Optional
 
@@ -15,7 +15,7 @@ from data.query.models.query_filter import (
     OrFilter,
     NotFilter,
     QueryFilter,
-    SelectorFilter,
+    RawFilter,
 )
 from db.druid.calculations.base_calculation import BaseCalculation
 from db.druid.calculations.calculation_merger import CalculationMerger
@@ -91,9 +91,10 @@ def get_dimension_value_filters(alert_def: AlertDefinition) -> List[QueryFilter]
 
     # If there is a dimension name and there are no filters on that same dimension,
     # add one to ensure alerts aren't triggered for empty dimension values.
+    # Empty is null: under SQL-compatible nulls `value ''` would let null rows through.
     if not dimension_name_filtered:
         druid_filters.append(
-            NotFilter(SelectorFilter(dimension=dimension_name, value=''))
+            RawFilter(filter=~Filter(dimension=dimension_name, value=None))
         )
 
     return druid_filters
@@ -194,7 +195,7 @@ def get_interval_bounds(latest_date: AlertLatestDate, time_granularity) -> str:
     }
 
     if time_granularity not in get_time_bound_map:
-        assert False, f'Time granularity: {time_granularity} is not supported'
+        raise ValueError(f'Time granularity: {time_granularity} is not supported')
     return get_time_bound_map[time_granularity](latest_date)
 
 

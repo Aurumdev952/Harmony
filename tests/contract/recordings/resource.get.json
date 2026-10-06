@@ -1,0 +1,71 @@
+{
+  "content_type": "application/json",
+  "headers": [],
+  "id": "resource.get",
+  "pinned": {},
+  "response_schema": {
+    "properties": {
+      "$uri": {
+        "type": "string",
+        "x-format": "api-uri"
+      },
+      "groups": {
+        "items": {
+          "properties": {
+            "name": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "name"
+          ],
+          "type": "object"
+        },
+        "type": "array"
+      },
+      "label": {
+        "type": "string"
+      },
+      "name": {
+        "type": "string"
+      },
+      "resourceType": {
+        "type": "string"
+      },
+      "users": {
+        "items": {
+          "properties": {
+            "firstName": {
+              "type": "string"
+            },
+            "lastName": {
+              "type": "string"
+            },
+            "username": {
+              "type": "string",
+              "x-format": "email"
+            }
+          },
+          "required": [
+            "firstName",
+            "lastName",
+            "username"
+          ],
+          "type": "object"
+        },
+        "type": "array"
+      }
+    },
+    "required": [
+      "$uri",
+      "groups",
+      "label",
+      "name",
+      "resourceType",
+      "users"
+    ],
+    "type": "object"
+  },
+  "route": "GET /api2/resource/<id>",
+  "status": 200
+}

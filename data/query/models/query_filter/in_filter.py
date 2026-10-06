@@ -2,7 +2,10 @@ import related
 
 from pydruid.utils.filters import Filter
 
-from data.query.models.query_filter.query_filter import QueryFilter
+from data.query.models.query_filter.query_filter import (
+    QueryFilter,
+    druid_dimension_value,
+)
 
 
 @QueryFilter.register_subtype
@@ -16,4 +19,5 @@ class InFilter(QueryFilter):
     type = related.StringField('IN')
 
     def to_druid(self):
-        return Filter(type='in', dimension=self.dimension, values=list(self.values))
+        values = [druid_dimension_value(value) for value in self.values]
+        return Filter(type='in', dimension=self.dimension, values=values)

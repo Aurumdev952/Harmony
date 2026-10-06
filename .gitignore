@@ -11,7 +11,6 @@ test/results
 
 ### Build/Source Related Artifacts ####
 venv*
-pypy/
 uploads/
 personal/
 src/
@@ -213,8 +212,6 @@ scripts/druid/query/output/[^.]*
 #Local playground
 playground/
 
-#Dask
-dask-worker-space/
 
 #mypy
 .dmypy.*
@@ -224,3 +221,9 @@ dask-worker-space/
 .claude/settings.local.json
 .claude/agent-memory-local/
 scripts/agents/__pycache__/
+
+# Playwright MCP snapshots written into the checkout by browser sessions
+.playwright-mcp/
+
+# hypothesis example database (contract and pipeline property tests)
+.hypothesis/

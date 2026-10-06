@@ -1,0 +1,103 @@
+{
+  "content_type": "text/html",
+  "headers": [],
+  "id": "graphql.BatchPublishModalMutation",
+  "pinned": {},
+  "response_schema": {
+    "properties": {
+      "data": {
+        "properties": {
+          "delete_unpublished_field": {
+            "properties": {
+              "returning": {
+                "maxItems": 0,
+                "type": "array"
+              }
+            },
+            "required": [
+              "returning"
+            ],
+            "type": "object"
+          },
+          "insert_field": {
+            "properties": {
+              "returning": {
+                "items": {
+                  "properties": {
+                    "calculation": {
+                      "properties": {
+                        "type": {
+                          "type": "string"
+                        }
+                      },
+                      "required": [
+                        "type"
+                      ],
+                      "type": "object"
+                    },
+                    "description": {
+                      "type": "string"
+                    },
+                    "field_category_mappings": {
+                      "items": {
+                        "properties": {
+                          "id": {
+                            "type": "string"
+                          }
+                        },
+                        "required": [
+                          "id"
+                        ],
+                        "type": "object"
+                      },
+                      "type": "array"
+                    },
+                    "field_pipeline_datasource_mappings": {
+                      "maxItems": 0,
+                      "type": "array"
+                    },
+                    "id": {
+                      "type": "string"
+                    },
+                    "name": {
+                      "type": "string"
+                    },
+                    "short_name": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "calculation",
+                    "description",
+                    "field_category_mappings",
+                    "field_pipeline_datasource_mappings",
+                    "id",
+                    "name",
+                    "short_name"
+                  ],
+                  "type": "object"
+                },
+                "type": "array"
+              }
+            },
+            "required": [
+              "returning"
+            ],
+            "type": "object"
+          }
+        },
+        "required": [
+          "delete_unpublished_field",
+          "insert_field"
+        ],
+        "type": "object"
+      }
+    },
+    "required": [
+      "data"
+    ],
+    "type": "object"
+  },
+  "route": "POST /api/graphql",
+  "status": 200
+}

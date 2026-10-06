@@ -231,10 +231,10 @@ class DataQualityReport(QueryBase):
             }
 
         # Cast the timestamp column to a datetime since `score` needs it to be fully
-        # parsed.
+        # parsed. Druid timestamps are full ISO 8601 in UTC.
         for input_df in (df, no_date_filter_df, no_geo_filter_df):
             input_df['dates'] = pd.to_datetime(
-                input_df[TIMESTAMP_COLUMN], format=DRUID_DATE_FORMAT
+                input_df[TIMESTAMP_COLUMN], format='ISO8601'
             )
 
         end_interval_date = datetime.strptime(

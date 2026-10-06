@@ -2,6 +2,7 @@ from builtins import str
 from builtins import range
 from past.builtins import basestring
 import collections
+from collections.abc import Iterable, Mapping
 import copy
 import re
 import time
@@ -29,7 +30,6 @@ INTERNAL_SERVER_ERROR = 'INTERNAL_SERVER_ERROR'
 ISO_DATETIME_FORMAT = '%Y-%m-%dT%H:%M:%S'
 SELECTIONS_DATETIME_FORMAT = '%Y-%m-%d'
 DATE_TIME_NOW = '@now'
-REMEMBER_COOKIE_NAME = 'remember_token'
 
 Node = collections.namedtuple('Node', ['original_dictionary', 'new_dictionary', 'key'])
 
@@ -198,13 +198,13 @@ def deep_update(source_dictionary, merge_dictionary):
     Performs a deep merge on `source_dictionary` from the values in `merge_dictionary`.
 
     1. If values corresponding to the same `key` in `source_dictionary` and `merge_dictionary`
-       are both instances of `collections.Mapping`, they will be deep merged.
+       are both instances of `collections.abc.Mapping`, they will be deep merged.
 
     2. If cyclic references are detected in `source_dictionary` and `merge_dictionary`, cyclic
        references will NOT be merged
 
     3. If values corresponding to the same `key` in `source_dictionary` and `merge_dictionary`
-       are both instances of `collections.Iterable`, they will also be merged via the `extend`
+       are both instances of `collections.abc.Iterable`, they will also be merged via the `extend`
        method.
 
     Parameters
@@ -251,10 +251,10 @@ def deep_update(source_dictionary, merge_dictionary):
         if key in original_dictionary:
             original_value = original_dictionary[key]
             new_value = new_dictionary[key]
-            original_is_mapping = isinstance(original_value, collections.Mapping)
-            new_is_mapping = isinstance(new_value, collections.Mapping)
-            original_is_iterable = isinstance(original_value, collections.Iterable)
-            new_is_iterable = isinstance(new_value, collections.Iterable)
+            original_is_mapping = isinstance(original_value, Mapping)
+            new_is_mapping = isinstance(new_value, Mapping)
+            original_is_iterable = isinstance(original_value, Iterable)
+            new_is_iterable = isinstance(new_value, Iterable)
             original_is_string = isinstance(original_value, basestring)
             new_is_string = isinstance(new_value, basestring)
             mapping_and_iterable_mix = (original_is_mapping and not new_is_mapping) or (
@@ -309,9 +309,9 @@ def assert_string(value, argument_name=None, pattern=None):
             value_string = (
                 f'The value for \'{argument_name}\'' if argument_name else 'The value'
             )
-            message = (
-                '{prefix} does not match pattern ' '\'{pattern_string}\''
-            ).format(prefix=value_string, pattern_string=pattern_value)
+            message = '{prefix} does not match pattern \'{pattern_string}\''.format(
+                prefix=value_string, pattern_string=pattern_value
+            )
             raise ValueError(message)
 
 
@@ -370,15 +370,11 @@ def assert_enum(value, enum_type, enum_name=None, argument_name=None):
 
 
 def assert_iterable(value, argument_name=None):
-    _assert_type(
-        value, collections.Iterable, 'iterable', basestring, 'string', argument_name
-    )
+    _assert_type(value, Iterable, 'iterable', basestring, 'string', argument_name)
 
 
 def assert_non_string_iterable(value, argument_name=None, element_validator=None):
-    _assert_type(
-        value, collections.Iterable, 'iterable', basestring, 'string', argument_name
-    )
+    _assert_type(value, Iterable, 'iterable', basestring, 'string', argument_name)
 
     if element_validator:
         errors = []
@@ -402,7 +398,7 @@ def assert_non_string_iterable(value, argument_name=None, element_validator=None
 
 
 def assert_mapping(value, argument_name=None, key_value_validator=None):
-    _assert_type(value, collections.Mapping, 'mapping', argument_name=argument_name)
+    _assert_type(value, Mapping, 'mapping', argument_name=argument_name)
 
     if key_value_validator:
         errors = []
@@ -477,7 +473,7 @@ def assert_equals(
             else str(that_value)
         )
         message = (
-            'Expected value {this_argument} to match value ' '{that_argument}.'
+            'Expected value {this_argument} to match value {that_argument}.'
         ).format(this_argument=this_argument, that_argument=that_argument)
         raise ValueError(message)
 
@@ -617,11 +613,6 @@ def assert_users_exist(value):
 
 def construct_recursive_dictionary():
     return collections.defaultdict(construct_recursive_dictionary)
-
-
-def is_session_persisted():
-    cookie_name = current_app.config.get('REMEMBER_COOKIE_NAME', REMEMBER_COOKIE_NAME)
-    return cookie_name in request.cookies
 
 
 class CachedRoute(Route):

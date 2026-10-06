@@ -22,7 +22,7 @@ No vendor skill exists. Before relying on any fact below, confirm it against the
 - **ZooKeeper.**
   - ZooKeeper-based segment loading was removed in 30.
   - The ZooKeeper task runner and segment announcement were removed in 38. Use `httpRemote`.
-  - Removing ZooKeeper from Compose is part of WP-8b when targeting 38.
+  - ZooKeeper is still required by 38 for leader election and discovery outside Kubernetes; it stays in Compose (decision 0007).
 - **Removed ingestion paths.** Hadoop ingestion was deprecated in 32 and removed in 37. Delete `db/druid/indexing/resources/task_templates` (Hadoop) and `tuning_configs/on_prem.json`.
 - **Nulls (WP-8a).**
   - SQL-compatible null handling has been the default since 28.

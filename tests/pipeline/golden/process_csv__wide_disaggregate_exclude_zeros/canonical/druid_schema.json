@@ -1,0 +1,96 @@
+{
+  "columns": {
+    "Age": {
+      "rows_present": 13,
+      "types": [
+        "string"
+      ]
+    },
+    "Death": {
+      "rows_present": 13,
+      "types": [
+        "string"
+      ]
+    },
+    "MunicipalityID": {
+      "rows_present": 9,
+      "types": [
+        "string"
+      ]
+    },
+    "MunicipalityLat": {
+      "rows_present": 9,
+      "types": [
+        "string"
+      ]
+    },
+    "MunicipalityLon": {
+      "rows_present": 9,
+      "types": [
+        "string"
+      ]
+    },
+    "MunicipalityName": {
+      "rows_present": 13,
+      "types": [
+        "string"
+      ]
+    },
+    "Real_Date": {
+      "rows_present": 13,
+      "types": [
+        "string"
+      ]
+    },
+    "Sex": {
+      "rows_present": 13,
+      "types": [
+        "string"
+      ]
+    },
+    "StateID": {
+      "rows_present": 9,
+      "types": [
+        "string"
+      ]
+    },
+    "StateLat": {
+      "rows_present": 9,
+      "types": [
+        "string"
+      ]
+    },
+    "StateLon": {
+      "rows_present": 9,
+      "types": [
+        "string"
+      ]
+    },
+    "StateName": {
+      "rows_present": 13,
+      "types": [
+        "string"
+      ]
+    },
+    "field": {
+      "rows_present": 13,
+      "types": [
+        "string"
+      ]
+    },
+    "source": {
+      "rows_present": 13,
+      "types": [
+        "string"
+      ]
+    },
+    "val": {
+      "rows_present": 13,
+      "types": [
+        "float",
+        "integer"
+      ]
+    }
+  },
+  "row_count": 13
+}

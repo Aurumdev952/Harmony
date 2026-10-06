@@ -1,0 +1,38 @@
+{
+  "data": [
+    {
+      "dimensions": {
+        "StateName": "Pará"
+      },
+      "key": "Pará",
+      "timestamp": "2024-01-01",
+      "yellow_fever_cases": 157.0
+    },
+    {
+      "dimensions": {
+        "StateName": "Pará"
+      },
+      "key": "Pará",
+      "timestamp": "2024-02-01",
+      "yellow_fever_cases": 99.0
+    },
+    {
+      "dimensions": {
+        "StateName": "Pará"
+      },
+      "key": "Pará",
+      "timestamp": "2024-03-01",
+      "yellow_fever_cases": 196.0
+    }
+  ],
+  "dates": [
+    "2024-01-01",
+    "2024-02-01",
+    "2024-03-01"
+  ],
+  "totals": {
+    "Pará": {
+      "yellow_fever_cases": 264.15
+    }
+  }
+}

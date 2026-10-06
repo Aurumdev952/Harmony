@@ -1,6 +1,10 @@
 #!/bin/bash -eu
 set -o pipefail
 
+# JSON log lines (WP-2g); the image copies docker/web/scripts/log_json.sh here.
+# shellcheck source=docker/web/scripts/log_json.sh
+source /zenysis/log_json.sh
+
 # Script called from docker to upgrade and run the web server in production.
 
 # File that will be created to show that entrypoint initialization has been
@@ -12,14 +16,14 @@ INIT_COMPLETE='/tmp/initialization_completed'
 pushd /zenysis &>/dev/null
 
 if ! [ -f "${INIT_COMPLETE}" ] ; then
-  echo 'Initializing server'
+  log_json 'Initializing server'
   ./initialize_new_container.sh
 
-  echo 'Initialization complete'
+  log_json 'Initialization complete'
   touch "${INIT_COMPLETE}"
 fi
 
-echo 'Running server...'
+log_json 'Running server...'
 ./run_web_gunicorn.sh
 
 popd &>/dev/null

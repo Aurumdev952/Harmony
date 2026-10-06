@@ -1,0 +1,101 @@
+{
+  "content_type": "application/json",
+  "headers": [],
+  "id": "dashboard.list",
+  "pinned": {},
+  "response_schema": {
+    "items": {
+      "properties": {
+        "$uri": {
+          "type": "string",
+          "x-format": "api-uri"
+        },
+        "author": {
+          "type": "string",
+          "x-format": "api-uri"
+        },
+        "authorUsername": {
+          "type": "string",
+          "x-format": "email"
+        },
+        "created": {
+          "type": "string",
+          "x-format": "date-time"
+        },
+        "description": {
+          "type": "null"
+        },
+        "isFavorite": {
+          "type": "boolean"
+        },
+        "isOfficial": {
+          "type": "boolean"
+        },
+        "lastAccessedByCurrentUser": {
+          "type": "string",
+          "x-format": "date-time"
+        },
+        "lastModified": {
+          "type": "string",
+          "x-format": "date-time"
+        },
+        "lastModifiedByCurrentUser": {
+          "type": "string",
+          "x-format": "date-time"
+        },
+        "myRoles": {
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        },
+        "registeredUsersCanDownloadData": {
+          "type": "boolean"
+        },
+        "resource": {
+          "type": "string",
+          "x-format": "api-uri"
+        },
+        "slug": {
+          "type": "string"
+        },
+        "title": {
+          "type": "string"
+        },
+        "totalViews": {
+          "type": "integer"
+        },
+        "totalViewsByUser": {
+          "type": "integer"
+        },
+        "unregisteredUsersCanDownloadData": {
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "$uri",
+        "author",
+        "authorUsername",
+        "created",
+        "description",
+        "isFavorite",
+        "isOfficial",
+        "lastAccessedByCurrentUser",
+        "lastModified",
+        "lastModifiedByCurrentUser",
+        "myRoles",
+        "registeredUsersCanDownloadData",
+        "resource",
+        "slug",
+        "title",
+        "totalViews",
+        "totalViewsByUser",
+        "unregisteredUsersCanDownloadData"
+      ],
+      "type": "object"
+    },
+    "type": "array"
+  },
+  "route": "GET /api2/dashboard",
+  "status": 200
+}

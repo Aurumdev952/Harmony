@@ -35,12 +35,10 @@ services:
       context: ../extensions
     volumes:
       - zen_extensions:/druid/extensions
-    environment:
-      - ZEN_DRUID_VERSION=${DRUID_VERSION}
     logging: *default-logging
 
   broker:
-    image: apache/druid:${DRUID_VERSION}
+    image: apache/druid:0.23.0@sha256:ed9719968b4be3a2f1643907a1a5a5814e2ee1215f3604da8b2da2ac05f65912
     container_name: broker
     restart: always
     volumes:
@@ -48,8 +46,10 @@ services:
       - zen_extensions:/var/lib/zen/extensions/
     depends_on:
       - extension_loader
+    # Druid runs without authentication: private address only, firewalled to
+    # the other Druid hosts, web and the pipeline.
     ports:
-      - "8082:8082"
+      - "${DRUID_QUERY_HOST:?set DRUID_QUERY_HOST to this host's private IP}:8082:8082"
     command:
       - broker
     env_file:
@@ -60,7 +60,7 @@ services:
     logging: *default-logging
 
   router:
-    image: apache/druid:${DRUID_VERSION}
+    image: apache/druid:0.23.0@sha256:ed9719968b4be3a2f1643907a1a5a5814e2ee1215f3604da8b2da2ac05f65912
     container_name: router
     restart: always
     volumes:
@@ -69,7 +69,7 @@ services:
     depends_on:
       - extension_loader
     ports:
-      - "8888:8888"
+      - "${DRUID_QUERY_HOST:?set DRUID_QUERY_HOST to this host's private IP}:8888:8888"
     command:
       - router
     env_file:

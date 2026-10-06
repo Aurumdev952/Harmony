@@ -1,0 +1,9 @@
+{
+  "content_type": "application/json",
+  "headers": [],
+  "id": "alert_definition.transfer_all",
+  "pinned": {},
+  "response_schema": null,
+  "route": "POST /api2/alert_definitions/transfer/username",
+  "status": 204
+}

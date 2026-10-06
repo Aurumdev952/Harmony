@@ -2,38 +2,64 @@ import base64
 import time
 
 from flask import current_app
+from flask_user import current_user
 
-from web.server.routes.page_renderer import PageRendererRouter
+from web.server.routes.views.page_renderer import (
+    RendersInFlight,
+    claim,
+    grid_dashboard_to_thumbnail,
+)
+from web.server.security.signal_handlers import query_policy_fingerprint
 
 EXPIRATION_SEC = 1209600  # Update thumbnail image every 2 weeks.
+PENDING = 'PENDING'
 PENDING_STATE_TIMEOUT = 600
+# The Overview page asks for every dashboard's thumbnail at once, and an account
+# renders one at a time, so an uncached thumbnail waits this long for the
+# account's render slot before it is left empty for the next visit.
+THUMBNAIL_SLOT_WAIT_SECONDS = 10
 
 
-# Render dashboard image and encode into base64 string. Then decode to utf-8
-# format to send to client.
-def fetch_base64_image(img_name):
-    page_renderer = PageRendererRouter()
-    response = page_renderer.grid_dashboard_to_thumbnail(name=img_name)
-    return base64.b64encode(response.get_data()).decode()
+def get_thumbnail_storage_name(dashboard):
+    return f'thumbnail:v2:{dashboard.resource_id}:{query_policy_fingerprint()}'
 
 
-def get_thumbnail_storage_name(name):
-    return f'thumbnail_{name}'
+def render_thumbnail(dashboard):
+    try:
+        rendered = grid_dashboard_to_thumbnail(
+            name=dashboard.slug,
+            auth_user_email=current_user.username,
+            slot_wait_seconds=THUMBNAIL_SLOT_WAIT_SECONDS,
+        )
+    except RendersInFlight:
+        # Not cached, so the next view renders it.
+        return ''
+    if rendered is None:
+        return ''
+    return base64.b64encode(rendered.content).decode()
 
 
-# Retrieves value from redis and renders new image if key doesn't exist.
-def retrieve_item(key):
+def retrieve_item(dashboard):
+    '''Returns the current user's thumbnail of the dashboard, rendering it as
+    them when no user with the same query policy has one cached.
+    '''
     cache = current_app.cache
-    storage_key = get_thumbnail_storage_name(key)
-    while (value := cache.get(storage_key)) == 'PENDING':
+    storage_key = get_thumbnail_storage_name(dashboard)
+    deadline = time.monotonic() + PENDING_STATE_TIMEOUT
+    while not claim(cache, storage_key, PENDING, PENDING_STATE_TIMEOUT):
+        value = cache.get(storage_key)
+        if value and value != PENDING:
+            return value
+        if time.monotonic() >= deadline:
+            return ''
         time.sleep(1)
 
-    if value:
-        return value
-
-    cache.set(storage_key, "PENDING", timeout=PENDING_STATE_TIMEOUT)
-    new_base64_img = fetch_base64_image(key)
-    if new_base64_img:
-        cache.set(storage_key, new_base64_img, timeout=EXPIRATION_SEC)
-        return new_base64_img
-    return ""
+    new_base64_img = ''
+    try:
+        new_base64_img = render_thumbnail(dashboard)
+    finally:
+        if new_base64_img:
+            cache.set(storage_key, new_base64_img, timeout=EXPIRATION_SEC)
+        else:
+            cache.delete(storage_key)
+    return new_base64_img

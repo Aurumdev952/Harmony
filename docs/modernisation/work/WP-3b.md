@@ -19,6 +19,8 @@ instances:
       - prod/browser_share/**
       - tests/infra/**
       - tests/toolchain/**
+      - tests/core/test_config_import_hook.py
+      - tests/worker/test_renderer_web_drift.py
       - docs/modernisation/work/WP-3b.md
       - docs/modernisation/work/WP-3b-evidence/**
   # Supporting role, on mig/WP-3b-cpython-313-core-2. Its removal of ijson-bigint
@@ -50,6 +52,7 @@ instances:
       - tests/contract/test_stack_image_tag.py
       - tests/golden/README.md
       - tests/golden/harness.py
+      - tests/authz/test_render_routes.py
       - tests/pipeline/README.md
       - tests/pipeline/mutation_check.py
       - tests/pipeline/requirements.txt

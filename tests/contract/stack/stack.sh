@@ -6,6 +6,7 @@
 #   tests/contract/stack/stack.sh logs [service]
 #   tests/contract/stack/stack.sh env    # print what the recorder and replay need
 #   tests/contract/stack/stack.sh image-tag  # print the web image tag `up` builds
+#   tests/contract/stack/stack.sh config [args]  # the merged Compose file, overlays included
 #   tests/contract/stack/stack.sh seed thumbnail <dashboard resource id>
 #                                        # the runner calls this for a case's `seed`
 #
@@ -113,6 +114,13 @@ build_images() {
   export CONTRACT_WEB_IMAGE="${tag}"
 }
 
+# web's upload tmpfs mounts at uploads/ in the read-only checkout, and Docker
+# cannot create a mount point there, so it is created here (the repository
+# ignores uploads/).
+create_mount_points() {
+  mkdir -p "${ROOT}/uploads"
+}
+
 wait_for_web() {
   local url="http://127.0.0.1:${CONTRACT_WEB_PORT}/login"
   for _ in $(seq 1 120); do
@@ -151,6 +159,7 @@ case "${1:-}" in
   up)
     load_secrets
     build_images
+    create_mount_points
     compose up -d --wait postgres redis druid-stub mailpit
     compose up -d forward
     wait_for_web
@@ -180,6 +189,10 @@ case "${1:-}" in
   image-tag)
     image_tag
     ;;
+  config)
+    placeholder_env
+    compose config "${@:2}"
+    ;;
   env)
     echo "export CONTRACT_PROJECT=${CONTRACT_PROJECT}"
     echo "export CONTRACT_BASE_URL=http://127.0.0.1:${CONTRACT_WEB_PORT}"
@@ -187,7 +200,7 @@ case "${1:-}" in
     echo "export CONTRACT_CREDENTIALS_FILE=${SECRETS}"
     ;;
   *)
-    echo "usage: $0 up|down|logs [service]|env|image-tag|seed thumbnail <id>" >&2
+    echo "usage: $0 up|down|logs [service]|env|image-tag|config [args]|seed thumbnail <id>" >&2
     exit 2
     ;;
 esac

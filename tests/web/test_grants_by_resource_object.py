@@ -151,14 +151,16 @@ class GroupStub(ModelResource):
 
 
 # Potion lets a resource join one Api, hence the module scope, and adds the
-# routes it registers to the resource. Another test module's Api may hold
-# DashboardResource, so it is released before and after.
-_DASHBOARD_ROUTES = dict(DashboardResource.routes)
+# routes it registers to the resource. Another test module's Api may hold the
+# app's resources used here, so they are released before and after.
+_ROUTES_BEFORE_REGISTRATION = {DashboardResource: dict(DashboardResource.routes)}
 
 
-def _release_dashboard_resource():
-    DashboardResource.api = None
-    DashboardResource.routes = dict(_DASHBOARD_ROUTES)
+def _release(resources):
+    for resource in resources:
+        routes = _ROUTES_BEFORE_REGISTRATION.setdefault(resource, dict(resource.routes))
+        resource.api = None
+        resource.routes = dict(routes)
 
 
 @pytest.fixture(name='app', scope='module')
@@ -186,15 +188,14 @@ def fixture_app():
     install_identity_loader(Principal(app, use_sessions=False))
     identity_loaded.connect(on_identity_loaded, app)
     request_started.connect(initialize_request_logger, app)
-    _release_dashboard_resource()
-    api = Api(app, prefix='/api2')
-    for resource in (
-        UserStub,
-        GroupStub,
+    app_resources = (
         permission_api.BackendTypeResource,
         permission_api.BackendResource,
         DashboardResource,
-    ):
+    )
+    _release(app_resources)
+    api = Api(app, prefix='/api2')
+    for resource in (UserStub, GroupStub, *app_resources):
         api.add_resource(resource)
 
     # Notification emails need the full app and are not under test.
@@ -212,7 +213,7 @@ def fixture_app():
         event.remove(model, 'before_insert', _store_unset_booleans_as_false)
     after_roles_update.connect(permission_api.send_email)
     after_create.connect(send_email_after_create, sender=DashboardResource)
-    _release_dashboard_resource()
+    _release(app_resources)
 
 
 def _seed_roles(session):

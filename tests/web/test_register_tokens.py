@@ -31,6 +31,16 @@ for _module in pkgutil.iter_modules(models.alchemy.__path__):
     importlib.import_module(f'models.alchemy.{_module.name}')
 
 
+class _TestAuthenticationResource(AuthenticationResource):
+    # Potion binds a resource class to one Api and raises if another Api adds
+    # it, so this test registers its own subclass and leaves the production
+    # class free for any real app built in the same process.
+    api = None
+
+    class Meta:
+        name = 'authentication'
+
+
 @pytest.fixture(name='app', scope='module')
 def fixture_app():
     here = os.path.dirname(__file__)
@@ -48,8 +58,8 @@ def fixture_app():
     app.user_manager = SimpleNamespace(
         hash_password=lambda password: 'hashed:' + password
     )
-    # Potion lets a resource join only one Api, hence the module scope.
-    Api(app, prefix='/api2').add_resource(AuthenticationResource)
+    # The subclass joins this Api once, hence the module scope.
+    Api(app, prefix='/api2').add_resource(_TestAuthenticationResource)
 
     with app.app_context():
         db.Model.metadata.create_all(

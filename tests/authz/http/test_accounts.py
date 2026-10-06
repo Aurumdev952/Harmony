@@ -21,6 +21,7 @@ import secrets
 import pytest
 
 from tests.authz.http.stack import (
+    DEPLOYMENT_ORIGIN,
     PENDING,
     TIMEOUT_SECONDS,
     USER_DOMAIN,
@@ -441,6 +442,67 @@ def test_a_spent_invitation_registers_nobody(stack):
     assert _account_row(stack, shell) == registered
 
 
+def test_registering_with_an_empty_invitation_token_registers_nobody(stack):
+    '''WP-0k INV-3 row R-1 (73fe97e), request (f). `reset_password_token` is
+    the empty string on every account never reset or invited.
+    Before WP-0k: registering with `invite_token: ""` found the first such
+    account; when `email` named it, 200: its password was replaced, it became
+    active and the caller was signed in as it. The other accounts with an
+    empty token are held aside during the request so that the target is the
+    first one.
+    After: 400 `Invalid invitation link`; nothing written; nobody signed in.'''
+    username = _name('register-empty-token')
+    account = stack.create_account(username, _password())
+    stack.rewrite_account(account, username)  # registered, token empty
+    before = _account_row(stack, account)
+    stack.sql(
+        'UPDATE "user" SET reset_password_token = \'authz-held-\' || id '
+        'WHERE reset_password_token = \'\' AND id <> :\'id\';',
+        id=_id(account),
+    )
+    try:
+        session, response = _register(stack, username, '', _password())
+    finally:
+        stack.sql(
+            'UPDATE "user" SET reset_password_token = \'\' '
+            'WHERE reset_password_token = \'authz-held-\' || id;'
+        )
+
+    assert response.status_code == 400, response.text[:300]
+    assert 'Invalid invitation link' in response.text
+    assert _account_row(stack, account) == before
+    assert stack.signed_in_as(session) == 'login'
+
+
+def test_registering_with_a_forgot_password_token_registers_nobody(stack):
+    '''WP-0k INV-3 row R-1, a token of an account that is not pending: the
+    forgot-password token of a registered account, posted to registration.
+    Before WP-0k: 200; the account's password was replaced without the reset
+    page, and the caller was signed in as it.
+    After: 400 `Invalid invitation link`; nothing written; nobody signed in.'''
+    username = _name('register-reset-token')
+    account = stack.create_account(username, _password())
+    response = stack.request(
+        new_session(),
+        'POST',
+        '/api2/authentication/forgot_password',
+        {'email': username},
+    )
+    assert response.status_code == 200, response.text[:300]
+    ((token,),) = stack.sql(
+        'SELECT reset_password_token FROM "user" WHERE id = :\'id\';', id=_id(account)
+    )
+    assert token
+    before = _account_row(stack, account)
+
+    session, response = _register(stack, username, token, _password())
+
+    assert response.status_code == 400, response.text[:300]
+    assert 'Invalid invitation link' in response.text
+    assert _account_row(stack, account) == before
+    assert stack.signed_in_as(session) == 'login'
+
+
 def test_activating_a_pending_case_twin_by_patch_is_refused(stack):
     '''WP-0k (3e22301), with row U-5. An admin sets a pending
     `Activate.Twin@` active beside a registered `activate.twin@`.
@@ -730,3 +792,29 @@ def test_forgot_password_for_an_account_not_active_answers_like_an_unknown_one(
     )
     assert unknown.status_code == 400, unknown.text[:300]
     assert stack.mail() == []
+
+
+def test_flask_user_reset_form_sets_no_password(stack):
+    '''WP-0k INV-3 row R-6. flask-user's `POST /user/reset-password/<token>`
+    with a valid reset token and a new password.
+    Before WP-0k: flask-user's own form handled it (for an account of any
+    status); without its CSRF token the form is served again (200).
+    After: 302 to Harmony's reset page on the configured origin with the same
+    token; the password is not set here.'''
+    account = stack.create_account(_name('flask-user-reset-form'), _password())
+    token = _mailed_reset_token(stack, account)
+    before = _account_row(stack, account)
+    password = _password()
+
+    response = new_session().post(
+        f'{stack.base_url}/user/reset-password/{token}',
+        data={'new_password': password, 'retype_password': password, 'next': '/'},
+        allow_redirects=False,
+        timeout=TIMEOUT_SECONDS,
+    )
+
+    assert response.status_code == 302, response.status_code
+    assert response.headers['Location'] == (
+        f'{DEPLOYMENT_ORIGIN}/user/reset-password?token={token}'
+    )
+    assert _account_row(stack, account) == before

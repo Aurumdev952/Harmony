@@ -37,6 +37,8 @@ USER_DOMAIN = 'authz.invalid'
 LOOPBACK_HOSTS = ('127.0.0.1', 'localhost', '::1')
 DEFAULT_PROJECT = 'harmony-wp2b-authz'
 DATABASE = 'harmony_demo-local'
+# config/harmony_demo/general.py DEPLOYMENT_BASE_URL, the deployment the stack runs.
+DEPLOYMENT_ORIGIN = 'https://harmony_demo.zenysis.com'
 # models.alchemy.user.UserStatusEnum
 ACTIVE, PENDING = 1, 3
 _BUNDLE = re.compile(r'/([A-Za-z]+)\.bundle\.js')

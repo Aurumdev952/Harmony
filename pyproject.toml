@@ -84,7 +84,7 @@ web = [
     "blinker==1.4",
     "flask-caching==2.0.1",
     "flask-login==0.4.1",
-    "gunicorn[gevent]==20.0.4",
+    "gunicorn[gevent]==22.0.0",
     "isodate>=0.5.4",
     "redis==5.0.1",
     "scipy>=1.2.1",

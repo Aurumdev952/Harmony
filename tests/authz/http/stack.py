@@ -268,6 +268,15 @@ class Stack:
             id=uri.rsplit('/', 1)[1],
         )
 
+    def clear_password(self, uri: str) -> None:
+        '''Empties an account's password, as an invitation that never
+        registered has it. `create_account` sets one, and since WP-0k a pending
+        account with a password counts as one that could sign in.'''
+        self.sql(
+            'UPDATE "user" SET password = \'\' WHERE id = :\'id\';',
+            id=uri.rsplit('/', 1)[1],
+        )
+
     def mail(self) -> list:
         '''Every message the stack's mail sink holds, oldest first, as
         `{'to': [address, ...], 'subject': str, 'links': [url, ...]}`; links are

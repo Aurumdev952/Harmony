@@ -205,7 +205,9 @@ def test_session_minted_before_wp0k_signs_in_the_registered_account_not_a_pendin
     stack,
 ):
     '''WP-0k INV-3 rows U-4 and T-6. A registered `legacy.twin@` and a pending
-    invitation `Legacy.Twin@` (made by the case-blind invitations before WP-0k).
+    invitation `Legacy.Twin@` (made by the case-blind invitations before WP-0k)
+    with no password, as an invitation that never registered has (with one,
+    it counts as an account that could sign in, and row T-5 signs in nobody).
     Before WP-0k: ILIKE with `first()` and no ORDER BY gave whichever row the
     table scan met first, which can be the pending account (here it is: the
     shell's row is written first).
@@ -219,6 +221,7 @@ def test_session_minted_before_wp0k_signs_in_the_registered_account_not_a_pendin
     # Written last, the registered account's row follows the shell's in the
     # table; `POST /api2/user` refuses a case twin of the pending shell.
     stack.rewrite_account(shell, f'Legacy.Twin@{USER_DOMAIN}', PENDING)
+    stack.clear_password(shell)
     stack.rewrite_account(account, f'legacy.twin@{USER_DOMAIN}')
 
     for typed in (

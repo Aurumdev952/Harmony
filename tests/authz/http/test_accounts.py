@@ -17,6 +17,8 @@ from __future__ import annotations
 
 import re
 import secrets
+import time
+from concurrent.futures import ThreadPoolExecutor
 
 import pytest
 
@@ -819,3 +821,186 @@ def test_flask_user_reset_form_sets_no_password(stack):
         f'{DEPLOYMENT_ORIGIN}/user/reset-password?token={token}'
     )
     assert _account_row(stack, account) == before
+
+
+def _reset_token(stack, uri: str) -> str:
+    return stack.sql(
+        'SELECT reset_password_token FROM "user" WHERE id = :\'id\';', id=_id(uri)
+    )[0][0]
+
+
+def _forgot_password_token(stack, uri: str, username: str) -> str:
+    '''Has the anonymous forgot-password form mail `username` a reset link;
+    returns the token the route stores on the account.'''
+    response = stack.request(
+        new_session(),
+        'POST',
+        '/api2/authentication/forgot_password',
+        {'email': username},
+    )
+    assert response.status_code == 200, response.text[:300]
+    token = _reset_token(stack, uri)
+    assert token
+    return token
+
+
+def _signs_in(stack, username: str, password: str) -> bool:
+    return stack.login(username, password)[1].status_code == 200
+
+
+def _invite(stack, username: str) -> tuple:
+    '''Invites `username` through the admin API; returns the pending
+    account's URI and the invitation token it stores.'''
+    response = stack.request(
+        stack.admin,
+        'POST',
+        '/api2/user/invite',
+        [{'email': username, 'name': 'Authz Invitee'}],
+    )
+    assert response.status_code == 200, response.text[:300]
+    uri = response.json()[0]['$uri']
+    stack.created_users.add(uri)
+    return uri, _reset_token(stack, uri)
+
+
+def test_a_reset_link_sets_the_password_once(stack):
+    '''WP-0k INV-3 row R-7 (8305190d). A mailed reset link is followed, then
+    followed again with another password.
+    Before WP-0k: 200 both times, for two days after the link was minted; the
+    second password replaced the first.
+    After: 400 `invalid_reset_link` the second time; nothing is written, and
+    only the first password signs in.'''
+    username = _name('reset-once')
+    account = stack.create_account(username, _password())
+    token = _forgot_password_token(stack, account, username)
+    first, second = _password(), _password()
+
+    used = _complete_reset(stack, token, first)
+    assert used.status_code == 200, used.text[:300]
+    after_first = _account_row(stack, account)
+    again = _complete_reset(stack, token, second)
+
+    assert again.status_code == 400, again.text[:300]
+    assert 'invalid_reset_link' in again.text
+    assert _account_row(stack, account) == after_first
+    assert _signs_in(stack, username, first)
+    assert not _signs_in(stack, username, second)
+
+
+def test_an_older_reset_link_is_refused_after_a_newer_one_is_mailed(stack):
+    '''WP-0k INV-3 row R-7. Two forgot-password mails, a second apart (tokens
+    minted in one second are identical); the older link is followed first.
+    Before WP-0k: 200; any link minted in the last two days set the password.
+    After: 400 `invalid_reset_link`, nothing written; the newer link still
+    works.'''
+    username = _name('reset-superseded')
+    account = stack.create_account(username, _password())
+    older = _forgot_password_token(stack, account, username)
+    time.sleep(1.1)
+    newer = _forgot_password_token(stack, account, username)
+    assert older != newer
+    before = _account_row(stack, account)
+
+    stale = _complete_reset(stack, older, _password())
+
+    assert stale.status_code == 400, stale.text[:300]
+    assert 'invalid_reset_link' in stale.text
+    assert _account_row(stack, account) == before
+    password = _password()
+    assert _complete_reset(stack, newer, password).status_code == 200
+    assert _signs_in(stack, username, password)
+
+
+def test_an_invitation_spent_on_registration_is_not_a_reset_link(stack):
+    '''WP-0k INV-3 rows R-2 and R-7. An invitee registers, then the same
+    invitation token is posted to the reset route.
+    Before WP-0k: 200; the invitation is a flask-user token, so for two days
+    whoever held the link set the registered account's password.
+    After: 400 `invalid_reset_link`; nothing is written.'''
+    username = _name('invite-then-reset')
+    account, invite = _invite(stack, username)
+    registered_with = _password()
+    _, registered = _register(stack, username, invite, registered_with)
+    assert registered.status_code == 200, registered.text[:300]
+    before = _account_row(stack, account)
+    password = _password()
+
+    response = _complete_reset(stack, invite, password)
+
+    assert response.status_code == 400, response.text[:300]
+    assert 'invalid_reset_link' in response.text
+    assert _account_row(stack, account) == before
+    assert _signs_in(stack, username, registered_with)
+    assert not _signs_in(stack, username, password)
+
+
+def test_an_invitation_used_at_reset_no_longer_registers(stack):
+    '''WP-0k INV-3 rows R-4 and R-2. An invitee follows its invitation token
+    through the reset route (it is a flask-user token), then registers with it.
+    Before WP-0k: 200 both times; the reset left the account pending and the
+    registration set the password again.
+    After: the reset activates the account (R-4); the registration answers
+    400 `Invalid invitation link`, and so does a second reset; nothing more is
+    written.'''
+    username = _name('invite-reset-register')
+    account, invite = _invite(stack, username)
+    password = _password()
+
+    reset = _complete_reset(stack, invite, password)
+    assert reset.status_code == 200, reset.text[:300]
+    assert _status_id(stack, account) == '1'
+    after_reset = _account_row(stack, account)
+    _, registered = _register(stack, username, invite, _password())
+    again = _complete_reset(stack, invite, _password())
+
+    assert registered.status_code == 400, registered.text[:300]
+    assert 'Invalid invitation link' in registered.text
+    assert again.status_code == 400, again.text[:300]
+    assert _account_row(stack, account) == after_reset
+    assert _signs_in(stack, username, password)
+
+
+def test_of_four_concurrent_resets_with_one_link_one_writes(stack):
+    '''WP-0k INV-3 row R-7 (the conditional write). Four requests follow one
+    reset link at once, each with its own password.
+    Before WP-0k: every request answered 200, and the last write won.
+    After: one 200 and three 400 `invalid_reset_link`; the stored password is
+    the one the 200 sent.'''
+    username = _name('reset-race')
+    account = stack.create_account(username, _password())
+    token = _forgot_password_token(stack, account, username)
+    passwords = [_password() for _ in range(4)]
+
+    with ThreadPoolExecutor(len(passwords)) as pool:
+        codes = list(
+            pool.map(lambda p: _complete_reset(stack, token, p).status_code, passwords)
+        )
+
+    assert sorted(codes) == [200, 400, 400, 400], codes
+    (winner,) = [p for p, code in zip(passwords, codes) if code == 200]
+    assert [p for p in passwords if _signs_in(stack, username, p)] == [winner]
+    assert _reset_token(stack, account) == ''
+
+
+def test_of_four_concurrent_registrations_with_one_invitation_one_writes(stack):
+    '''WP-0k INV-3 row R-2 (the conditional write). Four registrations with
+    one invitation at once, each with its own password.
+    Before WP-0k: every request answered 200 and signed the caller in; the
+    last write won.
+    After: one 200 and three 400 `Invalid invitation link`; the stored
+    password is the one the 200 sent.'''
+    username = _name('register-race')
+    _, invite = _invite(stack, username)
+    passwords = [_password() for _ in range(4)]
+
+    with ThreadPoolExecutor(len(passwords)) as pool:
+        codes = list(
+            pool.map(
+                lambda p: _register(stack, username, invite, p)[1].status_code,
+                passwords,
+            )
+        )
+
+    assert sorted(codes) == [200, 400, 400, 400], codes
+    (winner,) = [p for p, code in zip(passwords, codes) if code == 200]
+    assert [p for p in passwords if _signs_in(stack, username, p)] == [winner]

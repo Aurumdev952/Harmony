@@ -7,6 +7,14 @@ instances:
   - name: "lead-1"
     files:
       - scripts/create_user.py
+  - name: "qa-0k-pins"
+    files:
+      - tests/authz/http/conftest.py
+      - tests/authz/http/stack.py
+      - tests/authz/http/test_accounts.py
+      - tests/authz/http/test_links.py
+      - tests/authz/http/test_api_tokens.py
+      - tests/authz/stack.sh
   - name: "backend-0k"
     files:
       - web/server/util/deployment_links.py

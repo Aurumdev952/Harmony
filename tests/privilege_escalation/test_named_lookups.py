@@ -979,3 +979,54 @@ def test_an_acl_uri_naming_no_resource_is_refused(app, db, make_user, uri, statu
     assert response.status_code == status
     db.session.expire_all()
     assert db.session.query(User).get(target_id).acls == []
+
+
+# Round 2, reviewer item 1: WP-0l must not merge without WP-0k. Before WP-0k,
+# login checks the typed username with Flask-User's case-insensitive LIKE and
+# signs the typed string into the JWT; the session loader then resolves that
+# string. With exact matching in the loader alone, `x.doe` typing `x_doe` and
+# its own password is signed in as `x_doe`. WP-0k signs `user.username`.
+
+
+@pytest.mark.xfail(
+    strict=True,
+    reason='WP-0k signs the matched account into the JWT; passes once 0k merges',
+)
+def test_signing_in_with_a_look_alike_username_never_acts_as_its_account(app, db):
+    tag = _tag()
+    own_password = f'own-{tag}-password'
+    victim_password = f'victim-{tag}-password'
+    for username, password in (
+        (f'{tag}.doe@named.test', own_password),
+        (f'{tag}_doe@named.test', victim_password),
+    ):
+        db.session.add(
+            User(
+                username=username,
+                password=app.user_manager.hash_password(password),
+                first_name='Named',
+                last_name='Lookup',
+                status_id=UserStatusEnum.ACTIVE.value,
+            )
+        )
+    db.session.commit()
+    victim_id = db.session.query(User).filter_by(username=f'{tag}_doe@named.test')
+    victims_dashboard = _resource(db, f'dashboard-{tag}').id
+    _grant_user(db, victim_id.one().id, 'dashboard_viewer', victims_dashboard)
+    client = app.test_client()
+
+    login = client.post(
+        '/api2/authentication/login?set_cookie=false',
+        json={
+            'email': f'{tag}_doe@named.test',
+            'password': own_password,
+            'remember_me': False,
+        },
+    )
+    token = login.get_json().get('access_token') if login.status_code == 200 else None
+    response = client.get(
+        f'/api2/resource/{victims_dashboard}/roles',
+        headers={'Authorization': f'Bearer {token}'} if token else {},
+    )
+
+    assert response.status_code in (401, 403)

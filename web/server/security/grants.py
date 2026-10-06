@@ -15,13 +15,14 @@ non-superuser holds comes from its account.
 
 from __future__ import annotations
 
+import re
 from collections.abc import Iterable, Mapping
 from typing import TYPE_CHECKING, Any, NoReturn
 
 from flask import g
 from flask_login import current_user
 from flask_principal import Need
-from werkzeug.exceptions import BadRequest, Forbidden
+from werkzeug.exceptions import BadRequest, Forbidden, NotFound
 
 from models.alchemy.permission import Resource, ResourceRole, Role
 from models.alchemy.security_group import Group, GroupAcl
@@ -33,7 +34,10 @@ from web.server.routes.views.authorization import (
     current_user_is_superuser,
     is_authorized,
 )
-from web.server.routes.views.core import try_get_role_and_resource
+from web.server.routes.views.core import (
+    try_get_resource_role,
+    try_get_role_and_resource,
+)
 from web.server.routes.views.query_policy import construct_query_need_from_policy
 from web.server.security.permissions import SUPERUSER_ROLENAME
 from web.server.util.util import get_user_string
@@ -132,6 +136,36 @@ def member_groups_from_uris(
     return groups
 
 
+_RESOURCE_URI = re.compile(r'(?:^|/)api2/resource/(\d+)')
+
+
+def _resolve_acl(acl: Mapping[str, Any]) -> tuple[ResourceRole, Resource]:
+    '''The resource role and resource an ACL names. The resource's `$uri`
+    names exactly one row; its name is used only when the `$uri` is empty, and
+    then several resources with that name match none (names are not unique).
+    '''
+    resource_fields = acl['resource']
+    role_name = acl['resourceRole']['name']
+    uri = resource_fields.get('$uri')
+    if not uri:
+        resource_name = resource_fields.get('name')
+        if not resource_name:
+            # An ACL without a resource breaks need building for its holders.
+            raise BadRequest(description='Each ACL must name a resource.')
+        resource_role, _, resource = try_get_role_and_resource(
+            role_name, resource_fields.get('resourceType'), resource_name
+        )
+        return resource_role, resource
+
+    match = _RESOURCE_URI.search(uri)
+    if not match or match.end() != len(uri):
+        raise BadRequest(description='Expected a resource URI.')
+    resource = get_db_adapter().session.query(Resource).get(int(match.group(1)))
+    if resource is None:
+        raise NotFound(description='No resource has that URI.')
+    return try_get_resource_role(role_name, resource), resource
+
+
 def verify_acl_grants(
     acls: Iterable[Mapping[str, Any]],
     existing_acls: Iterable[GroupAcl | UserAcl],
@@ -144,15 +178,7 @@ def verify_acl_grants(
     existing = {(acl.resource_role_id, acl.resource_id) for acl in existing_acls}
     grants = []
     for acl in acls:
-        resource_name = acl['resource'].get('name')
-        if not resource_name:
-            # An ACL without a resource breaks need building for its holders.
-            raise BadRequest(description='Each ACL must name a resource.')
-        resource_role, _, resource = try_get_role_and_resource(
-            acl['resourceRole']['name'],
-            acl['resource'].get('resourceType'),
-            resource_name,
-        )
+        resource_role, resource = _resolve_acl(acl)
         grants.append((resource_role, resource))
         if (resource_role.id, resource.id) in existing:
             continue

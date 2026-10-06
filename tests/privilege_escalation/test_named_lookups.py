@@ -874,3 +874,108 @@ def test_transferring_a_twin_makes_the_new_owner_admin_of_that_twin(
     assert response.status_code == 204
     assert _user_acls(db, first_id) == {(first_creator.id, 'dashboard_admin')}
     assert (new_owner.id, 'dashboard_admin') in _user_acls(db, second_id)
+
+
+# Round 2: an ACL in a group or user update names its resource by `$uri` when
+# it has one; the name is used only when the `$uri` is empty.
+
+
+def _twin_resources(db) -> tuple:
+    name = f't{_tag()}_x'
+    return _resource(db, name).id, _resource(db, name).id, name
+
+
+def _acl_by_uri(resource_role_name: str, resource_id: int, name: str) -> dict:
+    acl = _acl(resource_role_name, name)
+    acl['resource']['$uri'] = f'/api2/resource/{resource_id}'
+    return acl
+
+
+def _group_with_acl(db, member, resource_role_name: str, resource_id: int):
+    group = Group(name=f'group-{_tag()}', users=[db.session.query(User).get(member.id)])
+    db.session.add(group)
+    db.session.commit()
+    _grant_group(db, group.id, resource_role_name, resource_id)
+    return group.id, group.name
+
+
+def test_adding_a_member_to_a_group_sharing_a_twin_keeps_its_acl(db, make_user):
+    admin = make_user(['admin'])
+    first_id, second_id, name = _twin_resources(db)
+    group_id, group_name = _group_with_acl(db, admin, 'dashboard_viewer', second_id)
+    member = make_user()
+
+    response = admin.request(
+        'PATCH',
+        f'/api2/group/{group_id}',
+        {
+            '$uri': f'/api2/group/{group_id}',
+            'name': group_name,
+            'roles': [],
+            'users': [admin.username, member.username],
+            'acls': [_acl_by_uri('dashboard_viewer', second_id, name)],
+        },
+    )
+
+    assert response.status_code == 200
+    assert _group_acls(db, second_id) == {(group_id, 'dashboard_viewer')}
+    assert _group_acls(db, first_id) == set()
+
+
+def test_an_acl_uri_is_checked_for_update_users_on_that_resource(db, make_user):
+    actor = make_user(['group_moderator'])
+    shared_id, other_id, name = _twin_resources(db)
+    _grant_user(db, actor.id, 'dashboard_admin', shared_id)
+    group_id, group_name = _group_with_acl(db, actor, 'dashboard_viewer', shared_id)
+
+    response = actor.request(
+        'PATCH',
+        f'/api2/group/{group_id}',
+        {
+            '$uri': f'/api2/group/{group_id}',
+            'name': group_name,
+            'roles': [],
+            'users': [actor.username],
+            'acls': [
+                _acl_by_uri('dashboard_viewer', shared_id, name),
+                _acl_by_uri('dashboard_viewer', other_id, name),
+            ],
+        },
+    )
+
+    assert response.status_code == 403
+    assert _group_acls(db, other_id) == set()
+
+
+@pytest.mark.parametrize(
+    ('uri', 'status'),
+    [('/api2/resource/not-an-id', 400), ('/api2/resource/999999999', 404)],
+)
+def test_an_acl_uri_naming_no_resource_is_refused(app, db, make_user, uri, status):
+    admin = make_user(['admin'])
+    target_id = _account(app, db, f'target-{_tag()}@named.test')
+    db.session.expire_all()
+    target = db.session.query(User).get(target_id)
+    acl = _acl('dashboard_viewer', f'dashboard-{_tag()}')
+    acl['resource']['$uri'] = uri
+
+    response = admin.request(
+        'PATCH',
+        f'/api2/user/{target_id}',
+        {
+            '$uri': f'/api2/user/{target_id}',
+            'username': target.username,
+            'firstName': target.first_name,
+            'lastName': target.last_name,
+            'phoneNumber': '',
+            'status': 'active',
+            'acls': [acl],
+            'apiTokens': [],
+            'roles': [],
+            'groups': [],
+        },
+    )
+
+    assert response.status_code == status
+    db.session.expire_all()
+    assert db.session.query(User).get(target_id).acls == []

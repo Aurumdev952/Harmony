@@ -65,7 +65,7 @@ None.
 - [x] core: in `web/server/data/data_access.py` `find_one_by_fields`, replace `query.filter(field.ilike(field_value))` with `query.filter(func.lower(field) == func.lower(field_value))` for string values when `case_sensitive=False` (blocks unit 1). Done by core on `mig/WP-0l-exact-name-matching-core` 7a5c600, merged here at 90a26f5.
 - [x] qa: re-record the contract cases `user.update_roles.assign` and `group.update_roles.assign` (`PATCH /api2/{user,group}/<id>/roles` with a non-empty map), which now answer 400 instead of 500 (INV-3 row 11). Add a case for `POST /api2/{user,group}/<id>/roles` if wanted: it is 400 now, 500 before.
 - [x] qa (qa-0l-tests): failing tests for paths A, B and D, and the WP-2b pins; merged at cc69345.
-- [ ] backend (WP-5c) or core (uniqueness rule): resolve ACL grants by `$uri` or id, or make resource names unique per type, so colliding slugs (`v-x`, `v_x`) stop making ACL saves 404 (security finding 1, Low, fails closed). This does not block WP-0l; see Findings.
+- [ ] core (uniqueness rule, optional): make resource names unique per type, so an ACL that names a resource by name only (an empty `$uri`) can never be ambiguous. Since round 2 (reviewer item 6), ACLs with a `$uri` resolve by id, and the UI sends one; this does not block WP-0l. See Findings.
 
 ## Findings while building
 
@@ -76,10 +76,7 @@ None.
 - **QA observations, recorded and not changed here.**
   - The sharing route is `POST /api2/resource/<id>/roles`, not `PATCH .../users`; the pins and the INV-3 rows use it.
   - A dashboard's resource `label` lags one save behind its title. This is a finding for WP-5d.
-- **Colliding resource names (security finding 1, Low, fails closed; request for WP-5c or core).** Any dashboard creator can pick a slug that becomes another dashboard's resource name: `v-x` and `v_x` both slugify to `v_x`. After that, ACL grants that name `v_x` are ambiguous. Row 7 makes them 404, so admins cannot save a user or group holding an ACL on either dashboard. Sharing through `POST /api2/resource/<id>/roles` still works. There are two remedies, and neither is done here:
-  - WP-5c (backend): resolve ACLs by `$uri` or id, not by name.
-  - Core: make resource names unique per type. This needs a uniqueness rule and a migration, and existing duplicates need deciding.
-  The human item for row 7 includes this consequence.
+- **Colliding resource names (security finding 1, Low, fails closed; request for WP-5c or core).** Any dashboard creator can pick a slug that becomes another dashboard's resource name: `v-x` and `v_x` both slugify to `v_x`. At bf75d1c, ACL grants naming `v_x` were ambiguous. Row 7 made them 404, so admins could not save a user or group holding an ACL on either dashboard. Since round 2, `verify_acl_grants` resolves an ACL by its resource `$uri` when it has one. The UI round-trips the `$uri` it read (`ItemLevelACL`, `Resource` serialize), so those saves succeed (`test_adding_a_member_to_a_group_sharing_a_twin_keeps_its_acl`). Only an ACL with an empty `$uri` and a colliding name is still a 404, and it fails closed. Making names unique per type (core, needs a migration and a decision on existing duplicates) would close that too. The human item for row 7 keeps this consequence.
 - **Not repaired by this fix:** admin ACLs that were already stored on the wrong dashboard, including those from innocent name matches in the past. Decision 0012's amendment leaves a read-only audit per deployment to the human.
 
 ## Merging with WP-0k
@@ -93,7 +90,6 @@ WP-0k (`mig/WP-0k-configured-links-exact-usernames`, in review) changes `try_get
 
 - `PATCH /api2/{user,group}/<id>/roles` with `{}` removes every role. This is the documented meaning of the route, and WP-0h pins it (`test_clearing_a_*_roles_keeps_the_roles`, `tests/authz/http/test_escalation.py:352`). Only a non-empty map is refused.
 - In `POST /api2/resource/<id>/roles`, an empty `userRoles` map leaves every user's share alone, while an empty `groupRoles` map removes every group's share. The schema says an empty map removes all of them for both. Kept as it was.
-- ACL payloads name their resource by `name`, although they carry a `$uri` that would identify the resource exactly. Resolving by `$uri` is left for the FastAPI port (WP-5c).
 - Paths F and G (`settings.py:140`, `druid_context.py:130`, `scripts/create_user.py`) look up fixed keys or are operator-only. Core's change makes them exact; nothing else is needed.
 
 ## Log
@@ -175,7 +171,7 @@ Rows 1 to 5 are decision 0012's. Rows 6 to 13 are what this WP found and changed
 | 4 | Membership and transfers by username | pattern, case-insensitive | equal ignoring case | `*_ignores_case` |
 | 5 | Case | case-insensitive | case-insensitive everywhere | `test_a_share_naming_a_holder_in_another_case_keeps_its_roles`, `*_ignores_case` |
 | 6 | Decision 0012 amendment, path H: creating a dashboard or an alert, or transferring an alert, makes the author or new owner admin of exactly that resource | `dashboard_admin` or `alert_admin` given on the first resource whose name the new name matches as a pattern; for dashboards, `xxx` instead of the author's own `x_x` (live check above) | given on the new or transferred resource | `test_creating_a_dashboard_makes_its_author_admin_of_that_dashboard`, `test_alert_transfer_by_username_ignores_case` |
-| 7 | A name equal ignoring case to several rows (usernames and group names unique only as stored; resource names not unique) | one of them, unordered | the exact spelling if only one row has it, else 404 with nothing written. Consequence for the human: two dashboards whose slugs collide (`v-x`, `v_x`) make ACL saves naming either one 404 until WP-5c or core resolves them (see Findings) | `test_a_group_named_in_another_case_than_two_groups_*`, `test_a_user_named_*`, `test_an_acl_naming_a_resource_two_resources_share_*` |
+| 7 | A name equal ignoring case to several rows (usernames and group names unique only as stored; resource names not unique) | one of them, unordered | the exact spelling if only one row has it, else 404 with nothing written. ACLs in user and group updates resolve by their resource `$uri` when present (round 2), so only an ACL with an empty `$uri` naming colliding slugs (`v-x`, `v_x`) is a 404 (see Findings) | `test_a_group_named_in_another_case_than_two_groups_*`, `test_a_user_named_*`, `test_an_acl_naming_a_resource_two_resources_share_*`, `test_adding_a_member_to_a_group_sharing_a_twin_keeps_its_acl`, `test_an_acl_uri_*` |
 | 8 | A share naming an existing holder in another case | the holder's roles were stripped (and a 500 from the access-granted email where it could not render) | the holder gets the roles named | `test_a_share_naming_a_holder_in_another_case_keeps_its_roles` |
 | 9 | A share naming an unknown user or group, or a look-alike with no exact match | 404, but the sitewide ACL in the body was already committed, and so were the removals implied by an empty `groupRoles` map | 404 with nothing written; the sitewide ACL is written only once every name is resolved | `test_a_share_naming_an_unknown_user_writes_nothing`, `test_a_share_naming_no_one_leaves_the_sitewide_acl_alone` |
 | 10 | 403 from ACL grants on `PATCH /api2/{user,group}/<id>`; 404 for a resource role of another type | bodies name the resource | bodies name the type only; the audit line keeps id and name | `test_a_refused_acl_grant_*`, `test_a_resource_role_of_another_type_*` |

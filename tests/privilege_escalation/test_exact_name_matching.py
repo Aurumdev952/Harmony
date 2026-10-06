@@ -582,12 +582,14 @@ def _group_acl_body(
 
 def test_a_refused_acl_grant_does_not_name_the_dashboard(db, make_user, tag):
     '''Before: 403 "Granting 'dashboard_viewer' on DASHBOARD '<name>' needs
-    ...". After: 403 that names no dashboard.'''
+    ...". After: 403 that names no dashboard. The actor can view the
+    dashboard but not share it: since WP-0l a dashboard the caller cannot
+    see is a 404, the same as one that does not exist (INV-3 row 7).'''
     actor = make_user(['group_moderator'])
     group_name = f'grants-{tag}'
     group_id = _group(db, group_name, users=[actor])
     dashboard_name = f'private-{tag}'
-    _dashboard(db, dashboard_name)
+    _grant_user(db, actor.id, 'dashboard_viewer', _dashboard(db, dashboard_name))
 
     response = actor.request(
         'PATCH',

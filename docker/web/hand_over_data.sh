@@ -7,9 +7,12 @@
 # CHOWN and DAC_READ_SEARCH capabilities and no network, then exits. After the
 # first run it finds nothing to change.
 #
-# uid 1000 may have planted symlinks in these trees. Nothing here follows one:
+# uid 1000 may have planted links in these trees. Nothing here follows a symlink:
 # find does not follow symlinks (-P), -execdir runs chown from each entry's own
-# directory, and chown -h changes a symlink itself, never its target.
+# directory, and chown -h changes a symlink itself, never its target. A hardlink
+# is the same inode as a file elsewhere on the filesystem (another service's file
+# under /data/output, say), so only directories and entries with one link are
+# handed over; anything with more links is reported and left alone.
 set -euo pipefail
 export PATH=/usr/sbin:/usr/bin:/sbin:/bin
 
@@ -18,7 +21,10 @@ APP_GID=1000
 
 # hand_over <dir> [find options and tests]
 hand_over() {
-  find -P "$1" -xdev "${@:2}" ! -user "$APP_UID" -execdir chown -h "$APP_UID:$APP_GID" {} +
+  find -P "$1" -xdev "${@:2}" ! -user "$APP_UID" \
+    \( -type d -o -links 1 \) -execdir chown -h "$APP_UID:$APP_GID" {} +
+  find -P "$1" -xdev "${@:2}" ! -user "$APP_UID" ! -type d -links +1 \
+    -printf 'hand_over_data: skipped %p: %n links\n' >&2
 }
 
 if [[ -d /data/output && ! -L /data/output ]]; then

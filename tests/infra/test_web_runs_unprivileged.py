@@ -175,11 +175,15 @@ def test_the_data_owner_hands_over_without_following_symlinks(tmp_path, web_imag
         arg for target, name in volumes.items() for arg in ('-v', f'{name}:{target}')
     ]
     owner, after = f'harmony-test-{tag}-owner', f'{web_image}-{tag}'
-    # A host written by root-run images, plus symlinks the app user planted.
+    # A host written by root-run images, plus symlinks the app user planted and
+    # a hardlink to a root-owned file outside the handed-over trees (hasura's log,
+    # on the same filesystem).
     layout = (
-        'set -e; mkdir -p /data/output/zenysis_static/build /zenysis/uploads/2024; '
-        'echo x > /data/output/zenysis.log; echo x > /data/output/zenysis_static/build/a.js; '
+        'set -e; mkdir -p /data/output/zenysis_static/build /data/output/logs '
+        '/zenysis/uploads/2024; echo x > /data/output/zenysis.log; '
+        'echo x > /data/output/zenysis_static/build/a.js; echo x > /data/output/logs/hasura.log; '
         'echo x > /zenysis/uploads/2024/r.csv; chown -R 0:0 /data/output /zenysis/uploads; '
+        'ln /data/output/logs/hasura.log /data/output/zenysis_static/build/hardlinked.js; '
         'ln -s /usr/local/bin /data/output/planted.log; '
         'ln -s /usr/local/bin /data/output/zenysis_static/build/planted; '
         'ln -s /usr/local/bin /zenysis/uploads/planted'
@@ -205,6 +209,7 @@ def test_the_data_owner_hands_over_without_following_symlinks(tmp_path, web_imag
             '--entrypoint', 'stat', after, '-c', '%n %u:%g', '/usr/local/bin',
             '/data/output', '/data/output/zenysis.log',
             '/data/output/zenysis_static/build/a.js', '/zenysis/uploads/2024/r.csv',
+            '/data/output/logs/hasura.log',
         )  # fmt: skip
         assert owners.splitlines() == [
             '/usr/local/bin 0:0',
@@ -212,7 +217,9 @@ def test_the_data_owner_hands_over_without_following_symlinks(tmp_path, web_imag
             '/data/output/zenysis.log 1000:1000',
             '/data/output/zenysis_static/build/a.js 1000:1000',
             '/zenysis/uploads/2024/r.csv 1000:1000',
+            '/data/output/logs/hasura.log 0:0',
         ]
+        assert 'hardlinked.js' in run.stderr, 'a skipped hardlink is reported'
     finally:
         _docker('rm', '-f', owner, check=False)
         _docker('rmi', after, check=False)

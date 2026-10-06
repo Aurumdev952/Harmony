@@ -12,7 +12,9 @@ const STACK = new URL(BASE_URL);
  * 5xx responses and failed requests, in every page of a watched browser
  * context, popups included. It also blocks and records every HTTP request and
  * WebSocket that leaves the disposable stack (CDNs, tile servers, analytics),
- * so the suite never makes an external call. Every test fails at teardown if
+ * so the suite never makes an external call; service workers, whose fetches
+ * would bypass these routes, are blocked in playwright.config.ts (guard.spec.ts
+ * checks both). Every test fails at teardown if
  * any were seen, unless the test allowed that exact message with a written
  * reason (a known defect or a limit of the disposable stack).
  */

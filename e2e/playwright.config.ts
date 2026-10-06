@@ -40,6 +40,9 @@ export default defineConfig({
     screenshot: 'only-on-failure',
     // Traces record typed text; specs that type a password turn them off.
     trace: 'retain-on-failure',
+    // A service worker's requests bypass the context routes the external-
+    // request guard relies on. Blocked until WP-7f adds the PWA's worker.
+    serviceWorkers: 'block',
   },
   projects: [
     // The axe baseline counts nodes on the stack as seeded; the e2e project

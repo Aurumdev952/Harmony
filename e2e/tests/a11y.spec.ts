@@ -29,6 +29,10 @@ const PAGE_NAMES = new Set(PAGES.map(({ name }) => name));
 const updated: Record<string, Counts> = Object.fromEntries(
   Object.entries(baseline).filter(([name]) => PAGE_NAMES.has(name)),
 );
+// Growth an update run refused. The tests run serially in update mode, so a
+// test that failed on its own refusal would skip every later page; they are
+// collected instead and fail the run once, after the file is written.
+const refusals: string[] = [];
 
 function compare(page: string, now: Counts): { worse: string[]; better: string[] } {
   const before = baseline[page] ?? {};
@@ -52,6 +56,10 @@ if (UPDATE) {
   test.afterAll(() => {
     const sorted = Object.fromEntries(Object.keys(updated).sort().map(k => [k, updated[k]]));
     writeFileSync(BASELINE_FILE, `${JSON.stringify(sorted, null, 2)}\n`);
+    expect(
+      refusals,
+      'an update only shrinks the baseline; name an accepted regression in E2E_A11Y_ACCEPT',
+    ).toEqual([]);
   });
 }
 
@@ -85,10 +93,7 @@ test.describe('axe baseline at 1440 px @a11y', () => {
           } else {
             delete updated[pageCase.name];
           }
-          expect(
-            next.refused,
-            'an update only shrinks the baseline; name an accepted regression in E2E_A11Y_ACCEPT',
-          ).toEqual([]);
+          refusals.push(...next.refused);
           return;
         }
 

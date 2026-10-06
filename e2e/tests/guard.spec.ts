@@ -42,4 +42,16 @@ test.describe('the external-request guard @smoke @guard', () => {
       );
     await context.close();
   });
+
+  // A worker's own fetches would pass the context routes above. With
+  // serviceWorkers: 'block' (playwright.config.ts) a registration resolves to
+  // nothing and no worker starts; allowed, this script would be fetched and
+  // installed.
+  test('service workers cannot register', async ({ page }) => {
+    await page.goto('/login');
+    const registration = await page.evaluate(async () =>
+      String(await navigator.serviceWorker.register('/js/vendor/min/jquery-3.6.0.js')),
+    );
+    expect(registration).toBe('undefined');
+  });
 });

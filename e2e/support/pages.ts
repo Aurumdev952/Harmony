@@ -23,10 +23,12 @@ export type PageCase = {
   knownErrors?: KnownError[];
 };
 
-// The digest API's 500 rejects APIService's promise with a ZenHTTPError that
-// nothing catches. Its message is the class's minified name, `l`, so a
-// change to the bundle that renames it fails here, loudly, rather than this
-// allowance swallowing other uncaught errors.
+// Admits exactly two messages: a 500 from /api2/data_digest/, and the uncaught
+// page error `l`. The 500 rejects APIService's promise with a ZenHTTPError,
+// and DataDigestApp/index.jsx:101 has no catch for it (request to
+// frontend-platform); the error's message is the class's minified name. Any
+// other uncaught error on the page, including one whose message differs only
+// because a rebuilt bundle renamed the class, still fails the test.
 const NO_OBJECT_STORAGE: KnownError = {
   pattern: /^(HTTP 500 GET http:\/\/[^/]+\/api2\/data_digest\/.*|page error: l)$/,
   reason:

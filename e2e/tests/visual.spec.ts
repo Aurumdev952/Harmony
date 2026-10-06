@@ -20,7 +20,6 @@ const dashboardActivity = (page: Page): Locator[] => [
   page.locator('.overview-page-dashboard-table tbody td:nth-child(n+2):nth-child(-n+4)'),
 ];
 const VOLATILE: Record<string, (page: Page) => Locator[]> = {
-  home: dashboardActivity,
   overview: dashboardActivity,
 };
 

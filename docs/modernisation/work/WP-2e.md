@@ -65,6 +65,7 @@ None of these block WP-2e.
   - `e2e/node_modules/.bin/playwright install-deps chromium` once on the runner, for the a11y and e2e projects that run on the host;
   - about 12 minutes, plus about 3 for a client build.
   `run.sh` already handles rootful Docker: it runs the image as the caller's uid. Compare the first CI run's visual results against `e2e/visual/` before making the job required, and report any drift to qa rather than adding tolerance.
+- [ ] frontend-platform: the data digest page leaves its API failure unhandled. `DataDigestApp/index.jsx:101` calls `DataDigestService.getDatasourceDigestTree()` with a `then` and no `catch`, so a failing `/api2/data_digest/` call surfaces as an uncaught `ZenHTTPError` (message `l` in the minified bundle), and the page stays blank with no message. Repro: `/data-digest` on the e2e stack, which has no object storage. Expected: a handled error state. Then drop the `page error: l` half of `NO_OBJECT_STORAGE` in `e2e/support/pages.ts`.
 - [ ] frontend-platform (WP-6e, FE-11): bring the TypeScript under `e2e/` into the ESLint 10 flat config with typescript-eslint, including `@typescript-eslint/no-floating-promises`. Without that rule, a missing `await` before an `expect(...)` or a locator action passes silently. The repository's ESLint today is babel-eslint and Flow over `.js` and `.jsx` only, so strict `tsc` (TypeScript 6) is the only gate on `e2e/`.
 
 ## Deferrals
@@ -115,6 +116,12 @@ None of these block WP-2e.
 - 2026-10-06 qa-5t round 2, unit 12 (QA gate finding 4): the present-mode case is now the last of the serial dashboard flow. A failure there can no longer skip the share and export cases. Check: with the present case broken on purpose (`Add Content` expected 5 times), `--grep @dashboard` gives 1 failed and 6 passed, with nothing skipped (`/tmp/wp2e-present-mutant.log`). Restored, the full e2e project passes 77.
 - 2026-10-06 qa-5t round 2, unit 13 (QA gate findings 6 and 7): recorded the unit-test location deviation (`tests/frontend/unit/` instead of `web/client/**/*.test.ts`) and the one-host limit of visual determinism, as a deferral tied to the CI job. Unit 3's `pages.spec.ts` count was corrected to 42 in unit 8.
 - 2026-10-06 qa-5t round 2 closing check at 0448800: `yarn e2e` from a `git archive` of the head passed visual 71, a11y 26 and e2e 77. The client-edit proof, strict tsc, shellcheck, ruff, ESLint, the 3.8 guard and task_gate are in the evidence. Status stays review.
+- 2026-10-06 qa-5t: the five follow-ups from the reviewer's round-2 approval, in one commit.
+  1. The client stamp now covers `relay.config.js`, which babel-plugin-relay loads, and the Node image reference. It also stores a hash of `web/public/build/min` next to the sources hash, and both must match. `build_client` deletes the stamp before building, so a failed or interrupted build leaves none. The new file is `web/public/build/e2e-client.stamp`.
+  2. The `NO_OBJECT_STORAGE` comment now says exactly which two messages the pattern admits, and that any other uncaught error, including a renamed class, still fails. A frontend-platform request covers the missing `catch` at `DataDigestApp/index.jsx:101`.
+  3. The dead `home` entry in the visual masks is deleted; home is an alias row and is not captured.
+  4. In a11y update mode, refusals are collected and asserted once in `afterAll`, after the file is written. Before, a refusing test failed on the spot, and in the serial update run it skipped every later page.
+  5. Service workers are blocked (`serviceWorkers: 'block'`) until WP-7f. A worker's fetches would bypass the context routes. The fixture comment says so, and `tests/guard.spec.ts` gained "service workers cannot register".
 
 ## Evidence
 
@@ -161,6 +168,11 @@ None of these block WP-2e.
   - Client-edit proof (reviewer finding 2) in that checkout. `e2e/run.sh client` said "client build matches its sources". After `invalid_login_credentials` in `web/client/components/Authentication/i18n.js` was changed to end in "(stamp check)", the next `client` printed "client sources changed ...; building" and rebuilt (141 s), `commons.bundle.js` then held the new text, and a third `client` said the build matches again (`/tmp/wp2e-r2-client-edit.log`).
   - Static checks at the head: strict `tsc --noEmit` on `e2e/` with TypeScript 6.0.3 is clean; shellcheck 0.11 on `e2e/run.sh` is clean; ruff check and format are clean on `e2e/stack` and `tests/golden`; `eslint --max-warnings 0 tests/frontend` is clean; the 3.8 guard reports 8 files and 0 problems in `tests/golden` and `e2e/stack`; `pytest tests/golden` passes 269.
   - `task_gate.py WP-2e` reports only the status (review) and the two changes-requested verdicts awaiting re-check, and no ownership problems.
+- Reviewer follow-ups, each failing first:
+  - Stamp (`/tmp/wp2e-stamp-proof.log`), in a `git archive` of 117b24a3. With the old `run.sh`, after a build, flipping `eagerESModules` in `relay.config.js` and then appending a line to `commons.bundle.js` both gave "client build matches its sources". With the new `run.sh`, the first `client` rebuilt (old stamp format), and the second matched. The relay flip then printed "no client build from these sources by run.sh; building", and after that build it matched. The appended bundle line rebuilt in the same way, and after that build it matched. Restoring the relay setting rebuilt once more.
+  - a11y update mode, against the stack, with `admin.aria-command-name` removed from the baseline and `admin-roles.color-contrast` raised by 1. Old spec: admin failed, admin-roles "did not run" and kept 95. New spec: both ran, admin-roles shrank to 94, and the run failed once on `admin: aria-command-name 0 -> 1` (`/tmp/wp2e-a11y-refusal-old.log`, `/tmp/wp2e-a11y-refusal-new.log`).
+  - Service workers: with `serviceWorkers: 'allow'` the new guard case fails, because the browser fetched and evaluated the script ("ServiceWorker script evaluation failed"). With `'block'` the registration resolves to `undefined` and the case passes.
+  - Then on one stack, in order: `run.sh visual` 71 passed, `run.sh a11y` 26 passed, and `run.sh e2e` 78 passed (the 77 plus the service-worker case). Strict tsc and shellcheck are clean.
 
 ## Verdicts
 

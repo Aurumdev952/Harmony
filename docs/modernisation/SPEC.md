@@ -1,6 +1,6 @@
 # Harmony modernisation specification
 
-Version 1.14, 2026-10-06 (decisions 0001, 0003 to 0014). Status: approved for execution.
+Version 1.15, 2026-10-06 (decisions 0001, 0003 to 0015). Status: approved for execution.
 
 This is the binding guide for every agent and engineer working on the Harmony migration. Where this spec and another document disagree, this spec wins. The other documents explain why and describe the work in detail:
 
@@ -194,7 +194,7 @@ Each WP is one pull request, or a short stack of them. Detail lives in the named
 | 5f | Dashboards, sharing, alerts, configuration, exports | backend | frontend-platform | 5a, 1h | yes |
 | 5g | Rewrite stored `$ref` URIs | core | backend, qa | 5b-5f | yes |
 | 5h | Pages on FastAPI; delete Flask | backend | infra, frontend-platform | 5b-5g | yes |
-| 6a | `fetch` instead of jQuery and bluebird | frontend-platform | none | 2e | no |
+| 6a | `fetch` instead of jQuery and bluebird | frontend-platform | frontend-design, visualization, backend (decision 0015) | 2e | no |
 | 6b | Vite 8 and the manifest helper | frontend-platform | backend | 6a | no |
 | 6c | React 19, decorators removed | frontend-platform | none | 6b | no |
 | 6d | Vitest and Storybook | frontend-platform | qa | 6b | no |

@@ -97,12 +97,12 @@ None.
 
 ## Merging with WP-0k
 
-Merge order: 0j, then 0k, then 0l, all at close-out. WP-0l merges only with or after WP-0k (INV-3 row 15). These notes were checked against WP-0k af27489d and WP-0j f7d8f678; the lead names the heads at close-out. On merge:
+Merge order: 0j, then 0k, then 0l, all at close-out. WP-0l merges only with or after WP-0k (INV-3 row 15). These notes were checked against WP-0k fdcad802 (PR #30) and WP-0j f7d8f678; the lead names the heads at close-out. On merge:
 - **`users.py` `try_get_user`**: keep WP-0k's body, `return find_named_account(username, session)` (`web/server/security/usernames.py`). Do not use `find_user_by_username`, which ranks active accounts first.
   - `find_named_account` and `find_by_name` then hold the same rule twice, so make one call the other. For usernames they agree, because usernames are unique as stored, so at most one row has the exact spelling.
   - The simplest form is for `find_named_account(username, session)` to return `find_by_name(User, username, session, name_field='username')`.
   - Drop the `find_by_name` import from `users.py` if nothing else there uses it.
-- **`resource.py`**: keep this branch's `update_resource_roles`, with `try_get_user` as the user lookup. WP-0k's `resource.py:112` (`find_named_account`) is on the line this branch rewrote, so its `find_named_account` import in `resource.py` becomes unused; drop it.
+- **`resource.py`**: keep this branch's `update_resource_roles`, with `try_get_user` as the user lookup. WP-0k's `resource.py:112` (`find_named_account`) is on the line this branch rewrote. After taking this branch's `update_resource_roles`, drop WP-0k's now-unused `from web.server.security.usernames import find_named_account` in `resource.py` (`resource.py:21` on fdcad802), or ruff F401 fails the lint gate.
 - **Other `users.py` changes**: keep WP-0k's (`invite_users`, `get_anonymous_user`, `update_user_api_tokens`).
 - **`web/server/security/grants.py`, with WP-0j**:
   - Imports: keep `ItemNeed` and `User` from WP-0j, and `NotFound`, `ResourceTypeEnum`, `re` and the `core` imports (`find_by_name`, `resource_not_found`, `try_get_resource_role`, `try_get_resource_type`) from WP-0l.
@@ -142,6 +142,17 @@ One line per finished unit: `YYYY-MM-DD <instance> unit N: <what>; check: <comma
   - QA merged: d975a521, cb4f3906 and 42555666.
   
   Check on a58c77fc: `ci/pytest_suites.sh` all 13 suites pass, including privilege_escalation 158 with 1 xfailed, web 309 and authz 4681 ([log](WP-0l-evidence/pytest_suites_round2.txt)). Contract replay on a fresh stack passes 234/234 ([log](WP-0l-evidence/contract_replay_round2.txt)). Lint and mypy are clean; the 3.8 guard finds 0 problems in 871 files.
+- 2026-10-06 backend-0l round 3 (QA r2 lows, reviewer r2 F1 to F4). Every pin failed before its fix:
+  - 3b8f30de, QA lows:
+    - A refused grant on a hidden resource is audited by resource id only; before, it left no audit line.
+    - `/api/authorization` and `/api/authorization_multi` answer a JSON 400 for a null or non-string `resourceType`; before, HTML 400.
+    - Merge notes updated for the `grants.py` conflict with WP-0j.
+    - The `no_mail` fixture tolerates WP-0k.
+  - 892174f3, F1: merged qa d6ca1a35 (live row-10 and row-7 pins).
+  - d370e6fa, F2: group sharing on the second of two same-named resources. On 90a26f5 the ACL landed on the first ([log](WP-0l-evidence/group_twin_pin_on_90a26f5.txt)). Row 1.
+  - 89762102, F3: role names resolved before any write. Before, a 404 left the sitewide ACL stored. Row 9.
+  - F4: merge notes for WP-0k fdcad802, including dropping the unused `find_named_account` import in `resource.py`.
+  - The decision 0012 consequence text is proposed under Findings (the decision file is lead-owned).
 
 ## Evidence
 
@@ -205,7 +216,7 @@ Rows 1 to 5 are decision 0012's. Rows 6 to 13 are what this WP found and changed
 
 | # | Decision | Before (7c34bca) | After | Pinned by |
 |---|---|---|---|---|
-| 1 | Sharing `POST /api2/resource/<id>/roles` | ACLs written on the first resource of the type whose name the URL resource's name matches as a LIKE pattern | ACLs written on the resource in the URL | `test_sharing_a_dashboard_*`; qa path A |
+| 1 | Sharing `POST /api2/resource/<id>/roles` | ACLs written on the first resource of the type whose name the URL resource's name matches as a LIKE pattern | ACLs written on the resource in the URL | `test_sharing_a_dashboard_*`, `test_sharing_the_second_twin_with_a_group_lands_on_it`; qa path A |
 | 2 | Removing a user's or group's share | could remove the share of a look-alike whose name matched as a pattern, and keep the named one's | removes exactly the holder spelled that way | `test_removing_a_users_share_removes_only_that_users_acls`; qa path B |
 | 3 | A name with `_` or `%` and no exact match (share, group or role membership, ACL grant, transfer, `DELETE /api2/{user,group}/<id>/roles`) | resolved to a matching row; `DELETE .../roles` removed the role on the look-alike resource | 404, nothing written | `test_deleting_a_role_on_a_look_alike_name_removes_nothing`, `test_role_membership_by_a_look_alike_username_adds_nobody`, `test_dashboard_transfer_from_a_look_alike_*`, `test_alert_transfer_naming_no_user_*`; qa path D |
 | 4 | Membership and transfers by username | pattern, case-insensitive | equal ignoring case | `*_ignores_case` |
@@ -213,7 +224,7 @@ Rows 1 to 5 are decision 0012's. Rows 6 to 13 are what this WP found and changed
 | 6 | Decision 0012 amendment, path H: creating a dashboard or an alert, or transferring a dashboard (one or in bulk) or an alert, makes the author or new owner admin of exactly that resource | `dashboard_admin` or `alert_admin` given on the first resource whose name the new name matches as a pattern; for dashboards, `xxx` instead of the author's own `x_x` (live check above) | given on the new or transferred resource | `test_creating_a_dashboard_makes_its_author_admin_of_that_dashboard`, `test_creating_a_twin_*`, `test_transferring_a_twin_*`, `test_transferring_a_dashboard_moves_only_that_dashboard`, `test_alert_transfer_by_username_ignores_case` |
 | 7 | A name equal ignoring case to several rows (usernames and group names unique only as stored; resource names not unique) | one of them, unordered | the exact spelling if only one row has it, else 404 with nothing written. ACLs in user and group updates resolve by their resource `$uri` when present (round 2), so only an ACL with an empty `$uri` naming colliding slugs (`v-x`, `v_x`) is a 404 (see Findings). An ACL grant on a resource the caller cannot see, which the target does not already hold, gets the same 404 as one that does not exist, whether named by `$uri` or by name. Before, it was a 403, which told the caller the resource exists (security's review of aed7d825). Grants on visible resources the caller cannot share stay 403. The hidden-resource refusal is audited by resource id only | `test_a_group_named_in_another_case_than_two_groups_*`, `test_a_user_named_*`, `test_an_acl_naming_a_resource_two_resources_share_*`, `test_adding_a_member_to_a_group_sharing_a_twin_keeps_its_acl`, `test_an_acl_uri_*`, `test_an_acl_on_a_resource_the_caller_cannot_see_looks_like_no_resource`, `test_a_grant_on_a_hidden_resource_is_audited_by_id_only` |
 | 8 | A share naming an existing holder in another case | the holder's roles were stripped (and a 500 from the access-granted email where it could not render) | the holder gets the roles named | `test_a_share_naming_a_holder_in_another_case_keeps_its_roles` |
-| 9 | A share naming an unknown user or group, or a look-alike with no exact match | 404, but the sitewide ACL in the body was already committed, and so were the removals implied by an empty `groupRoles` map | 404 with nothing written; the sitewide ACL is written only once every name is resolved | `test_a_share_naming_an_unknown_user_writes_nothing`, `test_a_share_naming_no_one_leaves_the_sitewide_acl_alone` |
+| 9 | A share naming an unknown user or group, a look-alike with no exact match, or a resource role that does not exist or is for another resource type | 404, but the sitewide ACL in the body was already committed, and so were the removals implied by an empty `groupRoles` map | 404 with nothing written; the sitewide ACL is written only once every user, group and role name is resolved | `test_a_share_naming_an_unknown_user_writes_nothing`, `test_a_share_naming_no_one_leaves_the_sitewide_acl_alone`, `test_a_share_naming_a_role_it_cannot_grant_writes_nothing` |
 | 10 | 403 from ACL grants on `PATCH /api2/{user,group}/<id>`; 404 for a resource role of another type | bodies name the resource | bodies name the type only; the audit line keeps id and name | `test_a_refused_acl_grant_*`, `test_a_resource_role_of_another_type_*` |
 | 11 | `POST /api2/{user,group}/<id>/roles`; `PATCH .../roles` with a map naming a role | `POST` for an ACL the target did not hold: 500 (it built `UserRoles`/`GroupRoles` with a `resource_id` they lack), nothing written; `POST` for one already held: 200, no-op; a `PATCH` map naming a role: 500 | 400, nothing written. A `PATCH` map naming no role (`{}`, or empty role lists) still removes every role, 200, as before | `test_the_legacy_single_role_post_*`, `test_a_non_empty_legacy_role_map_*`, `test_a_legacy_role_map_naming_no_role_still_removes_every_role`; contract `*.update_roles.assign` |
 | 12 | `POST /api2/alert_definitions/transfer/username` naming a missing user | 500, or a transfer from or to a look-alike | 404 | `test_alert_transfer_naming_no_user_is_not_found` |

@@ -1,0 +1,18 @@
+{
+  "name": "harmony-e2e",
+  "private": true,
+  "description": "Playwright end-to-end, accessibility and visual suites (WP-2e). A separate package because the root .yarnclean deletes every `test` directory, including the Playwright runner.",
+  "engines": {
+    "node": ">=18.17"
+  },
+  "scripts": {
+    "test": "playwright test",
+    "typecheck": "tsc --noEmit"
+  },
+  "devDependencies": {
+    "@axe-core/playwright": "4.10.2",
+    "@playwright/test": "1.56.1",
+    "@types/node": "18.19.130",
+    "typescript": "6.0.3"
+  }
+}

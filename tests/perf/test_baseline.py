@@ -692,9 +692,11 @@ def test_the_reference_web_has_its_own_redis():
 STACK_SH = baseline.HERE / 'stack.sh'
 
 
-def _build_image(tmp_path: Path, build_exit: int, **env: str):
+def _build_image(tmp_path: Path, failing_build: int | None, **env: str):
     """Source stack.sh with a fake `docker` first on PATH, call build_image the
-    way `up` and `reference` do, and return the result and the docker calls."""
+    way `up` and `reference` do, and return the result and the docker calls.
+    The fake fails the `failing_build`-th `docker build` (1: the web-server
+    image, 2: the perf overlay on it), or none."""
     calls = tmp_path / 'docker-calls'
     fake = tmp_path / 'bin' / 'docker'
     fake.parent.mkdir(parents=True)
@@ -703,7 +705,8 @@ def _build_image(tmp_path: Path, build_exit: int, **env: str):
         f'echo "$*" >> {calls}\n'
         # No image exists yet, so build_image has to build.
         '[[ $1 == image ]] && exit 1\n'
-        f'[[ $1 == build ]] && exit {build_exit}\n'
+        f'[[ $1 == build ]] && (( $(grep -c ^build {calls}) == {failing_build or 0} ))'
+        ' && exit 1\n'
         'exit 0\n'
     )
     fake.chmod(0o755)
@@ -722,21 +725,30 @@ def _build_image(tmp_path: Path, build_exit: int, **env: str):
 def test_a_failed_docker_build_stops_stack_sh(tmp_path: Path):
     # The image is built inside a command substitution, where bash drops
     # errexit: a failed build used to go on and start the old image.
-    result, builds = _build_image(tmp_path, build_exit=1)
+    result, builds = _build_image(tmp_path, failing_build=1)
     assert result.returncode != 0
     assert 'built' not in result.stdout
     assert len(builds) == 1
 
 
+def test_a_failed_overlay_build_stops_stack_sh_too(tmp_path: Path):
+    # The second build (the perf overlay on the web-server image) has its
+    # own guard; without it the function would still print the tag.
+    result, builds = _build_image(tmp_path, failing_build=2)
+    assert result.returncode != 0
+    assert 'built' not in result.stdout
+    assert len(builds) == 2
+
+
 def test_builds_use_the_default_network_unless_perf_build_network_is_set(
     tmp_path: Path,
 ):
-    result, builds = _build_image(tmp_path / 'default', build_exit=0)
+    result, builds = _build_image(tmp_path / 'default', failing_build=None)
     assert result.returncode == 0, result.stderr
     assert len(builds) == 2
     assert not any('--network' in b for b in builds)
     result, builds = _build_image(
-        tmp_path / 'host', build_exit=0, PERF_BUILD_NETWORK='host'
+        tmp_path / 'host', failing_build=None, PERF_BUILD_NETWORK='host'
     )
     assert result.returncode == 0, result.stderr
     assert len(builds) == 2
@@ -771,3 +783,36 @@ def test_the_image_tag_follows_pyproject_and_uv_lock_when_present(tmp_path: Path
     tags = [without_lock, with_lock, lock_changed, pyproject_changed]
     assert all(len(tag) == 12 for tag in tags)
     assert len(set(tags)) == 4
+
+
+def _git(repo: Path, *args: str) -> str:
+    return subprocess.run(
+        ['git', '-C', str(repo), *args], capture_output=True, text=True, check=True
+    ).stdout.strip()
+
+
+def test_the_default_reference_is_the_merge_base_with_integration(tmp_path: Path):
+    # main, then integration two commits ahead, then the WP branch off
+    # integration's first commit: the reference must be that commit, not main.
+    repo = tmp_path / 'repo'
+    repo.mkdir()
+    _git(repo, 'init', '-q', '-b', 'main')
+    _git(repo, 'config', 'user.email', 'perf@harmony.invalid')
+    _git(repo, 'config', 'user.name', 'perf')
+    # A signing setup in the user's global config must not reach this repo.
+    _git(repo, 'config', 'commit.gpgsign', 'false')
+    _git(repo, 'commit', '-q', '--allow-empty', '-m', 'main')
+    main = _git(repo, 'rev-parse', 'HEAD')
+    _git(repo, 'switch', '-q', '-c', 'mig/integration')
+    _git(repo, 'commit', '-q', '--allow-empty', '-m', 'integration 1')
+    base = _git(repo, 'rev-parse', 'HEAD')
+    _git(repo, 'commit', '-q', '--allow-empty', '-m', 'integration 2')
+    _git(repo, 'switch', '-q', '-c', 'mig/WP-x', base)
+    _git(repo, 'commit', '-q', '--allow-empty', '-m', 'wp')
+    result = subprocess.run(
+        ['bash', '-c', f'source {STACK_SH}\ndefault_reference {repo}\n'],
+        capture_output=True,
+        text=True,
+        check=True,
+    )
+    assert result.stdout.strip() == base != main

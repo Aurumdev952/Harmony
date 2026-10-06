@@ -396,10 +396,14 @@ client_unchanged_since() {
 # The default is the WP's base on mig/integration (decision 0011), never main:
 # main is the pre-migration tree, and a run against it would charge the WP
 # with every merged WP's cost or gain.
+default_reference() {
+  git -C "$1" merge-base HEAD mig/integration
+}
+
 reference() {
   local ref="${1:-}" sha src="${PERF_REFERENCE_DIR}/src"
   if [[ -z "${ref}" ]]; then
-    ref="$(git -C "${ROOT}" merge-base HEAD mig/integration)"
+    ref="$(default_reference "${ROOT}")"
   fi
   sha="$(git -C "${ROOT}" rev-parse --verify "${ref}^{commit}")"
   load_secrets

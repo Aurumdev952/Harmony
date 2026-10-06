@@ -1,7 +1,7 @@
 ---
 wp: "0l"
 title: "Match resource, role, group and user names exactly, never as patterns"
-status: review
+status: ready
 owner_role: "backend"
 instances:
   - name: "backend-0l"

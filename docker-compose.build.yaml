@@ -36,6 +36,12 @@ services:
         NAMESPACE: ${DOCKER_NAMESPACE:-ghcr.io/zenysis}
         IMAGE_PREFIX: ${DOCKER_IMAGE_PREFIX:-harmony}
         TAG: ${DOCKER_TAG:-latest}
+  renderer:
+    platform: linux/amd64
+    pull_policy: build
+    image: ${DOCKER_NAMESPACE:-ghcr.io/zenysis}/${DOCKER_IMAGE_PREFIX:-harmony}-renderer:${DOCKER_TAG:-latest}
+    build:
+      dockerfile: docker/renderer/Dockerfile
   etl-pipeline:
     # Currently the pipeline only builds on linux/amd64, arm is not supported.
     platform: linux/amd64

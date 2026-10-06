@@ -1,0 +1,84 @@
+{
+  "content_type": "application/json",
+  "headers": [],
+  "id": "dashboard_session.get",
+  "pinned": {},
+  "response_schema": {
+    "properties": {
+      "$uri": {
+        "type": "string",
+        "x-format": "api-uri"
+      },
+      "dashboardId": {
+        "type": "integer"
+      },
+      "dataBlob": {
+        "properties": {
+          "filters": {
+            "maxItems": 0,
+            "type": "array"
+          },
+          "groupings": {
+            "items": {
+              "properties": {
+                "item": {
+                  "properties": {
+                    "dimension": {
+                      "type": "string"
+                    },
+                    "includeAll": {
+                      "type": "boolean"
+                    },
+                    "includeNull": {
+                      "type": "boolean"
+                    },
+                    "includeTotal": {
+                      "type": "boolean"
+                    },
+                    "name": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "dimension",
+                    "includeAll",
+                    "includeNull",
+                    "includeTotal",
+                    "name"
+                  ],
+                  "type": "object"
+                },
+                "type": {
+                  "type": "string"
+                }
+              },
+              "required": [
+                "item",
+                "type"
+              ],
+              "type": "object"
+            },
+            "type": "array"
+          }
+        },
+        "required": [
+          "filters",
+          "groupings"
+        ],
+        "type": "object"
+      },
+      "uuid": {
+        "type": "string"
+      }
+    },
+    "required": [
+      "$uri",
+      "dashboardId",
+      "dataBlob",
+      "uuid"
+    ],
+    "type": "object"
+  },
+  "route": "GET /api2/dashboard_session/<hash>",
+  "status": 200
+}

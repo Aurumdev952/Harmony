@@ -1,3 +1,5 @@
+from typing import List, Optional, TypedDict
+
 from models.alchemy.permission import Permission, ResourceRole
 from models.alchemy.query_policy import QueryPolicy
 from models.alchemy.user import UserRoles
@@ -5,7 +7,18 @@ from web.server.data.data_access import Transaction
 from web.server.potion.signals import after_user_role_change
 
 
-def build_role(role_dict):
+class RoleFields(TypedDict):
+    '''The `Role` model fields `build_role` resolves from a frontend body.'''
+
+    alert_resource_role_id: Optional[int]
+    dashboard_resource_role_id: Optional[int]
+    label: str
+    permissions: List[Permission]
+    query_policies: List[QueryPolicy]
+    enable_data_export: bool
+
+
+def build_role(role_dict) -> RoleFields:
     '''Builds a role model dictionary with an input roles dictionary from the
     frontend, to add into the db.
     '''

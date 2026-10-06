@@ -1,6 +1,8 @@
 '''This module is responsible for managing CRUD requests against the Query Policy API and also for
 converting query policies into Druid Filters which are used to restrict query access.
 '''
+
+import json
 from collections import defaultdict
 from functools import wraps
 from datetime import datetime
@@ -60,39 +62,49 @@ def apply_authorization_filters():
     def filter_query(run_query):
         @wraps(run_query)
         def filter_query_inner(self, query):
-            if SuperUserPermission().can() or is_public_dashboard_user():
-                # NOTE: Since we are not using the standard authorization path, it is
-                # possible that Site Administrator queries may be inadvertently filtered.
-                # All other users will be expected to have a defined Query Policy to control what
-                # data they are allowed to view.
-                # NOTE: We also skip this for unregistered users when
-                # public access is turned on
-                return run_query(self, query)
-
-            updated_query = restrict_query_filter_to_user_permissions(query)
-            return run_query(self, updated_query)
+            policy_filter = caller_policy_filter()
+            if policy_filter is not None:
+                query.query_filter = and_policy_filter(
+                    query.query_filter, policy_filter
+                )
+                # A query-modifying aggregation (ExactUniqueCount) rebuilds its
+                # inner query from dimension_filter and drops query_filter.
+                if hasattr(query, 'dimension_filter'):
+                    query.dimension_filter = and_policy_filter(
+                        query.dimension_filter, policy_filter
+                    )
+            return run_query(self, query)
 
         return filter_query_inner
 
     return filter_query
 
 
-def restrict_query_filter_to_user_permissions(query, user_identity=None):
-    '''Returns a Druid filter that has been injected with a security filter that
-    accounts for the QueryPolicies a given user has been given.
+def caller_policy_filter():
+    '''The current caller's query policy as a Druid filter, or None when no policy
+    limits what they see.
+
+    Site administrators and, when public access is on, unregistered users have no
+    policy. Every other user sees only what their Query Policies allow.
+    NOTE: an API token issued to a site administrator keeps the administrator role,
+    so the token's own query_needs do not narrow it here.
     '''
-    user_identity = user_identity or g.identity
-    authorization_filter = _construct_authorization_filter(user_identity)
+    if SuperUserPermission().can() or is_public_dashboard_user():
+        return None
 
-    # Take the logical AND of the original query filter with all the filters
-    # referring to the query policies held by the user.
-    if authorization_filter and not isinstance(authorization_filter, EmptyFilter):
-        query_filter = query.query_filter
-        query.query_filter = Filter(
-            type=AND_FILTER_SYMBOL, fields=[query_filter, authorization_filter]
-        )
+    authorization_filter = _construct_authorization_filter(g.identity)
+    if not authorization_filter or isinstance(authorization_filter, EmptyFilter):
+        return None
+    return authorization_filter
 
-    return query
+
+def and_policy_filter(query_filter, policy_filter):
+    '''The query filter ANDed with a policy filter, as a new filter.'''
+    # EmptyFilter builds as null, and Druid rejects a null AND operand.
+    if query_filter is None or isinstance(query_filter, EmptyFilter):
+        return policy_filter
+    # Not `&`: pydruid appends into an existing "and" filter in place.
+    return Filter(type=AND_FILTER_SYMBOL, fields=[query_filter, policy_filter])
 
 
 def enumerate_query_needs(user_identity=None):
@@ -150,22 +162,62 @@ def _construct_authorization_filter(user_identity):
     ANDed to form a full_filter.
     authorization filter.
     '''
-    query_needs = enumerate_query_needs(user_identity)
-    category_map = _categorize_query_needs_type(query_needs)
-
-    simple_dimension_to_filters_map = _categorize_query_needs(category_map[SIMPLE])
-    hierarchical_dimension_to_filters_map = _categorize_query_needs(
-        category_map[HIERARCHICAL], dimensions_type=HIERARCHICAL
+    simple_map, hierarchical_map, complex_maps = _policy_filter_maps(
+        enumerate_query_needs(user_identity)
     )
     simple_and_hierarchical_filters = _and_simple_and_hierarchical_filters(
-        simple_dimension_to_filters_map, hierarchical_dimension_to_filters_map
+        simple_map, hierarchical_map
     )
+    return _or_all_filters(simple_and_hierarchical_filters, complex_maps)
 
-    all_dimension_value_maps = [
+
+def _policy_filter_maps(query_needs):
+    '''The simple, hierarchical and per-complex-need dimension maps that
+    `_construct_authorization_filter` builds a policy filter from.
+    '''
+    category_map = _categorize_query_needs_type(query_needs)
+    simple_map = _categorize_query_needs(category_map[SIMPLE])
+    hierarchical_map = _categorize_query_needs(
+        category_map[HIERARCHICAL], dimensions_type=HIERARCHICAL
+    )
+    complex_maps = [
         _categorize_query_needs([query_need]) for query_need in category_map[COMPLEX]
     ]
+    return simple_map, hierarchical_map, complex_maps
 
-    return _or_all_filters(simple_and_hierarchical_filters, all_dimension_value_maps)
+
+def canonical_policy(query_needs):
+    '''The maps a policy filter is built from, as JSON-ready values that do not
+    depend on set order: query needs with equal canonical policies build equal
+    filters.
+    '''
+
+    def canonical(dimension_map):
+        return {
+            dimension: {'all_values': True}
+            if values['all_values']
+            else {
+                'include': sorted(values['include'], key=str),
+                'exclude': sorted(values['exclude'], key=str),
+            }
+            for dimension, values in dimension_map.items()
+        }
+
+    simple_map, hierarchical_map, complex_maps = _policy_filter_maps(query_needs)
+    # Any all-values hierarchical dimension lifts the whole hierarchical filter.
+    hierarchical = (
+        'all_values'
+        if any(values['all_values'] for values in hierarchical_map.values())
+        else canonical(hierarchical_map)
+    )
+    return {
+        'simple': canonical(simple_map),
+        'hierarchical': hierarchical,
+        'complex': sorted(
+            (canonical(dimension_map) for dimension_map in complex_maps),
+            key=lambda value: json.dumps(value, sort_keys=True),
+        ),
+    }
 
 
 def _and_simple_and_hierarchical_filters(simple_value_map, hierarchical_value_map=None):
@@ -320,12 +372,19 @@ def construct_query_need_from_policy(query_policy):
 
 
 class AuthorizedQueryClient:
+    '''The query client for user requests.
+
+    run_query ANDs the caller's policy into the query builder's query_filter and,
+    for groupBy builders, its dimension_filter, which query-modifying aggregations
+    rebuild from. A query whose Druid filter comes from anywhere else (a raw dict,
+    a nested dataSource built outside the builder) is not covered, so the client
+    has no run_raw_query: code that sends raw queries holds the system client and
+    must take no user input.
+    '''
+
     def __init__(self, query_client):
-        self.query_client = query_client
+        self._query_client = query_client
 
     @apply_authorization_filters()
     def run_query(self, query):
-        return self.query_client.run_query(query)
-
-    def run_raw_query(self, query):
-        return self.query_client.run_raw_query(query)
+        return self._query_client.run_query(query)

@@ -1,0 +1,9 @@
+{
+  "content_type": "application/json",
+  "headers": [],
+  "id": "resource.update_roles",
+  "pinned": {},
+  "response_schema": null,
+  "route": "POST /api2/resource/<id>/roles",
+  "status": 204
+}

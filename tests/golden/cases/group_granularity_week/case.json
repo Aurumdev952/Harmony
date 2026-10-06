@@ -1,0 +1,5 @@
+{
+  "description": "Granularity week with a state group.",
+  "endpoint": "bar_graph",
+  "policy": null
+}

@@ -1,0 +1,43 @@
+{
+  "content_type": "application/json",
+  "headers": [],
+  "id": "user.generate_api_token",
+  "pinned": {},
+  "response_schema": {
+    "properties": {
+      "$uri": {
+        "type": "string",
+        "x-format": "api-uri"
+      },
+      "created": {
+        "type": "string",
+        "x-format": "date"
+      },
+      "id": {
+        "type": "string"
+      },
+      "isRevoked": {
+        "type": "boolean"
+      },
+      "revoked": {
+        "type": "string",
+        "x-format": "date"
+      },
+      "token": {
+        "type": "string",
+        "x-format": "jwt"
+      }
+    },
+    "required": [
+      "$uri",
+      "created",
+      "id",
+      "isRevoked",
+      "revoked",
+      "token"
+    ],
+    "type": "object"
+  },
+  "route": "POST /api2/user/<id>/generate_api_token",
+  "status": 200
+}

@@ -1,0 +1,5 @@
+{
+  "description": "outliers_box_plot with outlier type All.",
+  "endpoint": "outliers_box_plot",
+  "policy": null
+}

@@ -1,0 +1,6 @@
+indicator_id,count,start_date,end_date
+demo_malaria_positive,6,2021-05-01,2021-07-05
+demo_status_confirmed,5,2021-05-01,2021-07-05
+demo_status_suspected,2,2021-05-01,2021-05-20
+demo_status,1,2021-05-01,2021-05-01
+demo_status_discarded,1,2021-06-30,2021-06-30

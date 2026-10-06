@@ -1,0 +1,9 @@
+{
+  "content_type": "application/json",
+  "headers": [],
+  "id": "dashboard.transfer_one",
+  "pinned": {},
+  "response_schema": null,
+  "route": "POST /api2/dashboard/<id>/transfer/username",
+  "status": 204
+}

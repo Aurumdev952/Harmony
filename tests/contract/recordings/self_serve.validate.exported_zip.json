@@ -1,0 +1,35 @@
+{
+  "content_type": "application/json",
+  "headers": [],
+  "id": "self_serve.validate.exported_zip",
+  "pinned": {
+    "/statusCode": 200
+  },
+  "response_schema": {
+    "properties": {
+      "dataCatalogChangesFileKey": {
+        "type": "string"
+      },
+      "statusCode": {
+        "type": "integer"
+      },
+      "validationMessage": {
+        "type": "string"
+      },
+      "validationSummary": {
+        "properties": {},
+        "required": [],
+        "type": "object"
+      }
+    },
+    "required": [
+      "dataCatalogChangesFileKey",
+      "statusCode",
+      "validationMessage",
+      "validationSummary"
+    ],
+    "type": "object"
+  },
+  "route": "POST /api/validate_self_serve_upload",
+  "status": 200
+}

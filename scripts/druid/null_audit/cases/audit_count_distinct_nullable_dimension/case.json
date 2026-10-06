@@ -1,0 +1,5 @@
+{
+  "description": "COUNT_DISTINCT over Sex, which is null on some rows.",
+  "endpoint": "table",
+  "policy": null
+}

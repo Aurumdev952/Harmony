@@ -1,0 +1,8 @@
+{
+  "description": "table when Druid returns no rows.",
+  "endpoint": "table",
+  "policy": null,
+  "druid": {
+    "empty": true
+  }
+}

@@ -4,80 +4,81 @@
 # This allows us to import from config directly.
 # for example: from config.general import NATION_NAME
 # and NOT: from config.et.general import NATION_NAME
-import glob
 import importlib
+import importlib.abc
+import importlib.machinery
 import os
 import sys
+from types import ModuleType
+from typing import Optional, Sequence
 
-# Initialize the set of valid config modules to be the subdirectories of the
-# config/ directory.
-VALID_MODULES = sorted(
-    {
-        os.path.basename(os.path.dirname(path))
-        for path in glob.glob(os.path.join(os.path.dirname(__file__), '*/general.py'))
-        if '/template/general.py' not in path
-    }
-)
+from harmony.core.deployment import deployment_codes
+
+VALID_MODULES = list(deployment_codes())
+
+# Config modules we never want to handle importing for
+_MODULE_WHITELIST = frozenset(
+    {'druid_base', 'system', 'instance', 'locales', 'loader', 'settings'}
+).union(VALID_MODULES)
 
 
-class ConfigImporter:
+class _AliasLoader(importlib.abc.Loader):
+    '''Loads `config.<module>` as the module object of `config.<site>.<module>`,
+    so both names share one module.'''
+
+    def __init__(self, target_name: str) -> None:
+        self._target_name = target_name
+        self._target_spec: Optional[importlib.machinery.ModuleSpec] = None
+
+    def create_module(
+        self, spec: importlib.machinery.ModuleSpec
+    ) -> Optional[ModuleType]:
+        module = importlib.import_module(self._target_name)
+        self._target_spec = module.__spec__
+        return module
+
+    def exec_module(self, module: ModuleType) -> None:
+        # The import system has pointed __spec__ at the alias spec. Restore the
+        # site module's own spec so importlib.reload re-executes its file.
+        module.__spec__ = self._target_spec
+
+
+class ConfigImporter(importlib.abc.MetaPathFinder):
     '''Captures all config imports and redirect them to the correct site specific
     version.
     '''
 
-    def __init__(self, site_module):
-        site_module = site_module.lower()
-        assert (
-            site_module in VALID_MODULES
-        ), f'Invalid ZEN_ENV {site_module} not in {VALID_MODULES}'
-
-        # Store a list of config modules we never want to handle importing for
-        self._module_whitelist = {
-            'druid_base',
-            'system',
-            'instance',
-            'locales',
-            'loader',
-            'settings',
-        }.union(VALID_MODULES)
-
+    def __init__(self, site_module: Optional[str]) -> None:
+        if site_module is not None:
+            site_module = site_module.lower()
+            message = f'Invalid ZEN_ENV {site_module} not in {VALID_MODULES}'
+            if site_module not in VALID_MODULES:
+                raise AssertionError(message)
         self._new_config_module = site_module
 
-    def _should_handle_import(self, fullname):
+    def find_spec(
+        self,
+        fullname: str,
+        path: Optional[Sequence[str]],
+        target: Optional[ModuleType] = None,
+    ) -> Optional[importlib.machinery.ModuleSpec]:
         if not fullname.startswith('config.'):
-            return False
-        start_idx = 7  # len('config.')
-        end_idx = fullname.find('.', start_idx)
-        if end_idx < 0:
-            end_idx = len(fullname)
-
+            return None
+        relative_name = fullname[len('config.') :]
         # Config redirection is only needed if the base config module
         # being imported is not part of the whitelist
-        return fullname[start_idx:end_idx] not in self._module_whitelist
-
-    def find_module(self, fullname, path=None):
-        return self if self._should_handle_import(fullname) else None
-
-    def load_module(self, module_name):
-        if module_name in sys.modules:
-            return sys.modules[module_name]
-
-        new_module_name = f'config.{self._new_config_module}.{module_name[7:]}'
-        # Use the absolute import for this module if it has already been
-        # imported
-        module = sys.modules.get(
-            new_module_name, importlib.import_module(new_module_name)
-        )
-        # Register both the relative config module and the absolute config
-        # module in the sys.modules table to avoid duplicate imports
-        sys.modules[new_module_name] = module
-        sys.modules[module_name] = module
-        return module
+        if relative_name.partition('.')[0] in _MODULE_WHITELIST:
+            return None
+        if self._new_config_module is None:
+            raise ModuleNotFoundError(
+                f'{fullname} is read from config/<ZEN_ENV>/, but ZEN_ENV was not '
+                f'set when config was imported. Valid values: {VALID_MODULES}',
+                name=fullname,
+            )
+        target_name = f'config.{self._new_config_module}.{relative_name}'
+        return importlib.machinery.ModuleSpec(fullname, _AliasLoader(target_name))
 
 
-# Allow the environment variable to be unset so that scripts can work if they
-# reference an explicit config.
-site_module = os.environ.get('ZEN_ENV')
-if site_module:
-    # TODO: Fix type error
-    sys.meta_path.append(ConfigImporter(site_module))  # type: ignore[arg-type]
+# ZEN_ENV may be unset so that scripts can import an explicit config, such as
+# config.harmony_demo.general.
+sys.meta_path.append(ConfigImporter(os.environ.get('ZEN_ENV') or None))

@@ -1,0 +1,64 @@
+[
+  [
+    [
+      "Acre",
+      "Cruzeiro do Sul",
+      347.61,
+      11
+    ],
+    [
+      "Acre",
+      "Rio Branco",
+      199.0,
+      58
+    ],
+    [
+      "Pará",
+      "Belém",
+      270.0,
+      11
+    ],
+    [
+      "Pará",
+      "Conceição do Araguaia",
+      369.0,
+      41
+    ],
+    [
+      "Roraima",
+      "Alto Alegre",
+      121.9,
+      13
+    ],
+    [
+      "Roraima",
+      "Pacaraima",
+      232.0,
+      55
+    ],
+    [
+      "Acre",
+      null,
+      0.0,
+      0
+    ],
+    [
+      "Pará",
+      null,
+      247.49,
+      16
+    ],
+    [
+      "Roraima",
+      null,
+      271.0,
+      15
+    ],
+    [
+      null,
+      null,
+      273.0,
+      36
+    ]
+  ]
+]

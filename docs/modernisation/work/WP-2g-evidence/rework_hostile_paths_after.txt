@@ -1,0 +1,5 @@
+a-a-a (4071 bytes): slowest of 5 requests 0.005s
+token-token- (4069 bytes): slowest of 5 requests 0.002s
+slashes (4070 bytes): slowest of 5 requests 0.003s
+ordinary: slowest of 5 requests 0.053s
+access lines: 21, stderr bytes: 0

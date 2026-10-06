@@ -1,17 +1,18 @@
 import os
+import secrets
 import socket
+import subprocess
 import sys
+from pathlib import Path
 from pylib.base.flags import Flags
 
 # NOTE: Need to import our dev reloader since registration is handled in that
 # file.
-# pylint: disable=unused-import
-import web.dev_reloader
+import web.dev_reloader  # noqa: F401
 
 from config import VALID_MODULES
 from web.server.app import create_app
 from web.server.configuration.instance import load_instance_configuration_from_file
-from web.server.configuration.flask import FlaskConfiguration
 from util.flask import build_flask_config
 
 
@@ -20,7 +21,26 @@ def start_postgres():
     with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
         port_in_use = s.connect_ex(('localhost', 5432)) == 0
         if not port_in_use:
-            os.system('scripts/db/postgres/dev/start_postgres.sh')
+            subprocess.run(['scripts/db/postgres/dev/start_postgres.sh'], check=False)
+
+
+def ensure_dev_hasura_admin_secret():
+    '''Give local Hasura a random admin secret that survives restarts, unless the
+    developer set HASURA_ADMIN_SECRET themselves.'''
+    if os.environ.get('HASURA_ADMIN_SECRET'):
+        return
+    secret_path = Path.home() / '.config' / 'harmony' / 'hasura_admin_secret'
+    if not secret_path.exists():
+        secret_path.parent.mkdir(parents=True, exist_ok=True)
+        fd = os.open(secret_path, os.O_WRONLY | os.O_CREAT | os.O_EXCL, 0o600)
+        with os.fdopen(fd, 'w') as secret_file:
+            secret_file.write(secrets.token_urlsafe(32))
+    if secret_path.stat().st_mode & 0o077:
+        raise PermissionError(
+            f'{secret_path} is readable by other users. Run `chmod 600 {secret_path}`, '
+            'or delete it so a new secret is generated.'
+        )
+    os.environ['HASURA_ADMIN_SECRET'] = secret_path.read_text().strip()
 
 
 def main():
@@ -94,6 +114,8 @@ def main():
     # it is missing.
     instance_config = load_instance_configuration_from_file(log_missing=False)
 
+    ensure_dev_hasura_admin_secret()
+
     # Create the default flask configuration. Apply any instance config overrides the
     # dev might be using locally.
     flask_config = build_flask_config(environment)
@@ -107,7 +129,7 @@ def main():
 
     # NOTE: For ease of development, make sure hasura graphql docker services
     # are running and using the correct DB.
-    os.system(f'scripts/db/hasura/dev/start_hasura.sh {db_name}')
+    subprocess.run(['scripts/db/hasura/dev/start_hasura.sh', db_name], check=False)
 
     app = create_app(
         flask_config,
@@ -117,7 +139,13 @@ def main():
         and (Flags.ARGS.skip_db_check or os.environ.get('ZEN_SKIP_DB_CHECK')),
         Flags.ARGS.force_druid_db_update,
     )
-    app.run(host='0.0.0.0', port=Flags.ARGS.port, reloader_type='zenysis_watchdog')
+    # Local dev server only. It has always listened on every interface; narrowing
+    # that to loopback would change how developers reach it, so it is out of scope.
+    app.run(
+        host='0.0.0.0',  # noqa: S104
+        port=Flags.ARGS.port,
+        reloader_type='zenysis_watchdog',
+    )
 
 
 if __name__ == '__main__':

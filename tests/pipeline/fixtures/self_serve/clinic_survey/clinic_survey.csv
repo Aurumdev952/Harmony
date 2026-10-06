@@ -1,0 +1,4 @@
+Province,Facility,Sex,Visit Date,Visits: Total,clinic_survey_referrals,Ignored
+Northvale,Ashford,F,2021-09-01,12,1,a
+Northvale,Ashford,F,2021-09-01,8,0,b
+Southmere,Cedar Point,M,2021-09-02,5,,c

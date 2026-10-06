@@ -1,0 +1,25 @@
+{
+  "content_type": "application/json",
+  "headers": [],
+  "id": "authorization.check",
+  "pinned": {
+    "/success": true
+  },
+  "response_schema": {
+    "properties": {
+      "data": {
+        "type": "null"
+      },
+      "success": {
+        "type": "boolean"
+      }
+    },
+    "required": [
+      "data",
+      "success"
+    ],
+    "type": "object"
+  },
+  "route": "POST /api/authorization",
+  "status": 200
+}

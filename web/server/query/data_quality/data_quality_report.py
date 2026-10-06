@@ -30,11 +30,6 @@ from web.server.query.visualizations.util import build_key_column
 from web.server.routes.views.query_policy import AuthorizedQueryClient
 
 
-def parse_druid_timestamps(timestamps: pd.Series) -> pd.Series:
-    '''Parse Druid's full ISO 8601 UTC timestamps (`2024-01-01T00:00:00.000Z`).'''
-    return pd.to_datetime(timestamps, format='ISO8601')
-
-
 def get_report_counts(
     all_dates: List[pd.Timestamp],
     report_dates: List[pd.Timestamp],
@@ -236,9 +231,11 @@ class DataQualityReport(QueryBase):
             }
 
         # Cast the timestamp column to a datetime since `score` needs it to be fully
-        # parsed.
+        # parsed. Druid timestamps are full ISO 8601 in UTC.
         for input_df in (df, no_date_filter_df, no_geo_filter_df):
-            input_df['dates'] = parse_druid_timestamps(input_df[TIMESTAMP_COLUMN])
+            input_df['dates'] = pd.to_datetime(
+                input_df[TIMESTAMP_COLUMN], format='ISO8601'
+            )
 
         end_interval_date = datetime.strptime(
             self.request.build_intervals()[0].split('/')[1], DRUID_DATE_FORMAT

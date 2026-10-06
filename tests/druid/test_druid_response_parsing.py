@@ -7,6 +7,7 @@ on Python 3.11+, and ijson's pure-Python fallback is 8 to 16 times slower.
 '''
 
 import gzip
+import itertools
 import json
 import math
 import os
@@ -17,6 +18,9 @@ from io import BytesIO
 from pathlib import Path
 
 import pytest
+from hypothesis import given
+from hypothesis import settings as hypothesis_settings
+from hypothesis import strategies as st
 from requests.adapters import BaseAdapter
 from requests.models import Response
 from requests.structures import CaseInsensitiveDict
@@ -150,22 +154,42 @@ def test_bodies_yajl_rejected_still_fail(body):
         _stream(body)
 
 
+def _best_of_3(run):
+    best = float('inf')
+    for _ in range(3):
+        start = time.perf_counter()
+        run()
+        best = min(best, time.perf_counter() - start)
+    return best
+
+
 def test_large_response_parses_fast():
-    # 100,000 array rows (13 MB). The client reads them in about 0.15 s; ijson's
-    # pure-Python backend, which the 3.13 image would fall back to, in 1.2 s.
+    # 100,000 array rows (13 MB). Timed against the stdlib's whole-body
+    # json.loads of the same body in this process, so host load cancels out: the
+    # client takes about 2 times as long, ijson's pure-Python backend (the 3.13
+    # image's fallback) about 16 times.
     row = (
         '[1709510400000, "Município de São Paulo", "15-49", "Pará", 292.19, null,'
         ' 16, 1234.5678, 0.0, 48, "NaN", -9223372036854775808]'
     )
-    wire = gzip.compress(('[' + ','.join([row] * 100_000) + ']').encode())
+    body = ('[' + ','.join([row] * 100_000) + ']').encode()
+    wire = gzip.compress(body)
+    counts = []
     with _client_answering(wire) as client:
-        start = time.perf_counter()
-        count = sum(
-            1 for _ in client.run_raw_query({'queryType': 'groupBy'}, streaming=True)
+        client_seconds = _best_of_3(
+            lambda: counts.append(
+                sum(
+                    1
+                    for _ in client.run_raw_query(
+                        {'queryType': 'groupBy'}, streaming=True
+                    )
+                )
+            )
         )
-        elapsed = time.perf_counter() - start
-    assert count == 100_000
-    assert elapsed < 0.5, f'{elapsed:.2f} s'
+    stdlib_seconds = _best_of_3(lambda: json.loads(gzip.decompress(wire)))
+    assert counts == [100_000] * 3
+    ratio = client_seconds / stdlib_seconds
+    assert ratio < 6, f'{client_seconds:.2f} s, {ratio:.1f} times json.loads'
 
 
 @pytest.mark.parametrize('gzipped', [True, False], ids=['gzip', 'identity'])
@@ -210,6 +234,48 @@ def test_highly_compressed_body_streams_without_inflating():
     assert peak < 8 * 1024 * 1024, f'{peak / 2**20:.1f} MiB'
 
 
+_ROW = b'[1709510400000, "Acre", "Rio Branco", 150.0, 48]'
+
+
+@pytest.mark.parametrize(
+    'body',
+    [
+        # Security gate F3: whitespace inside one element must be buffered to
+        # decode it, so a highly compressed body could fill memory.
+        b'[[0], [1,' + b' ' * (64 * 1024 * 1024) + b'2]]',
+        # Review (6): a malformed element is read on to the end of the body, as
+        # the decoder cannot tell it from an incomplete one.
+        b'[' + b','.join([_ROW] * 10 + [b'{"a":x}'] + [_ROW] * 400_000) + b']',
+    ],
+    ids=['padding-inside-an-element', 'malformed-element-early-in-a-large-body'],
+)
+def test_one_element_stops_at_the_element_cap(monkeypatch, body):
+    # Against a 1 MiB cap.
+    monkeypatch.setattr(json_stream, '_MAX_ELEMENT_CHARS', 1024 * 1024)
+    wire = gzip.compress(body, compresslevel=9)
+    rows = []
+    with _client_answering(wire) as client:
+        tracemalloc.start()
+        try:
+            with pytest.raises(ValueError, match='larger than'):
+                rows = list(
+                    client.run_raw_query({'queryType': 'groupBy'}, streaming=True)
+                )
+            _, peak = tracemalloc.get_traced_memory()
+        finally:
+            tracemalloc.stop()
+    # Fail closed: the caller gets an error, not the rows before it.
+    assert rows == []
+    assert peak < 16 * 1024 * 1024, f'{peak / 2**20:.1f} MiB'
+
+
+def test_element_at_the_cap_parses(monkeypatch):
+    element = b'["' + b'x' * 100 + b'"]'
+    monkeypatch.setattr(json_stream, '_MAX_ELEMENT_CHARS', len(element))
+    parsed = list(json_stream.iter_json_array(_Trickle(b'[' + element + b']', 7)))
+    assert parsed == [['x' * 100]]
+
+
 class _Trickle:
     '''A binary file that returns at most `size` bytes per read.'''
 
@@ -243,6 +309,80 @@ def test_every_read_boundary_parses_the_same(monkeypatch, size):
 )
 def test_array_framing(body, rows):
     assert list(json_stream.iter_json_array(BytesIO(body))) == rows
+
+
+@pytest.mark.parametrize(
+    'body',
+    [
+        b'[0.0]',
+        b'[1.5e+300, -2E-5, 7]',
+        b'[0.5e10]',
+        b'[3, 0.25]',
+        b'[1e5]',
+        b'[-1E+2]',
+        b'[12.25,3]',
+    ],
+    ids=[
+        'fraction',
+        'exponents',
+        'fraction-exponent',
+        'last',
+        'exponent',
+        'signed-exponent',
+        'no-space',
+    ],
+)
+def test_top_level_numbers_split_by_one_byte_reads(body):
+    # A read that ends after "0" of "0.0" leaves a valid number "0" that is not
+    # the whole number.
+    parsed = list(json_stream.iter_json_array(_Trickle(body, 1)))
+    assert _typed(parsed) == _typed(json.loads(body))
+
+
+def test_top_level_number_split_at_the_production_read_size():
+    # QA's repro: through GzipFile, the first 1 MiB read ends just after "0."
+    body = b'[' + b' ' * (json_stream._READ_BYTES - 3) + b'0.5]'
+    fp = gzip.GzipFile(fileobj=BytesIO(gzip.compress(body)))
+    assert list(json_stream.iter_json_array(fp)) == [0.5]
+
+
+class _Chunked:
+    '''A binary file that returns successive reads of the given sizes, cycling.'''
+
+    def __init__(self, data, sizes):
+        self.data = BytesIO(data)
+        self.sizes = itertools.cycle(sizes)
+
+    def read(self, size=-1):
+        chunk = next(self.sizes)
+        return self.data.read(chunk if size < 0 else min(size, chunk))
+
+
+_JSON_VALUES = st.recursive(
+    st.none()
+    | st.booleans()
+    | st.integers(min_value=-(2**63), max_value=2**63 - 1)
+    | st.floats(allow_nan=False, allow_infinity=False)
+    | st.text(),
+    lambda inner: (
+        st.lists(inner, max_size=4)
+        | st.dictionaries(st.text(max_size=5), inner, max_size=4)
+    ),
+    max_leaves=12,
+)
+
+
+@given(
+    rows=st.lists(_JSON_VALUES, max_size=8),
+    sizes=st.lists(st.integers(min_value=1, max_value=9), min_size=1, max_size=6),
+    ensure_ascii=st.booleans(),
+    indent=st.sampled_from([None, 0, 2]),
+)
+@hypothesis_settings(max_examples=300, deadline=None)
+def test_any_array_round_trips_in_any_chunking(rows, sizes, ensure_ascii, indent):
+    body = json.dumps(rows, ensure_ascii=ensure_ascii, indent=indent).encode()
+    parsed = list(json_stream.iter_json_array(_Chunked(body, sizes)))
+    assert _typed(parsed) == _typed(json.loads(body))
 
 
 @pytest.mark.parametrize(

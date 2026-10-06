@@ -832,11 +832,13 @@ class PydruidQueryWrapper(PydruidQuery):
         if granularity not in ('day', 'week', 'month', 'quarter'):
             return []
 
-        # Convenience mapping to pandas frequency string.
-        # day -> d, week -> w, month -> m, quarter -> q
+        # Convenience mapping to pandas period frequency string.
+        # day -> D, week -> W, month -> M, quarter -> Q
         # NOTE: Week starts on Monday for both pandas and druid, so we are safe
         # here.
-        return self._build_date_range(first_timestamp, last_timestamp, granularity[0])
+        return self._build_date_range(
+            first_timestamp, last_timestamp, granularity[0].upper()
+        )
 
     def _build_date_range(self, first_timestamp, last_timestamp, freq):
         # NOTE: Deferring pandas import since this is library code that might

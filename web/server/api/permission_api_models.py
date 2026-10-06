@@ -56,6 +56,7 @@ from web.server.routes.views.resource import (
     update_role_users,
 )
 from web.server.security.grants import holds_everything_in, verify_role_grants
+from web.server.security.permission_cache import clear_permission_cache
 from web.server.security.permissions import SuperUserPermission, principals
 from web.server.util.util import get_resource_string, get_user_string
 
@@ -563,24 +564,14 @@ class RoleResource(PrincipalResource):
         rel='updateUsers',
     )
     def update_users(self, role, usernames):
-        with (
-            AuthorizedOperation('edit_resource', 'role', role.id),
-            Transaction() as transaction,
-        ):
-            update_role_users(role, usernames, transaction)
+        with AuthorizedOperation('edit_resource', 'role', role.id):
+            with Transaction() as transaction:
+                affected_users = update_role_users(role, usernames, transaction)
+            # After the commit, so no request caches the old roles again.
+            for user in affected_users:
+                clear_permission_cache(user)
             return StandardResponse('Role usernames has been updated', OK, True)
         return None, UNAUTHORIZED
-
-
-# pylint: disable=W0613
-@after_roles_update.connect
-def invalidate_roles_update(sender, existing_roles, new_roles):
-    users = set(new_roles['userRoles'])
-    cache = current_app.cache
-    for username in users:
-        if cache.has(username):
-            cache.delete(username)
-    g.request_logger.info('Invalidate cache for users %s after updating roles', users)
 
 
 # TODO: Fix typing of this array

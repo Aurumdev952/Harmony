@@ -12,10 +12,10 @@ from models.alchemy.user.base_user import BaseUserMixin
 
 
 if TYPE_CHECKING:
-    from models.alchemy.api_token import APIToken
-    from models.alchemy.dashboard import Dashboard
-    from models.alchemy.permission import Resource, ResourceRole
-    from models.alchemy.security_group import Group
+    from models.alchemy.api_token import APIToken  # noqa: F401
+    from models.alchemy.dashboard import Dashboard  # noqa: F401
+    from models.alchemy.permission import Resource, ResourceRole  # noqa: F401
+    from models.alchemy.security_group import Group  # noqa: F401
 
 
 class UserStatusEnum(Enum):
@@ -92,6 +92,7 @@ class UserMixin(BaseUserMixin):
 # column to represent a unique way of identifying a database
 # model.
 # pylint:disable=C0103
+
 
 # Pylint fails to pick up the Integer/Column/ForeignKey/relationship
 # attributes that denote columns in a SQLAlchemy field.

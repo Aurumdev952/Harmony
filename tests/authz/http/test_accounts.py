@@ -797,8 +797,9 @@ def test_forgot_password_for_an_account_not_active_answers_like_an_unknown_one(
 def test_flask_user_reset_form_sets_no_password(stack):
     '''WP-0k INV-3 row R-6. flask-user's `POST /user/reset-password/<token>`
     with a valid reset token and a new password.
-    Before WP-0k: flask-user's own form handled it (for an account of any
-    status); without its CSRF token the form is served again (200).
+    Before WP-0k: flask-user's own form handled it, for an account of any
+    status; posted like this, with no CSRF token, integration 7958c7d
+    answered 500.
     After: 302 to Harmony's reset page on the configured origin with the same
     token; the password is not set here.'''
     account = stack.create_account(_name('flask-user-reset-form'), _password())

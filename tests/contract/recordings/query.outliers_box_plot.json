@@ -1,0 +1,61 @@
+{
+  "content_type": "application/json",
+  "headers": [],
+  "id": "query.outliers_box_plot",
+  "pinned": {},
+  "response_schema": {
+    "properties": {
+      "data": {
+        "items": {
+          "properties": {
+            "dimensions": {
+              "properties": {
+                "MunicipalityName": {
+                  "type": "string"
+                },
+                "StateName": {
+                  "type": "string"
+                }
+              },
+              "required": [
+                "MunicipalityName",
+                "StateName"
+              ],
+              "type": "object"
+            },
+            "metrics": {
+              "properties": {
+                "yellow_fever_cases": {
+                  "type": "number"
+                }
+              },
+              "required": [
+                "yellow_fever_cases"
+              ],
+              "type": "object"
+            }
+          },
+          "required": [
+            "dimensions",
+            "metrics"
+          ],
+          "type": "object"
+        },
+        "type": "array"
+      },
+      "dimensions": {
+        "items": {
+          "type": "string"
+        },
+        "type": "array"
+      }
+    },
+    "required": [
+      "data",
+      "dimensions"
+    ],
+    "type": "object"
+  },
+  "route": "POST /api2/query/outliers_box_plot",
+  "status": 200
+}

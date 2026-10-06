@@ -5,6 +5,7 @@ import sqlalchemy as sa
 from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy.orm import relationship, backref
 
+from log import LOG
 from web.server.data.data_access import Transaction
 from . import get_session
 
@@ -241,16 +242,18 @@ def detect_duplicate_users(transaction):
         user_resource_tuple = (user_id, resource_id)
         user_and_resource_to_roles_map[user_resource_tuple].append(role)
         user_resource_role_to_object_map[(user_id, resource_id, role.id)] = user_role
-    for ((user_id, resource_id), role_id_lst) in user_and_resource_to_roles_map.items():
+    for (user_id, resource_id), role_id_lst in user_and_resource_to_roles_map.items():
         if len(role_id_lst) > 1:
             sorted_roles = sorted(role_id_lst, key=role_permission_count)
             for role in sorted_roles[:-1]:
                 user_role_to_delete = user_resource_role_to_object_map[
                     (user_id, resource_id, role.id)
                 ]
-                print(
-                    f'[info] Deleting UserRole: user_id: {user_id}, '
-                    f'resource_id: {resource_id}, role_id: {role.id}'
+                LOG.info(
+                    'Deleting UserRole: user_id: %s, resource_id: %s, role_id: %s',
+                    user_id,
+                    resource_id,
+                    role.id,
                 )
                 transaction.delete(user_role_to_delete)
 
@@ -284,9 +287,11 @@ def detect_duplicate_groups(transaction):
                 group_role_to_delete = group_resource_role_to_object_map[
                     (group_id, resource_id, role.id)
                 ]
-                print(
-                    f'[info] Deleting GroupRole: group_id: {group_id}, '
-                    f'resource_id: {resource_id}, role_id: {role.id}'
+                LOG.info(
+                    'Deleting GroupRole: group_id: %s, resource_id: %s, role_id: %s',
+                    group_id,
+                    resource_id,
+                    role.id,
                 )
                 transaction.delete(group_role_to_delete)
 

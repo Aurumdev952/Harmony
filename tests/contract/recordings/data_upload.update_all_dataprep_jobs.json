@@ -1,0 +1,11 @@
+{
+  "content_type": "application/json",
+  "headers": [],
+  "id": "data_upload.update_all_dataprep_jobs",
+  "pinned": {},
+  "response_schema": {
+    "type": "null"
+  },
+  "route": "POST /api2/data_upload_file_summary/update_all_dataprep_jobs",
+  "status": 200
+}

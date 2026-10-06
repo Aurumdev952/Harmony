@@ -7,6 +7,8 @@
 # hasura: graphql stuff worker and web need hasura.
 # worker: runs the celery worker
 # web: runs the flask web service
+# renderer: renders dashboards to PDF and images for web (headless Chromium)
+# render-egress: the renderer's only way out, a proxy to the map origins
 ##################################################################################
 
 version: '3.9'
@@ -26,10 +28,19 @@ volumes:
   nginx_html:
   redis-volume:
 
+networks:
+  # No route out: the renderer reaches web and render-egress and nothing else,
+  # even if the in-browser egress guard fails.
+  render:
+    internal: true
+  # A route out for render-egress alone, apart from the default network that
+  # redis and hasura are on.
+  render-egress:
+
 
 services:
   nginx:
-    image: nginxproxy/nginx-proxy:alpine
+    image: nginxproxy/nginx-proxy:1.11.6-alpine@sha256:99376e95c8754547213d411222a2c4dca046d974e753ae2a1c9aef09b2c03364
     ports:
       - 80:80
       - 443:443
@@ -46,9 +57,20 @@ services:
       # This html directory is only used to write let's encrypt challenge
       # files during the cert issuing process.
       - nginx_html:/usr/share/nginx/html
-      # environment:
+    environment:
       # TODO: Establish if TRUST_DOWNSTREAM_PROXY needs to be set to true
       # - TRUST_DOWNSTREAM_PROXY=false
+      # Access lines as JSON with the app's keys (WP-2g); `$$` is a literal `$`.
+      # nginx-proxy cannot forward an X-Request-ID without a conf.d file on the
+      # host, so the id is the one the app returns. `$$uri` has no query string.
+      LOG_FORMAT_ESCAPE: json
+      LOG_FORMAT: >-
+        {"timestamp":"$$time_iso8601","level":"INFO","logger":"nginx.access",
+        "message":"$$request_method $$uri $$status","deployment":"${ZEN_ENV}",
+        "request_id":"$$upstream_http_x_request_id",
+        "http":{"method":"$$request_method","host":"$$host","path":"$$uri",
+        "status":$$status,"bytes":$$body_bytes_sent,"duration_s":$$request_time},
+        "client_ip":"$$remote_addr","user_agent":"$$http_user_agent"}
       # healthcheck:
       #   # TODO: Healthcheck causes problems with initial cert generation,
       #   # Further investigation required.
@@ -59,7 +81,7 @@ services:
       #   retries: 3
     logging: *default-logging
   nginx-letsencrypt-companion:
-    image: nginxproxy/acme-companion
+    image: nginxproxy/acme-companion:2.8.2@sha256:e3c5fb08bf623ae93dbc945d78fe50040c1fa107ddf59f7ee04ba6a61f34cbc1
     volumes:
       - /var/run/docker.sock:/var/run/docker.sock:ro
         # NOTE: These are the same volumes used by the nginx image.
@@ -81,11 +103,13 @@ services:
   # see: https://docs.docker.com/storage/volumes/#back-up-restore-or-migrate-data-volumes
   # 'flags_extra': {'volumes-from': 'nginx'},
   redis:
-    image: redis:alpine
-    ports:
-      - 6379:6379
+    image: redis:8.10.2-alpine@sha256:3811787313eba226a2ef38658c6ccb91cd5e110edc89c37767de373120a0e5a0
+    command: [ "redis-server", "--requirepass", "${REDIS_PASSWORD:?set REDIS_PASSWORD to a random value, e.g. openssl rand -hex 32}" ]
+    environment:
+      REDISCLI_AUTH: ${REDIS_PASSWORD:?set REDIS_PASSWORD}
     healthcheck:
-      test: [ "CMD", "redis-cli", "--raw", "incr", "ping" ]
+      # redis-cli exits 0 on NOAUTH, so match the reply instead.
+      test: [ "CMD-SHELL", "redis-cli ping | grep -qx PONG" ]
       interval: 30s
       timeout: 30s
       start_period: 0s
@@ -94,15 +118,21 @@ services:
       - redis-volume:/data
     logging: *default-logging
   hasura:
-    image: hasura/graphql-engine:v2.11.3.cli-migrations-v2
-    ports:
-      - 8088:8080
+    image: hasura/graphql-engine:v2.45.8-ce.cli-migrations-v2@sha256:18b39122f207afa4fe7116acaa6484ddac69c2160fde0571e3a27abf924e0bec
+    # No published port: only web reaches Hasura, over the Compose network.
     environment:
       HASURA_GRAPHQL_ENABLE_TELEMETRY: 'false'
+      HASURA_GRAPHQL_ENABLE_CONSOLE: 'false'
+      HASURA_GRAPHQL_DEV_MODE: 'false'
+      # Relay (/v1beta1/relay) is part of the graphql API; metadata is for apply_metadata_snapshot.py.
+      HASURA_GRAPHQL_ENABLED_APIS: graphql,metadata
       HASURA_GRAPHQL_MIGRATIONS_SERVER_TIMEOUT: 500
       HASURA_GRAPHQL_DATABASE_URL: ${DATABASE_URL}
+      # An empty value would make the empty string the secret, so that a request with an
+      # empty X-Hasura-Admin-Secret header gets admin. Refuse to start without a real one.
+      HASURA_GRAPHQL_ADMIN_SECRET: ${HASURA_ADMIN_SECRET:?HASURA_ADMIN_SECRET must be set to a random value, e.g. openssl rand -hex 32}
     healthcheck:
-      test: "timeout 10s bash -c ':> /dev/tcp/127.0.0.1/8080'"
+      test: [ "CMD", "curl", "-fsS", "-o", "/dev/null", "http://127.0.0.1:8080/healthz" ]
       interval: 30s
       timeout: 30s
       start_period: 0s
@@ -112,8 +142,6 @@ services:
     platform: linux/amd64
     pull_policy: always
     image: ${DOCKER_NAMESPACE:-ghcr.io/zenysis}/${DOCKER_IMAGE_PREFIX:-harmony}-web:${DOCKER_TAG:-latest}
-    ports:
-      - 5000:5000
     environment:
       - ZEN_ENV=${ZEN_ENV}
       - HSTS=off
@@ -125,17 +153,25 @@ services:
       - MAILGUN_SMTP_ACCOUNT_ID=${MAILGUN_SMTP_ACCOUNT_ID:-}
       - EMAIL_TAG_HEADER_NAME=${EMAIL_TAG_HEADER_NAME:-X-Mailgun-Tag}
       - EMAIL_USE_ENCRYPTION=${EMAIL_USE_ENCRYPTION:-tls}
-      - DEFAULT_SECRET_KEY=${DEFAULT_SECRET_KEY:-changeme}
+      - DEFAULT_SECRET_KEY=${DEFAULT_SECRET_KEY:?set DEFAULT_SECRET_KEY to a random value, e.g. openssl rand -hex 32}
+      - JWT_SECRET_KEY=${JWT_SECRET_KEY:?set JWT_SECRET_KEY to a random value different from DEFAULT_SECRET_KEY, e.g. openssl rand -hex 32}
       - DRUID_HOST=${DRUID_HOST}
       - MAPBOX_ACCESS_TOKEN=${MAPBOX_ACCESS_TOKEN}
       - REDIS_HOST=redis
+      - REDIS_PASSWORD=${REDIS_PASSWORD:?set REDIS_PASSWORD}
       - HASURA_HOST=http://hasura:8080
+      - HASURA_ADMIN_SECRET=${HASURA_ADMIN_SECRET:?HASURA_ADMIN_SECRET must be set}
       - SQLALCHEMY_DATABASE_URI=${DATABASE_URL}
       - VIRTUAL_HOST=${WEB_VIRTUAL_HOST}
-      - URLBOX_API_KEY=${URLBOX_API_KEY:-}
-      - RENDERBOT_EMAIL=${RENDERBOT_EMAIL:-}
       - OBJECT_STORAGE_ALIAS=${OBJECT_STORAGE_ALIAS}
       - ZEN_GUNICORN_WORKER_THREADS=${ZEN_GUNICORN_WORKER_THREADS:-4}
+      - LOG_FORMAT=json
+      - LOG_STREAM=stdout
+      - RENDERER_URL=http://renderer:8080
+      # The renderer loads dashboards from here, never from the request's Host.
+      - RENDER_WEB_ORIGIN=http://web:5000
+    # Naming a network drops the implicit default, so list both.
+    networks: [default, render]
     volumes:
       # Map minio config folder
       - ${MC_CONFIG_PATH}:/root/.mc
@@ -150,9 +186,6 @@ services:
   worker:
     platform: linux/amd64
     image: ${DOCKER_NAMESPACE:-ghcr.io/zenysis}/${DOCKER_IMAGE_PREFIX:-harmony}-web:${DOCKER_TAG:-latest}
-    # Assign some random ports for worker service to work
-    ports:
-      - 61234:61234
     environment:
       - ZEN_ENV=${ZEN_ENV}
       - EMAIL_HOST=${EMAIL_HOST}
@@ -161,23 +194,25 @@ services:
       - MAILGUN_SMTP_ACCOUNT_ID=${MAILGUN_SMTP_ACCOUNT_ID:-}
       - EMAIL_TAG_HEADER_NAME=${EMAIL_TAG_HEADER_NAME:-X-Mailgun-Tag}
       - EMAIL_USE_ENCRYPTION=${EMAIL_USE_ENCRYPTION:-tls}
-      - DEFAULT_SECRET_KEY=${DEFAULT_SECRET_KEY:-changeme}
-      - BROKER_URL=redis://redis:6379/0
+      - DEFAULT_SECRET_KEY=${DEFAULT_SECRET_KEY:?set DEFAULT_SECRET_KEY to a random value, e.g. openssl rand -hex 32}
+      - JWT_SECRET_KEY=${JWT_SECRET_KEY:?set JWT_SECRET_KEY to a random value different from DEFAULT_SECRET_KEY, e.g. openssl rand -hex 32}
+      - REDIS_HOST=redis
+      - REDIS_PASSWORD=${REDIS_PASSWORD:?set REDIS_PASSWORD}
       - SQLALCHEMY_DATABASE_URI=${DATABASE_URL}
       - HASURA_HOST=http://hasura:8080
       - DRUID_HOST=${DRUID_HOST}
       - MAPBOX_ACCESS_TOKEN=${MAPBOX_ACCESS_TOKEN}
-      - URLBOX_API_KEY=${URLBOX_API_KEY:-}
-      - RENDERBOT_EMAIL=${RENDERBOT_EMAIL:-}
       - OBJECT_STORAGE_ALIAS=${OBJECT_STORAGE_ALIAS}
+      - LOG_FORMAT=json
+      - LOG_STREAM=stdout
     command:
       [
         "celery",
+        "-q",
         "-A",
         "web.background_worker.celery",
         "worker",
-        "--beat",
-        "--loglevel=INFO"
+        "--beat"
       ]
     healthcheck:
       test:
@@ -191,5 +226,72 @@ services:
       interval: 60s
       timeout: 30s
       start_period: 5s
+      retries: 3
+    logging: *default-logging
+  renderer:
+    platform: linux/amd64
+    image: ${DOCKER_NAMESPACE:-ghcr.io/zenysis}/${DOCKER_IMAGE_PREFIX:-harmony}-renderer:${DOCKER_TAG:-latest}
+    # No published port: only web calls it, over the internal render network.
+    networks: [render]
+    environment:
+      - RENDERER_ALLOWED_ORIGIN=http://web:5000
+      - RENDERER_CONCURRENCY=${RENDERER_CONCURRENCY:-2}
+      # Map styles and tiles: fetched only through render-egress, which allows the
+      # same list.
+      - RENDERER_EGRESS_PROXY=http://render-egress:3128
+      - RENDERER_MAP_ORIGINS=${RENDERER_MAP_ORIGINS:-https://api.mapbox.com}
+    depends_on:
+      # Started, not healthy: only map exports need the proxy, and they fail fast
+      # with egress_blocked while it is down.
+      render-egress:
+        condition: service_started
+    read_only: true
+    tmpfs:
+      - /tmp
+      - /home/pwuser
+    # Chromium renders through /dev/shm; Docker's 64 MiB default crashes tabs.
+    shm_size: 1gb
+    # Reaps the Chromium helpers left behind when each render's browser closes.
+    init: true
+    cap_drop: [ALL]
+    # Chromium's sandbox chroots inside its own user namespace, and Docker allows
+    # the chroot syscall through the seccomp profile only with this capability.
+    # pwuser never holds it outside that namespace.
+    cap_add: [SYS_CHROOT]
+    security_opt:
+      - no-new-privileges:true
+      # Chromium keeps its sandbox, which needs user namespaces. This is Playwright
+      # v1.63.0's profile: Docker's default plus clone, setns and unshare. Without
+      # it Chromium refuses to start; the renderer never falls back to --no-sandbox.
+      - seccomp=./docker/renderer/seccomp_profile.json
+    mem_limit: 2g
+    pids_limit: 512
+    # The image's HEALTHCHECK probes GET /healthz.
+    logging: *default-logging
+  render-egress:
+    platform: linux/amd64
+    # The renderer image; the proxy is harmony/worker/renderer/egress_proxy.py,
+    # stdlib only. It tunnels to the map origins, drops Cookie and Authorization,
+    # and answers 403 to everything else before connecting.
+    image: ${DOCKER_NAMESPACE:-ghcr.io/zenysis}/${DOCKER_IMAGE_PREFIX:-harmony}-renderer:${DOCKER_TAG:-latest}
+    entrypoint: ["python", "-m", "harmony.worker.renderer.egress_proxy"]
+    # No published port: only the renderer uses it.
+    networks: [render, render-egress]
+    environment:
+      - EGRESS_PROXY_PORT=3128
+      - EGRESS_ALLOWED_ORIGINS=${RENDERER_MAP_ORIGINS:-https://api.mapbox.com}
+    read_only: true
+    # Python as PID 1 ignores SIGTERM; the init passes it on.
+    init: true
+    cap_drop: [ALL]
+    security_opt:
+      - no-new-privileges:true
+    mem_limit: 128m
+    pids_limit: 128
+    healthcheck:
+      # Replaces the image's HEALTHCHECK, which probes the renderer's /healthz.
+      test: ["CMD", "python", "-c", "import socket; socket.create_connection(('127.0.0.1', 3128), 3).close()"]
+      interval: 30s
+      timeout: 5s
       retries: 3
     logging: *default-logging

@@ -1,0 +1,5 @@
+{
+  "description": "TIME (LineGraphQueryEngine): month by state over a year; issues the main query and the totals query.",
+  "endpoint": "line_graph",
+  "policy": null
+}

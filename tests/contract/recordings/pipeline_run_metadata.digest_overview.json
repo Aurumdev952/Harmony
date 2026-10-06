@@ -1,0 +1,44 @@
+{
+  "content_type": "application/json",
+  "headers": [],
+  "id": "pipeline_run_metadata.digest_overview",
+  "pinned": {},
+  "response_schema": {
+    "additionalProperties": {
+      "items": {
+        "properties": {
+          "dataPointsCount": {
+            "type": "integer"
+          },
+          "endDate": {
+            "type": "string",
+            "x-format": "date"
+          },
+          "fieldsCount": {
+            "type": "integer"
+          },
+          "generationDatetime": {
+            "type": "string",
+            "x-format": "date-time-space"
+          },
+          "startDate": {
+            "type": "string",
+            "x-format": "date"
+          }
+        },
+        "required": [
+          "dataPointsCount",
+          "endDate",
+          "fieldsCount",
+          "generationDatetime",
+          "startDate"
+        ],
+        "type": "object"
+      },
+      "type": "array"
+    },
+    "type": "object"
+  },
+  "route": "GET /api2/pipeline_run_metadata/digest_overview",
+  "status": 200
+}

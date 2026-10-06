@@ -9,8 +9,8 @@ No vendor skill exists. Before relying on any fact below, confirm it against the
 
 ## Today
 
-- Druid 0.23.0 (`druid_setup/*/environment/common.env`), ZooKeeper, Postgres metadata store, local deep storage on NFS.
-- `druid_javascript_enabled=true`, used by `js_formulas`, week extraction and legacy JavaScript post-aggregators.
+- Druid 38.0.0 on Java 21 after WP-8b (0.23.0 before it), ZooKeeper, Postgres metadata store, local deep storage on NFS.
+- `druid_javascript_enabled=false` since WP-8a; permanent tests keep JavaScript out of env files, fixtures and builder sources.
 - Native `index_parallel` over sharded gzip JSON (`db/druid/indexing/`) creates a new datasource `<deployment>_<YYYYMMDD…>` on every run. The web app reads the newest one. Two are kept.
 - `hashed` partitioning with `numShards: 1` and `segmentGranularity: MONTH` (`db/druid/indexing/common.py:32`).
 - The index step waits with a fixed `sleep 120`.
@@ -22,7 +22,7 @@ No vendor skill exists. Before relying on any fact below, confirm it against the
 - **ZooKeeper.**
   - ZooKeeper-based segment loading was removed in 30.
   - The ZooKeeper task runner and segment announcement were removed in 38. Use `httpRemote`.
-  - Removing ZooKeeper from Compose is part of WP-8b when targeting 38.
+  - ZooKeeper is still required by 38 for leader election and discovery outside Kubernetes; it stays in Compose (decision 0007).
 - **Removed ingestion paths.** Hadoop ingestion was deprecated in 32 and removed in 37. Delete `db/druid/indexing/resources/task_templates` (Hadoop) and `tuning_configs/on_prem.json`.
 - **Nulls (WP-8a).**
   - SQL-compatible null handling has been the default since 28.
@@ -32,6 +32,18 @@ No vendor skill exists. Before relying on any fact below, confirm it against the
   - `x <> 'v'` no longer matches null rows. Add `OR x IS NULL`, or use `IS DISTINCT FROM`.
   - Aggregates over null inputs return null, not 0.
 - **MSQ.** MSQ is core from 35 and must not be in `loadList`. Array ingest mode defaults to `array` from 31.
+- **Removed settings.** `druid.indexer.runner.type=remote` makes 38 fail to start (`httpRemote` is the default); `druid.serverview.type` must be `http` (38); the `cachingCost` balancer went in 28. 28 and 37 add metadata columns and tables, created automatically while `druid.metadata.storage.connector.createTables` is on.
+- **Upgrade path.** No rolling upgrade from before 0.23. A stop-start from 0.23 straight to 38 over the same metadata store and deep storage works: WP-8b served every 0.23 segment on 38 and replayed the golden suite unchanged.
+
+## Druid 38 in druid_setup (WP-8b; decisions 0007 and 0014)
+
+- **Image.** `apache/druid:38.0.0` by digest: Temurin 21.0.10, runs as uid 1000. Every service in `druid_setup` sets a non-root `user`.
+- **Authentication.** `druid-basic-security`: chain `["basic"]`, metadata credentials, internal escalator `druid_system`, authorizer `basic`. Every password is an `environment` password provider, never a literal: `druid.sh` echoes every `druid_*` setting into the log. Only the coordinator needs `DRUID_ADMIN_PASSWORD`; every process needs `DRUID_INTERNAL_PASSWORD`. `auth_init` (`druid_setup/auth/provision.sh`) creates and rotates `harmony_query` (web: datasource and STATE read) and `harmony_pipeline` (adds datasource write and EXTERNAL read). `/status/health` is always anonymous; `/status` and `/status/properties` need STATE.
+- **Network.** Single mode publishes nothing. Druid, ZooKeeper, Postgres and memcached share an `internal: true` network; the router alone also joins `harmony_druid`, which web, worker and pipeline join, so all of them run on one Docker host (decision 0014). Clients send every request to the router (management proxy on). Cluster mode keeps private-address ports behind authentication, a residual until infra's encrypted overlay (`8b-net`).
+- **`druid_host` on an internal network.** The image announces the address of its default route; an `internal: true` network has none, so `druid.host` comes out empty and the router cannot find the coordinator. Set `druid_host` to the service name on every process.
+- **Zenysis extensions.** No build newer than 29.0.1 exists. `druid-arbitrary-granularity` 29.0.1 works on 38 and is the only one loaded. `druid-tuple-sketch-expansion` 29.0.1 throws on 38, so the builder keeps theta sketches apart. `druid-aggregatable-first-last` is replaced by the native LAST_VALUE expression aggregator, and nothing reads `nestedJson` any more.
+- **Query policies that include `''`.** On 38, `in dim [""]` matches no null row, so such a policy fails closed. Only a JWT `query_needs` claim can produce one; a stored `query_policy` row with `''` grants nothing on either version. `scripts/druid/find_empty_string_policies.py` is the pre-upgrade check (decision 0014).
+- **Proof tools.** `scripts/druid/null_audit/run_audit.py` (`--auth-env`; `index`, `replay`, `diff`, `summary`) and `policy_probe.py` replay the golden suite and the policy matrix against a live Druid; `tests/druid_setup/test_druid_auth_live.py` checks authentication from inside the network.
 
 ## WP-8a: the null audit, done safely
 
@@ -69,4 +81,5 @@ CLUSTERED BY "field", "source"
 - Golden suite against a live Druid of the target version.
 - Ingest the demo dataset and compare row counts and per-field sums against 0.23.
 - Run a single-month change and confirm only that month reindexes. Record the time.
-- `docker compose -f druid_setup/single/docker-compose.yml config` validates.
+- `docker compose -f druid_setup/single/docker-compose.yml config --quiet` validates (with the five secrets set), and `uv run pytest tests/druid_setup` passes.
+- On a live stack: `tests/druid_setup/test_druid_auth_live.py` and `policy_probe.py`.

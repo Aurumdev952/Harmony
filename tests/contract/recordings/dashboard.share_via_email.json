@@ -1,0 +1,11 @@
+{
+  "content_type": "application/json",
+  "headers": [],
+  "id": "dashboard.share_via_email",
+  "pinned": {},
+  "response_schema": {
+    "type": "integer"
+  },
+  "route": "POST /api2/dashboard/<id>/share_via_email",
+  "status": 200
+}

@@ -1,0 +1,11 @@
+{
+  "content_type": "application/json",
+  "headers": [],
+  "id": "dashboard_session.generate_link",
+  "pinned": {},
+  "response_schema": {
+    "type": "string"
+  },
+  "route": "POST /api2/dashboard_session/generate_link",
+  "status": 200
+}

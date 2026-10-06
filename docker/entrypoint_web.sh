@@ -1,6 +1,13 @@
 #!/bin/bash -eu
 set -o pipefail
 
+# A JSON line like the app's (WP-2g), so `docker compose logs web | jq` parses.
+# Messages are fixed strings without quotes or backslashes.
+log_json() {
+  printf '{"timestamp":"%s","level":"INFO","logger":"%s","message":"%s"}\n' \
+    "$(date -u +%Y-%m-%dT%H:%M:%S.000+00:00)" "${0##*/}" "$1"
+}
+
 # Script called from docker to upgrade and run the web server in production.
 
 # File that will be created to show that entrypoint initialization has been
@@ -12,14 +19,14 @@ INIT_COMPLETE='/tmp/initialization_completed'
 pushd /zenysis &>/dev/null
 
 if ! [ -f "${INIT_COMPLETE}" ] ; then
-  echo 'Initializing server'
+  log_json 'Initializing server'
   ./initialize_new_container.sh
 
-  echo 'Initialization complete'
+  log_json 'Initialization complete'
   touch "${INIT_COMPLETE}"
 fi
 
-echo 'Running server...'
+log_json 'Running server...'
 ./run_web_gunicorn.sh
 
 popd &>/dev/null

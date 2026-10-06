@@ -1,0 +1,16 @@
+{
+  "description": "Policy with an otherwise empty query filter (includeAll and includeNull, no interval filter): the posted filter is the policy filter alone (WP-0c and_policy_filter).",
+  "endpoint": "table",
+  "policy": {
+    "query_policies": [
+      {
+        "dimension": "StateName",
+        "dimension_value": "Acre"
+      },
+      {
+        "dimension": "source",
+        "dimension_value": null
+      }
+    ]
+  }
+}

@@ -11,6 +11,7 @@ from flask import (
 from flask_login import current_user
 from werkzeug.exceptions import BadRequest
 
+from web.server.potion.managers import visible_username
 from web.server.routes.views.authentication import authentication_required
 from web.server.routes.views.authorization import is_authorized
 from web.server.routes.views.dashboard import get_dashboard
@@ -55,7 +56,7 @@ class DashboardPageRouter:
             'dashboard': {
                 'activeDashboard': name,
                 'dashboardUri': resource_uri,
-                'dashboardAuthor': dashboard_entity.author.username,
+                'dashboardAuthor': visible_username(dashboard_entity.author.username),
                 'isOfficial': dashboard_entity.is_official,
             }
         }

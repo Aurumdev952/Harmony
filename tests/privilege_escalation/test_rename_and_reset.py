@@ -28,6 +28,8 @@ from models.alchemy.security_group import Group
 from models.alchemy.user import User, UserAcl
 
 _USER_EDITOR = ['manager', 'user_admin']
+# The harness's password for every user (tests/privilege_escalation/conftest.py).
+_PASSWORD = 'escalation-test-password'
 
 
 @pytest.fixture(name='db')
@@ -795,3 +797,75 @@ def test_a_dashboard_names_its_author_only_to_callers_who_see_the_author(
         author.username,
         [author.username],
     )
+
+
+@pytest.mark.parametrize('kind', [_DIRECT_ADMIN, _GROUP_ADMIN])
+@pytest.mark.parametrize('narrowed', [False, True], ids=['full_session', 'narrowed'])
+def test_a_narrowed_admin_token_is_not_told_an_admin_authors_name(
+    app, db, make_user, kind, narrowed
+):
+    '''"Superuser" is the identity: a token narrowed on an admin account to
+    viewing one dashboard (as the render bot's is) reads its author as hidden.
+    '''
+    author = _admin_target(db, make_user, kind)
+    resource_id, slug = _dashboard_by(db, author.id)
+    admin = make_user(['admin'])
+    needs = [['view_resource', resource_id, 'dashboard']]
+    caller = _token_caller(app, admin.username, needs if narrowed else None)
+
+    shown = None if narrowed else author.username
+    assert _author_usernames(caller, resource_id, slug) == (shown, [shown])
+
+
+@pytest.fixture(name='dashboard_page')
+def fixture_dashboard_page(app):
+    '''The dashboard page's `dashboardAuthor` for a caller. The session app has
+    served requests, so the page's blueprint cannot be registered on it; the
+    view runs inside a request context after the hooks Flask runs before a
+    routed request's view (`request_started`, then before-request: request
+    logger, sign-in and identity).
+    '''
+    # pylint: disable=import-outside-toplevel
+    from flask import request_started
+
+    from web.server.routes.dashboard import DashboardPageRouter
+
+    rendered: list[dict] = []
+    router = DashboardPageRouter(
+        SimpleNamespace(
+            render_helper=lambda _template, _locale, args, _js: (
+                rendered.append(args) or 'page'
+            )
+        ),
+        'en',
+    )
+
+    def page_author(caller, slug: str):
+        headers = {'X-Username': caller.username, 'X-Password': _PASSWORD}
+        with app.test_request_context(f'/dashboard/{slug}', headers=headers):
+            request_started.send(app)
+            assert app.preprocess_request() is None
+            response = router.grid_dashboard(name=slug)
+        assert response.status_code == 200
+        return rendered[-1]['dashboard']['dashboardAuthor']
+
+    return page_author
+
+
+@pytest.mark.parametrize('kind', [_DIRECT_ADMIN, _GROUP_ADMIN, 'not_admin'])
+def test_the_dashboard_page_names_its_author_only_to_callers_who_see_the_author(
+    db, make_user, dashboard_page, kind
+):
+    author = (
+        make_user(['group_admin'])
+        if kind == 'not_admin'
+        else _admin_target(db, make_user, kind)
+    )
+    resource_id, slug = _dashboard_by(db, author.id)
+    viewer = make_user()
+    _give_acl(db, viewer.id, 'dashboard_viewer', resource_id)
+    superuser = _admin_target(db, make_user, _GROUP_ADMIN)
+
+    shown = author.username if kind == 'not_admin' else None
+    assert dashboard_page(viewer, slug) == shown
+    assert dashboard_page(superuser, slug) == author.username

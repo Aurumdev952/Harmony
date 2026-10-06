@@ -179,6 +179,13 @@ use_built_image() {
   export PERF_WEB_IMAGE
 }
 
+# create_mount_points <checkout>: web's upload tmpfs mounts at uploads/ in the
+# read-only checkout, and Docker cannot create a mount point there (the
+# repository ignores uploads/).
+create_mount_points() {
+  mkdir -p "$1/uploads"
+}
+
 # wait_for <description> <tries> <command...>: retry every 5 s.
 wait_for() {
   local what="$1" tries="$2"
@@ -321,6 +328,7 @@ up() {
   druid_compose up -d --no-deps "${DRUID_SERVICES[@]}"
   wait_for 'Druid coordinator, broker, middlemanager and historical are up' 60 druid_ready
   broker_sees_datasource || index_druid
+  create_mount_points "${ROOT}"
   web_compose up -d --wait postgres redis
   web_compose up -d web
   wait_for "web is up at http://127.0.0.1:${PERF_WEB_PORT}" 120 web_answers
@@ -418,6 +426,7 @@ reference() {
   rm -rf "${PERF_REFERENCE_DIR}"
   mkdir -p "${src}"
   git -C "${ROOT}" archive --format=tar "${sha}" | tar -x -C "${src}"
+  create_mount_points "${src}"
   PERF_REFERENCE_IMAGE="$(build_image "${src}")"
   if client_unchanged_since "${sha}"; then
     if [[ ! -d "${PERF_SCRATCH}/client/min" ]]; then

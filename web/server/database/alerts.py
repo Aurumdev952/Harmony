@@ -38,8 +38,7 @@ def make_author_alert_administrator(
     add_user_acl(
         user or current_user,
         'alert_admin',
-        ResourceTypeEnum.ALERT.name,
-        authorization_item.name,
+        authorization_item,
         session=transaction.run_raw(),
         commit=False,
     )

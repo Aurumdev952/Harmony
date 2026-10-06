@@ -12,7 +12,11 @@ from web.server.data.data_access import (
 from web.server.errors import ItemNotFound
 from web.server.potion.signals import after_user_group_change
 from web.server.routes.views.users import try_get_user
-from web.server.routes.views.core import try_get_role_and_resource
+from web.server.routes.views.core import (
+    find_named_resource,
+    try_get_resource_role,
+    try_get_role_and_resource,
+)
 
 
 def try_get_group_acl(group_id, resource_role_id, resource_id):
@@ -98,18 +102,17 @@ def add_group_role(
 def add_group_acl(
     group,
     resource_role_name,
-    resource_type,
-    resource_name,
+    resource,
     session=None,
     flush=True,
     commit=True,
 ):
+    '''Gives `group` the resource role `resource_role_name` on `resource`, the
+    row the caller holds, never one found again by its name.
+    '''
     session = session or get_db_adapter().session
-    (resource_role, resource_type, resource) = try_get_role_and_resource(
-        resource_role_name, resource_type, resource_name
-    )
-    resource_id = resource.id if resource else None
-    entity = try_get_group_acl(group.id, resource_role.id, resource_id)
+    resource_role = try_get_resource_role(resource_role_name, resource, session)
+    entity = try_get_group_acl(group.id, resource_role.id, resource.id)
     exists = True
 
     if not entity:
@@ -117,7 +120,7 @@ def add_group_acl(
         entity = GroupAcl(
             group_id=group.id,
             resource_role_id=resource_role.id,
-            resource_id=resource_id,
+            resource_id=resource.id,
         )
         add_entity(session, entity, flush, commit)
 
@@ -168,21 +171,13 @@ def update_group_resource_roles(
 
     for resource_role in new_resource_roles:
         role_name = resource_role['role_name']
-        resource_type = resource_role['resource_type']
-        resource_name = (
-            resource.name if resource else resource_role.get('resource_name')
-        )
+        # Without `resource`, each role names its resource.
+        target = resource or find_named_resource(resource_role, session)
 
         # Do not flush or commit these changes. We want to perform the update in a transacted
         # fashion.
         (result, _) = add_group_acl(
-            group,
-            role_name,
-            resource_type,
-            resource_name,
-            session,
-            flush=False,
-            commit=False,
+            group, role_name, target, session, flush=False, commit=False
         )
         new_role_entities.append(result)
 

@@ -1,0 +1,55 @@
+{
+  "adminBoundaryExcludeLocations": [],
+  "adminBoundaryIncludeLocations": [],
+  "data": [
+    {
+      "date": "2024-01-01",
+      "datedData": [
+        {
+          "dimensions": {
+            "MunicipalityName": "Cruzeiro do Sul",
+            "StateName": "Acre"
+          },
+          "lat": "-7.6307",
+          "lng": "-72.6704",
+          "metrics": {
+            "yellow_fever_cases": null
+          }
+        },
+        {
+          "dimensions": {
+            "MunicipalityName": "Rio Branco",
+            "StateName": "Acre"
+          },
+          "lat": "-9.974",
+          "lng": "-67.8076",
+          "metrics": {
+            "yellow_fever_cases": 386.51
+          }
+        },
+        {
+          "dimensions": {
+            "MunicipalityName": "Alto Alegre",
+            "StateName": "Roraima"
+          },
+          "lat": "2.9858",
+          "lng": "-61.3071",
+          "metrics": {
+            "yellow_fever_cases": 276.0
+          }
+        },
+        {
+          "dimensions": {
+            "MunicipalityName": "Pacaraima",
+            "StateName": "Roraima"
+          },
+          "lat": "4.4799",
+          "lng": "-61.1477",
+          "metrics": {
+            "yellow_fever_cases": 69.0
+          }
+        }
+      ]
+    }
+  ]
+}

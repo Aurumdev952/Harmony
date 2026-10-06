@@ -1,0 +1,5 @@
+# Build context for docker/renderer/Dockerfile: the renderer package only.
+*
+!harmony/worker/renderer/
+**/__pycache__
+**/*.py[cod]

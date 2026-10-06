@@ -1,9 +1,7 @@
 ENV_FILE?=.env
 -include $(ENV_FILE)
 
-COMMIT?=master
-DOCKER_NAMESPACE?=zengineering
-DOCKER_TAG?=latest
+COMMIT?=main
 DOCKER_HOST?=ssh://$(WEB_REMOTE)
 SERVICE?=
 PROJECT_NAME?=harmony-web
@@ -23,19 +21,23 @@ help: # Show help for each of the Makefile recipes.
 configure:	
 	scp ./prod/nginx/nginx_vhost_default_location $(WEB_REMOTE):${NGINX_VHOST}
 
-lint-python: # Lint only the python files that have changed on this branch, with respect to master. (You can run `make lint-python COMMIT=<my-commit>` e.g. `make lint-python COMMIT=HEAD~1` to lint the files that have changed on the last commit.)
-	COMMIT=$(COMMIT) ./scripts/lint_python.sh
+lint-python: # Ruff: the whole tree for syntax errors and undefined names, plus lint and format checks on the Python files changed with respect to main (`make lint-python COMMIT=HEAD~1` for the last commit).
+	ci/lint_python.sh $(COMMIT)
 
-lint-js: # Lint only the js and jsx files that have changed on this branch, with respect to master. (You can run `make lint-js COMMIT=<my-commit>` e.g. `make lint-js COMMIT=my-other-branch` to lint the files that have changed with respect to my-other-branch.)
+lint-js: # Lint only the js and jsx files that have changed on this branch, with respect to main. (You can run `make lint-js COMMIT=<my-commit>` e.g. `make lint-js COMMIT=my-other-branch` to lint the files that have changed with respect to my-other-branch.)
 	COMMIT=$(COMMIT) ./scripts/lint_js.sh
 
-lint: lint-python lint-js # Lint only the python, js and jsx files that have changed on this branch, with respect to master. (You can run `make lint COMMIT=<my-commit>` e.g. `make lint COMMIT=HEAD~1` to lint the files that have changed on the last commit.)
+lint: lint-python lint-js # Lint only the python, js and jsx files that have changed on this branch, with respect to main. (You can run `make lint COMMIT=<my-commit>` e.g. `make lint COMMIT=HEAD~1` to lint the files that have changed on the last commit.)
 	
-black: # Run black on all python files that have changed on this branch, with respect to master. (You can run `make black COMMIT=<my-commit>` e.g. `make black COMMIT=origin/master` to lint the files that have changed with respect to origin/master.)
-	COMMIT=$(COMMIT) ./scripts/format_python.sh
+format-python: # Ruff: fix and format the Python files changed with respect to main (`make format-python COMMIT=origin/main`).
+	ci/lint_python.sh --fix $(COMMIT)
 
 build: # Build docker images (for development and production) using docker compose.
 	docker compose --env-file $(ENV_FILE) -f docker-compose.build.yaml build $(SERVICE)
+
+
+push: # Push the images built by `make build` to $DOCKER_NAMESPACE (default ghcr.io/zenysis).
+	docker compose --env-file $(ENV_FILE) -f docker-compose.build.yaml push $(or $(SERVICE),web-client web-server web renderer etl-pipeline)
 
 convert: # Use the "docker compose config" command to render the compose file. (Useful to see the impact of environment variables.) 
 	$(COMPOSE_COMMAND) config
@@ -64,9 +66,11 @@ minio-server-up: # Start the minio server container.
 minio-server-down: # Stop the minio server container.
 	DOCKER_HOST=$(DOCKER_HOST) docker compose --env-file $(ENV_FILE) -f docker-compose.minio.yaml down
 
-mypy: # Run mypy using `mypy --config-file mypy.ini`
-	source venv/bin/activate;
-	mypy --config-file mypy.ini;
+mypy: # Type-check with the [tool.mypy] settings in pyproject.toml.
+	uv run --locked --isolated --group renderer-types mypy
+
+test: # Run the Python suites as CI does: each tests/ suite in its own process on the uv.lock environment.
+	ci/pytest_suites.sh
 
 postgres-psql:
 	$(COMPOSE_COMMAND) exec postgres psql -h ${POSTGRES_HOST} -U ${POSTGRES_USER} ${POSTGRES_DB}
@@ -109,37 +113,3 @@ populate-query-models:
 
 run-bash: # Bash into a container
 	$(COMPOSE_COMMAND) run --rm $(SERVICE) /bin/bash
-
-web-client-build:
-	@docker build -t $(DOCKER_NAMESPACE)/harmony-web-client:$(DOCKER_TAG) \
-		-f docker/web/Dockerfile_web-client .
-
-web-client-push: # Push the web client docker image to the container registry.
-	docker push $(DOCKER_NAMESPACE)/harmony-web-client:$(DOCKER_TAG)
-
-web-server-build:
-	@docker build -t $(DOCKER_NAMESPACE)/harmony-web-server:$(DOCKER_TAG) \
-		-f docker/web/Dockerfile_web-server .
-
-web-server-push: # Push the web server docker image to the container registry.
-	docker push $(DOCKER_NAMESPACE)/harmony-web-server:$(DOCKER_TAG)
-
-web-build:
-	@docker build -t $(DOCKER_NAMESPACE)/harmony-web:$(DOCKER_TAG) \
-		-f docker/web/Dockerfile_web \
-		--build-arg NAMESPACE=$(DOCKER_NAMESPACE) \
-		--build-arg TAG=$(DOCKER_TAG)  .
-
-web-push: # Push the web docker image to the container registry.
-	docker push $(DOCKER_NAMESPACE)/harmony-web:$(DOCKER_TAG)
-
-etl-pipeline-build:
-	@docker build -t $(DOCKER_NAMESPACE)/harmony-etl-pipeline:$(DOCKER_TAG) \
-		-f docker/pipeline/Dockerfile  .
-
-etl-pipeline-push: # Push the etl pipeline docker image to the container registry.
-	docker push $(DOCKER_NAMESPACE)/harmony-etl-pipeline:$(DOCKER_TAG)
-
-all-build: web-client-build web-server-build web-build etl-pipeline-build
-
-all-push: web-client-push web-server-push web-push etl-pipeline-push # Push all docker images.

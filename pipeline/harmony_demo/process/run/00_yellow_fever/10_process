@@ -1,12 +1,6 @@
 #!/bin/bash -eu
 set -o pipefail
 
-# Load the utilities file to use the 'SetupEnvForPyPy' command.
-source "${PIPELINE_UTILS_DIR}/bash/common.sh"
-
-# Enters the pypy virtual environment for better performance.
-SetupEnvForPyPy
-
 # This data will still need to be process by the shared steps, so put it in
 # the temp directory for intermediate outputs.
 pushd "${PIPELINE_TMP_DIR}" &> /dev/null

@@ -1,6 +1,5 @@
 pipeline/out
 venv*
-pypy
 
 .git
 node_modules
@@ -8,3 +7,4 @@ node_modules
 **/*.py[cod]
 **/__pycache__
 **/*$py.class
+.venv

@@ -1,0 +1,51 @@
+# Proposed additions to docker-compose.yaml for WP-1h. infra owns the final change.
+# Merge it into docker-compose.yaml rather than shipping it as an overlay, so that
+# every deployment gets the renderer.
+#
+# Also remove URLBOX_API_KEY and RENDERBOT_EMAIL from web and worker in
+# docker-compose.yaml, and from .env.example. The worker does not render; only web
+# calls the renderer.
+networks:
+  # No route out: the renderer can reach web and nothing else, even if the
+  # in-browser egress guard failed.
+  render:
+    internal: true
+
+services:
+  web:
+    environment:
+      - RENDERER_URL=http://renderer:8080
+      - RENDER_WEB_ORIGIN=http://web:5000
+    # Naming one network drops the implicit default, so list both.
+    networks: [default, render]
+
+  renderer:
+    platform: linux/amd64
+    image: ${DOCKER_NAMESPACE:-ghcr.io/zenysis}/${DOCKER_IMAGE_PREFIX:-harmony}-renderer:${DOCKER_TAG:-latest}
+    # Built from docker/renderer/Dockerfile (proposed in this directory) by the
+    # build overlay and CI, like the web image.
+    networks: [render]
+    environment:
+      - RENDERER_ALLOWED_ORIGIN=http://web:5000
+      - RENDERER_CONCURRENCY=${RENDERER_CONCURRENCY:-2}
+      - RENDERER_MAX_TIMEOUT_SECONDS=120
+    read_only: true
+    tmpfs:
+      - /tmp
+      - /home/pwuser
+    # Chromium uses /dev/shm for rendering; Docker's default of 64 MiB crashes tabs.
+    shm_size: 1gb
+    cap_drop: [ALL]
+    security_opt:
+      - no-new-privileges:true
+      # Chromium runs with its sandbox, which needs user namespaces. Docker's
+      # default seccomp profile blocks them; this is Playwright's v1.63.0 profile
+      # (sha256 cc3e61ca...7849), i.e. Docker's default plus clone, setns and
+      # unshare. Without it Chromium refuses to start; the renderer never falls
+      # back to --no-sandbox.
+      - seccomp=./docker/renderer/seccomp_profile.json
+    mem_limit: 2g
+    pids_limit: 512
+    restart: unless-stopped
+    # The image's HEALTHCHECK probes GET /healthz.
+    logging: *default-logging

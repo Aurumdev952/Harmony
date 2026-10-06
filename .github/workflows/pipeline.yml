@@ -9,35 +9,54 @@ on:
       branches:
         - main
 
+permissions: {}
+
 jobs:
     prepare:
-        runs-on: ubuntu-latest
+        runs-on: ubuntu-24.04
+        permissions: {}
         steps:
             - id: repository_name
-              run: |
-                lowercase_repo_name=$(echo "${{ github.event.repository.name }}" | tr '[:upper:]' '[:lower:]')
-                echo "lowercase_repo_name=${lowercase_repo_name}" >> $GITHUB_OUTPUT
+              env:
+                REPO_NAME: ${{ github.event.repository.name }}
+              run: echo "lowercase_repo_name=${REPO_NAME,,}" >> "$GITHUB_OUTPUT"
             - id: repository_owner
+              env:
+                REPO_OWNER: ${{ github.repository_owner }}
+              run: echo "lowercase_repo_owner=${REPO_OWNER,,}" >> "$GITHUB_OUTPUT"
+            - id: image_tag
+              # A Docker tag allows [A-Za-z0-9_.-] and at most 128 characters; branch
+              # names such as mig/WP-3b-cpython-313 contain '/'.
+              env:
+                REF: ${{ github.head_ref || github.ref_name }}
               run: |
-                lowercase_repo_owner=$(echo "${{ github.repository_owner }}" | tr '[:upper:]' '[:lower:]')
-                echo "lowercase_repo_owner=${lowercase_repo_owner}" >> $GITHUB_OUTPUT
+                tag=${REF//[^A-Za-z0-9_.-]/-}
+                echo "image_tag=${tag:0:128}" >> "$GITHUB_OUTPUT"
         outputs:
             lowercase_repo_name: ${{ steps.repository_name.outputs.lowercase_repo_name }}
             lowercase_repo_owner: ${{ steps.repository_owner.outputs.lowercase_repo_owner }}
+            image_tag: ${{ steps.image_tag.outputs.image_tag }}
 
     build-etl-pipeline:
-        permissions: write-all
-        runs-on: ubuntu-latest
+        runs-on: ubuntu-24.04
         needs: prepare
+        permissions:
+            contents: read
+            packages: write
+        env:
+            IMAGE: ghcr.io/${{ needs.prepare.outputs.lowercase_repo_owner }}/${{ needs.prepare.outputs.lowercase_repo_name }}-etl-pipeline
+            TAG: ${{ needs.prepare.outputs.image_tag }}
         steps:
-            - uses: actions/checkout@v3
+            - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+              with:
+                persist-credentials: false
             - name: Login to GitHub Container Registry
-              uses: docker/login-action@v2
+              uses: docker/login-action@dbcb813823bdd20940b903addbd779551569679f # v4.6.0
               with:
                 registry: ghcr.io
                 username: ${{ github.actor }}
                 password: ${{ secrets.GITHUB_TOKEN }}
             - name: Build ${{ needs.prepare.outputs.lowercase_repo_name }}-etl-pipeline
               run: |
-                docker build --platform linux/amd64 -t ghcr.io/${{ needs.prepare.outputs.lowercase_repo_owner }}/${{ needs.prepare.outputs.lowercase_repo_name }}-etl-pipeline:${{ github.head_ref || github.ref_name }} -f docker/pipeline/Dockerfile --cache-from ghcr.io/${{ needs.prepare.outputs.lowercase_repo_owner }}/${{ needs.prepare.outputs.lowercase_repo_name }}-etl-pipeline:main,ghcr.io/${{ needs.prepare.outputs.lowercase_repo_owner }}/${{ needs.prepare.outputs.lowercase_repo_name }}-etl-pipeline:${{ github.head_ref || github.ref_name }} --build-arg BUILDKIT_INLINE_CACHE=1 .
-                docker push ghcr.io/${{ needs.prepare.outputs.lowercase_repo_owner }}/${{ needs.prepare.outputs.lowercase_repo_name }}-etl-pipeline:${{ github.head_ref || github.ref_name }}
+                docker build --platform linux/amd64 -t "$IMAGE:$TAG" -f docker/pipeline/Dockerfile --cache-from "$IMAGE:main,$IMAGE:$TAG" --build-arg BUILDKIT_INLINE_CACHE=1 .
+                docker push "$IMAGE:$TAG"

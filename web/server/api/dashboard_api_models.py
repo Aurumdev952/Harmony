@@ -21,7 +21,6 @@ from models.alchemy.permission import (
     RESOURCE_ROLE_NAMES,
     SitewideResourceAcl,
 )
-from models.alchemy.schedule import SchedulerEntry
 from models.alchemy.security_group import Group
 from web.server.api.model_schemas import (
     QUERY_LINK_PATTERN,
@@ -57,6 +56,7 @@ from web.server.routes.views.dashboard import (
 )
 from web.server.routes.views.users import get_current_user
 from web.server.security.permissions import SuperUserPermission, principals
+from web.server.security.render_tokens import is_render_request
 from web.server.util.util import EMAIL_PATTERN, get_dashboard_title
 
 
@@ -583,9 +583,10 @@ class DashboardResource(PrincipalResource):
         schema=USER_URI_SCHEMA,
     )
     def transfer_ownership(self, dashboard, new_author):
-        with AuthorizedOperation(
-            'update_users', 'dashboard', dashboard.resource_id
-        ), AuthorizedOperation('view_resource', 'user', dashboard.author.id):
+        with (
+            AuthorizedOperation('update_users', 'dashboard', dashboard.resource_id),
+            AuthorizedOperation('view_resource', 'user', dashboard.author.id),
+        ):
             new_author = lookup_author(author_id=new_author)
             api_transfer_dashboard_ownership(dashboard, new_author)
             return None, NO_CONTENT
@@ -598,9 +599,10 @@ class DashboardResource(PrincipalResource):
         schema=USERNAME_SCHEMA,
     )
     def transfer_ownership_by_username(self, dashboard, new_author):
-        with AuthorizedOperation(
-            'update_users', 'dashboard', dashboard.resource_id
-        ), AuthorizedOperation('view_resource', 'user', dashboard.author.id):
+        with (
+            AuthorizedOperation('update_users', 'dashboard', dashboard.resource_id),
+            AuthorizedOperation('view_resource', 'user', dashboard.author.id),
+        ):
             new_author = lookup_author(author_username=new_author)
             api_transfer_dashboard_ownership(dashboard, new_author)
             return None, NO_CONTENT
@@ -642,8 +644,7 @@ class DashboardResource(PrincipalResource):
         title='Update Dashboard \'official\' flag',
         description='Marks a Dashboard as official or not.',
         schema=fields.Boolean(
-            description='The updated value of the "isOfficial" flag for the '
-            'dashboard.'
+            description='The updated value of the "isOfficial" flag for the dashboard.'
         ),
     )
     @authorization_required('publish_resource', 'dashboard')
@@ -656,14 +657,14 @@ class DashboardResource(PrincipalResource):
         title='Update Dashboard \'favorite\' flag',
         description='Marks a Dashboard as a user favorite or not.',
         schema=fields.Boolean(
-            description='The updated value of the "isFavorite" flag for the '
-            'dashboard.'
+            description='The updated value of the "isFavorite" flag for the dashboard.'
         ),
     )
     def set_favorite(self, dashboard, is_favorite):
-        with AuthorizedOperation(
-            'view_resource', 'dashboard', dashboard.id
-        ), Transaction() as transaction:
+        with (
+            AuthorizedOperation('view_resource', 'dashboard', dashboard.id),
+            Transaction() as transaction,
+        ):
             metadata = get_or_create_metadata(transaction, dashboard.id)
             metadata.is_favorite = is_favorite
             transaction.add_or_update(metadata)
@@ -720,8 +721,7 @@ class DashboardResource(PrincipalResource):
     def read(self, id):
         with Transaction() as transaction:
             dashboard = super().read(id)
-            dashboard.total_views += 1
-            track_dashboard_access(dashboard.id)
+            record_dashboard_view(dashboard)
             dashboard = transaction.add_or_update(dashboard, flush=True)
 
         # NOTE: Dirty hack to check if the user requested the legacy spec
@@ -1072,6 +1072,15 @@ class DashboardResource(PrincipalResource):
                     transaction.add_or_update(dashboard)
             return None, NO_CONTENT
         return None, UNAUTHORIZED
+
+
+def record_dashboard_view(dashboard):
+    # An export renders the page signed in as the requesting user; that is not
+    # the user viewing the dashboard.
+    if is_render_request():
+        return
+    dashboard.total_views += 1
+    track_dashboard_access(dashboard.id)
 
 
 def track_dashboard_access(dashboard_id, edited=False, increment_view_count=True):

@@ -1,0 +1,47 @@
+# e2e overlay on tests/contract/stack/compose.yaml, added by e2e/run.sh
+# through CONTRACT_OVERLAYS. It changes two things:
+#
+# - Queries: the mock query client is off and the metadata stub is replaced by
+#   druid_broker.py, so queries take the production Druid client and get
+#   deterministic, Druid-shaped answers.
+# - Dashboard export: RENDERER_URL points at renderer.py, a stand-in for the
+#   renderer service that checks the render token opens the dashboard.
+#
+# The upload folder's tmpfs comes from the contract stack itself.
+#
+# Relative paths resolve against tests/contract/stack, the first file's
+# directory.
+x-e2e-web-env: &e2e-web-env
+  ZEN_OFFLINE: ""
+  RENDERER_URL: http://renderer:8080
+  RENDER_WEB_ORIGIN: http://web:5000
+
+services:
+  druid-stub:
+    image: ${CONTRACT_WEB_IMAGE:?}
+    working_dir: /src
+    volumes:
+      - ../../..:/src:ro
+    environment:
+      PYTHONPATH: /src
+      PYTHONDONTWRITEBYTECODE: "1"
+      ZEN_ENV: harmony_demo
+    command: ["python", "-u", "e2e/stack/druid_broker.py"]
+
+  renderer:
+    image: python:3.12-slim@sha256:f77ac9e44ae96ef2c90b8053ea08c31f8be030f824196b0ae4db6d462c84e51f
+    networks: [internal]
+    volumes:
+      - ../../../e2e/stack/renderer.py:/renderer/renderer.py:ro
+    environment:
+      PYTHONDONTWRITEBYTECODE: "1"
+    command: ["python", "-u", "/renderer/renderer.py"]
+
+  web-init:
+    environment: *e2e-web-env
+
+  web:
+    environment: *e2e-web-env
+    depends_on:
+      renderer:
+        condition: service_started

@@ -1,0 +1,143 @@
+# Overlay on druid_setup/single/docker-compose.yml for the performance stack.
+# scripts/perf/stack.sh applies it. The metadata password reaches Druid the
+# way druid_setup ships it since WP-0b: common.env names the environment
+# variable DRUID_POSTGRES_PASSWORD, so the value never lands in
+# runtime.properties or the startup log. Do not set
+# druid_metadata_storage_connector_password here.
+#
+# What it changes, and why:
+# - No fixed container names and no published ports except coordinator, broker
+#   and router on loopback, so the stack runs beside other projects.
+# - Images pinned to the digests WP-0b pins.
+# - Shared folder and segment cache in named volumes, not host paths.
+# - Smaller JVM floors and processing buffers so the stack fits a shared
+#   development host (Druid allocates merge buffers eagerly). The stock size is
+#   about 1 GiB (direct memory / (threads + merge buffers + 1)). 512 MiB
+#   answers every baseline case; 128 MiB fails dq_data_quality_table's 579
+#   theta sketches with "Not enough aggregation buffer space". These settings
+#   are part of the baseline method: compare only runs made with the same
+#   overlay.
+# - The broker writes a request log, which is where Druid-side query time
+#   comes from.
+# - A `druid` forwarder joins the web network (see druid_forward.py).
+# - The extension loader builds on PERF_BUILD_NETWORK when it is set, as the
+#   web image does (stack.sh), for hosts whose build containers have no DNS.
+
+x-perf-druid-env: &perf-druid-env
+  DRUID_XMS: 512m
+  DRUID_MAXDIRECTMEMORYSIZE: 3g
+  druid_processing_buffer_sizeBytes: "536870912"
+
+x-druid-image: &druid-image apache/druid:0.23.0@sha256:ed9719968b4be3a2f1643907a1a5a5814e2ee1215f3604da8b2da2ac05f65912
+
+volumes:
+  perf_share:
+    name: ${PERF_PROJECT:?}-share
+  perf_output: {}
+
+networks:
+  web:
+    name: ${PERF_PROJECT:?}-druid-web
+    internal: true
+
+services:
+  extension_loader:
+    build:
+      network: ${PERF_BUILD_NETWORK:-default}
+
+  postgres:
+    image: postgres:17.11-bookworm@sha256:639ab7ceb90e13123085b741fb31ef493fba25463002f6da665352e7b534b652
+    ports: !reset []
+
+  memcache:
+    container_name: !reset null
+    image: memcached:1.6.45@sha256:405a445c7c81bca205850426288baa5655c72859ae31d3de3fa823e6482be4ad
+    ports: !reset []
+
+  zookeeper:
+    container_name: !reset null
+    image: zookeeper:3.8.6@sha256:6abd40b410986c173db7b262ab429a658d1cfb808f72c0609980a564e284214e
+    ports: !reset []
+
+  coordinator:
+    container_name: !reset null
+    image: *druid-image
+    ports: !override
+      - 127.0.0.1:${PERF_COORDINATOR_PORT:?}:8081
+    volumes:
+      - perf_share:/home/share
+    environment:
+      <<: *perf-druid-env
+
+  broker:
+    container_name: !reset null
+    image: *druid-image
+    ports: !override
+      - 127.0.0.1:${PERF_BROKER_PORT:?}:8082
+    volumes:
+      - ${PERF_REQUEST_LOG_DIR:?}:/opt/druid/requestlogs
+    environment:
+      <<: *perf-druid-env
+      druid_request_logging_type: file
+      druid_request_logging_dir: /opt/druid/requestlogs
+
+  historical:
+    container_name: !reset null
+    image: *druid-image
+    ports: !reset []
+    volumes:
+      - perf_share:/home/share
+      - perf_output:/data/output
+    environment:
+      <<: *perf-druid-env
+      druid_segmentCache_locations: '[{"path": "/data/output/druid", "maxSize": 20000000000}]'
+
+  middlemanager:
+    container_name: !reset null
+    image: *druid-image
+    ports: !reset []
+    volumes:
+      - perf_share:/home/share
+      - perf_output:/data/output
+    environment:
+      <<: *perf-druid-env
+      # Indexing peons inherit every druid.* property of the middlemanager,
+      # after their java options, so the query services' 512 MiB buffer would
+      # replace the 128 MiB below: 2.5 GiB of direct memory for 1 GiB (WP-1g).
+      # The middlemanager answers no queries.
+      druid_processing_buffer_sizeBytes: "134217728"
+      druid_worker_capacity: "2"
+      druid_indexer_runner_javaOptsArray: '["-server", "-Xmx1g", "-Xms256m", "-XX:MaxDirectMemorySize=1g", "-XX:+UseG1GC", "-XX:+ExitOnOutOfMemoryError", "-Ddruid.processing.buffer.sizeBytes=134217728", "-Ddruid.processing.numMergeBuffers=2", "-Ddruid.processing.numThreads=2", "-Djava.util.logging.manager=org.apache.logging.log4j.jul.LogManager"]'
+
+  router:
+    container_name: !reset null
+    image: *druid-image
+    ports: !override
+      - 127.0.0.1:${PERF_ROUTER_PORT:?}:8888
+    environment:
+      <<: *perf-druid-env
+
+  druid:
+    image: python:3.12-slim@sha256:f77ac9e44ae96ef2c90b8053ea08c31f8be030f824196b0ae4db6d462c84e51f
+    restart: always
+    networks:
+      default: {}
+      web:
+        aliases: [druid]
+    volumes:
+      - ${PERF_STACK_DIR:?}/druid_forward.py:/forward/druid_forward.py:ro
+    command: ["python", "-u", "/forward/druid_forward.py"]
+    depends_on: [coordinator, broker, router]
+
+  # One-off, run by stack.sh before `up`: Druid runs as uid 1000 and the named
+  # volumes start out owned by root.
+  volumes-init:
+    image: alpine:3.24.2@sha256:294b683cb724975bec92580e1e685676bd4b50bda910ddb8c51d4cabeaec77e6
+    profiles: [init]
+    volumes:
+      - perf_share:/home/share
+      - perf_output:/data/output
+    command:
+      - sh
+      - -c
+      - mkdir -p /home/share/data/druid/segments /home/share/data/logs/druid_indexing /data/output/druid && chown -R 1000:1000 /home/share /data/output

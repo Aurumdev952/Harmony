@@ -1,0 +1,3 @@
+# Build context for docker/renderer/Dockerfile.test: the pytest pins only.
+*
+!docker/renderer/test-requirements.txt

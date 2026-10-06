@@ -1,7 +1,6 @@
 import json
 from http.client import OK, BAD_REQUEST
 from datetime import timedelta
-from http.client import OK
 
 from flask import current_app, jsonify, make_response, request
 from flask_potion import fields, Resource
@@ -92,6 +91,11 @@ class AuthenticationResource(Resource):
             password = payload['password']
             invite_token = payload['invite_token']
 
+            # Every account starts with an empty reset_password_token, so an empty
+            # token would match accounts that were never invited.
+            if not invite_token.strip():
+                raise BadRequest("Invalid invitation link")
+
             # if the token does not correspond to any user, do not allow registration
             pending_user = transaction.find_one_by_fields(
                 User, True, {'reset_password_token': invite_token}
@@ -102,8 +106,14 @@ class AuthenticationResource(Resource):
             if email != pending_user.username:
                 raise BadRequest("Registered email does not match the invited email")
 
-            # Enable user account
+            # A password-reset token is also stored here, so only an invited account
+            # that has not registered yet may use it.
+            if pending_user.status_id != UserStatusEnum.PENDING.value:
+                raise BadRequest("Invalid invitation link")
+
+            # Enable user account and make the invitation single-use
             pending_user.status_id = UserStatusEnum.ACTIVE.value
+            pending_user.reset_password_token = ''
 
             # Hash password field
             hashed_password = user_manager.hash_password(password)

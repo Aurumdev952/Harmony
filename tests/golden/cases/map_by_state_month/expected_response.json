@@ -1,0 +1,111 @@
+{
+  "adminBoundaryExcludeLocations": [],
+  "adminBoundaryIncludeLocations": [],
+  "data": [
+    {
+      "date": "2024-01-01",
+      "datedData": [
+        {
+          "dimensions": {
+            "StateName": "Acre"
+          },
+          "lat": "-9.128693",
+          "lng": "-71.973581",
+          "metrics": {
+            "yellow_fever_cases": null
+          }
+        },
+        {
+          "dimensions": {
+            "StateName": "Pará"
+          },
+          "lat": "-3.974166",
+          "lng": "-52.751945",
+          "metrics": {
+            "yellow_fever_cases": 251.89
+          }
+        },
+        {
+          "dimensions": {
+            "StateName": "Roraima"
+          },
+          "lat": "1.989233",
+          "lng": "-61.330109",
+          "metrics": {
+            "yellow_fever_cases": 11.96
+          }
+        }
+      ]
+    },
+    {
+      "date": "2024-02-01",
+      "datedData": [
+        {
+          "dimensions": {
+            "StateName": "Acre"
+          },
+          "lat": "-9.128693",
+          "lng": "-71.973581",
+          "metrics": {
+            "yellow_fever_cases": 171.0
+          }
+        },
+        {
+          "dimensions": {
+            "StateName": "Pará"
+          },
+          "lat": "-3.974166",
+          "lng": "-52.751945",
+          "metrics": {
+            "yellow_fever_cases": 215.49
+          }
+        },
+        {
+          "dimensions": {
+            "StateName": "Roraima"
+          },
+          "lat": "1.989233",
+          "lng": "-61.330109",
+          "metrics": {
+            "yellow_fever_cases": null
+          }
+        }
+      ]
+    },
+    {
+      "date": "2024-03-01",
+      "datedData": [
+        {
+          "dimensions": {
+            "StateName": "Acre"
+          },
+          "lat": "-9.128693",
+          "lng": "-71.973581",
+          "metrics": {
+            "yellow_fever_cases": 325.0
+          }
+        },
+        {
+          "dimensions": {
+            "StateName": "Pará"
+          },
+          "lat": "-3.974166",
+          "lng": "-52.751945",
+          "metrics": {
+            "yellow_fever_cases": 148.0
+          }
+        },
+        {
+          "dimensions": {
+            "StateName": "Roraima"
+          },
+          "lat": "1.989233",
+          "lng": "-61.330109",
+          "metrics": {
+            "yellow_fever_cases": 236.86
+          }
+        }
+      ]
+    }
+  ]
+}

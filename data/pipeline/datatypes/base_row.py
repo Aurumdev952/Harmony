@@ -4,23 +4,13 @@ from json import JSONDecoder, JSONEncoder
 from typing import List, Optional
 
 
-# PyPy speedup to use the optimized decoder if it is available.
-# pylint: disable=import-error
-try:
-    import _pypyjson
-except ImportError:
-    _pypyjson = None
-
 # Reuse the same encoder/decoder instead of using loads and dumps since those
 # versions construct a new encoder/decoder each time they are called.
 _JSON_ENCODER = JSONEncoder(ensure_ascii=False, check_circular=False, allow_nan=False)
 # NOTE: If we are fine with unicode escaping, this encoder will be
 # more performant.
 _JSON_ENCODER_ASCII = JSONEncoder(check_circular=False, allow_nan=False)
-
-# If we are using pypy, we should use the optimized decoder instead of the standard
-# json decoder.
-_DECODE_JSON = _pypyjson.loads if _pypyjson else JSONDecoder().decode
+_DECODE_JSON = JSONDecoder().decode
 
 
 # Processed pipeline sources will store their data as a child class
@@ -70,9 +60,10 @@ class BaseRow:
     @data.setter
     def data(self, value: dict):
         # TODO: It'd be nice if there was a better way to enforce types
-        assert isinstance(
-            value, dict
-        ), f'Data must be a dictionary type. New value being set: {type(value)}'
+        if not isinstance(value, dict):
+            raise AssertionError(
+                f'Data must be a dictionary type. New value being set: {type(value)}'
+            )
         self._internal['data'] = value
 
     @property
@@ -136,7 +127,8 @@ class BaseRow:
 
         zero_fields = []
         for key, val in self.data.items():
-            assert isinstance(val, numbers.Number), f'val is not a Number: {val}'
+            if not isinstance(val, numbers.Number):
+                raise AssertionError(f'val is not a Number: {val}')
             # Process fields with a zero value separately below.
             if not val:
                 zero_fields.append(key)

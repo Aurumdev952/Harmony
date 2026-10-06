@@ -1,7 +1,6 @@
 from collections import defaultdict
 
 from models.alchemy.security_group import GroupAcl, GroupRoles, GroupUsers
-from models.alchemy.permission import Role
 from web.server.data.data_access import (
     get_db_adapter,
     add_entity,
@@ -11,10 +10,13 @@ from web.server.data.data_access import (
     Transaction,
 )
 from web.server.errors import ItemNotFound
-from web.server.potion.access import get_id_from_uri
 from web.server.potion.signals import after_user_group_change
 from web.server.routes.views.users import try_get_user
-from web.server.routes.views.core import try_get_role_and_resource
+from web.server.routes.views.core import (
+    find_named_resource,
+    try_get_resource_role,
+    try_get_role_and_resource,
+)
 
 
 def try_get_group_acl(group_id, resource_role_id, resource_id):
@@ -100,18 +102,17 @@ def add_group_role(
 def add_group_acl(
     group,
     resource_role_name,
-    resource_type,
-    resource_name,
+    resource,
     session=None,
     flush=True,
     commit=True,
 ):
+    '''Gives `group` the resource role `resource_role_name` on `resource`, the
+    row the caller holds, never one found again by its name.
+    '''
     session = session or get_db_adapter().session
-    (resource_role, resource_type, resource) = try_get_role_and_resource(
-        resource_role_name, resource_type, resource_name
-    )
-    resource_id = resource.id if resource else None
-    entity = try_get_group_acl(group.id, resource_role.id, resource_id)
+    resource_role = try_get_resource_role(resource_role_name, resource, session)
+    entity = try_get_group_acl(group.id, resource_role.id, resource.id)
     exists = True
 
     if not entity:
@@ -119,7 +120,7 @@ def add_group_acl(
         entity = GroupAcl(
             group_id=group.id,
             resource_role_id=resource_role.id,
-            resource_id=resource_id,
+            resource_id=resource.id,
         )
         add_entity(session, entity, flush, commit)
 
@@ -170,21 +171,13 @@ def update_group_resource_roles(
 
     for resource_role in new_resource_roles:
         role_name = resource_role['role_name']
-        resource_type = resource_role['resource_type']
-        resource_name = (
-            resource.name if resource else resource_role.get('resource_name')
-        )
+        # Without `resource`, each role names its resource.
+        target = resource or find_named_resource(resource_role, session)
 
         # Do not flush or commit these changes. We want to perform the update in a transacted
         # fashion.
         (result, _) = add_group_acl(
-            group,
-            role_name,
-            resource_type,
-            resource_name,
-            session,
-            flush=False,
-            commit=False,
+            group, role_name, target, session, flush=False, commit=False
         )
         new_role_entities.append(result)
 
@@ -205,10 +198,7 @@ def update_group_roles_from_map(
 ):
     session = session or get_db_adapter().session
     new_role_entities = []
-    roles = group.roles
-
-    for role in roles:
-        session.delete(role)
+    group.roles = []
 
     for resource_type in list(role_mapping.keys()):
         resource_to_roles = role_mapping[resource_type]['resources']
@@ -314,33 +304,27 @@ def update_group_users(group, new_users, session=None, flush=True, commit=True):
     return updated_users
 
 
-def build_group(group_obj):
-    '''Builds a group model dictionary with an input group dictionary from the
-    frontend, to add into the db.
+def replace_group_acls(group, grants):
+    '''Replaces the group's ACLs with `grants`, `(resource_role, resource)` pairs
+    already resolved and authorised by `verify_acl_grants`.
     '''
-    roles = []
-    # NOTE: We don't update users here because self.manager.update cannot
-    # hash users list. Users will be updated separately.
-    with Transaction() as transaction:
-        for role_uri in group_obj.get('roles'):
-            role = transaction.find_by_id(Role, get_id_from_uri(role_uri))
-            if role:
-                roles.append(role)
-    return {'name': group_obj.get('name'), 'roles': roles}
-
-
-def update_group_acls(group, acls):
-    resource_roles_map = []
-    for acl in acls:
-        resource = acl.get('resource')
-        resource_roles_map.append(
-            {
-                'role_name': acl.get('resourceRole').get('name'),
-                'resource_type': resource.get('resourceType'),
-                'resource_name': resource.get('name'),
-            }
+    session = get_db_adapter().session
+    for acl in list_resource_roles_for_group(group.id):
+        session.delete(acl)
+    for resource_role_id, resource_id in {
+        (resource_role.id, resource.id) for resource_role, resource in grants
+    }:
+        session.add(
+            GroupAcl(
+                group_id=group.id,
+                resource_role_id=resource_role_id,
+                resource_id=resource_id,
+            )
         )
-    update_group_resource_roles(group, resource_roles_map)
+    session.commit()
+
+    for group_user in group.users.all():
+        after_user_group_change.send(group_user, group=group)
 
 
 def delete_group(group):

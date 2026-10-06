@@ -1,0 +1,39 @@
+start load 13.07 17.51 18.31
+== parse bench (200,000 rows; best of 5; peak RSS growth MB)
+ijson_yajl2_c	array	200000	0.366	0	3.9.25
+client	array	200000	0.468	0	3.13.15
+ijson_python	array	200000	2.984	7	3.13.15
+json	array	200000	0.435	188	3.13.15
+orjson	array	200000	0.287	238	3.13.15
+msgspec	array	200000	0.274	163	3.13.15
+ijson_yajl2_c	dict	200000	0.156	0	3.9.25
+client	dict	200000	0.185	0	3.13.15
+ijson_python	dict	200000	2.048	0	3.13.15
+json	dict	200000	0.156	104	3.13.15
+orjson	dict	200000	0.142	173	3.13.15
+msgspec	dict	200000	0.120	121	3.13.15
+== memory matrix
+old	druid_response.json	stream	rows=294	body=0.010MB	peak_growth=0.0MB	time=0.00s	py=3.9.25
+old	  process Maximum resident set size (kbytes): 36776
+new	druid_response.json	stream	rows=294	body=0.010MB	peak_growth=0.0MB	time=0.00s	py=3.13.15
+new	  process Maximum resident set size (kbytes): 36252
+old	druid_response.json	retain	rows=294	body=0.010MB	peak_growth=0.0MB	time=0.00s	py=3.9.25
+old	  process Maximum resident set size (kbytes): 35880
+new	druid_response.json	retain	rows=294	body=0.010MB	peak_growth=0.0MB	time=0.00s	py=3.13.15
+new	  process Maximum resident set size (kbytes): 36432
+old	body_200mb.json.gz	stream	rows=1013631	body=0.000MB	peak_growth=0.6MB	time=1.89s	py=3.9.25
+old	  process Maximum resident set size (kbytes): 92164
+new	body_200mb.json.gz	stream	rows=1013631	body=0.000MB	peak_growth=9.6MB	time=2.48s	py=3.13.15
+new	  process Maximum resident set size (kbytes): 102812
+old	body_200mb.json.gz	retain	rows=1013631	body=0.000MB	peak_growth=705.9MB	time=2.96s	py=3.9.25
+old	  process Maximum resident set size (kbytes): 814408
+new	body_200mb.json.gz	retain	rows=1013631	body=0.000MB	peak_growth=670.8MB	time=3.12s	py=3.13.15
+new	  process Maximum resident set size (kbytes): 779856
+== end to end
+rows=200000 body=0.6MB gz, best=3.27s (broker dumps+gzip 1.06s), peak RSS growth=258MB, out rows=173077, py=3.9.25 ijson backend=yajl2_c
+rows=200000 body=0.6MB gz, best=4.03s (broker dumps+gzip 0.81s), peak RSS growth=230MB, out rows=173077, py=3.13.15 ijson backend=python
+rows=200000 body=0.6MB gz, best=2.76s (broker dumps+gzip 0.81s), peak RSS growth=228MB, out rows=173077, py=3.13.15 ijson backend=none (no ijson in client)
+rows=600000 body=1.9MB gz, best=10.21s (broker dumps+gzip 3.24s), peak RSS growth=670MB, out rows=519230, py=3.9.25 ijson backend=yajl2_c
+rows=600000 body=1.9MB gz, best=12.82s (broker dumps+gzip 2.55s), peak RSS growth=616MB, out rows=519230, py=3.13.15 ijson backend=python
+rows=600000 body=1.9MB gz, best=9.25s (broker dumps+gzip 2.41s), peak RSS growth=616MB, out rows=519230, py=3.13.15 ijson backend=none (no ijson in client)
+end load 13.25 15.25 17.22

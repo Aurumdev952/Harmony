@@ -13,7 +13,6 @@ DIRECTORIES_TO_IGNORE = (
     os.path.join(ZENYSIS_SRC_ROOT, 'node_modules'),
     os.path.join(ZENYSIS_SRC_ROOT, 'open_source'),
     os.path.join(ZENYSIS_SRC_ROOT, 'pipeline'),
-    os.path.join(ZENYSIS_SRC_ROOT, 'venv_pypy3'),
     os.path.join(ZENYSIS_SRC_ROOT, '.hotfix_worktree'),
 )
 

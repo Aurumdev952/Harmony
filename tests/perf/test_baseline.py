@@ -1,0 +1,1141 @@
+"""Tests for the offline parts of scripts/perf/baseline.py: statistics, case
+loading, the request-log reader and the PERF-7 comparison. conftest.py puts
+scripts/perf on the path.
+
+    uv run --locked pytest tests/perf
+"""
+
+from __future__ import annotations
+
+import hashlib
+import json
+import math
+import os
+import random
+import re
+import statistics
+import subprocess
+from pathlib import Path, PurePosixPath
+
+import baseline
+import pytest
+from baseline import PerfSample
+from hypothesis import HealthCheck, given, settings
+from hypothesis import strategies as st
+
+latencies = st.lists(
+    st.floats(min_value=0.1, max_value=1e5, allow_nan=False), min_size=1, max_size=60
+)
+
+
+def sample(case_id: str, p95: float) -> PerfSample:
+    return PerfSample(case_id, 'table', p95 / 2, p95, 100, 1.0, 30, 1.0, p95, 1)
+
+
+def test_hypothesis_runs_without_a_deadline():
+    # These properties run the bootstrap (thousands of resamples) and assert
+    # results, not speed; on a loaded host the default 200 ms deadline fails
+    # them at random (DeadlineExceeded, then Flaky). conftest.py loads the
+    # profile.
+    assert settings().deadline is None
+
+
+def test_hypothesis_does_not_fail_a_slow_draw_on_a_loaded_host():
+    # The same load makes generating examples slow: FailedHealthCheck
+    # (too_slow) was seen at load 72. The properties' results do not depend
+    # on how fast the examples arrive.
+    assert HealthCheck.too_slow in settings().suppress_health_check
+
+
+@given(latencies, st.floats(min_value=0, max_value=1))
+def test_percentile_lies_between_min_and_max(values, fraction):
+    assert min(values) <= baseline.percentile(values, fraction) <= max(values)
+
+
+@given(latencies)
+def test_percentile_is_monotonic_in_the_fraction(values):
+    points = [baseline.percentile(values, f / 20) for f in range(21)]
+    assert points == sorted(points)
+
+
+@given(latencies)
+def test_median_matches_the_statistics_module(values):
+    assert math.isclose(
+        baseline.percentile(values, 0.5), statistics.median(values), rel_tol=1e-9
+    )
+
+
+def test_p95_of_twenty_values_interpolates_between_the_top_two():
+    assert baseline.percentile(range(1, 21), 0.95) == pytest.approx(19.05)
+
+
+def test_every_case_loads_with_intervals_widened_and_nothing_else_changed():
+    for name in baseline.CASES:
+        endpoint, body = baseline.load_case(name)
+        original = json.loads(
+            (baseline.GOLDEN_CASES / name / 'request.json').read_text()
+        )
+        assert endpoint, name
+        intervals = list(_intervals(body))
+        assert intervals, f'{name} has no INTERVAL filter to widen'
+        expected = baseline.case_interval(name)
+        assert all((i['start'], i['end']) == expected for i in intervals), name
+        assert _without_dates(body) == _without_dates(original), name
+
+
+def test_cases_span_the_dataset_except_the_raw_download():
+    spans = {name: baseline.case_interval(name) for name in baseline.CASES}
+    assert spans.pop('table_disaggregated') == ('2025-12-01', '2026-01-01')
+    assert set(spans.values()) == {(baseline.DATASET_START, baseline.DATASET_END)}
+
+
+def _intervals(node):
+    if isinstance(node, list):
+        for item in node:
+            yield from _intervals(item)
+    elif isinstance(node, dict):
+        if node.get('type') == 'INTERVAL':
+            yield node
+        for value in node.values():
+            yield from _intervals(value)
+
+
+def _without_dates(node):
+    if isinstance(node, list):
+        return [_without_dates(item) for item in node]
+    if isinstance(node, dict):
+        return {
+            key: _without_dates(value)
+            for key, value in node.items()
+            if not (node.get('type') == 'INTERVAL' and key in ('start', 'end'))
+        }
+    return node
+
+
+def test_widen_intervals_leaves_the_input_untouched():
+    body = {
+        'filter': {
+            'type': 'AND',
+            'fields': [{'type': 'INTERVAL', 'start': 'a', 'end': 'b'}],
+        }
+    }
+    baseline.widen_intervals(body)
+    assert body['filter']['fields'][0] == {'type': 'INTERVAL', 'start': 'a', 'end': 'b'}
+
+
+def test_druid_times_reads_query_time_and_skips_other_lines():
+    lines = [
+        '2026-10-04T18:30:23.324Z\t172.24.0.10\t{"queryType":"groupBy"}\t{"query/time":172,"success":true}',
+        '2026-10-04T18:30:24.000Z\t172.24.0.10\t{"queryType":"timeBoundary"}\t{"query/time":3}',
+        'not a request line',
+        '2026-10-04T18:30:25.000Z\t172.24.0.10\t{}\t{"success":false}',
+    ]
+    assert list(baseline.druid_times(lines)) == [172.0, 3.0]
+
+
+def test_request_log_returns_only_new_complete_lines(tmp_path: Path):
+    log = tmp_path / '2026-10-04.log'
+    log.write_text('old\n')
+    reader = baseline.RequestLog(tmp_path)
+    with log.open('a') as handle:
+        handle.write('first\nsecond\npartial')
+    assert reader.drain() == ['first', 'second']
+    with log.open('a') as handle:
+        handle.write(' line\n')
+    (tmp_path / '2026-10-05.log').write_text('next day\n')
+    assert reader.drain() == ['partial line', 'next day']
+    assert reader.drain() == []
+
+
+def test_summarise_refuses_a_response_whose_size_changed():
+    with pytest.raises(RuntimeError, match='size changed'):
+        baseline.summarise('c', 'table', [1.0, 2.0], [10, 11], None)
+
+
+def test_summarise_reports_druid_time_and_query_count():
+    s = baseline.summarise(
+        'c', 'line_graph', [10.0, 30.0, 20.0], [5, 5, 5], [(4, 2), (6, 2), (5, 2)]
+    )
+    assert (s.p50_ms, s.bytes, s.druid_ms, s.druid_queries, s.n) == (20.0, 5, 5.0, 2, 3)
+
+
+@given(st.dictionaries(st.text(min_size=1), st.floats(1, 1e5), min_size=1))
+def test_a_run_never_regresses_against_itself(p95s):
+    run = [sample(case, p95) for case, p95 in p95s.items()]
+    results = baseline.compare(run, run)
+    assert not any(c.regressed or c.missing for c in results)
+
+
+@given(st.floats(min_value=1, max_value=1e5), st.floats(min_value=0.5, max_value=2))
+def test_regression_means_p95_more_than_ten_percent_higher(base_p95, factor):
+    (result,) = baseline.compare(
+        [sample('c', base_p95)], [sample('c', base_p95 * factor)]
+    )
+    assert result.regressed == (base_p95 * factor / base_p95 > 1.10)
+
+
+def test_ten_percent_exactly_passes_and_just_over_fails():
+    (at_limit,) = baseline.compare([sample('c', 100.0)], [sample('c', 110.0)])
+    (over,) = baseline.compare([sample('c', 100.0)], [sample('c', 110.1)])
+    assert not at_limit.regressed
+    assert over.regressed
+
+
+def test_a_lost_case_fails_and_a_new_case_does_not():
+    results = baseline.compare(
+        [sample('kept', 1), sample('lost', 1)], [sample('kept', 1), sample('added', 1)]
+    )
+    by_id = {c.case_id: c for c in results}
+    assert by_id['lost'].missing
+    assert not by_id['added'].missing and not by_id['added'].regressed
+
+
+def test_compare_command_exit_codes(tmp_path: Path, capsys):
+    base = tmp_path / 'base.jsonl'
+    ok = tmp_path / 'ok.jsonl'
+    slow = tmp_path / 'slow.jsonl'
+    for path, p95 in ((base, 100.0), (ok, 105.0), (slow, 120.0)):
+        path.write_text(json.dumps(sample('c', p95).__dict__) + '\n')
+    assert baseline.main(['compare', str(base), str(ok)]) == 0
+    assert baseline.main(['compare', str(base), str(slow)]) == 1
+    assert 'REGRESSED' in capsys.readouterr().out
+
+
+def test_samples_round_trip_through_jsonl(tmp_path: Path):
+    samples = [sample('a', 12.5), PerfSample('b', 'map', 1, 2, 3, None, 30, 1, 2, None)]
+    meta = {
+        'git_sha': 'abc',
+        'git_dirty': False,
+        'started_utc': 'now',
+        'host': {
+            'cpu': 'x',
+            'logical_cpus': 1,
+            'memory_gib': 1,
+            'kernel': 'k',
+            'load_average_at_start': [0],
+        },
+        'method': {
+            'rounds': 30,
+            'warmup_rounds': 3,
+            'concurrency': 1,
+            'interval': 'i',
+            'caches': 'warm',
+        },
+    }
+    baseline.write_results(tmp_path / 'run', samples, meta)
+    assert baseline.read_samples(tmp_path / 'run.jsonl') == samples
+    assert '| b | map |' in (tmp_path / 'run.md').read_text()
+
+
+def test_markdown_reports_the_host_load_at_start_and_end():
+    meta = {
+        'git_sha': 'abc',
+        'git_dirty': False,
+        'started_utc': 'now',
+        'host': {
+            'cpu': 'x',
+            'logical_cpus': 16,
+            'memory_gib': 1,
+            'kernel': 'k',
+            'load_average_at_start': [46.1, 53.53, 37.59],
+            'load_average_at_end': [19.23, 34.08, 36.78],
+        },
+        'method': {
+            'rounds': 100,
+            'warmup_rounds': 3,
+            'concurrency': 1,
+            'interval': 'i',
+            'caches': 'warm',
+        },
+    }
+    text = baseline.markdown('run', [sample('a', 12.5)], meta)
+    assert 'load [46.1, 53.53, 37.59] at start, [19.23, 34.08, 36.78] at end' in text
+
+
+def test_summarise_dashboard_uses_the_query_percentiles_and_median_bytes():
+    record = {
+        'case_id': 'perf-mixed-6',
+        'tiles': 6,
+        'latencies_ms': [700.0, 900.0, 800.0],
+        'bytes': [1859300, 1856230, 1859302],
+        'query_requests': [6, 6, 6],
+    }
+    assert baseline.summarise_dashboard(record) == PerfSample(
+        'perf-mixed-6', 'dashboard', 800.0, 890.0, 1859300, None, 3, 700.0, 900.0, None
+    )
+
+
+def test_summarise_dashboard_refuses_a_load_that_skipped_tile_queries():
+    record = {
+        'case_id': 'd',
+        'tiles': 2,
+        'latencies_ms': [1.0, 2.0],
+        'bytes': [5, 5],
+        'query_requests': [2, 1],
+    }
+    with pytest.raises(RuntimeError, match='query requests'):
+        baseline.summarise_dashboard(record)
+
+
+def test_split_cases_routes_dashboard_slugs_to_the_browser_run():
+    slugs = baseline.dashboard_slugs()
+    assert baseline.split_cases(None) == (list(baseline.CASES), slugs)
+    assert baseline.split_cases(['calc_formula', slugs[0]]) == (
+        ['calc_formula'],
+        [slugs[0]],
+    )
+
+
+def test_every_reference_dashboard_tile_is_a_query_tile():
+    specs = json.loads(baseline.DASHBOARD_SPECS.read_text())
+    assert len(specs) == 3
+    for slug, spec in specs.items():
+        assert spec['items'], slug
+        assert all(h['item']['type'] == 'QUERY_ITEM' for h in spec['items']), slug
+
+
+# --- paired runs: reference and candidate interleaved on one host --------------
+
+rounds = st.integers(min_value=1, max_value=60)
+
+
+@given(rounds)
+def test_each_round_runs_every_side_once_and_the_lead_alternates(n):
+    order = [baseline.interleaved_order(i, baseline.SIDES) for i in range(n)]
+    assert all(sorted(sides) == sorted(baseline.SIDES) for sides in order)
+    leads = [sides[0] for sides in order]
+    assert leads.count('reference') - leads.count('candidate') in (0, 1)
+    assert all(a != b for a, b in zip(leads, leads[1:]))
+
+
+def test_warm_up_rounds_run_on_both_sides_and_are_dropped():
+    calls = []
+
+    def measure(side):
+        calls.append(side)
+        return len(calls)
+
+    results = baseline.run_interleaved(baseline.SIDES, 2, 1, measure)
+    assert calls == [
+        'reference',
+        'candidate',
+        'candidate',
+        'reference',
+        'reference',
+        'candidate',
+    ]
+    assert results == {'reference': [4, 5], 'candidate': [3, 6]}
+
+
+@given(
+    st.floats(min_value=1, max_value=1e4),
+    st.lists(st.floats(min_value=-0.09, max_value=0.09), min_size=2, max_size=400),
+)
+def test_an_a_a_run_passes_while_host_load_drifts_up_to_nine_percent_per_request(
+    intrinsic_ms, steps
+):
+    # Host load as a multiplier per request slot, changing by at most 9% from
+    # one request to the next (a 9% fall is a 1.099 ratio the other way): the two sides of a round see nearly the same
+    # load, so identical code stays within the limit however far load wanders.
+    load = [1.0]
+    for step in steps:
+        load.append(load[-1] * (1 + step))
+    slot = iter(load)
+    n = len(load) // 2
+
+    def measure(side):
+        return intrinsic_ms * next(slot)
+
+    latencies = baseline.run_interleaved(baseline.SIDES, n, 0, measure)
+    reference, candidate = (
+        sample('c', baseline.percentile(latencies[side], 0.95))
+        for side in baseline.SIDES
+    )
+    (result,) = baseline.compare([reference], [candidate])
+    assert not result.regressed
+
+
+def test_dashboard_lines_are_summarised_per_target():
+    def line(target, ms):
+        return json.dumps(
+            {
+                'case_id': 'd',
+                'target': target,
+                'tiles': 1,
+                'latencies_ms': [ms, ms],
+                'bytes': [5, 5],
+                'query_requests': [1, 1],
+            }
+        )
+
+    grouped = baseline.dashboard_samples_by_side(
+        [line('reference', 100.0), line('candidate', 120.0), '']
+    )
+    assert {
+        side: [s.p95_ms for s, _ in samples] for side, samples in grouped.items()
+    } == {
+        'reference': [100.0],
+        'candidate': [120.0],
+    }
+
+
+def _paired_meta():
+    return {
+        'reference_sha': 'a' * 40,
+        'candidate_sha': 'b' * 40,
+        'git_dirty': False,
+        'started_utc': 'now',
+        'host': {
+            'cpu': 'x',
+            'logical_cpus': 16,
+            'memory_gib': 1,
+            'kernel': 'k',
+            'load_average_at_start': [40.0, 1, 1],
+            'load_average_at_end': [20.0, 1, 1],
+        },
+        'method': {
+            'rounds': 100,
+            'warmup_rounds': 3,
+            'concurrency': 1,
+            'interval': 'i',
+            'caches': 'warm',
+        },
+    }
+
+
+def test_a_paired_run_writes_both_sides_and_fails_on_a_clear_regression(
+    tmp_path: Path, capsys
+):
+    stem = baseline.paired_stem(tmp_path, '2026-10-05', 'a' * 40, 'b' * 40, 'aa')
+    assert stem == tmp_path / 'paired' / '2026-10-05-aaaaaaaaaa-vs-bbbbbbbbbb-aa'
+    ms = [float(v) for v in range(100, 131)]
+    reference = [sample('q', 128.5), sample('perf-mixed-6', 128.5)]
+    rounds = {'q': (ms, ms), 'perf-mixed-6': (ms, ms)}
+    assert (
+        baseline.finish_paired(stem, reference, reference, rounds, _paired_meta()) == 0
+    )
+    assert baseline.read_samples(Path(f'{stem}.reference.jsonl')) == reference
+    assert baseline.read_samples(Path(f'{stem}.candidate.jsonl')) == reference
+    recorded = [
+        json.loads(line)
+        for line in Path(f'{stem}.rounds.jsonl').read_text().splitlines()
+    ]
+    assert recorded[0] == {'case_id': 'q', 'reference_ms': ms, 'candidate_ms': ms}
+    text = Path(f'{stem}.md').read_text()
+    assert '| q | 128.5 | 128.5 | 1.000 | 1.000 | 1.000 | 1.000 | 1.100 | ok |' in text
+    assert 'every case would have failed a slowdown of 1.100 or more' in text
+    assert (
+        'every case would have failed a slowdown of 1.100 or more'
+        in capsys.readouterr().out
+    )
+    assert 'load [40.0, 1, 1] at start, [20.0, 1, 1] at end' in text
+    slower = {'q': (ms, ms), 'perf-mixed-6': (ms, [v * 1.2 for v in ms])}
+    rerun = baseline.paired_stem(tmp_path, '2026-10-05', 'a' * 40, 'b' * 40, 'aa2')
+    assert (
+        baseline.finish_paired(rerun, reference, reference, slower, _paired_meta()) == 1
+    )
+    out = capsys.readouterr().out
+    assert 'REGRESSED (p95, paired median)' in out
+    assert 'FAIL: perf-mixed-6' in out
+
+
+def test_a_rerun_never_overwrites_a_recorded_run(tmp_path: Path, capsys):
+    # Decision 0011, item 4: a failing run stays beside its rerun. A rerun on
+    # the same day, commits and label must refuse rather than replace it.
+    stem = baseline.paired_stem(tmp_path, '2026-10-06', 'a' * 40, 'b' * 40, 'WP-1b')
+    ms = [float(v) for v in range(100, 131)]
+    reference = [sample('q', 128.5)]
+    slower = {'q': (ms, [v * 1.2 for v in ms])}
+    assert baseline.finish_paired(stem, reference, reference, slower, _paired_meta())
+    recorded = {
+        path.name: path.read_bytes() for path in stem.parent.glob(f'{stem.name}.*')
+    }
+    assert len(recorded) == 5
+    with pytest.raises(SystemExit) as refused:
+        baseline.finish_paired(
+            stem, reference, reference, {'q': (ms, ms)}, _paired_meta()
+        )
+    assert refused.value.code != 0
+    assert 'pick a new --label, e.g. WP-<id>-rerun1' in str(refused.value.code)
+    assert {
+        path.name: path.read_bytes() for path in stem.parent.glob(f'{stem.name}.*')
+    } == recorded
+
+
+@pytest.mark.parametrize('label', ['run.1', 'run*', 'run?', 'run[1]', 'a/b', 'a b'])
+def test_a_label_that_could_dodge_the_overwrite_refusal_is_refused(label):
+    # The refusal globs `<stem>.*`: a dot in a committed-mode label turns part
+    # of it into a suffix, and glob characters match other runs or nothing.
+    with pytest.raises(SystemExit):
+        baseline.parse_args(['--label', label])
+
+
+@pytest.mark.parametrize('label', ['', 'WP-1b', 'WP-1b-rerun1', 'phase_1_exit'])
+def test_letters_digits_underscores_and_hyphens_make_a_label(label):
+    assert baseline.parse_args(['--label', label]).label == label
+
+
+def test_a_run_refuses_a_recorded_name_before_measuring(tmp_path: Path, monkeypatch):
+    # A 30-minute run must not be lost at the end: run() names the run when
+    # it starts and refuses before sending a single timed request.
+    for name, value in (
+        ('PERF_CANDIDATE_URL', 'http://candidate.invalid'),
+        ('PERF_CANDIDATE_UI_URL', 'http://candidate-ui.invalid'),
+        ('PERF_REFERENCE_URL', 'http://reference.invalid'),
+        ('PERF_REFERENCE_UI_URL', 'http://reference-ui.invalid'),
+        ('PERF_REFERENCE_SHA', 'a' * 40),
+    ):
+        monkeypatch.setenv(name, value)
+    for name in ('PERF_REQUEST_LOG_DIR', 'PERF_COORDINATOR_URL', 'PERF_BROKER_URL'):
+        monkeypatch.delenv(name, raising=False)
+    monkeypatch.setattr(baseline, 'login', lambda url: object())
+
+    def no_measuring(*args, **kwargs):
+        raise AssertionError('measured before refusing')
+
+    monkeypatch.setattr(baseline, 'measure_case', no_measuring)
+    monkeypatch.setattr(baseline, 'measure_dashboards', no_measuring)
+    date = baseline.dt.datetime.now(baseline.dt.timezone.utc).date().isoformat()
+    stem = baseline.paired_stem(
+        tmp_path, date, 'a' * 40, baseline.git('rev-parse', 'HEAD'), 'WP-1b'
+    )
+    stem.parent.mkdir(parents=True)
+    Path(f'{stem}.md').write_text('a failing run\n')
+    args = baseline.parse_args(['--label', 'WP-1b', '--out', str(tmp_path)])
+    with pytest.raises(SystemExit, match='pick a new --label'):
+        baseline.run(args)
+    assert Path(f'{stem}.md').read_text() == 'a failing run\n'
+
+
+def test_a_committed_run_never_overwrites_a_recorded_run(tmp_path: Path):
+    meta = {
+        'git_sha': 'abc',
+        'git_dirty': False,
+        'started_utc': 'now',
+        'host': {
+            'cpu': 'x',
+            'logical_cpus': 1,
+            'memory_gib': 1,
+            'kernel': 'k',
+            'load_average_at_start': [0],
+        },
+        'method': {
+            'rounds': 30,
+            'warmup_rounds': 3,
+            'concurrency': 1,
+            'interval': 'i',
+            'caches': 'warm',
+        },
+    }
+    baseline.write_results(tmp_path / 'run', [sample('a', 12.5)], meta)
+    before = (tmp_path / 'run.jsonl').read_text()
+    with pytest.raises(SystemExit, match='pick a new --label'):
+        baseline.write_results(tmp_path / 'run', [sample('a', 99.0)], meta)
+    assert (tmp_path / 'run.jsonl').read_text() == before
+
+
+def test_the_error_budget_is_split_over_both_bounds_of_every_case():
+    # Each case has two one-sided bounds (p95 and paired median), and either
+    # can fail it, so an A/A run fails about FAMILY_ALPHA of the time only
+    # when the budget is split over twice the number of cases.
+    assert baseline.FAMILY_ALPHA == 0.05
+    assert baseline.case_alpha(24) == pytest.approx(0.05 / 48)
+
+
+def test_a_paired_run_judges_each_bound_at_the_split_level(tmp_path: Path, capsys):
+    stem = baseline.paired_stem(tmp_path, '2026-10-06', 'a' * 40, 'b' * 40, 'alpha')
+    ms = [float(v) for v in range(100, 130)]
+    samples = [sample('q', 128.0), sample('r', 128.0)]
+    rounds = {'q': (ms, ms), 'r': (ms, ms)}
+    baseline.finish_paired(stem, samples, samples, rounds, _paired_meta())
+    assert 'one-sided 1.25%' in Path(f'{stem}.md').read_text()
+    assert 'one-sided 1.25%' in capsys.readouterr().out
+
+
+@given(
+    st.lists(st.floats(min_value=1, max_value=1e4), min_size=30, max_size=120),
+    st.floats(min_value=0.5, max_value=2),
+)
+def test_a_candidate_slower_by_a_constant_factor_fails_exactly_above_ten_percent(
+    reference_ms, factor
+):
+    # Every resample of pairs scales by the same factor, so the bound equals it.
+    result = baseline.paired_result(
+        'c', reference_ms, [ms * factor for ms in reference_ms], 0.05, resamples=50
+    )
+    assert result.ratio == pytest.approx(factor)
+    assert result.lower == pytest.approx(factor)
+    assert result.regressed == (result.ratio > 1.10)
+
+
+@given(st.lists(st.floats(min_value=1, max_value=1e4), min_size=30, max_size=120))
+def test_identical_sides_never_regress(ms):
+    result = baseline.paired_result('c', ms, list(ms), 0.05, resamples=50)
+    assert result.ratio == 1 and not result.regressed
+
+
+def test_paired_result_is_deterministic():
+    reference = [float(v % 17 + 50) for v in range(100)]
+    candidate = [float(v % 13 + 50) for v in range(100)]
+    first = baseline.paired_result('c', reference, candidate, 0.002)
+    assert baseline.paired_result('c', reference, candidate, 0.002) == first
+
+
+def test_independent_stalls_trip_the_bare_p95_ratio_but_not_the_paired_verdict():
+    # An A/A run on a loaded host, simulated: both sides share each round's
+    # load, and one request in ten also stalls on its own for up to 3x. Taken
+    # bare, some cases' p95 ratios land over 1.10; the confidence bound keeps
+    # them from failing the run.
+    rng = random.Random(20261005)
+
+    def latency(load):
+        stall = rng.uniform(1, 3) if rng.random() < 0.1 else 1
+        return 50 * load * stall
+
+    bare_over, regressed = 0, 0
+    cases = 24
+    for case in range(cases):
+        reference, candidate = [], []
+        for _ in range(100):
+            load = rng.uniform(1, 3)
+            reference.append(latency(load))
+            candidate.append(latency(load))
+        result = baseline.paired_result(
+            f'c{case}', reference, candidate, baseline.case_alpha(cases)
+        )
+        bare_over += result.ratio > 1.10
+        regressed += result.regressed
+    assert bare_over > 0
+    assert regressed == 0
+
+
+def _loaded_host_rounds(rng, factor, tail_every=0, rounds=100):
+    """One case on the simulated loaded host above: a shared load per round,
+    independent stalls per request, and the candidate `factor` times slower.
+    With tail_every, every tail_every-th round the candidate alone takes 3x."""
+
+    def latency(load):
+        stall = rng.uniform(1, 3) if rng.random() < 0.1 else 1
+        return 50 * load * stall
+
+    reference, candidate = [], []
+    for index in range(rounds):
+        load = rng.uniform(1, 3)
+        reference.append(latency(load))
+        tail = 3 if tail_every and index % tail_every == 0 else 1
+        candidate.append(latency(load) * factor * tail)
+    return reference, candidate
+
+
+def test_a_uniform_fifteen_percent_slowdown_fails_every_case_on_a_loaded_host():
+    # The noise that keeps an A/A run from failing must not hide a real
+    # regression: p95 alone cannot see 15% through these stalls, the paired
+    # per-round ratio can.
+    rng = random.Random(20261006)
+    cases = 24
+    for case in range(cases):
+        reference, candidate = _loaded_host_rounds(rng, 1.15)
+        result = baseline.paired_result(
+            f'c{case}', reference, candidate, baseline.case_alpha(cases)
+        )
+        assert result.regressed, result
+
+
+def test_a_median_ratio_over_the_limit_inside_the_noise_does_not_fail():
+    # Per-round ratios spread wide: 16 of 30 rounds at 1.5, 14 at 0.6. The
+    # median ratio is 1.5, but a resample of the rounds lands on 0.6 often, so
+    # the bound is far below 1 and the case passes. Judging the ratio alone
+    # would fail it. The reference is slow where the candidate is fast, so
+    # the p95 ratio is 0.6 and cannot fail it either.
+    reference = [60.0] * 16 + [200.0] * 14
+    candidate = [90.0] * 16 + [120.0] * 14
+    result = baseline.paired_result('c', reference, candidate, baseline.case_alpha(24))
+    assert result.shift == pytest.approx(1.5)
+    assert result.shift_lower <= 1
+    assert result.ratio == pytest.approx(0.6)
+    assert not result.shift_regressed
+    assert not result.regressed
+    assert baseline.paired_verdict(result) == 'over the limit, within noise'
+
+
+def test_a_tail_regression_fails_on_p95_even_when_the_typical_request_is_unchanged():
+    # A slow path one request in ten takes leaves the paired median at 1 and
+    # triples p95; the p95 check still fires on its own.
+    rng = random.Random(7)
+    reference = [100 + rng.uniform(0, 5) for _ in range(100)]
+    candidate = [
+        ms * (3 if index % 10 == 0 else 1) for index, ms in enumerate(reference)
+    ]
+    result = baseline.paired_result('c', reference, candidate, baseline.case_alpha(24))
+    assert result.shift == pytest.approx(1)
+    assert not result.shift_regressed
+    assert result.p95_regressed and result.regressed
+
+
+@given(
+    st.lists(st.tuples(st.floats(1, 1e4), st.floats(1, 1e4)), min_size=30, max_size=60),
+    st.floats(min_value=0.5, max_value=3),
+)
+def test_detects_is_the_smallest_uniform_slowdown_the_run_would_fail(pairs, factor):
+    # p95, the median and the seeded bootstrap all scale with the candidate,
+    # so scaling the candidate by `factor` fails exactly when factor > detects.
+    reference = [r for r, _ in pairs]
+    candidate = [c for _, c in pairs]
+    detects = baseline.paired_result('c', reference, candidate, 0.05, 50).detects
+    scaled = baseline.paired_result(
+        'c', reference, [ms * factor for ms in candidate], 0.05, 50
+    )
+    if not math.isclose(factor, detects, rel_tol=1e-6):
+        assert scaled.regressed == (factor > detects)
+
+
+def test_paired_is_the_default_and_compare_selects_the_committed_baseline():
+    assert baseline.parse_args([]).mode == 'paired'
+    assert baseline.parse_args(['--committed']).mode == 'committed'
+    committed = baseline.parse_args(['--compare'])
+    assert (committed.mode, committed.compare) == ('committed', '')
+
+
+def test_a_paired_verdict_needs_thirty_rounds():
+    # Over few pairs a bootstrap of p95 resamples little more than the
+    # maximum, so an A/A case's bound exceeds 1 more often than its level
+    # (probes/2026-10-06-rounds.txt); decision 0011 sets the floor at 30.
+    ms = [float(v) for v in range(1, 30)]
+    with pytest.raises(ValueError, match='at least 30 rounds'):
+        baseline.paired_result('c', ms, ms, 0.05)
+    baseline.paired_result('c', ms + [30.0], ms + [30.0], 0.05)
+
+
+@pytest.mark.parametrize('flag', ['--rounds', '--dashboard-rounds'])
+def test_paired_mode_refuses_fewer_than_thirty_rounds(flag):
+    with pytest.raises(SystemExit):
+        baseline.parse_args([flag, '29'])
+    assert baseline.parse_args([flag, '30']).mode == 'paired'
+    assert baseline.parse_args(['--committed', flag, '5']).mode == 'committed'
+
+
+def test_the_report_says_whether_the_reference_is_the_wps_base():
+    # Decision 0011: the reference is `git merge-base HEAD mig/integration`;
+    # only a phase-exit run uses another commit (the phase's start).
+    meta = _paired_meta()
+    meta['integration_merge_base'] = 'a' * 40
+    text = '\n'.join(baseline.method_lines(meta))
+    assert "the WP's base (merge base with mig/integration)" in text
+    meta['integration_merge_base'] = 'c' * 40
+    text = '\n'.join(baseline.method_lines(meta))
+    assert f'not the merge base with mig/integration (`{"c" * 40}`)' in text
+
+
+def test_the_reference_web_has_its_own_redis():
+    # Decision 0011: from WP-1b the result cache lives in Redis, so a shared
+    # Redis would let one side answer from bytes the other side cached.
+    import yaml
+
+    compose = yaml.safe_load((baseline.HERE / 'stack/web.yaml').read_text())
+    services = compose['services']
+    candidate_redis = services['web']['environment']['REDIS_HOST']
+    reference_redis = services['web-reference']['environment']['REDIS_HOST']
+    assert candidate_redis == 'redis'
+    assert reference_redis != candidate_redis
+    assert services[reference_redis]['profiles'] == ['reference']
+    assert reference_redis in services['web-reference']['depends_on']
+
+
+# --- stack.sh: building the web image ------------------------------------------
+
+STACK_SH = baseline.HERE / 'stack.sh'
+
+
+def _build_image(tmp_path: Path, failing_build: int | None, **env: str):
+    """Source stack.sh with a fake `docker` first on PATH, call build_image the
+    way `up` and `reference` do, and return the result and the docker calls.
+    The fake fails the `failing_build`-th `docker build` (1: the web-server
+    image, 2: the perf overlay on it), or none."""
+    calls = tmp_path / 'docker-calls'
+    fake = tmp_path / 'bin' / 'docker'
+    fake.parent.mkdir(parents=True)
+    fake.write_text(
+        '#!/bin/bash\n'
+        f'echo "$*" >> {calls}\n'
+        # No image exists yet, so build_image has to build.
+        '[[ $1 == image ]] && exit 1\n'
+        f'[[ $1 == build ]] && (( $(grep -c ^build {calls}) == {failing_build or 0} ))'
+        ' && exit 1\n'
+        'exit 0\n'
+    )
+    fake.chmod(0o755)
+    script = f'source {STACK_SH}\nimage="$(build_image "${{ROOT}}")"\necho "built ${{image}}"\n'
+    result = subprocess.run(
+        ['bash', '-c', script],
+        env={**os.environ, 'PATH': f'{fake.parent}:{os.environ["PATH"]}', **env},
+        capture_output=True,
+        text=True,
+        check=False,
+    )
+    builds = [c for c in calls.read_text().splitlines() if c.startswith('build ')]
+    return result, builds
+
+
+def test_a_failed_docker_build_stops_stack_sh(tmp_path: Path):
+    # The image is built inside a command substitution, where bash drops
+    # errexit: a failed build used to go on and start the old image.
+    result, builds = _build_image(tmp_path, failing_build=1)
+    assert result.returncode != 0
+    assert 'built' not in result.stdout
+    assert len(builds) == 1
+
+
+def test_a_failed_overlay_build_stops_stack_sh_too(tmp_path: Path):
+    # The second build (the perf overlay on the web-server image) has its
+    # own guard; without it the function would still print the tag.
+    result, builds = _build_image(tmp_path, failing_build=2)
+    assert result.returncode != 0
+    assert 'built' not in result.stdout
+    assert len(builds) == 2
+
+
+def test_builds_use_the_default_network_unless_perf_build_network_is_set(
+    tmp_path: Path,
+):
+    result, builds = _build_image(tmp_path / 'default', failing_build=None)
+    assert result.returncode == 0, result.stderr
+    assert len(builds) == 2
+    assert not any('--network' in b for b in builds)
+    result, builds = _build_image(
+        tmp_path / 'host', failing_build=None, PERF_BUILD_NETWORK='host'
+    )
+    assert result.returncode == 0, result.stderr
+    assert len(builds) == 2
+    assert all(' --network host ' in f' {b} ' for b in builds)
+
+
+def _druid_services(tmp_path: Path, **env: str) -> dict:
+    """Druid's services, as `stack.sh config druid` renders them."""
+    import yaml
+
+    done = subprocess.run(
+        ['bash', str(STACK_SH), 'config', 'druid'],
+        env={
+            'PATH': os.environ['PATH'],
+            'HOME': str(tmp_path),
+            'PERF_SCRATCH': str(tmp_path / 'scratch'),
+            **env,
+        },
+        capture_output=True,
+        text=True,
+        check=False,
+    )
+    assert done.returncode == 0, done.stderr
+    return yaml.safe_load(done.stdout)['services']
+
+
+def _druid_build(tmp_path: Path, **env: str) -> dict:
+    """The extension loader's build section."""
+    services = _druid_services(tmp_path, **env)
+    builds = {name: s['build'] for name, s in services.items() if 'build' in s}
+    assert set(builds) == {'extension_loader'}, set(builds)
+    return builds['extension_loader']
+
+
+def test_the_extension_loader_builds_on_the_default_network_by_default(
+    tmp_path: Path,
+):
+    assert _druid_build(tmp_path).get('network', 'default') == 'default'
+
+
+def test_perf_build_network_reaches_the_extension_loader_build(tmp_path: Path):
+    # Where build containers have no DNS, `up` failed at the loader's
+    # `apk add` on a fresh project although the web image built on the host's
+    # network.
+    assert _druid_build(tmp_path, PERF_BUILD_NETWORK='host')['network'] == 'host'
+
+
+_SIZE = {'k': 1024, 'm': 1024**2, 'g': 1024**3}
+
+
+def _java_bytes(text: str) -> int:
+    return int(text[:-1]) * _SIZE[text[-1].lower()] if text[-1].isalpha() else int(text)
+
+
+def test_indexing_peons_have_the_direct_memory_their_buffers_need(tmp_path: Path):
+    # A fresh project could not index (WP-1g): the peons inherit every
+    # druid.* property of the middlemanager, and those come after the peons'
+    # java options on the command line, so the overlay's 512 MiB processing
+    # buffer replaced the 128 MiB in the java options. Druid then wanted
+    # buffer x (threads + merge buffers + 1) = 2.5 GiB of the peons' 1 GiB.
+    middlemanager = _druid_services(tmp_path)['middlemanager']
+    environment = middlemanager['environment']
+    options = json.loads(environment['druid_indexer_runner_javaOptsArray'])
+    flags = dict(o[2:].split('=', 1) for o in options if o.startswith('-D'))
+
+    def effective(name: str) -> int:
+        inherited = environment.get('druid_' + name.replace('.', '_'))
+        return int(inherited if inherited is not None else flags['druid.' + name])
+
+    for name in ('processing.buffer.sizeBytes', 'processing.numThreads'):
+        # No option the inherited property silently replaces.
+        if 'druid.' + name in flags:
+            assert int(flags['druid.' + name]) == effective(name), name
+    needed = effective('processing.buffer.sizeBytes') * (
+        effective('processing.numThreads') + effective('processing.numMergeBuffers') + 1
+    )
+    (direct,) = [
+        o.split('=', 1)[1] for o in options if o.startswith('-XX:MaxDirectMemorySize=')
+    ]
+    assert needed <= _java_bytes(direct), (needed, direct)
+
+
+def test_the_query_services_keep_the_baseline_processing_buffer(tmp_path: Path):
+    # The baseline method fixes 512 MiB for every service that answers queries.
+    services = _druid_services(tmp_path)
+    for name in ('broker', 'historical'):
+        env = services[name]['environment']
+        assert env['druid_processing_buffer_sizeBytes'] == '536870912', name
+
+
+def _image_tag(tree: Path) -> str:
+    result = subprocess.run(
+        ['bash', '-c', f'source {STACK_SH}\nimage_tag {tree}\n'],
+        capture_output=True,
+        text=True,
+        check=True,
+    )
+    return result.stdout.strip()
+
+
+def test_the_image_tag_follows_pyproject_and_uv_lock_when_present(tmp_path: Path):
+    # Since WP-2f the requirements files are exported from pyproject.toml and
+    # uv.lock; a lock change that misses the export must still rebuild.
+    (tmp_path / 'docker/web').mkdir(parents=True)
+    for name in ('requirements.txt', 'requirements-web.txt'):
+        (tmp_path / name).write_text('flask==1.0.1\n')
+    (tmp_path / 'docker/web/Dockerfile_web-server').write_text('FROM python\n')
+    without_lock = _image_tag(tmp_path)
+    (tmp_path / 'pyproject.toml').write_text('[project]\n')
+    (tmp_path / 'uv.lock').write_text('version = 1\n')
+    with_lock = _image_tag(tmp_path)
+    (tmp_path / 'uv.lock').write_text('version = 2\n')
+    lock_changed = _image_tag(tmp_path)
+    (tmp_path / 'pyproject.toml').write_text('[project]\nname = "x"\n')
+    pyproject_changed = _image_tag(tmp_path)
+    tags = [without_lock, with_lock, lock_changed, pyproject_changed]
+    assert all(len(tag) == 12 for tag in tags)
+    assert len(set(tags)) == 4
+
+
+def test_the_image_tag_needs_no_requirements_files(tmp_path: Path):
+    # WP-3b deleted requirements*.txt: the image installs from uv.lock alone.
+    (tmp_path / 'docker/web').mkdir(parents=True)
+    (tmp_path / 'docker/web/Dockerfile_web-server').write_text('FROM python\n')
+    (tmp_path / 'pyproject.toml').write_text('[project]\n')
+    (tmp_path / 'uv.lock').write_text('version = 1\n')
+    result = subprocess.run(
+        ['bash', '-c', f'source {STACK_SH}\nimage_tag {tmp_path}\n'],
+        capture_output=True,
+        text=True,
+        check=False,
+    )
+    assert result.returncode == 0, result.stderr
+    assert result.stderr == ''
+    before = result.stdout.strip()
+    (tmp_path / 'uv.lock').write_text('version = 2\n')
+    assert _image_tag(tmp_path) != before
+
+
+def test_a_pre_wp_3b_tree_keeps_its_image_tag(tmp_path: Path):
+    # A reference older than WP-3b has the requirements files; its tag must not
+    # move, so its cached image is reused.
+    files = {
+        'requirements.txt': 'flask==1.0.1\n',
+        'requirements-web.txt': 'gunicorn\n',
+        'docker/web/Dockerfile_web-server': 'FROM python\n',
+        'pyproject.toml': '[project]\n',
+        'uv.lock': 'version = 1\n',
+    }
+    for name, text in files.items():
+        (tmp_path / name).parent.mkdir(parents=True, exist_ok=True)
+        (tmp_path / name).write_text(text)
+    overlay = (baseline.HERE / 'stack/Dockerfile').read_bytes()
+    ordered = [
+        files['requirements.txt'].encode(),
+        files['requirements-web.txt'].encode(),
+        files['docker/web/Dockerfile_web-server'].encode(),
+        overlay,
+        files['pyproject.toml'].encode(),
+        files['uv.lock'].encode(),
+    ]
+    expected = hashlib.sha256(b''.join(ordered)).hexdigest()[:12]
+    assert _image_tag(tmp_path) == expected
+
+
+# --- web.yaml: where the checkout is mounted ------------------------------------
+
+_PERF_COMPOSE_ENV = {
+    name: 'x'
+    for name in (
+        'DEFAULT_SECRET_KEY',
+        'HASURA_ADMIN_SECRET',
+        'JWT_SECRET_KEY',
+        'PERF_PASSWORD',
+        'POSTGRES_PASSWORD',
+        'REDIS_PASSWORD',
+        'PERF_USERNAME',
+    )
+} | {
+    'PERF_WEB_IMAGE': 'perf-candidate-image',
+    'PERF_REFERENCE_IMAGE': 'perf-reference-image',
+    'PERF_PROJECT': 'perf-test',
+    'PERF_REFERENCE_DIR': '/tmp/perf-test/reference',
+    'PERF_REPO_ROOT': '/tmp/perf-test/repo',
+    'PERF_SCRATCH': '/tmp/perf-test',
+    'PERF_STACK_DIR': '/tmp/perf-test/stack',
+    'PERF_WEB_PORT': '1',
+    'PERF_UI_PORT': '2',
+    'PERF_REFERENCE_WEB_PORT': '3',
+    'PERF_REFERENCE_UI_PORT': '4',
+}
+_CHECKOUTS = {
+    'perf-candidate-image': '/tmp/perf-test/repo',
+    'perf-reference-image': '/tmp/perf-test/reference/src',
+}
+
+
+def _image_venv() -> PurePosixPath:
+    """Where the web image keeps its Python environment (WP-3b)."""
+    dockerfile = (
+        baseline.HERE.parents[1] / 'docker/web/Dockerfile_web-server'
+    ).read_text()
+    (venv,) = re.findall(r'UV_PROJECT_ENVIRONMENT=(\S+)', dockerfile)
+    return PurePosixPath(venv)
+
+
+def _web_image_services(tmp_path: Path) -> dict[str, dict]:
+    """Every service that runs a web image, as Compose renders web.yaml with
+    every profile."""
+    profiles = [
+        arg for name in ('reference', 'index', 'ui') for arg in ('--profile', name)
+    ]
+    done = subprocess.run(
+        ['docker', 'compose', '-f', str(baseline.HERE / 'stack/web.yaml'), *profiles]
+        + ['config', '--format', 'json'],
+        env={'PATH': os.environ['PATH'], 'HOME': str(tmp_path), **_PERF_COMPOSE_ENV},
+        capture_output=True,
+        text=True,
+        check=False,
+    )
+    assert done.returncode == 0, done.stderr
+    services = json.loads(done.stdout)['services']
+    return {
+        name: service
+        for name, service in services.items()
+        if service.get('image') in _CHECKOUTS
+    }
+
+
+def test_every_web_image_service_is_found(tmp_path: Path):
+    assert set(_web_image_services(tmp_path)) == {
+        'web-init',
+        'web',
+        'web-reference',
+        'indexer',
+    }
+
+
+def test_no_mount_hides_the_image_venv(tmp_path: Path):
+    # A mount at the venv or above it hides the image's packages: web-init
+    # exited 127 (`/zenysis/.venv/bin/flask: cannot execute`).
+    venv = _image_venv()
+    for name, service in _web_image_services(tmp_path).items():
+        for volume in service.get('volumes', []):
+            target = PurePosixPath(volume['target'])
+            assert not (venv == target or target in venv.parents), (name, volume)
+
+
+def test_each_web_image_service_runs_its_own_checkout(tmp_path: Path):
+    # The candidate runs this checkout and the reference its unpacked commit,
+    # from the directory they are mounted at, whatever the image holds.
+    for name, service in _web_image_services(tmp_path).items():
+        checkout = _CHECKOUTS[service['image']]
+        (mount,) = [v for v in service['volumes'] if v['source'] == checkout]
+        assert mount['read_only'] is True, name
+        target = mount['target']
+        assert service['working_dir'] == target, name
+        assert service['environment']['PYTHONPATH'] == target, name
+        assert service['environment']['ZEN_HOME'] == target, name
+        command = ' '.join(service['command'])
+        assert '/zenysis/' not in command, (name, command)
+
+
+def _upload_folder() -> str:
+    flask = (baseline.HERE.parents[1] / 'web/server/configuration/flask.py').read_text()
+    (folder,) = re.findall(r"^DATA_UPLOAD_FOLDER = '([^']+)'$", flask, re.MULTILINE)
+    return folder
+
+
+def test_the_serving_web_services_can_write_the_upload_folder(tmp_path: Path):
+    # The app writes uploads/ under its working directory, and the checkout is
+    # mounted read-only, as on the contract stack.
+    services = _web_image_services(tmp_path)
+    for name in ('web', 'web-reference'):
+        service = services[name]
+        folder = PurePosixPath(service['working_dir']) / _upload_folder()
+        writable = [PurePosixPath(m.split(':')[0]) for m in service.get('tmpfs', [])]
+        assert any(folder == w or w in folder.parents for w in writable), (
+            name,
+            writable,
+        )
+
+
+def test_each_started_checkout_gets_its_upload_mount_point(tmp_path: Path):
+    # Docker cannot create a mount point inside the read-only checkout mount.
+    script = (
+        f'source {STACK_SH}\ncreate_mount_points {tmp_path}\ndeclare -f up reference\n'
+    )
+    done = subprocess.run(
+        ['bash', '-c', script], capture_output=True, text=True, check=False
+    )
+    assert done.returncode == 0, done.stderr
+    assert (tmp_path / 'uploads').is_dir()
+    up, reference = done.stdout.split('reference ()', 1)
+    assert 'create_mount_points "${ROOT}"' in up
+    assert 'create_mount_points "${src}"' in reference
+
+
+def test_the_stack_scripts_start_in_the_mounted_checkout():
+    # init.sh and index.sh cd to the checkout before running anything.
+    for script in ('init.sh', 'index.sh'):
+        text = (baseline.HERE / 'stack' / script).read_text()
+        assert re.search(r'^cd /src$', text, re.MULTILINE), script
+
+
+def _git(repo: Path, *args: str) -> str:
+    return subprocess.run(
+        ['git', '-C', str(repo), *args], capture_output=True, text=True, check=True
+    ).stdout.strip()
+
+
+def test_the_default_reference_is_the_merge_base_with_integration(tmp_path: Path):
+    # main, then integration two commits ahead, then the WP branch off
+    # integration's first commit: the reference must be that commit, not main.
+    repo = tmp_path / 'repo'
+    repo.mkdir()
+    _git(repo, 'init', '-q', '-b', 'main')
+    _git(repo, 'config', 'user.email', 'perf@harmony.invalid')
+    _git(repo, 'config', 'user.name', 'perf')
+    # A signing setup in the user's global config must not reach this repo.
+    _git(repo, 'config', 'commit.gpgsign', 'false')
+    _git(repo, 'commit', '-q', '--allow-empty', '-m', 'main')
+    main = _git(repo, 'rev-parse', 'HEAD')
+    _git(repo, 'switch', '-q', '-c', 'mig/integration')
+    _git(repo, 'commit', '-q', '--allow-empty', '-m', 'integration 1')
+    base = _git(repo, 'rev-parse', 'HEAD')
+    _git(repo, 'commit', '-q', '--allow-empty', '-m', 'integration 2')
+    _git(repo, 'switch', '-q', '-c', 'mig/WP-x', base)
+    _git(repo, 'commit', '-q', '--allow-empty', '-m', 'wp')
+    result = subprocess.run(
+        ['bash', '-c', f'source {STACK_SH}\ndefault_reference {repo}\n'],
+        capture_output=True,
+        text=True,
+        check=True,
+    )
+    assert result.stdout.strip() == base != main

@@ -3,14 +3,16 @@ from datetime import datetime
 
 import pydruid.query
 import pydruid.utils.aggregators
-from pydruid.utils.dimensions import TimeFormatExtraction
+from pydruid.utils.dimensions import ExtractionFunction, TimeFormatExtraction
 from pydruid.utils.filters import Filter
 from pydruid.utils.postaggregator import Postaggregator
 
 from config.druid_base import DEFAULT_DRUID_INTERVAL
 from data.calculated_indicator.util import get_constituent_fields
+from db.druid.aggregations.last_value_aggregation import build_last_value
 
 DRUID_DATE_FORMAT = '%Y-%m-%d'  # TODO: Add time portion
+
 
 ##### Hack
 # TODO: either fork pydruid master branch or submit pull request to
@@ -27,8 +29,57 @@ def _build_filter_workaround(filter_obj):
             _build_filter_workaround(f) for f in raw_filter['fields']
         ]
     elif filter_type in ['not']:
-        raw_filter['field'] = Filter.build_filter(raw_filter['field'])
+        raw_filter['field'] = _false_on_null(Filter.build_filter(raw_filter['field']))
     return raw_filter
+
+
+def _false_on_null(raw_filter):
+    '''Make each value comparison in a built filter false, not unknown, on a row
+    whose dimension is null: `leaf AND NOT dimension IS NULL`.
+
+    Druid 28 and later evaluate native filters with three-valued logic, so
+    `NOT Sex = F` drops rows with no Sex; legacy Druid kept them, and so does
+    this form. It is the bare leaf on legacy Druid. Leaves that test for null or
+    '' (one value on legacy Druid) are left alone, and nested `not` filters were
+    already rewritten when they were built. Built filters are rebuilt
+    (`build_filter_from_dict`), so a leaf that already carries its guard keeps it
+    once.
+    '''
+    filter_type = raw_filter.get('type')
+    if filter_type == 'and' and _is_guarded_leaf(raw_filter):
+        return raw_filter
+    if filter_type in ('and', 'or'):
+        return {
+            **raw_filter,
+            'fields': [_false_on_null(field) for field in raw_filter['fields']],
+        }
+    if filter_type == 'selector':
+        values = [raw_filter['value']]
+    elif filter_type == 'in':
+        values = raw_filter['values']
+    else:
+        return raw_filter
+    if any(value in (None, '') for value in values):
+        return raw_filter
+    return {'type': 'and', 'fields': [raw_filter, _is_not_null(raw_filter)]}
+
+
+def _is_not_null(leaf):
+    '''`NOT dimension IS NULL`, tested on the leaf's extraction output if any.'''
+    is_null = {'type': 'selector', 'dimension': leaf['dimension'], 'value': None}
+    if 'extractionFn' in leaf:
+        is_null['extractionFn'] = leaf['extractionFn']
+    return {'type': 'not', 'field': is_null}
+
+
+def _is_guarded_leaf(raw_filter):
+    '''Whether `raw_filter` is exactly what `_false_on_null` makes of a leaf.'''
+    fields = raw_filter['fields']
+    return (
+        len(fields) == 2
+        and fields[0].get('type') in ('selector', 'in')
+        and fields[1] == _is_not_null(fields[0])
+    )
 
 
 Filter.build_filter = _build_filter_workaround
@@ -41,6 +92,8 @@ def _build_aggregator_workaround(name, kwargs):
         aggregator["aggregator"] = _build_aggregator_workaround(
             name, aggregator["aggregator"]
         )
+    elif aggregator["type"] == "aggregateLast":
+        aggregator = build_last_value(name, aggregator)
     else:
         aggregator.update({"name": name})
     return aggregator
@@ -48,6 +101,7 @@ def _build_aggregator_workaround(name, kwargs):
 
 # pylint: disable=protected-access
 pydruid.utils.aggregators._build_aggregator = _build_aggregator_workaround
+
 
 # NOTE: The stupid pydruid library allowed another dumb bug in
 # when they patched pull #74 in. It added validation to the datasource being
@@ -60,6 +114,7 @@ def _parse_datasource_workaround(datasource, _):
 
 pydruid.query.QueryBuilder.parse_datasource = _parse_datasource_workaround
 ##### End Hack
+
 
 # Empty filter object that acts like a normal druid filter for bitwise
 # operations.
@@ -110,6 +165,7 @@ def _filter_or_workaround(self, other_filter):
 
 Filter.__and__ = _filter_and_workaround
 Filter.__or__ = _filter_or_workaround
+
 
 # Add support for the undocumented Expression post aggregator.
 class ExpressionPostAggregator(Postaggregator):
@@ -174,10 +230,6 @@ def _recursive_get_post_aggregation_fields(post_aggregation, found_fields):
     if post_agg_type == 'expression':
         formula = post_aggregation['expression']
         found_fields.update(get_constituent_fields(formula))
-        return
-
-    if post_agg_type == 'javascript':
-        found_fields.update(post_aggregation['fieldNames'])
         return
 
     fields = post_aggregation.get('fields')
@@ -271,7 +323,9 @@ def build_query_filter_from_aggregations(aggregations):
         if len(values) == 1:
             output |= Filter(dimension=dimension, value=values.pop())
         else:
-            output |= Filter(type='in', dimension=dimension, values=sorted(values))
+            output |= Filter(
+                type='in', dimension=dimension, values=sorted(values, key=null_first)
+            )
 
     for dimension, patterns in regex_output.items():
         regex = f"({')|('.join(patterns)})"
@@ -282,6 +336,11 @@ def build_query_filter_from_aggregations(aggregations):
     if len(output.filter['filter']['fields']) == 1:
         return output.filter['filter']['fields'][0]
     return output
+
+
+def null_first(value):
+    '''Sort key for dimension values that may hold null (an empty value).'''
+    return (value is not None, value or '')
 
 
 # Retrieve a list of the dimension values and regex patterns being
@@ -304,8 +363,8 @@ _DIMENSION_VALUE_FIELD_MAP = {'in': 'values', 'regex': 'pattern', 'selector': 'v
 
 # Only care about filters that either filter a dimension or could
 # contain a dimension filter in its child filters.
-# TODO: Javascript filter?
 _ALLOWED_FILTERS = {'and', 'or', *_DIMENSION_VALUE_FIELD_MAP.keys()}
+
 
 # Traverse a nested filter tree and extract the dimension values and
 # regex patterns that are being filtered on. If a filter type is found that
@@ -334,8 +393,8 @@ def _recursive_get_dimension_filters(
         value_field = _DIMENSION_VALUE_FIELD_MAP[filter_type]
         values = raw_filter[value_field]
 
-        # Selector and regex filters return a string value.
-        if isinstance(values, str) or isinstance(values, str):
+        # Selector and regex filters hold one value, null for an empty selector.
+        if values is None or isinstance(values, str):
             values = [values]
 
         # Treat regex patterns differently
@@ -398,4 +457,19 @@ class GranularityTimeFormatExtraction(TimeFormatExtraction):
     def build(self):
         output = super().build()
         output['granularity'] = self._granularity
+        return output
+
+
+class CascadeExtraction(ExtractionFunction):
+    '''Applies each extraction function to the output of the one before it.'''
+
+    extraction_type = 'cascade'
+
+    def __init__(self, extraction_functions):
+        super().__init__()
+        self._extraction_functions = extraction_functions
+
+    def build(self):
+        output = super().build()
+        output['extractionFns'] = [fn.build() for fn in self._extraction_functions]
         return output

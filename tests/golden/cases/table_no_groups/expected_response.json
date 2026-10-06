@@ -1,0 +1,11 @@
+{
+  "data": [
+    {
+      "yellow_fever_cases": 366.84
+    }
+  ],
+  "dimensions": [],
+  "fields": [
+    "yellow_fever_cases"
+  ]
+}

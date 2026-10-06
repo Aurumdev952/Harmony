@@ -1,0 +1,17 @@
+# syntax=docker/dockerfile:1.27.1@sha256:4edf897a3ffa55b89f906fc8cc78afdb3f1834cc9c7083565e611a8a7d5fe99e
+# check=skip=InvalidDefaultArgInFrom
+# A renderer image plus pytest, to run tests/worker/renderer against the Chromium,
+# Playwright and code that ship. Built and run by docker/renderer/test_in_image.sh;
+# Dockerfile.test.dockerignore limits the context to test-requirements.txt.
+
+# No default: a missing image must fail the build, not pull some other image.
+ARG RENDERER_IMAGE
+FROM ${RENDERER_IMAGE}
+
+USER root
+RUN --mount=type=bind,source=docker/renderer/test-requirements.txt,target=/tmp/test-requirements.txt \
+    pip install --no-cache-dir --no-deps --require-hashes -r /tmp/test-requirements.txt
+USER pwuser
+
+# The working directory stays /app, so the tests import the image's own code.
+ENTRYPOINT ["python", "-m", "pytest", "-p", "no:cacheprovider"]

@@ -1,0 +1,13 @@
+ints	ijson_yajl2_c	[[int(-9223372036854775808), int(9223372036854775807), int(0), int(0), int(1), int(-1), int(4294967296)]]
+u64	ijson_yajl2_c	ERROR IncompleteJSONError
+beyond_u64	ijson_yajl2_c	ERROR IncompleteJSONError
+floats	ijson_yajl2_c	[[float(0.1), float(-0.0 neg), float(1.5), float(123456789.12345679), float(100000.0), float(1e-07), float(25000000000.0), float(1.0), float(1.7976931348623157e+308), float(5e-324), float(2.2250738585072014e-308), float(9007199254740992.0), float(0.30000000000000004)]]
+float_overflow	ijson_yajl2_c	ERROR IncompleteJSONError
+quoted_special	ijson_yajl2_c	[[str('NaN'), str('Infinity'), str('-Infinity'), NoneType(None), bool(True), bool(False)]]
+bare_nan	ijson_yajl2_c	ERROR IncompleteJSONError
+bare_infinity	ijson_yajl2_c	ERROR IncompleteJSONError
+non_ascii	ijson_yajl2_c	[[str('São Paulo'), str('Pará'), str('日本'), str('😀'), str('ã'), str('😀'), str('tab\tq"b\\'), str('/')]]
+lone_surrogate	ijson_yajl2_c	[[str('?')]]
+invalid_utf8	ijson_yajl2_c	ERROR IncompleteJSONError
+nested	ijson_yajl2_c	[[int(1), [float(0.5), float(0.9)], {'a': [int(1), {'b': NoneType(None)}]}], {'timestamp': str('x'), 'result': {'v': int(1)}}]
+empty	ijson_yajl2_c	[]

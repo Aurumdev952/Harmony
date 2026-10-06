@@ -3,8 +3,6 @@ set -o pipefail
 
 source "${PIPELINE_UTILS_DIR}/bash/common.sh"
 
-SetupEnvForPyPy
-
 STEP='fill_dimension_data'
 SOURCES=($("${PIPELINE_SRC_ROOT}/data/pipeline/scripts/generate_pipeline_sources.py" ${STEP}))
 

@@ -1,0 +1,95 @@
+{
+  "content_type": "text/html",
+  "headers": [],
+  "id": "graphql.BreadcrumbLeafItemQuery",
+  "pinned": {},
+  "response_schema": {
+    "properties": {
+      "data": {
+        "properties": {
+          "node": {
+            "properties": {
+              "__typename": {
+                "type": "string"
+              },
+              "childrenCategoryAggregate": {
+                "properties": {
+                  "aggregate": {
+                    "properties": {
+                      "count": {
+                        "type": "integer"
+                      }
+                    },
+                    "required": [
+                      "count"
+                    ],
+                    "type": "object"
+                  }
+                },
+                "required": [
+                  "aggregate"
+                ],
+                "type": "object"
+              },
+              "fieldCategoryMappingsAggregate": {
+                "properties": {
+                  "aggregate": {
+                    "properties": {
+                      "count": {
+                        "type": "integer"
+                      }
+                    },
+                    "required": [
+                      "count"
+                    ],
+                    "type": "object"
+                  }
+                },
+                "required": [
+                  "aggregate"
+                ],
+                "type": "object"
+              },
+              "id": {
+                "type": "string"
+              },
+              "name": {
+                "type": "string"
+              },
+              "parent": {
+                "properties": {
+                  "id": {
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "id"
+                ],
+                "type": "object"
+              }
+            },
+            "required": [
+              "__typename",
+              "childrenCategoryAggregate",
+              "fieldCategoryMappingsAggregate",
+              "id",
+              "name",
+              "parent"
+            ],
+            "type": "object"
+          }
+        },
+        "required": [
+          "node"
+        ],
+        "type": "object"
+      }
+    },
+    "required": [
+      "data"
+    ],
+    "type": "object"
+  },
+  "route": "POST /api/graphql",
+  "status": 200
+}

@@ -57,6 +57,3 @@ if DRUID_LAST_VALUE not in ('extension', 'native'):
         "HARMONY_DRUID_LAST_VALUE must be 'extension' or 'native', "
         f'not {DRUID_LAST_VALUE!r}'
     )
-
-RENDERBOT_EMAIL = getenv('RENDERBOT_EMAIL', None)
-URLBOX_API_KEY = getenv('URLBOX_API_KEY', None)

@@ -11,6 +11,9 @@ from jwt import InvalidTokenError
 from werkzeug.wrappers import Response
 
 REMEMBER_ME_CLAIM = 'remember_me'
+# The id of the account a browser session was issued to, so the session never
+# signs in a later account that reuses the username.
+USER_ID_CLAIM = 'user_id'
 
 
 def create_user_access_token(

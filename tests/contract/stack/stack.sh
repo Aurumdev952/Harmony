@@ -5,11 +5,16 @@
 #   tests/contract/stack/stack.sh down   # stop, delete containers, tmpfs data and secrets
 #   tests/contract/stack/stack.sh logs [service]
 #   tests/contract/stack/stack.sh env    # print what the recorder and replay need
+#   tests/contract/stack/stack.sh seed thumbnail <dashboard resource id>
+#                                        # the runner calls this for a case's `seed`
 #
 # Concurrent stacks (one per CI job or worktree) need their own
 #   CONTRACT_PROJECT   compose project name, default harmony-wp2c-contract
 #   CONTRACT_WEB_PORT  loopback port for web, default 58650
 # e.g. CONTRACT_PROJECT=contract-$CI_JOB_ID CONTRACT_WEB_PORT=$((40000 + RANDOM % 20000)).
+#
+# CONTRACT_OVERLAYS, a colon-separated list of compose files, is added after
+# the stack's own; the e2e suite uses it to swap the Druid stand-in.
 #
 # Every secret (admin password, Postgres, Redis, Hasura admin, session and JWT
 # keys) is generated per stack into a mode-600 file outside the repository, so
@@ -35,6 +40,11 @@ compose_files() {
   if grep -q HASURA_ADMIN_SECRET "${ROOT}/web/server/configuration/flask.py"; then
     files+=(-f "${HERE}/compose.hasura-secret.yaml")
   fi
+  local overlays overlay
+  IFS=: read -ra overlays <<<"${CONTRACT_OVERLAYS:-}"
+  for overlay in "${overlays[@]}"; do
+    files+=(-f "${overlay}")
+  done
   printf '%s\n' "${files[@]}"
 }
 
@@ -131,7 +141,6 @@ case "${1:-}" in
     compose up -d forward
     wait_for_web
     apply_hasura_metadata
-    compose exec -T web python tests/contract/stack/seed_cache.py
     ;;
   down)
     placeholder_env
@@ -142,13 +151,26 @@ case "${1:-}" in
     placeholder_env
     compose logs --tail 200 "${@:2}"
     ;;
+  seed)
+    placeholder_env
+    case "${2:-}" in
+      thumbnail)
+        compose exec -T web python tests/contract/stack/seed_cache.py "${3:?dashboard resource id}"
+        ;;
+      *)
+        echo "usage: $0 seed thumbnail <dashboard resource id>" >&2
+        exit 2
+        ;;
+    esac
+    ;;
   env)
+    echo "export CONTRACT_PROJECT=${CONTRACT_PROJECT}"
     echo "export CONTRACT_BASE_URL=http://127.0.0.1:${CONTRACT_WEB_PORT}"
     echo "export CONTRACT_USERNAME=${CONTRACT_USERNAME}"
     echo "export CONTRACT_CREDENTIALS_FILE=${SECRETS}"
     ;;
   *)
-    echo "usage: $0 up|down|logs [service]|env" >&2
+    echo "usage: $0 up|down|logs [service]|env|seed thumbnail <id>" >&2
     exit 2
     ;;
 esac

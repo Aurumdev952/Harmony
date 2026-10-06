@@ -308,7 +308,9 @@ def test_a_rename_outside_the_orm_does_not_move_cached_rights(app):
     db = _db(app)
     table = User.__table__
     db.session.execute(
-        table.update().where(table.c.id == boss).values(username='boss-renamed@example.org')
+        table.update()
+        .where(table.c.id == boss)
+        .values(username='boss-renamed@example.org')
     )
     db.session.execute(table.update().where(table.c.id == eve).values(username=BOSS))
     db.session.commit()

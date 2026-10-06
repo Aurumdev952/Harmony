@@ -17,4 +17,10 @@ metadata:
 - **Never print a failing subprocess's argv.** It carried the run's synthetic password into the transcript once. Report only the command name and stderr.
 - **SQLAlchemy and Python `and`.** `filter(A == x and B == y)` keeps only the first clause, because `bool()` of an `==` expression against a bind parameter is False. The type condition in `get_resource_by_type_and_name` was dropped silently for years.
 
+- **Late blueprints on the session app.** The `tests/privilege_escalation` app has already served requests, so registering a new blueprint on it (for example `ApiRouter` for `/api/authorization`) fails with "A setup function was called after the first request". Call the handler inside `app.test_request_context(..., headers={'X-Username': ..., 'X-Password': ...})` and assert the exception instead.
+- **Reviewers' standing checks on authz fixes (WP-0l round 2, 2026-10-06):**
+  - Resolving an id or `$uri` before the permission check creates an existence oracle (404 missing versus 403 hidden). Answer the same 404, with the same body, for both.
+  - Prove "fail first" for mutation-style pins on the intermediate tree (core's change only), not only on the base.
+  - A pin that must fail until a sibling WP merges is a strict xfail, plus a merge note to remove it.
+
 Related: [[potion-route-test-harness]], [[backend-testing-traps]]

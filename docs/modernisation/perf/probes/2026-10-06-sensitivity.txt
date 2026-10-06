@@ -1,0 +1,44 @@
+2026-10-05-01d5bdf47f-vs-01d5bdf47f-aa.rounds.jsonl: 24 cases, per-bound level 0.00104
+  regressed: none
+  uniform slowdown 1.05: 1 of 24 cases fail
+  uniform slowdown 1.08: 3 of 24 cases fail
+  uniform slowdown 1.10: 9 of 24 cases fail
+  uniform slowdown 1.12: 17 of 24 cases fail
+  uniform slowdown 1.15: 21 of 24 cases fail
+  uniform slowdown 1.20: 23 of 24 cases fail
+  table_by_state_sex_with_total            p95 ratio 1.011 (bound 0.788)  median ratio 1.073 (bound 0.965)  detects 1.036  ok
+  dq_reporting_completeness_line_graph     p95 ratio 1.044 (bound 0.749)  median ratio 1.036 (bound 0.990)  detects 1.062  ok
+  perf-heavy-4                             p95 ratio 1.025 (bound 0.930)  median ratio 0.980 (bound 0.950)  detects 1.075  ok
+  line_graph_time_by_state                 p95 ratio 1.045 (bound 0.857)  median ratio 1.017 (bound 0.935)  detects 1.082  ok
+  perf-mixed-6                             p95 ratio 1.068 (bound 0.892)  median ratio 1.008 (bound 0.957)  detects 1.091  ok
+  line_graph_bump_chart_quarter            p95 ratio 1.059 (bound 0.897)  median ratio 1.007 (bound 0.925)  detects 1.093  ok
+  dq_data_quality                          p95 ratio 0.964 (bound 0.882)  median ratio 1.007 (bound 0.952)  detects 1.093  ok
+  group_granularity_day                    p95 ratio 0.981 (bound 0.805)  median ratio 1.002 (bound 0.928)  detects 1.098  ok
+  table_disaggregated                      p95 ratio 1.041 (bound 0.850)  median ratio 1.001 (bound 0.981)  detects 1.098  ok
+  dq_outliers_line_graph                   p95 ratio 0.872 (bound 0.722)  median ratio 0.999 (bound 0.960)  detects 1.101  ok
+  perf-wide-12                             p95 ratio 1.191 (bound 0.877)  median ratio 0.997 (bound 0.935)  detects 1.104  over the limit, within noise
+  bar_graph_histogram                      p95 ratio 1.053 (bound 0.703)  median ratio 1.038 (bound 0.902)  detects 1.109  ok
+  map_by_municipality                      p95 ratio 1.040 (bound 0.879)  median ratio 1.008 (bound 0.901)  detects 1.110  ok
+  hierarchy_sunburst                       p95 ratio 0.984 (bound 0.598)  median ratio 1.020 (bound 0.901)  detects 1.110  ok
+  calc_formula                             p95 ratio 0.999 (bound 0.892)  median ratio 1.038 (bound 0.897)  detects 1.115  ok
+  dq_data_quality_table                    p95 ratio 0.997 (bound 0.773)  median ratio 1.002 (bound 0.896)  detects 1.117  ok
+  group_two_totals                         p95 ratio 1.005 (bound 0.639)  median ratio 0.987 (bound 0.894)  detects 1.118  ok
+  bar_graph_sum_by_state_month             p95 ratio 1.001 (bound 0.849)  median ratio 1.010 (bound 0.887)  detects 1.128  ok
+  dq_field_reporting_stats                 p95 ratio 0.982 (bound 0.831)  median ratio 0.998 (bound 0.884)  detects 1.132  ok
+  map_by_state_month                       p95 ratio 0.971 (bound 0.830)  median ratio 0.963 (bound 0.875)  detects 1.143  ok
+  line_graph_heat_tiles_week               p95 ratio 1.059 (bound 0.816)  median ratio 0.984 (bound 0.875)  detects 1.143  ok
+  hierarchy_expando_tree                   p95 ratio 1.025 (bound 0.687)  median ratio 0.974 (bound 0.867)  detects 1.153  ok
+  bar_graph_box_plot                       p95 ratio 0.833 (bound 0.679)  median ratio 0.935 (bound 0.836)  detects 1.196  ok
+  calc_count_distinct_by_state             p95 ratio 0.972 (bound 0.752)  median ratio 0.906 (bound 0.855)  detects 1.214  ok
+2026-10-05-2ddc30cdb0-vs-b8b80deeb5-r2-merge-smoke.rounds.jsonl: 4 cases, per-bound level 0.00625
+  regressed: none
+  uniform slowdown 1.05: 0 of 4 cases fail
+  uniform slowdown 1.08: 0 of 4 cases fail
+  uniform slowdown 1.10: 0 of 4 cases fail
+  uniform slowdown 1.12: 1 of 4 cases fail
+  uniform slowdown 1.15: 2 of 4 cases fail
+  uniform slowdown 1.20: 3 of 4 cases fail
+  perf-mixed-6                             p95 ratio 0.888 (bound 0.701)  median ratio 0.990 (bound 0.899)  detects 1.113  ok
+  line_graph_time_by_state                 p95 ratio 0.998 (bound 0.888)  median ratio 1.042 (bound 0.886)  detects 1.126  ok
+  dq_data_quality_table                    p95 ratio 0.822 (bound 0.352)  median ratio 0.999 (bound 0.844)  detects 1.184  ok
+  bar_graph_sum_by_state_month             p95 ratio 1.043 (bound 0.260)  median ratio 1.072 (bound 0.786)  detects 1.272  ok

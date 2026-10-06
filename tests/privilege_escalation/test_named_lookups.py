@@ -840,12 +840,16 @@ def test_transferring_a_dashboard_moves_only_that_dashboard(app, db, make_user):
 @pytest.fixture(name='no_mail')
 def fixture_no_mail(app, monkeypatch):
     '''Creating or sharing a dashboard mails a link to the dashboard page; this
-    app has neither the page blueprint nor a mailer.'''
+    app has neither the page blueprint nor a mailer. The link comes from
+    `url_for`, or from `deployment_url` once WP-0k lands; whichever name the
+    module has is patched.'''
     for module in ('dashboard_api_models', 'permission_api_models'):
-        monkeypatch.setattr(
-            f'web.server.api.{module}.url_for',
-            lambda *args, **kwargs: 'http://dashboard.invalid/',
-        )
+        for name in ('url_for', 'deployment_url'):
+            monkeypatch.setattr(
+                f'web.server.api.{module}.{name}',
+                lambda *args, **kwargs: 'http://dashboard.invalid/',
+                raising=False,
+            )
     monkeypatch.setattr(app, 'email_renderer', mock.Mock(), raising=False)
     monkeypatch.setattr(app, 'notification_service', mock.Mock(), raising=False)
 

@@ -1,6 +1,7 @@
 '''This module is responsible for managing CRUD requests against the Query Policy API and also for
 converting query policies into Druid Filters which are used to restrict query access.
 '''
+
 from collections import defaultdict
 from functools import wraps
 from datetime import datetime
@@ -271,33 +272,43 @@ def _construct_single_filter(dimension_to_filters_map):
     return full_filter
 
 
+def _sorted_values(values):
+    return sorted(values, key=lambda value: (value is None, str(value)))
+
+
 def _construct_hierarchical_filter(dimension_to_filters_map):
-    '''Takes in a dict mapping dimension to permitted values and produces a
-    single OR filter across each set for included values.
+    '''Takes in a dict mapping dimension to permitted values and produces one
+    filter for the whole hierarchy: included values are ORed across its
+    dimensions, and excluded values, on whichever dimension, are ANDed onto that
+    union. A dimension with neither contributes `NO_FILTER_VAL` to the union.
+
+    Dimensions and values are visited in sorted order, so the same policies give
+    the same filter in every process: the map's order follows set order, which
+    changes with PYTHONHASHSEED.
     '''
+    if any(values['all_values'] for values in dimension_to_filters_map.values()):
+        return EmptyFilter()
 
-    full_filter = EmptyFilter()
-    for dimension_name, values in dimension_to_filters_map.items():
-        if values['all_values']:
-            return EmptyFilter()
-
-        is_filter_added = False
+    allowed_filter = EmptyFilter()
+    excluded_filter = EmptyFilter()
+    for dimension_name in sorted(dimension_to_filters_map):
+        values = dimension_to_filters_map[dimension_name]
         if values['include']:
-            full_filter |= Filter(
-                type='in', dimension=dimension_name, values=list(values['include'])
+            allowed_filter |= Filter(
+                type='in',
+                dimension=dimension_name,
+                values=_sorted_values(values['include']),
             )
-            is_filter_added = True
+        elif not values['exclude']:
+            allowed_filter |= Dimension(dimension_name) == NO_FILTER_VAL
         if values['exclude']:
-            full_filter &= ~Filter(
-                type='in', dimension=dimension_name, values=list(values['exclude'])
+            excluded_filter &= ~Filter(
+                type='in',
+                dimension=dimension_name,
+                values=_sorted_values(values['exclude']),
             )
-            is_filter_added = True
 
-        # Need to do an additional check for no items
-        if not is_filter_added:
-            full_filter |= Dimension(dimension_name) == NO_FILTER_VAL
-
-    return full_filter
+    return allowed_filter & excluded_filter
 
 
 def construct_query_need_from_policy(query_policy):

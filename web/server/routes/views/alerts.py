@@ -2,8 +2,8 @@ from flask import current_app, g
 
 from log import LOG
 from models.alchemy.alerts import AlertDefinition, AlertNotification
-from models.alchemy.permission import ResourceTypeEnum
 from web.server.data.data_access import Transaction
+from web.server.errors import ItemNotFound
 from web.server.routes.views.query_policy import (
     enumerate_query_needs,
     get_empty_filter_map,
@@ -95,8 +95,7 @@ def add_user_as_alert_administrator(transaction, resource_entity, user_entity):
     add_user_acl(
         user_entity,
         'alert_admin',
-        ResourceTypeEnum.ALERT.name,
-        resource_entity.name,
+        resource_entity,
         session=transaction.run_raw(),
         commit=False,
     )
@@ -119,6 +118,8 @@ def bulk_transfer_alert_def_ownership(source_username, target_username):
         logger.error(
             f'Cannot transfer alerts from "{source_username}" to "{target_username}"'
         )
+        missing = target_username if source_user_entity else source_username
+        raise ItemNotFound('user', {'username': missing})
 
     logger.info(
         'Attempting to transfer ownership of all alerts owned by %s to %s',

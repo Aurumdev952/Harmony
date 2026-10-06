@@ -1,0 +1,85 @@
+{
+  "fields": [
+    {
+      "id": "yellow_fever_cases",
+      "calculation": {
+        "type": "SUM",
+        "filter": {
+          "type": "FIELD",
+          "fieldId": "yellow_fever_cases"
+        }
+      }
+    }
+  ],
+  "filter": {
+    "type": "AND",
+    "fields": [
+      {
+        "type": "INTERVAL",
+        "start": "2024-01-01",
+        "end": "2024-04-01"
+      },
+      {
+        "type": "OR",
+        "fields": [
+          {
+            "type": "AND",
+            "fields": [
+              {
+                "type": "SELECTOR",
+                "dimension": "MunicipalityName",
+                "value": "Rio Branco"
+              },
+              {
+                "type": "SELECTOR",
+                "dimension": "StateName",
+                "value": ""
+              }
+            ]
+          },
+          {
+            "type": "IN",
+            "dimension": "MunicipalityName",
+            "values": [
+              "Belém",
+              ""
+            ]
+          }
+        ]
+      },
+      {
+        "type": "NOT",
+        "field": {
+          "type": "AND",
+          "fields": [
+            {
+              "type": "SELECTOR",
+              "dimension": "MunicipalityName",
+              "value": "Cruzeiro do Sul"
+            },
+            {
+              "type": "SELECTOR",
+              "dimension": "StateName",
+              "value": ""
+            }
+          ]
+        }
+      }
+    ]
+  },
+  "groups": [
+    {
+      "dimension": "StateName",
+      "includeAll": false,
+      "includeNull": true,
+      "includeTotal": false
+    },
+    {
+      "dimension": "MunicipalityName",
+      "includeAll": false,
+      "includeNull": true,
+      "includeTotal": false
+    }
+  ],
+  "type": "GROUP_BY"
+}

@@ -10,8 +10,11 @@ services:
       HASURA_GRAPHQL_DATABASE_URL: postgresql://postgres:zenysis@postgres:5432/${ZEN_ENV}-local
     volumes:
       - ./graphql/hasura/metadata/versions/latest:/hasura-metadata
+  redis:
+    ports:
+      - "127.0.0.1:6379:6379"
   postgres:
-    image: postgres:15.2-alpine
+    image: postgres:15.19-alpine@sha256:f7d23353e1b15400d22ebe31189f4d314b87a4c129cc400c8c2d8d4ca127bf81
     restart: always
     environment:
       POSTGRES_USER: postgres
@@ -19,7 +22,7 @@ services:
       POSTGRES_DB: postgres
       POSTGRES_HOST_AUTH_METHOD: trust
     ports:
-      - "5432:5432"
+      - "127.0.0.1:5432:5432"
     volumes:
       - pgdata-volume:/var/lib/postgresql/data
     healthcheck:
@@ -58,11 +61,15 @@ services:
       POSTGRES_HOST: postgres
       SQLALCHEMY_DATABASE_URI: postgresql://postgres:zenysis@postgres:5432/${ZEN_ENV}-local
       OBJECT_STORAGE_ALIAS: ${OBJECT_STORAGE_ALIAS}
+      LOG_FORMAT: text
     ports:
-      - "5000:5000"
+      - "127.0.0.1:5000:5000"
     depends_on:
       postgres:
         condition: service_healthy
+  worker:
+    environment:
+      LOG_FORMAT: text
   pipeline:
     # Currently dev only supports builds on linux/amd64, arm is not supported.
     platform: linux/amd64
@@ -88,10 +95,11 @@ services:
       - DRUID_HOST=${DRUID_HOST}
       - COMMAND=${COMMAND-echo Specify a pipeline command, e.g. "./pipeline/harmony_demo/generate/zeus_generate run"}
       - PYTHONPATH=/app
-      - DEFAULT_SECRET_KEY=${DEFAULT_SECRET_KEY:-changeme}
+      - DEFAULT_SECRET_KEY=${DEFAULT_SECRET_KEY:?set DEFAULT_SECRET_KEY to a random value, e.g. openssl rand -hex 32}
       - HASURA_HOST=http://hasura:8080
       - SQLALCHEMY_DATABASE_URI=postgresql://postgres:zenysis@postgres:5432/${ZEN_ENV}-local
       - MAPBOX_ACCESS_TOKEN=${MAPBOX_ACCESS_TOKEN:-}
+      - LOG_FORMAT=text
     depends_on:
       postgres:
         condition: service_healthy

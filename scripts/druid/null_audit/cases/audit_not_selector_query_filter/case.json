@@ -1,0 +1,5 @@
+{
+  "description": "NOT Sex = F as the query filter, on rows where Sex is null for some.",
+  "endpoint": "table",
+  "policy": null
+}

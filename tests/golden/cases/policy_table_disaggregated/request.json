@@ -1,0 +1,43 @@
+{
+  "fields": [
+    {
+      "id": "yellow_fever_cases",
+      "calculation": {
+        "type": "SUM",
+        "filter": {
+          "type": "FIELD",
+          "fieldId": "yellow_fever_cases"
+        }
+      }
+    }
+  ],
+  "filter": {
+    "type": "AND",
+    "fields": [
+      {
+        "type": "INTERVAL",
+        "start": "2024-03-04",
+        "end": "2024-03-18"
+      }
+    ]
+  },
+  "groups": [
+    {
+      "granularity": "day",
+      "includeTotal": false
+    },
+    {
+      "dimension": "StateName",
+      "includeAll": false,
+      "includeNull": true,
+      "includeTotal": false
+    },
+    {
+      "dimension": "MunicipalityName",
+      "includeAll": false,
+      "includeNull": true,
+      "includeTotal": false
+    }
+  ],
+  "type": "GROUP_BY"
+}

@@ -12,7 +12,6 @@ from web.server.api.model_schemas import (
     CONCISE_USER_SCHEMA,
     GROUP_ROLES_SCHEMA,
     ROLE_MAP_SCHEMA,
-    group_role_as_dictionary,
 )
 from web.server.api.permission_api_schemas import (
     RESOURCE_ROLE_SUMMARY,
@@ -23,18 +22,21 @@ from web.server.api.permission_api_schemas import (
 from web.server.api.permission_api_models import RoleResource
 from web.server.api.responses import STANDARD_RESPONSE_SCHEMA, StandardResponse
 from web.server.potion.managers import GroupResourceManager
-from web.server.routes.views.authorization import AuthorizedOperation
+from web.server.routes.views.authorization import (
+    AuthorizedOperation,
+    current_user_is_superuser,
+)
+from web.server.routes.views.core import refuse_legacy_role_grant
 from web.server.routes.views.groups import (
-    add_group_role,
     delete_group_role,
     update_group_roles_from_map,
     add_group_user,
     delete_group_user,
     update_group_users,
-    build_group,
-    update_group_acls,
+    replace_group_acls,
     delete_group,
 )
+from web.server.security.grants import held_roles_from_uris, verify_acl_grants
 from web.server.security.permissions import principals
 from web.server.util.util import get_resource_string, get_user_string
 
@@ -47,6 +49,15 @@ FRONTEND_GROUP_SCHEMA = fields.Object(
         'roles': fields.List(fields.String(description='Role uris')),
     }
 )
+
+
+def build_group(group_obj, roles):
+    '''The group model fields from a `FRONTEND_GROUP_SCHEMA` body and its roles,
+    already resolved and authorised. Users are left out because
+    `self.manager.update` cannot hash a users list; the routes set them
+    separately.
+    '''
+    return {'name': group_obj.get('name'), 'roles': roles}
 
 
 class GroupAclResource(PrincipalResource):
@@ -107,14 +118,16 @@ class GroupResource(PrincipalResource):
         `Admin` like a `Manager`.
         '''
         with AuthorizedOperation('create_resource', 'group'):
+            roles = held_roles_from_uris(group_obj.get('roles'))
+            acl_grants = verify_acl_grants(group_obj.get('acls', []), existing_acls=[])
             # We update users separately because self.manager.update cannot
             # hash users list.
-            group = self.manager.create(build_group(group_obj))
-            if current_user.is_superuser():
+            group = self.manager.create(build_group(group_obj, roles))
+            if current_user_is_superuser():
                 update_group_users(group, group_obj.get('users', []))
             else:
                 update_group_users(group, [current_user.username])
-            update_group_acls(group, group_obj.get('acls', []))
+            replace_group_acls(group, acl_grants)
             return None, OK
 
     @ItemRoute.PATCH(
@@ -127,11 +140,15 @@ class GroupResource(PrincipalResource):
     )
     def update_group(self, group, obj):
         with AuthorizedOperation('edit_resource', 'group'):
+            roles = held_roles_from_uris(obj.get('roles'))
+            acl_grants = verify_acl_grants(
+                obj.get('acls', []), existing_acls=group.acls
+            )
             # We update users separately because self.manager.update cannot
             # hash users list.
-            updated_group = self.manager.update(group, build_group(obj))
+            updated_group = self.manager.update(group, build_group(obj, roles))
             update_group_users(updated_group, obj.get('users', []))
-            update_group_acls(updated_group, obj.get('acls', []))
+            replace_group_acls(updated_group, acl_grants)
             return None, OK
 
     # Overriding the default method here because Flask-Potion is unable to
@@ -155,19 +172,7 @@ class GroupResource(PrincipalResource):
     )
     def add_role_by_name(self, group, request):
         with AuthorizedOperation('edit_resource', 'group', group.id):
-            role_name = request['roleName']
-            resource_name = request.get('resourceName')
-            resource_type = request['resourceType']
-            (_, exists) = add_group_role(group, role_name, resource_type, resource_name)
-            action = 'already exists' if exists else 'has been added'
-            message = 'Role \'%s\' %s for %s' % (
-                role_name,
-                action,
-                get_resource_string(resource_name, resource_type),
-            )
-            g.request_logger.info(message)
-            response_code = OK if exists else CREATED
-            return (StandardResponse(message, response_code, True), response_code)
+            refuse_legacy_role_grant()
 
     @ItemRoute.PATCH(
         '/roles',
@@ -179,11 +184,10 @@ class GroupResource(PrincipalResource):
     )
     def update_roles(self, group, request):
         with AuthorizedOperation('edit_resource', 'group', group.id):
-            roles = update_group_roles_from_map(group, request)
+            update_group_roles_from_map(group, request)
             message = (
                 'Successfully updated the roles attached to group \'%s\'. '
-                'New roles are now: \'%s\''
-                % (group.name, [group_role_as_dictionary(role) for role in roles])
+                'New roles are now: \'[]\'' % group.name
             )
             g.request_logger.info(message)
             return StandardResponse(message, OK, True)

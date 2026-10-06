@@ -1,0 +1,5 @@
+{
+  "description": "NUMBER_TREND: only the granularity group is kept, so the time group becomes a __time extraction.",
+  "endpoint": "hierarchy",
+  "policy": null
+}

@@ -1,0 +1,15 @@
+........................................................................ [ 30%]
+.................................F...................................... [ 61%]
+........................................................................ [ 92%]
+..................                                                       [100%]
+=================================== FAILURES ===================================
+_________ test_replay_matches_recording[storage.retrieve.unknown_slug] _________
+tests/contract/test_replay.py:25: in test_replay_matches_recording
+    assert compare(recorded, observed) == []
+E   assert ['status 500 ...key 'status'"] == []
+E     
+E     Left contains 5 more items, first extra item: 'status 500 != 404'
+E     Use -v to get more diff
+=========================== short test summary info ============================
+FAILED tests/contract/test_replay.py::test_replay_matches_recording[storage.retrieve.unknown_slug]
+1 failed, 233 passed in 42.10s

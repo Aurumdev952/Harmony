@@ -1,0 +1,4 @@
+tests/privilege_escalation/test_named_lookups.py:831: AssertionError: assert {(1, 'dashboa...board_admin')} == {(1, 'dashboard_admin')}
+tests/privilege_escalation/test_named_lookups.py:851: assert 401 == 204
+tests/privilege_escalation/test_named_lookups.py:874: assert 404 == 204
+3 failed, 29 deselected in 58.96s

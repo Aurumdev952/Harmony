@@ -1,0 +1,41 @@
+/tmp/wp0l-base/tests/privilege_escalation/test_named_lookups.py:148: AssertionError: assert set() == {(1, 'dashboa...board_admin')}
+/tmp/wp0l-base/tests/privilege_escalation/test_named_lookups.py:174: AssertionError: assert set() == {(1, 'dashboard_viewer')}
+/tmp/wp0l-base/tests/privilege_escalation/test_named_lookups.py:205: AssertionError: assert set() == {(4, 'dashboard_admin')}
+/tmp/wp0l-base/tests/privilege_escalation/test_named_lookups.py:228: assert 500 == 204
+/tmp/wp0l-base/tests/privilege_escalation/test_named_lookups.py:255: AssertionError: assert {(7, 'dashboa...oard_viewer')} == {(7, 'dashboa...oard_viewer')}
+/tmp/wp0l-base/tests/privilege_escalation/test_named_lookups.py:281: AssertionError: assert set() == {(2, 'dashboard_viewer')}
+/tmp/wp0l-base/tests/privilege_escalation/test_named_lookups.py:309: assert 'secret-8f2313c0' not in '{\n    "mes...tus": 403\n}'
+/tmp/wp0l-base/tests/privilege_escalation/test_named_lookups.py:338: assert 'secret-c807abad' not in '{\n    "mes...tus": 404\n}'
+/tmp/wp0l-base/tests/privilege_escalation/test_named_lookups.py:385: assert 200 == 404
+/tmp/wp0l-base/tests/privilege_escalation/test_named_lookups.py:434: assert 204 == 404
+/tmp/wp0l-base/tests/privilege_escalation/test_named_lookups.py:468: assert 204 == 404
+/tmp/wp0l-base/tests/privilege_escalation/test_named_lookups.py:468: assert 204 == 404
+/tmp/wp0l-base/tests/privilege_escalation/test_named_lookups.py:528: assert 204 == 404
+/tmp/wp0l-base/tests/privilege_escalation/test_named_lookups.py:550: assert 200 == 404
+/tmp/wp0l-base/tests/privilege_escalation/test_named_lookups.py:581: assert 200 == 404
+/tmp/wp0l-base/tests/privilege_escalation/test_named_lookups.py:599: Failed: DID NOT RAISE <class 'web.server.errors.errors.ItemNotFound'>
+/tmp/wp0l-base/tests/privilege_escalation/test_named_lookups.py:616: assert 500 == 400
+/tmp/wp0l-base/tests/privilege_escalation/test_named_lookups.py:616: assert 500 == 400
+/tmp/wp0l-base/tests/privilege_escalation/test_named_lookups.py:644: assert 500 == 400
+/tmp/wp0l-base/tests/privilege_escalation/test_named_lookups.py:644: assert 500 == 400
+FAILED tests/privilege_escalation/test_named_lookups.py::test_sharing_a_dashboard_stores_its_acls_on_that_dashboard
+FAILED tests/privilege_escalation/test_named_lookups.py::test_sharing_a_dashboard_with_a_group_stores_its_acl_on_that_dashboard
+FAILED tests/privilege_escalation/test_named_lookups.py::test_creating_a_dashboard_makes_its_author_admin_of_that_dashboard
+FAILED tests/privilege_escalation/test_named_lookups.py::test_a_share_naming_a_holder_in_another_case_keeps_its_roles
+FAILED tests/privilege_escalation/test_named_lookups.py::test_removing_a_users_share_removes_only_that_users_acls
+FAILED tests/privilege_escalation/test_named_lookups.py::test_a_share_naming_an_unknown_user_writes_nothing
+FAILED tests/privilege_escalation/test_named_lookups.py::test_a_refused_acl_grant_does_not_name_the_resource
+FAILED tests/privilege_escalation/test_named_lookups.py::test_a_resource_role_of_another_type_does_not_name_the_resource
+FAILED tests/privilege_escalation/test_named_lookups.py::test_role_membership_by_a_look_alike_username_adds_nobody
+FAILED tests/privilege_escalation/test_named_lookups.py::test_dashboard_transfer_from_a_look_alike_username_moves_nothing
+FAILED tests/privilege_escalation/test_named_lookups.py::test_alert_transfer_naming_no_user_is_not_found[sourceUser]
+FAILED tests/privilege_escalation/test_named_lookups.py::test_alert_transfer_naming_no_user_is_not_found[targetUser]
+FAILED tests/privilege_escalation/test_named_lookups.py::test_a_group_named_in_another_case_than_two_groups_is_not_found
+FAILED tests/privilege_escalation/test_named_lookups.py::test_a_user_named_in_another_case_than_two_accounts_is_not_found
+FAILED tests/privilege_escalation/test_named_lookups.py::test_an_acl_naming_a_resource_two_resources_share_is_not_found
+FAILED tests/privilege_escalation/test_named_lookups.py::test_a_resource_is_found_by_type_and_name_not_by_name_alone
+FAILED tests/privilege_escalation/test_named_lookups.py::test_the_legacy_single_role_post_is_refused_cleanly[user]
+FAILED tests/privilege_escalation/test_named_lookups.py::test_the_legacy_single_role_post_is_refused_cleanly[group]
+FAILED tests/privilege_escalation/test_named_lookups.py::test_a_non_empty_legacy_role_map_is_refused_and_keeps_the_roles[user]
+FAILED tests/privilege_escalation/test_named_lookups.py::test_a_non_empty_legacy_role_map_is_refused_and_keeps_the_roles[group]
+20 failed, 3 passed in 87.78s (0:01:27)

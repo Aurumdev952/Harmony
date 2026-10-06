@@ -1,0 +1,59 @@
+base | H | creator makes slug 'q26d78d_q26d78d' while q26d78dxq26d78d exists | own resource name=q26d78d_q26d78d own=[] victim=[admin-q5e35ec:dashboard_admin,creator-q5e35ec:dashboard_admin]
+base | H | creator makes slug 'qc43165%qc43165' while qc43165xqc43165 exists | own resource name=qc43165_qc43165 own=[] victim=[admin-q5e35ec:dashboard_admin,creator-q5e35ec:dashboard_admin]
+base | H | creator makes slug 'qf3aa19.qf3aa19' while qf3aa19xqf3aa19 exists | own resource name=qf3aa19_qf3aa19 own=[] victim=[admin-q5e35ec:dashboard_admin,creator-q5e35ec:dashboard_admin]
+base | H | creator makes slug 'QE10059_QE10059' while qe10059xqe10059 exists | own resource name=qe10059_qe10059 own=[] victim=[admin-q5e35ec:dashboard_admin,creator-q5e35ec:dashboard_admin]
+base | A | non-admin creator shares own a_b (admin to accomplice) while axb exists | 204 own=[] victim=[accomplice-q5e35ec:dashboard_admin,admin-q5e35ec:dashboard_admin,creator-q5e35ec:dashboard_admin]
+base | B | remove x_doe share (x.doe stored first), keep x.doe | 204 [admin-q5e35ec:dashboard_admin,qc26f24_doe:dashboard_viewer]
+base | B | remove groups g_x and g%x, keep g.x and gzx (look-alikes stored first) | 204 [g%qc26f24:dashboard_viewer,g_qc26f24:dashboard_viewer,gzqc26f24:dashboard_viewer]
+base | C | user admin role permissions | SITE:edit_user,USER:edit_resource,USER:view_resource
+base | C | user admin (no update_users on dashboard): ACL by pattern secretX% | 403 body names it=True body={ "message": "Granting 'dashboard_viewer' on DASHBOARD 'secretq57767cabc' needs the 'update_users' permission on it.", "status": 403 }
+base | C | user admin (no update_users on dashboard): ACL by pattern secretX_bc | 403 body names it=True body={ "message": "Granting 'dashboard_viewer' on DASHBOARD 'secretq57767cabc' needs the 'update_users' permission on it.", "status": 403 }
+base | C | user admin (no update_users on dashboard): ACL by exact name | 403 body names it=True body={ "message": "Granting 'dashboard_viewer' on DASHBOARD 'secretq57767cabc' needs the 'update_users' permission on it.", "status": 403 }
+base | C | user admin (no update_users on dashboard): alert_admin on pattern (type mismatch) | 404 body names it=True body={ "message": { "errors": [ { "fields": [ "resourceType", "roleName" ], "message": "Role 'alert_admin' is only valid for resource type: 'ResourceTypeEnum.ALERT'.
+base | C | user admin (no update_users on dashboard): alert_admin on exact name (type mismatch) | 404 body names it=True body={ "message": { "errors": [ { "fields": [ "resourceType", "roleName" ], "message": "Role 'alert_admin' is only valid for resource type: 'ResourceTypeEnum.ALERT'.
+base | C | /api/authorization by pattern | 404 names it=False { "item": { "$type": "DASHBOARD", "$where": { "name": "secretq57767c%" } }, "message": "Not Found", 
+base | C | legacy DELETE /roles by pattern | 200 names it=False { "code": 200, "message": "Revoked Role 'dashboard_viewer' on Resource 'secretq57767c%' of type 'DASHBOARD' for User 'Pr
+base | C | web log lines naming the secret dashboard | 3
+base | C | log | Refused grant by 'Probe, Sec0l (Id:uadmin-q57767c@sec0l.invalid, IP:172.20.0.8)': Granting 'dashboard_viewer' on DASHBOARD 'secretq57767cabc' needs the 'update_users' permission on it. [request_id=59f1aea834b94c05b2fea3853e4eb35f user_id=7]
+base | C | log | Refused grant by 'Probe, Sec0l (Id:uadmin-q57767c@sec0l.invalid, IP:172.20.0.8)': Granting 'dashboard_viewer' on DASHBOARD 'secretq57767cabc' needs the 'update_users' permission on it. [request_id=4ddc1182a6e5416592bf7878328671b0 user_id=7]
+base | C | log | Refused grant by 'Probe, Sec0l (Id:uadmin-q57767c@sec0l.invalid, IP:172.20.0.8)': Granting 'dashboard_viewer' on DASHBOARD 'secretq57767cabc' needs the 'update_users' permission on it. [request_id=f8faa3ab26a340e6897ed12b286eb2d4 user_id=7]
+base | D | group PATCH /users [seed, x_member] (only x.member exists) | 200 members=[q017b8e.member,q017b8eseed]
+base | D | group POST /users x%member | 200 members=[q017b8e.member,q017b8eseed]
+base | D | group DELETE /users x_member (x.member is a member) | 200 members=[q017b8eseed]
+base | D | role PATCH /users [seed, x_member] | 200 members=[q017b8e.member,q017b8eseed]
+base | D | role PATCH /users [seed, X.MEMBER] (case only) | 200 members=[q017b8e.member,q017b8eseed]
+base | E | dashboard item transfer to x_author (only x.author exists) | 204 author=q4dba2a.author
+base | E | dashboard bulk transfer from x_author | 204 author=admin-q5e35ec
+base | E | alert bulk transfer to x_author | 204
+base | E | transfer a_b to HEIR (case only) while axb exists | 204 moved=[] victim=[admin-q5e35ec:dashboard_admin]
+base | Pairs | group POST /users 'twinq4d1e02' (Twin and twin exist) | 200 members=[Twinq4d1e02]
+base | Pairs | group POST /users 'Twinq4d1e02' (Twin and twin exist) | 200 members=[Twinq4d1e02]
+base | Pairs | group POST /users 'TWINq4d1e02' (Twin and twin exist) | 200 members=[Twinq4d1e02]
+base | Unicode | group POST /users legit exact (k.. and Kelvin-K.. exist) | 200 members=[kq4d1e02]
+base | Unicode | group POST /users ASCII K (k.. and Kelvin-K.. exist) | 200 members=[kq4d1e02]
+base | Unicode | group POST /users Kelvin sign exact (k.. and Kelvin-K.. exist) | 200 members=[kq4d1e02]
+base | Twins | resource names victim=v_q20958c twin=v_q20958c (twin made by a default user) | 
+base | Twins | admin re-saves a viewer of the victim (UI resends ACLs by name) | before twin 200, after twin 200 { "$uri": "/api2/user/None", "acls": [], "apiTokens": [], "created": null, "firstName": null, "lastName": null, "phoneNumber": null, "roles"
+base | Twins | admin /api/authorization publish_resource on v-x | before twin 200 { "data": null, "success": true }, after twin 200
+base | Twins | admin shares the victim by its URL after the twin | 204 victim=[admin-q5e35ec:dashboard_admin,viewer-q20958c:dashboard_viewer] twin=[]
+base | Legacy | POST user/<id>/roles {"roleName": "dashboard_viewer", "resourceType": "DASHBOARD"} | 500
+base | Legacy | POST group/<id>/roles {"roleName": "dashboard_viewer", "resourceType": "DASHBOARD"} | 500
+base | Legacy | PATCH user/<id>/roles {"DASHBOARD": {"sitewideRoles": ["dashboard_viewer"], "resources": {}} | 500
+base | Legacy | PATCH user/<id>/roles {"DASHBOARD": {"sitewideRoles": [], "resources": {"x": []}}} | 200
+base | Legacy | PATCH group/<id>/roles {"DASHBOARD": {"sitewideRoles": [], "resources": {"x": ["dashboard_vie | 404
+base | Legacy | PATCH user/<id>/roles {} | 200
+base | Legacy | user DELETE /roles naming a_b (ACL is on axb) | 200 axb=[admin-q5e35ec:dashboard_admin]
+base | Legacy | group DELETE /roles naming a_b (ACL is on axb) | 200 axb=[]
+base | Type | creator /api/authorization view_resource DASHBOARD typed.. | 200 { "data": { "code": "UNAUTHORIZED", "message": "You do not h
+base | Type | creator /api/authorization view_resource ALERT typed.. | 200 { "data": { "code": "UNAUTHORIZED", "message": "You do not h
+base | Type | creator /api/authorization view_resource dashboard typed.. | 200 { "data": { "code": "UNAUTHORIZED", "message": "You do not h
+base | Type | creator /api/authorization view_resource NOPE typed.. | 200 { "data": { "code": "UNAUTHORIZED", "message": "You do not h
+base | Type | creator /api/authorization view_resource None typed.. | 200 { "data": { "code": "UNAUTHORIZED", "message": "You do not h
+base | Timing | 403 exists, no update_users | status=[403] median=1233.0ms p10=1011.6 p90=1594.4
+base | Timing | 404 no such name | status=[404] median=1105.5ms p10=947.3 p90=1700.3
+base | Timing | 404 two resources share the name | status=[403] median=1179.3ms p10=949.1 p90=1942.9
+base | Timing | 400 ACL without a name | status=[400] median=1209.6ms p10=902.3 p90=1618.6
+base | Timing | authz 200 exists | status=[200] median=626.2ms p10=508.8 p90=887.7
+base | Timing | authz 404 missing | status=[404] median=581.3ms p10=477.1 p90=789.0
+base | Audit | dashboards whose author lacks dashboard_admin | 9
+base | Audit | dashboard_admin held via another dashboard name as pattern | 5

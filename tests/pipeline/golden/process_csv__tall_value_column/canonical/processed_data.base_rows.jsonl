@@ -1,0 +1,2 @@
+{"Real_Date": "2021-10-01", "data": {"demo_malaria_positive": 7}, "key": {"MunicipalityName": "Ashford", "StateName": "Northvale"}, "source": "demo_tall"}
+{"Real_Date": "2021-10-02", "data": {"demo_bed_nets": 2.5, "demo_malaria_tested": 0}, "key": {"MunicipalityName": "Cedar Point", "StateName": "Southmere"}, "source": "demo_tall"}

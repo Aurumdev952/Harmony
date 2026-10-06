@@ -1,0 +1,21 @@
+{
+  "data": [
+    {
+      "MunicipalityName": null,
+      "StateName": "Acre",
+      "yellow_fever_cases": null
+    },
+    {
+      "MunicipalityName": "Belém",
+      "StateName": "Pará",
+      "yellow_fever_cases": 336.0
+    }
+  ],
+  "dimensions": [
+    "StateName",
+    "MunicipalityName"
+  ],
+  "fields": [
+    "yellow_fever_cases"
+  ]
+}

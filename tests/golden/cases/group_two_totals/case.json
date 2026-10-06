@@ -1,0 +1,5 @@
+{
+  "description": "Totals on two nested dimensions: three subtotal blocks.",
+  "endpoint": "table",
+  "policy": null
+}

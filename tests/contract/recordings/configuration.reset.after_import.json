@@ -1,0 +1,32 @@
+{
+  "content_type": "application/json",
+  "headers": [],
+  "id": "configuration.reset.after_import",
+  "pinned": {},
+  "response_schema": {
+    "properties": {
+      "$uri": {
+        "type": "string",
+        "x-format": "api-uri"
+      },
+      "defaultValue": {
+        "type": "null"
+      },
+      "key": {
+        "type": "string"
+      },
+      "value": {
+        "type": "null"
+      }
+    },
+    "required": [
+      "$uri",
+      "defaultValue",
+      "key",
+      "value"
+    ],
+    "type": "object"
+  },
+  "route": "POST /api2/configuration/<key>/reset",
+  "status": 200
+}

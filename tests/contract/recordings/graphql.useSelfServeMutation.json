@@ -1,0 +1,123 @@
+{
+  "content_type": "text/html",
+  "headers": [],
+  "id": "graphql.useSelfServeMutation",
+  "pinned": {},
+  "response_schema": {
+    "properties": {
+      "data": {
+        "properties": {
+          "insert_self_serve_source": {
+            "properties": {
+              "returning": {
+                "items": {
+                  "properties": {
+                    "dataUploadFileSummaries": {
+                      "maxItems": 0,
+                      "type": "array"
+                    },
+                    "dataprepFlow": {
+                      "type": "null"
+                    },
+                    "id": {
+                      "type": "string"
+                    },
+                    "lastModified": {
+                      "type": "string",
+                      "x-format": "date-time"
+                    },
+                    "latestFileSummary": {
+                      "maxItems": 0,
+                      "type": "array"
+                    },
+                    "pipelineDatasource": {
+                      "properties": {
+                        "id": {
+                          "type": "string"
+                        },
+                        "name": {
+                          "type": "string"
+                        },
+                        "unpublishedFieldsCount": {
+                          "properties": {
+                            "aggregate": {
+                              "properties": {
+                                "count": {
+                                  "type": "integer"
+                                }
+                              },
+                              "required": [
+                                "count"
+                              ],
+                              "type": "object"
+                            }
+                          },
+                          "required": [
+                            "aggregate"
+                          ],
+                          "type": "object"
+                        }
+                      },
+                      "required": [
+                        "id",
+                        "name",
+                        "unpublishedFieldsCount"
+                      ],
+                      "type": "object"
+                    },
+                    "sourceId": {
+                      "type": "string"
+                    },
+                    "sourceLastModified": {
+                      "type": "string",
+                      "x-format": "date-time"
+                    }
+                  },
+                  "required": [
+                    "dataUploadFileSummaries",
+                    "dataprepFlow",
+                    "id",
+                    "lastModified",
+                    "latestFileSummary",
+                    "pipelineDatasource",
+                    "sourceId",
+                    "sourceLastModified"
+                  ],
+                  "type": "object"
+                },
+                "type": "array"
+              }
+            },
+            "required": [
+              "returning"
+            ],
+            "type": "object"
+          },
+          "update_data_upload_file_summary": {
+            "properties": {
+              "returning": {
+                "maxItems": 0,
+                "type": "array"
+              }
+            },
+            "required": [
+              "returning"
+            ],
+            "type": "object"
+          }
+        },
+        "required": [
+          "insert_self_serve_source",
+          "update_data_upload_file_summary"
+        ],
+        "type": "object"
+      }
+    },
+    "required": [
+      "data"
+    ],
+    "type": "object"
+  },
+  "route": "POST /api/graphql",
+  "status": 200
+}

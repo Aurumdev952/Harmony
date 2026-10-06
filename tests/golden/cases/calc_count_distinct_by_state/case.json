@@ -1,0 +1,5 @@
+{
+  "description": "COUNT_DISTINCT of municipalities by state: theta sketch sized from dimension metadata, grouped-sketch optimisation.",
+  "endpoint": "table",
+  "policy": null
+}

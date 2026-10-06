@@ -1,0 +1,62 @@
+{
+  "content_type": "application/json",
+  "headers": [
+    "link",
+    "x-total-count"
+  ],
+  "id": "query.granularities",
+  "pinned": {
+    "/[]/id": [
+      "day",
+      "day_of_year",
+      "month",
+      "month_of_year",
+      "quarter",
+      "quarter_of_year",
+      "week",
+      "week_of_year",
+      "year"
+    ]
+  },
+  "response_schema": {
+    "items": {
+      "properties": {
+        "$uri": {
+          "type": "string",
+          "x-format": "api-uri"
+        },
+        "category": {
+          "properties": {
+            "id": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "id"
+          ],
+          "type": "object"
+        },
+        "description": {
+          "type": "string"
+        },
+        "id": {
+          "type": "string"
+        },
+        "name": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "$uri",
+        "category",
+        "description",
+        "id",
+        "name"
+      ],
+      "type": "object"
+    },
+    "type": "array"
+  },
+  "route": "GET /api2/query/granularities",
+  "status": 200
+}

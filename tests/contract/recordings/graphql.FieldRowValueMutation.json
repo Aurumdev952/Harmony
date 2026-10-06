@@ -1,0 +1,78 @@
+{
+  "content_type": "text/html",
+  "headers": [],
+  "id": "graphql.FieldRowValueMutation",
+  "pinned": {},
+  "response_schema": {
+    "properties": {
+      "data": {
+        "properties": {
+          "update_field_by_pk": {
+            "properties": {
+              "description": {
+                "type": "string"
+              },
+              "id": {
+                "type": "string"
+              },
+              "name": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "description",
+              "id",
+              "name"
+            ],
+            "type": "object"
+          },
+          "update_field_category_mapping": {
+            "properties": {
+              "returning": {
+                "items": {
+                  "properties": {
+                    "category_id": {
+                      "type": "string"
+                    },
+                    "field_id": {
+                      "type": "string"
+                    },
+                    "id": {
+                      "type": "string"
+                    },
+                    "visibility_status": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "category_id",
+                    "field_id",
+                    "id",
+                    "visibility_status"
+                  ],
+                  "type": "object"
+                },
+                "type": "array"
+              }
+            },
+            "required": [
+              "returning"
+            ],
+            "type": "object"
+          }
+        },
+        "required": [
+          "update_field_by_pk",
+          "update_field_category_mapping"
+        ],
+        "type": "object"
+      }
+    },
+    "required": [
+      "data"
+    ],
+    "type": "object"
+  },
+  "route": "POST /api/graphql",
+  "status": 200
+}

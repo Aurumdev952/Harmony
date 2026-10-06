@@ -1,14 +1,23 @@
 from slugify import slugify
-from werkzeug.exceptions import NotFound
+from werkzeug.exceptions import BadRequest, NotFound
 
-from models.alchemy.permission import Resource, SitewideResourceAcl, ResourceRole
-from models.alchemy.user import User
-from models.alchemy.security_group import Group
-from models.alchemy.user import UserRoles
-from web.server.data.data_access import Transaction, get_db_adapter, find_one_by_fields
+from models.alchemy.permission import (
+    Resource,
+    ResourceRole,
+    ResourceTypeEnum,
+    SitewideResourceAcl,
+)
+from models.alchemy.security_group import Group, GroupAcl
+from models.alchemy.user import UserAcl, UserRoles
+from web.server.data.data_access import (
+    Transaction,
+    find_all_by_fields,
+    find_one_by_fields,
+    get_db_adapter,
+)
 from web.server.errors import ItemNotFound
+from web.server.routes.views.core import find_by_name, try_get_resource_role
 from web.server.routes.views.groups import (
-    delete_group_role,
     list_group_roles_for_resource_api,
     update_group_resource_roles,
 )
@@ -22,14 +31,23 @@ from web.server.potion.signals import after_roles_update, before_roles_update
 
 
 def get_resource_by_type_and_name(resource_type, resource_name):
+    if not isinstance(resource_type, str) or not isinstance(resource_name, str):
+        raise BadRequest(description='A resource is named by a type and a name.')
     slugified_name = slugify(resource_name.lower(), separator='_')
+    type_member = ResourceTypeEnum.__members__.get(resource_type.upper())
+    resources = (
+        # pylint: disable=no-member
+        Resource.query.filter(
+            Resource.name == slugified_name,
+            Resource.resource_type_id == type_member.value,
+        ).all()
+        if type_member
+        else []
+    )
 
-    resource = Resource.query.filter(
-        Resource.name == slugified_name and Resource.resource_type.name == resource_type
-    ).first()
-
-    if resource:
-        return resource
+    # Resource names are not unique: several matches name no one resource.
+    if len(resources) == 1:
+        return resources[0]
 
     raise ItemNotFound(resource_type, {'name': resource_name})
 
@@ -67,109 +85,33 @@ def get_current_resource_roles(resource):
     }
 
 
-def _mark_existing_roles_for_deletion(
-    existing_roles, new_user_roles=None, new_group_roles=None
-):
+def _roles_by_principal(requested, holders, find, remove_missing):
+    '''Resolves `requested`, a map from user or group names to the resource
+    role names they should hold, to a map from principals to role names, and
+    the names that match no principal.
+
+    A name spelled exactly like the name of a principal in `holders` (name to
+    principal, for those holding roles on the resource) is that principal;
+    other names go to `find`. With `remove_missing`, holders not named get no
+    roles.
     '''
-    Given an updated list of user roles for a resource, go through the existing roles for a
-    resource and explicitly delete users/groups that should no longer possess roles for a
-    resource
-    '''
+    roles_by_principal = {}
+    undefined = []
+    if requested is None:
+        return roles_by_principal, undefined
 
-    existing_group_roles = existing_roles['groupRoles']
-    updated_user_roles = dict(new_user_roles) if new_user_roles is not None else None
-    updated_group_roles = dict(new_group_roles) if new_group_roles is not None else None
+    for name, roles in requested.items():
+        principal = holders.get(name) or find(name)
+        if principal is None:
+            undefined.append(name)
+        else:
+            roles_by_principal.setdefault(principal, []).extend(roles)
 
-    if new_user_roles:
-        existing_user_roles = existing_roles['userRoles']
-        for username in list(existing_user_roles.keys()):
-            if username not in new_user_roles:
-                # Specifying an empty list will indicate that all existing
-                # roles for this user should be deleted
-                # pylint: disable=E1137
-                updated_user_roles[username] = []
+    if remove_missing:
+        for principal in holders.values():
+            roles_by_principal.setdefault(principal, [])
 
-    if new_group_roles:
-        for group_name in list(existing_group_roles.keys()):
-            if group_name not in new_group_roles:
-                # Specifying an empty list will indicate that all existing
-                # roles for this group should be deleted
-                # pylint: disable=E1137
-                updated_group_roles[group_name] = []
-
-    return (updated_user_roles, updated_group_roles)
-
-
-def _update_user_roles(resource, user_roles, session, add_roles=True):
-    resource_name = resource.name
-    type_name = resource.resource_type.name
-    undefined_users = set()
-
-    if user_roles is None:
-        return undefined_users
-
-    for username, roles in list(user_roles.items()):
-        user = find_one_by_fields(User, False, {'username': username})
-
-        if not user:
-            undefined_users.add(username)
-            add_roles = False
-            continue
-
-        if add_roles:
-            new_roles = [
-                {
-                    'resource_name': resource_name,
-                    'resource_type': type_name,
-                    'role_name': role,
-                }
-                for role in roles
-            ]
-            update_user_resource_roles(user, new_roles, resource, session, True, False)
-
-    return undefined_users
-
-
-def _update_group_roles(
-    resource, new_group_roles, existing_group_roles, session, add_roles=True
-):
-    resource_name = resource.name
-    type_name = resource.resource_type.name
-    undefined_groups = set()
-
-    if new_group_roles is None:
-        return undefined_groups
-
-    if not new_group_roles and existing_group_roles:
-        for name, roles in list(existing_group_roles.items()):
-            group = find_one_by_fields(Group, False, {'name': name})
-            for role in roles:
-                delete_group_role(
-                    group, role, type_name, resource_name, session=session
-                )
-
-    for name, roles in list(new_group_roles.items()):
-        group = find_one_by_fields(Group, False, {'name': name})
-
-        if not group:
-            undefined_groups.add(name)
-            add_roles = False
-            continue
-
-        if add_roles:
-            new_roles = [
-                {
-                    'resource_name': resource_name,
-                    'resource_type': type_name,
-                    'role_name': role,
-                }
-                for role in roles
-            ]
-            update_group_resource_roles(
-                group, new_roles, resource, session, True, False
-            )
-
-    return undefined_groups
+    return roles_by_principal, undefined
 
 
 def _update_sitewide_resource_acl(resource, new_sitewide_resource_acl):
@@ -224,63 +166,73 @@ def _update_sitewide_resource_acl(resource, new_sitewide_resource_acl):
 def update_resource_roles(
     resource, user_roles=None, group_roles=None, sitewide_acl=None
 ):
-    # Update sitewide_acl. This can still be independent of other role updates
-    _update_sitewide_resource_acl(resource, sitewide_acl)
-
-    # TODO: Clean this up to use transactions
-    db_adapter = get_db_adapter()
-    session = db_adapter.session
-    add_roles = True
+    session = get_db_adapter().session
     existing_roles = get_current_resource_roles(resource)
-    user_roles, group_roles = _mark_existing_roles_for_deletion(
-        existing_roles, user_roles, group_roles
+    user_acls = find_all_by_fields(UserAcl, {'resource_id': resource.id})
+    group_acls = find_all_by_fields(GroupAcl, {'resource_id': resource.id})
+    # An empty map of user roles leaves every user's roles alone, while an empty
+    # map of group roles removes every group's.
+    users, undefined_users = _roles_by_principal(
+        user_roles,
+        {acl.user.username: acl.user for acl in user_acls},
+        lambda username: try_get_user(username, session),
+        remove_missing=bool(user_roles),
     )
-    undefined_users = _update_user_roles(resource, user_roles, session)
-    add_roles = len(undefined_users) == 0
-    undefined_groups = _update_group_roles(
-        resource, group_roles, existing_roles['groupRoles'], session, add_roles
+    groups, undefined_groups = _roles_by_principal(
+        group_roles,
+        {acl.group.name: acl.group for acl in group_acls},
+        lambda name: find_by_name(Group, name, session),
+        remove_missing=group_roles is not None,
     )
-    add_roles = add_roles and len(undefined_groups) == 0
 
-    if add_roles:
-        new_roles = {}
-        new_roles['userRoles'] = user_roles
-        new_roles['groupRoles'] = group_roles
-        before_roles_update.send(
-            resource, existing_roles=existing_roles, new_roles=new_roles
-        )
-        session.commit()
-        after_roles_update.send(
-            resource, existing_roles=existing_roles, new_roles=new_roles
-        )
-
-        return (existing_roles, new_roles)
-
-    session.rollback()
-    errors = [
-        {
-            'fields': ['username'],
-            'message': [f'User with username \'{username}\' cannot be found. '],
-        }
-        for username in undefined_users
-    ]
-
-    errors.extend(
-        [
+    # Nothing is written until every user, group and role name is resolved.
+    if undefined_users or undefined_groups:
+        errors = [
+            {
+                'fields': ['username'],
+                'message': [f'User with username \'{username}\' cannot be found. '],
+            }
+            for username in undefined_users
+        ]
+        errors.extend(
             {
                 'fields': ['name'],
                 'message': [f'Group with name \'{group_name}\' cannot be found. '],
             }
             for group_name in undefined_groups
-        ]
-    )
+        )
+        raise NotFound(
+            {
+                'message': 'Certain user(s) and group(s) could not be found. See the \'errors\' section.',
+                'errors': errors,
+            }
+        )
+    # Every resource role named must exist and be for this resource's type.
+    for role_name in {
+        role_name
+        for role_names in (*users.values(), *groups.values())
+        for role_name in role_names
+    }:
+        try_get_resource_role(role_name, resource, session)
 
-    raise NotFound(
-        {
-            'message': 'Certain user(s) and group(s) could not be found. See the \'errors\' section.',
-            'errors': errors,
-        }
+    _update_sitewide_resource_acl(resource, sitewide_acl)
+    for user, role_names in users.items():
+        update_user_resource_roles(user, role_names, resource, session, commit=False)
+    for group, role_names in groups.items():
+        update_group_resource_roles(group, role_names, resource, session)
+
+    new_roles = {
+        'userRoles': {user.username: roles for user, roles in users.items()},
+        'groupRoles': {group.name: roles for group, roles in groups.items()},
+    }
+    before_roles_update.send(
+        resource, existing_roles=existing_roles, new_roles=new_roles
     )
+    session.commit()
+    after_roles_update.send(
+        resource, existing_roles=existing_roles, new_roles=new_roles
+    )
+    return (existing_roles, new_roles)
 
 
 def add_role_user(role, username, session):

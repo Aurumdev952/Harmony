@@ -1,0 +1,43 @@
+{
+  "content_type": "text/html",
+  "headers": [],
+  "id": "graphql.CategoryGroupRowValueMutation",
+  "pinned": {},
+  "response_schema": {
+    "properties": {
+      "data": {
+        "properties": {
+          "update_category_by_pk": {
+            "properties": {
+              "id": {
+                "type": "string"
+              },
+              "name": {
+                "type": "string"
+              },
+              "visibilityStatus": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "id",
+              "name",
+              "visibilityStatus"
+            ],
+            "type": "object"
+          }
+        },
+        "required": [
+          "update_category_by_pk"
+        ],
+        "type": "object"
+      }
+    },
+    "required": [
+      "data"
+    ],
+    "type": "object"
+  },
+  "route": "POST /api/graphql",
+  "status": 200
+}

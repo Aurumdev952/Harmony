@@ -4,6 +4,7 @@ import sqlalchemy as sa
 from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy.orm import relationship, backref
 
+from log import LOG
 from web.server.data.data_access import Transaction
 
 from . import get_session
@@ -202,7 +203,7 @@ def downvert_data(alembic_operation):
                 role_obj.alert_resource_role or role_obj.dashboard_resource_role
             )
             if not resource_role:
-                print('No match for: ', role_obj.name)
+                LOG.info('No match for: %s', role_obj.name)
                 continue
             role_obj.permissions = resource_role.permissions
             transaction.add_or_update(role_obj)

@@ -16,7 +16,7 @@ Every number a ministry analyst sees passes through this path. Correctness beats
    - formulas become native `expression` post-aggregators (`data/query/models/calculation/formula_calculation.py`);
    - the OR of all aggregator filters is pushed down as the query filter (`query_builder.py:200-218`), so do not drop it;
    - subtotals use `subtotalsSpec` (`query_builder.py:303`).
-4. **Authorise.** `AuthorizedQueryClient.run_query` ANDs in the caller's query-policy filter (`web/server/routes/views/query_policy.py:322-328`). `run_raw_query` does not, and SEC-4 requires fixing that.
+4. **Authorise.** `AuthorizedQueryClient.run_query` ANDs the caller's policy filter (`caller_policy_filter` and `and_policy_filter` in `web/server/routes/views/query_policy.py`) into the request filter. `run_raw_query` was deleted from the authorised client in WP-0c; raw queries exist only on the system client, which route code must not reach (an AST guard in `tests/web/test_no_raw_queries_from_routes.py` enforces one hop). Known SEC-4 gaps are listed in WP-0c's open items.
 5. **Execute.** `db/druid/query_client.py` posts with a pooled `requests.Session` and parses with `ijson`.
 6. **Shape.** `web/server/query/visualizations/*` turns rows into each chart's response.
 

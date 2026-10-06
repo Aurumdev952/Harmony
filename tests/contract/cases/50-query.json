@@ -1,0 +1,598 @@
+{
+  "cases": [
+    {
+      "id": "query.bar_graph",
+      "route": "POST /api2/query/bar_graph",
+      "body": {
+        "type": "GROUP_BY",
+        "fields": [
+          {
+            "id": "yellow_fever_cases",
+            "calculation": {
+              "type": "SUM",
+              "filter": {
+                "type": "FIELD",
+                "fieldId": "yellow_fever_cases"
+              }
+            }
+          }
+        ],
+        "groups": [
+          {
+            "dimension": "StateName",
+            "includeNull": false,
+            "includeAll": false,
+            "includeTotal": false
+          }
+        ],
+        "filter": {
+          "type": "AND",
+          "fields": [
+            {
+              "type": "INTERVAL",
+              "start": "2020-01-01",
+              "end": "2021-01-01"
+            }
+          ]
+        }
+      }
+    },
+    {
+      "id": "query.line_graph",
+      "route": "POST /api2/query/line_graph",
+      "body": {
+        "type": "GROUP_BY",
+        "fields": [
+          {
+            "id": "yellow_fever_cases",
+            "calculation": {
+              "type": "SUM",
+              "filter": {
+                "type": "FIELD",
+                "fieldId": "yellow_fever_cases"
+              }
+            }
+          }
+        ],
+        "groups": [
+          {
+            "dimension": "StateName",
+            "includeNull": false,
+            "includeAll": false,
+            "includeTotal": false
+          },
+          {
+            "granularity": "month",
+            "includeTotal": false
+          }
+        ],
+        "filter": {
+          "type": "AND",
+          "fields": [
+            {
+              "type": "INTERVAL",
+              "start": "2020-01-01",
+              "end": "2021-01-01"
+            }
+          ]
+        }
+      },
+      "maps": [
+        "$.totals"
+      ]
+    },
+    {
+      "id": "query.map",
+      "route": "POST /api2/query/map",
+      "body": {
+        "type": "GROUP_BY",
+        "fields": [
+          {
+            "id": "yellow_fever_cases",
+            "calculation": {
+              "type": "SUM",
+              "filter": {
+                "type": "FIELD",
+                "fieldId": "yellow_fever_cases"
+              }
+            }
+          }
+        ],
+        "groups": [
+          {
+            "dimension": "StateName",
+            "includeNull": false,
+            "includeAll": false,
+            "includeTotal": false
+          }
+        ],
+        "filter": {
+          "type": "AND",
+          "fields": [
+            {
+              "type": "INTERVAL",
+              "start": "2020-01-01",
+              "end": "2021-01-01"
+            }
+          ]
+        }
+      }
+    },
+    {
+      "id": "query.table",
+      "route": "POST /api2/query/table",
+      "body": {
+        "type": "GROUP_BY",
+        "fields": [
+          {
+            "id": "yellow_fever_cases",
+            "calculation": {
+              "type": "SUM",
+              "filter": {
+                "type": "FIELD",
+                "fieldId": "yellow_fever_cases"
+              }
+            }
+          }
+        ],
+        "groups": [
+          {
+            "dimension": "StateName",
+            "includeNull": false,
+            "includeAll": false,
+            "includeTotal": false
+          },
+          {
+            "granularity": "month",
+            "includeTotal": false
+          }
+        ],
+        "filter": {
+          "type": "AND",
+          "fields": [
+            {
+              "type": "INTERVAL",
+              "start": "2020-01-01",
+              "end": "2021-01-01"
+            }
+          ]
+        }
+      }
+    },
+    {
+      "id": "query.table.disaggregated",
+      "route": "POST /api2/query/table/disaggregated",
+      "body": {
+        "type": "GROUP_BY",
+        "fields": [
+          {
+            "id": "yellow_fever_cases",
+            "calculation": {
+              "type": "SUM",
+              "filter": {
+                "type": "FIELD",
+                "fieldId": "yellow_fever_cases"
+              }
+            }
+          }
+        ],
+        "groups": [
+          {
+            "granularity": "day",
+            "includeTotal": false
+          },
+          {
+            "dimension": "StateName",
+            "includeNull": true,
+            "includeAll": false,
+            "includeTotal": false
+          },
+          {
+            "dimension": "MunicipalityName",
+            "includeNull": true,
+            "includeAll": false,
+            "includeTotal": false
+          }
+        ],
+        "filter": {
+          "type": "AND",
+          "fields": [
+            {
+              "type": "INTERVAL",
+              "start": "2020-01-01",
+              "end": "2020-02-01"
+            }
+          ]
+        }
+      }
+    },
+    {
+      "id": "query.table.disaggregated.client_payload",
+      "route": "POST /api2/query/table/disaggregated",
+      "body": {
+        "fields": [
+          {
+            "id": "yellow_fever_cases",
+            "calculation": {
+              "type": "SUM",
+              "filter": {
+                "type": "FIELD",
+                "fieldId": "yellow_fever_cases"
+              }
+            }
+          }
+        ],
+        "filter": {
+          "type": "AND",
+          "fields": [
+            {
+              "type": "INTERVAL",
+              "start": "2020-01-01",
+              "end": "2020-02-01"
+            }
+          ]
+        },
+        "groups": [
+          {
+            "granularity": "day",
+            "includeTotal": false
+          },
+          {
+            "dimension": "StateName",
+            "includeNull": true,
+            "includeAll": false,
+            "includeTotal": false
+          },
+          {
+            "dimension": "MunicipalityName",
+            "includeNull": true,
+            "includeAll": false,
+            "includeTotal": false
+          }
+        ],
+        "includeNull": false,
+        "includeTotal": false,
+        "name": "Contract export"
+      },
+      "note": "The exact payload QuerySelections.serializeForDisaggregatedQuery() builds. The server rejects its extra keys with 400 today (WP-2c finding F1)."
+    },
+    {
+      "id": "query.field_reporting_stats",
+      "route": "POST /api2/query/field_reporting_stats",
+      "body": {
+        "type": "GROUP_BY",
+        "fields": [
+          {
+            "id": "yellow_fever_cases",
+            "calculation": {
+              "type": "SUM",
+              "filter": {
+                "type": "FIELD",
+                "fieldId": "yellow_fever_cases"
+              }
+            }
+          }
+        ],
+        "groups": [],
+        "filter": {
+          "type": "AND",
+          "fields": [
+            {
+              "type": "INTERVAL",
+              "start": "2020-01-01",
+              "end": "2021-01-01"
+            }
+          ]
+        }
+      }
+    },
+    {
+      "id": "query.data_quality",
+      "route": "POST /api2/query/data_quality",
+      "body": {
+        "type": "GROUP_BY",
+        "fields": [
+          {
+            "id": "yellow_fever_cases",
+            "calculation": {
+              "type": "SUM",
+              "filter": {
+                "type": "FIELD",
+                "fieldId": "yellow_fever_cases"
+              }
+            }
+          }
+        ],
+        "groups": [
+          {
+            "granularity": "day",
+            "includeTotal": false
+          }
+        ],
+        "filter": {
+          "type": "AND",
+          "fields": [
+            {
+              "type": "INTERVAL",
+              "start": "2020-01-01",
+              "end": "2021-01-01"
+            }
+          ]
+        }
+      }
+    },
+    {
+      "id": "query.data_quality.exclude_outliers",
+      "route": "POST /api2/query/data_quality",
+      "query": {
+        "excludeOutliers": "1"
+      },
+      "body": {
+        "type": "GROUP_BY",
+        "fields": [
+          {
+            "id": "yellow_fever_cases",
+            "calculation": {
+              "type": "SUM",
+              "filter": {
+                "type": "FIELD",
+                "fieldId": "yellow_fever_cases"
+              }
+            }
+          }
+        ],
+        "groups": [
+          {
+            "granularity": "day",
+            "includeTotal": false
+          }
+        ],
+        "filter": {
+          "type": "AND",
+          "fields": [
+            {
+              "type": "INTERVAL",
+              "start": "2020-01-01",
+              "end": "2021-01-01"
+            }
+          ]
+        }
+      }
+    },
+    {
+      "id": "query.data_quality_table",
+      "route": "POST /api2/query/data_quality_table",
+      "body": {
+        "type": "GROUP_BY",
+        "fields": [
+          {
+            "id": "yellow_fever_cases",
+            "calculation": {
+              "type": "SUM",
+              "filter": {
+                "type": "FIELD",
+                "fieldId": "yellow_fever_cases"
+              }
+            }
+          }
+        ],
+        "groups": [
+          {
+            "dimension": "StateName",
+            "includeNull": false,
+            "includeAll": false,
+            "includeTotal": false
+          }
+        ],
+        "filter": {
+          "type": "AND",
+          "fields": [
+            {
+              "type": "INTERVAL",
+              "start": "2020-01-01",
+              "end": "2021-01-01"
+            }
+          ]
+        }
+      }
+    },
+    {
+      "id": "query.reporting_completeness_line_graph",
+      "route": "POST /api2/query/reporting_completeness_line_graph",
+      "body": {
+        "type": "GROUP_BY",
+        "fields": [
+          {
+            "id": "yellow_fever_cases",
+            "calculation": {
+              "type": "SUM",
+              "filter": {
+                "type": "FIELD",
+                "fieldId": "yellow_fever_cases"
+              }
+            }
+          }
+        ],
+        "groups": [
+          {
+            "dimension": "StateName",
+            "includeNull": false,
+            "includeAll": false,
+            "includeTotal": false
+          },
+          {
+            "granularity": "month",
+            "includeTotal": false
+          }
+        ],
+        "filter": {
+          "type": "AND",
+          "fields": [
+            {
+              "type": "INTERVAL",
+              "start": "2020-01-01",
+              "end": "2021-01-01"
+            }
+          ]
+        }
+      },
+      "maps": [
+        "$.totals"
+      ]
+    },
+    {
+      "id": "query.outliers_box_plot",
+      "route": "POST /api2/query/outliers_box_plot",
+      "body": {
+        "queryRequest": {
+          "type": "GROUP_BY",
+          "fields": [
+            {
+              "id": "yellow_fever_cases",
+              "calculation": {
+                "type": "SUM",
+                "filter": {
+                  "type": "FIELD",
+                  "fieldId": "yellow_fever_cases"
+                }
+              }
+            }
+          ],
+          "groups": [
+            {
+              "dimension": "StateName",
+              "includeNull": false,
+              "includeAll": false,
+              "includeTotal": false
+            },
+            {
+              "granularity": "month",
+              "includeTotal": false
+            }
+          ],
+          "filter": {
+            "type": "AND",
+            "fields": [
+              {
+                "type": "INTERVAL",
+                "start": "2020-01-01",
+                "end": "2021-01-01"
+              }
+            ]
+          }
+        },
+        "outlierType": "All"
+      }
+    },
+    {
+      "id": "query.outliers_line_graph",
+      "route": "POST /api2/query/outliers_line_graph",
+      "body": {
+        "queryRequest": {
+          "type": "GROUP_BY",
+          "fields": [
+            {
+              "id": "yellow_fever_cases",
+              "calculation": {
+                "type": "SUM",
+                "filter": {
+                  "type": "FIELD",
+                  "fieldId": "yellow_fever_cases"
+                }
+              }
+            }
+          ],
+          "groups": [
+            {
+              "dimension": "StateName",
+              "includeNull": false,
+              "includeAll": false,
+              "includeTotal": false
+            },
+            {
+              "granularity": "month",
+              "includeTotal": false
+            }
+          ],
+          "filter": {
+            "type": "AND",
+            "fields": [
+              {
+                "type": "INTERVAL",
+                "start": "2020-01-01",
+                "end": "2021-01-01"
+              }
+            ]
+          }
+        },
+        "outlierType": "Extreme"
+      }
+    },
+    {
+      "id": "query.outliers_table",
+      "route": "POST /api2/query/outliers_table",
+      "body": {
+        "queryRequest": {
+          "type": "GROUP_BY",
+          "fields": [
+            {
+              "id": "yellow_fever_cases",
+              "calculation": {
+                "type": "SUM",
+                "filter": {
+                  "type": "FIELD",
+                  "fieldId": "yellow_fever_cases"
+                }
+              }
+            }
+          ],
+          "groups": [
+            {
+              "dimension": "StateName",
+              "includeNull": false,
+              "includeAll": false,
+              "includeTotal": false
+            },
+            {
+              "granularity": "month",
+              "includeTotal": false
+            }
+          ],
+          "filter": {
+            "type": "AND",
+            "fields": [
+              {
+                "type": "INTERVAL",
+                "start": "2020-01-01",
+                "end": "2021-01-01"
+              }
+            ]
+          }
+        },
+        "outlierType": "Moderate"
+      }
+    },
+    {
+      "id": "query.field_reporting_stats.client_payload",
+      "route": "POST /api2/query/field_reporting_stats",
+      "body": {
+        "fields": [
+          {
+            "calculation": {
+              "type": "SUM",
+              "filter": {
+                "type": "FIELD",
+                "fieldId": "yellow_fever_cases"
+              }
+            },
+            "id": "reporting_stats"
+          }
+        ],
+        "filter": {},
+        "groups": [],
+        "type": "GROUP_BY"
+      },
+      "note": "The payload useCalculationReportingStats builds: no filter items, so filter is {}."
+    }
+  ]
+}

@@ -1,0 +1,5 @@
+{
+  "description": "No interval filter: the query covers the datasource time boundary.",
+  "endpoint": "bar_graph",
+  "policy": null
+}

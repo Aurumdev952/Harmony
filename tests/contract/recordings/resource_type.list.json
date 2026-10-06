@@ -1,0 +1,39 @@
+{
+  "content_type": "application/json",
+  "headers": [
+    "link",
+    "x-total-count"
+  ],
+  "id": "resource_type.list",
+  "pinned": {
+    "/[]/name": [
+      "ALERT",
+      "DASHBOARD",
+      "GROUP",
+      "ROLE",
+      "SITE",
+      "USER"
+    ]
+  },
+  "response_schema": {
+    "items": {
+      "properties": {
+        "$uri": {
+          "type": "string",
+          "x-format": "api-uri"
+        },
+        "name": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "$uri",
+        "name"
+      ],
+      "type": "object"
+    },
+    "type": "array"
+  },
+  "route": "GET /api2/resource-type",
+  "status": 200
+}

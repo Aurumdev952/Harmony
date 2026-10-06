@@ -1,4 +1,4 @@
-import os
+from config.settings import setting
 from config.template.datatypes import (
     HIERARCHICAL_DIMENSIONS,
 )
@@ -59,7 +59,7 @@ MAP_DEFAULT_ZOOM = 4
 MAP_GEOJSON_LOCATION = ''
 
 # Mapbox access token.
-MAPBOX_ACCESS_TOKEN = os.environ['MAPBOX_ACCESS_TOKEN']
+MAPBOX_ACCESS_TOKEN = setting('MAPBOX_ACCESS_TOKEN')
 
 # Static geo data locations.
 GEO_DATA_URL = ''

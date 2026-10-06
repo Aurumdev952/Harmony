@@ -317,9 +317,7 @@ class UserResource(PrincipalResource):
     def update_roles(self, user, request):
         with AuthorizedOperation('edit_resource', 'user', user.id):
             update_user_roles_from_map(user, request)
-            g.request_logger.info(
-                'Removed every role from user \'%s\'.', get_user_string(user)
-            )
+            g.request_logger.info('Removed every role from user \'%s\'.', user.username)
             return self.manager.read(user.id)
 
     @ItemRoute.GET(

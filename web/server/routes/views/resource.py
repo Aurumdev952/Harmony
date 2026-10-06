@@ -1,5 +1,5 @@
 from slugify import slugify
-from werkzeug.exceptions import NotFound
+from werkzeug.exceptions import BadRequest, NotFound
 
 from models.alchemy.permission import (
     Resource,
@@ -31,6 +31,8 @@ from web.server.potion.signals import after_roles_update, before_roles_update
 
 
 def get_resource_by_type_and_name(resource_type, resource_name):
+    if not isinstance(resource_type, str) or not isinstance(resource_name, str):
+        raise BadRequest(description='A resource is named by a type and a name.')
     slugified_name = slugify(resource_name.lower(), separator='_')
     type_member = ResourceTypeEnum.__members__.get(resource_type.upper())
     resources = (

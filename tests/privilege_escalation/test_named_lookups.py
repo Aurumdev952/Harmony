@@ -9,6 +9,7 @@ a pattern (`_` matches any one character), created first so an unordered
 
 from __future__ import annotations
 
+import logging
 import uuid
 
 import pytest
@@ -24,6 +25,8 @@ from models.alchemy.permission import (
 )
 from models.alchemy.security_group import Group, GroupAcl
 from models.alchemy.user import User, UserAcl, UserRoles, UserStatusEnum
+from werkzeug.exceptions import BadRequest
+
 from web.server.errors import ItemNotFound
 
 _PASSWORD = 'escalation-test-password'
@@ -646,4 +649,60 @@ def test_a_non_empty_legacy_role_map_is_refused_and_keeps_the_roles(
     model = User if target == 'user' else Group
     assert [role.name for role in db.session.query(model).get(target_id).roles] == [
         'manager'
+    ]
+
+
+@pytest.mark.parametrize(
+    ('resource_type', 'refusal'), [(None, BadRequest), ('no_such_type', ItemNotFound)]
+)
+def test_an_authorization_check_naming_no_resource_type_is_refused(
+    app, db, make_user, resource_type, refusal
+):
+    # pylint: disable=import-outside-toplevel
+    from web.server.routes.api import ApiRouter
+
+    # The session app has served requests, so the `/api` blueprint cannot be
+    # registered on it any more; the handler runs in a request context instead.
+    actor = make_user(['admin'])
+    name = f'dashboard_{_tag()}'
+    _resource(db, name)
+    body = {
+        'permission': 'view_resource',
+        'resourceType': resource_type,
+        'resourceName': name,
+    }
+
+    with app.test_request_context(
+        '/api/authorization',
+        method='POST',
+        json=body,
+        headers={'X-Username': actor.username, 'X-Password': _PASSWORD},
+    ):
+        with pytest.raises(refusal):
+            ApiRouter(None, None).api_is_authorized()
+
+
+class _Records(logging.Handler):
+    def __init__(self) -> None:
+        super().__init__()
+        self.lines: list[str] = []
+
+    def emit(self, record: logging.LogRecord) -> None:
+        self.lines.append(record.getMessage())
+
+
+def test_clearing_a_users_roles_logs_the_target_by_username_only(make_user):
+    admin = make_user(['admin'])
+    target = make_user()
+    handler = _Records()
+    app_logger = logging.getLogger('ZenysisLogger')
+    app_logger.addHandler(handler)
+    try:
+        response = admin.request('PATCH', f'/api2/user/{target.id}/roles', {})
+    finally:
+        app_logger.removeHandler(handler)
+
+    assert response.status_code == 200
+    assert [line for line in handler.lines if 'every role' in line] == [
+        f'Removed every role from user \'{target.username}\'.'
     ]

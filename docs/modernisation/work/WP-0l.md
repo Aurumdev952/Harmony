@@ -17,6 +17,7 @@ instances:
       - "web/server/api/user_api_models.py"
       - "web/server/api/group_api_models.py"
       - "tests/privilege_escalation/test_named_lookups.py"
+      - "tests/privilege_escalation/test_group_and_role_grants.py"
       - "docs/modernisation/work/WP-0l-evidence/**"
       - "docs/modernisation/work/WP-0l.md"
   - name: "core-0l"

@@ -35,6 +35,9 @@ services:
     # Currently dev only supports builds on linux/amd64, arm is not supported.
     platform: linux/amd64
     image: harmony-dev-web:latest
+    # The dev image runs as root and writes into the bind-mounted checkout, which
+    # the host user owns, so it keeps the default capabilities.
+    cap_drop: !reset []
     build:
       dockerfile: docker/dev/Dockerfile
     volumes:

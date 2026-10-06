@@ -45,17 +45,35 @@ def test_production_app_services_run_as_uid_1000(tmp_path, name):
     )
 
 
+@pytest.mark.parametrize('files', [['docker-compose.yaml'], PROD], ids=['base', 'prod'])
 @pytest.mark.parametrize('name', APP_SERVICES)
-def test_the_mc_config_is_mounted_read_only_in_the_app_home(tmp_path, name):
+def test_app_services_drop_every_capability(tmp_path, files, name):
+    # Security L1: uid 1000 needs none, and nothing in the container may gain any.
+    service = config(tmp_path, files)['services'][name]
+    assert service.get('cap_drop') == ['ALL']
+    assert 'no-new-privileges:true' in service.get('security_opt', [])
+
+
+# Security L2: the config lives at a root-owned path the app user cannot replace;
+# the image's ~/.mc is a root-owned symlink to its directory.
+MC_CONFIG = '/etc/zenysis/mc/config.json'
+
+
+@pytest.mark.parametrize('name', APP_SERVICES)
+def test_the_mc_config_is_mounted_read_only_at_a_root_owned_path(tmp_path, name):
     mounts = [
         v
         for v in config(tmp_path, PROD)['services'][name].get('volumes', [])
-        if '/.mc' in v['target']
+        if 'config.json' in v['target'] or '/.mc' in v['target']
     ]
-    assert mounts, f'{name} mounts no MinIO client config'
-    for mount in mounts:
-        assert mount['target'].startswith('/home/zenysis/.mc'), mount
-        assert mount.get('read_only') is True, mount
+    assert [(m['target'], m.get('read_only')) for m in mounts] == [(MC_CONFIG, True)]
+
+
+def test_the_web_image_links_mc_to_the_root_owned_config():
+    dockerfile = (REPO / 'docker/web/Dockerfile_web').read_text()
+    assert re.search(r'ln -s /etc/zenysis/mc /home/zenysis/\.mc', dockerfile), (
+        'no ~/.mc symlink to /etc/zenysis/mc'
+    )
 
 
 def test_only_the_one_shot_data_owner_runs_as_root(tmp_path):
@@ -82,6 +100,17 @@ def _docker(*args, check=True):
     return subprocess.run(
         ['docker', *args], capture_output=True, text=True, check=check
     ).stdout.strip()
+
+
+def _probe(*args):
+    """A read-only `docker` command whose output the test needs. A container that
+    exits at once sometimes loses its stdout on the build host's rootless daemon
+    (1 run in 5), so an empty answer is asked again."""
+    for _ in range(3):
+        output = _docker(*args)
+        if output:
+            return output
+    return output
 
 
 @pytest.fixture(name='web_image', scope='module')
@@ -141,14 +170,23 @@ def test_a_symlink_at_mc_cannot_make_a_restart_chown_a_root_path(
     args = ['run', '-d', '--network', 'none']
     if service.get('user'):
         args += ['--user', service['user']]
+    args += [f'--cap-drop={c}' for c in service.get('cap_drop', [])]
+    args += [f'--security-opt={o}' for o in service.get('security_opt', [])]
     for volume in service.get('volumes', []):
-        if '/.mc' not in volume['target']:
+        if '/.mc' not in volume['target'] and 'config.json' not in volume['target']:
             continue
         source = mc / 'config.json' if volume['target'].endswith('.json') else mc
         mode = ':ro' if volume.get('read_only') else ''
         args += ['-v', f'{source}:{volume["target"]}{mode}']
     container = _docker(*args, web_image, 'sleep', 'infinity')
     try:
+        # The app reads ~/.mc/config.json, which lands on the root-owned mount
+        # through a root-owned symlink.
+        seen = _docker(
+            'exec', '-u', '1000:1000', container,
+            'sh', '-c', 'stat -c %u:%g /home/zenysis/.mc; cat /home/zenysis/.mc/config.json',
+        )  # fmt: skip
+        assert seen.splitlines() == ['0:0', '{"version": "10", "aliases": {}}']
         # The app user replaces ~/.mc with a symlink to a root-owned directory.
         _docker(
             'exec', '-u', '1000:1000', container, 'sh', '-c',
@@ -204,7 +242,7 @@ def test_the_data_owner_hands_over_without_following_symlinks(tmp_path, web_imag
         )  # fmt: skip
         assert run.returncode == 0, run.stdout + run.stderr
         _docker('commit', owner, after)
-        owners = _docker(
+        owners = _probe(
             'run', '--rm', '--network', 'none', '--user', '0', *mounts,
             '--entrypoint', 'stat', after, '-c', '%n %u:%g', '/usr/local/bin',
             '/data/output', '/data/output/zenysis.log',

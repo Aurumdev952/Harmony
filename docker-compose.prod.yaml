@@ -56,7 +56,7 @@ services:
     volumes:
       - ${DATA_PATH}/output:/data/output
       - ${DATA_PATH}/output/logs:/logs
-      - ${DATA_PATH}/ubuntu/.mc/config.json:/home/zenysis/.mc/config.json:ro
+      - ${DATA_PATH}/ubuntu/.mc/config.json:/etc/zenysis/mc/config.json:ro
     restart: always
   renderer:
     restart: always

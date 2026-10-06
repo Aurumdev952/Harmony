@@ -30,6 +30,10 @@ WORKDIR ${INSTALL_PATH}
 RUN mkdir -p web/public /data/output uploads && \
   chown zenysis:zenysis /data/output uploads
 
+# Compose mounts the MinIO client config read-only at a root-owned path; the app
+# reads ~/.mc/config.json through this root-owned symlink.
+RUN mkdir -p /etc/zenysis/mc && ln -s /etc/zenysis/mc /home/zenysis/.mc
+
 # Copy the built client files.
 COPY --from=client-build /client/ web/public/
 

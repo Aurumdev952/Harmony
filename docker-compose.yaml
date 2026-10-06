@@ -173,8 +173,13 @@ services:
     # Naming a network drops the implicit default, so list both.
     networks: [default, render]
     volumes:
-      # The MinIO client config, read-only in the app user's home.
-      - ${MC_CONFIG_PATH}/config.json:/home/zenysis/.mc/config.json:ro
+      # The MinIO client config, read-only at a root-owned path; the image's
+      # ~/.mc is a root-owned symlink to its directory.
+      - ${MC_CONFIG_PATH}/config.json:/etc/zenysis/mc/config.json:ro
+    # uid 1000 needs no capability, and nothing in the container may gain one.
+    cap_drop: [ALL]
+    security_opt:
+      - no-new-privileges:true
     healthcheck:
       test: "timeout 10s bash -c ':> /dev/tcp/127.0.0.1/5000'"
       interval: 30s
@@ -205,6 +210,10 @@ services:
       - OBJECT_STORAGE_ALIAS=${OBJECT_STORAGE_ALIAS}
       - LOG_FORMAT=json
       - LOG_STREAM=stdout
+    # uid 1000 needs no capability, and nothing in the container may gain one.
+    cap_drop: [ALL]
+    security_opt:
+      - no-new-privileges:true
     command:
       [
         "celery",

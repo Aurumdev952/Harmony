@@ -5,9 +5,9 @@ missing `DRUID_HOST`, so a misconfigured web server, worker or pipeline run stop
 at startup rather than hours in. Only the environment is read: no `.env` file and
 no secrets directory.
 
-Every image runs CPython 3.13 since WP-3b. The `typing` generics and
-`typing_extensions.Annotated` date from the CPython 3.8 and PyPy 3.8 runtimes
-before it.
+Every image that loads these settings runs CPython 3.13 since WP-3b. The
+`typing` generics and `typing_extensions.Annotated` date from the CPython 3.8 and
+PyPy 3.8 runtimes before it.
 '''
 
 import functools

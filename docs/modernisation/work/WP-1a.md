@@ -1,7 +1,7 @@
 ---
 wp: "1a"
 title: "Performance baseline"
-status: review
+status: ready
 owner_role: "qa"
 instances:
   - name: "qa-9"
@@ -120,6 +120,14 @@ None.
   - `--label` takes only letters, digits, underscores and hyphens (`run_label`, checked by argparse). The refusal globs `<stem>.*`, so a dot in a committed-mode label or glob characters in any label would bypass it.
 
   Check: `test_hypothesis_does_not_fail_a_slow_draw_on_a_loaded_host` was seen failing first (`too_slow in ()`). The refusal test passes, and with `run()`'s early `refuse_existing` call deleted it fails ("measured before refusing"). The six refused-label cases (`run.1`, `run*`, `run?`, `run[1]`, `a/b`, `a b`) were seen failing first, and the four accepted ones pass. 63 pass on the host and on CPython 3.8; ruff clean. The perf stack was not touched.
+- 2026-10-06 qa-10 ready: both required verdicts are approved (QA at `c9b623e7`, reviewer round 3 at `c9b623e7`), and the reviewer's Lows are folded into `b12f430b`. Merged `mig/integration` at `f7580e3a` (`13c147a0`, no conflicts). Checks on the merge:
+  - `tests/perf`: 63 passed;
+  - `ci/lint_python.sh mig/integration`: clean;
+  - `ci/check_py38_syntax.py`: 879 files, 0 problems;
+  - shellcheck: clean;
+  - `ci/pytest_suites.sh`: all 15 suites passed.
+
+  Status set to `ready`; branch pushed, PR opened against `main`.
 
 ## Evidence
 

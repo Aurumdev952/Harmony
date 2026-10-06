@@ -16,7 +16,7 @@ from web.server.data.data_access import (
     get_db_adapter,
 )
 from web.server.errors import ItemNotFound
-from web.server.routes.views.core import find_by_name
+from web.server.routes.views.core import find_by_name, try_get_resource_role
 from web.server.routes.views.groups import (
     list_group_roles_for_resource_api,
     update_group_resource_roles,
@@ -185,7 +185,7 @@ def update_resource_roles(
         remove_missing=group_roles is not None,
     )
 
-    # Nothing is written until every name is resolved.
+    # Nothing is written until every user, group and role name is resolved.
     if undefined_users or undefined_groups:
         errors = [
             {
@@ -207,6 +207,13 @@ def update_resource_roles(
                 'errors': errors,
             }
         )
+    # Every resource role named must exist and be for this resource's type.
+    for role_name in {
+        role_name
+        for role_names in (*users.values(), *groups.values())
+        for role_name in role_names
+    }:
+        try_get_resource_role(role_name, resource, session)
 
     _update_sitewide_resource_acl(resource, sitewide_acl)
     for user, role_names in users.items():

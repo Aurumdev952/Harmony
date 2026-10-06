@@ -1236,3 +1236,47 @@ def test_sharing_the_second_twin_with_a_group_lands_on_it(db, make_user):
     assert response.status_code == 204
     assert _group_acls(db, second_id) == {(group_id, 'dashboard_viewer')}
     assert _group_acls(db, first_id) == set()
+
+
+# Round 3 (reviewer r2 F3): a share naming a resource role that does not exist,
+# or one of another resource type, writes nothing, the sitewide ACL included.
+
+
+@pytest.mark.parametrize('principal', ['user', 'group'])
+@pytest.mark.parametrize('role_name', ['no_such_role', 'alert_admin'])
+def test_a_share_naming_a_role_it_cannot_grant_writes_nothing(
+    db, make_user, principal, role_name
+):
+    dashboard_id = _resource(db, f'dashboard-{_tag()}').id
+    actor = make_user()
+    _grant_user(db, actor.id, 'dashboard_admin', dashboard_id)
+    other = make_user()
+    group_name = _group(db, f'group-{_tag()}').name
+    user_roles = {actor.username: ['dashboard_admin']}
+    group_roles = {}
+    if principal == 'user':
+        user_roles[other.username] = [role_name]
+    else:
+        group_roles[group_name] = [role_name]
+
+    response = actor.request(
+        'POST',
+        f'/api2/resource/{dashboard_id}/roles',
+        {
+            'userRoles': user_roles,
+            'groupRoles': group_roles,
+            'sitewideResourceAcl': {
+                'registeredResourceRole': 'dashboard_viewer',
+                'unregisteredResourceRole': '',
+            },
+        },
+    )
+
+    assert response.status_code == 404
+    db.session.expire_all()
+    assert (
+        db.session.query(SitewideResourceAcl).filter_by(resource_id=dashboard_id).all()
+        == []
+    )
+    assert _user_acls(db, dashboard_id) == {(actor.id, 'dashboard_admin')}
+    assert _group_acls(db, dashboard_id) == set()

@@ -269,6 +269,8 @@ services:
       - seccomp=./docker/renderer/seccomp_profile.json
     mem_limit: 2g
     pids_limit: 512
+    # It exits with status 70 when a render slot is stuck past its deadline.
+    restart: unless-stopped
     # The image's HEALTHCHECK probes GET /healthz.
     logging: *default-logging
   render-egress:
@@ -291,6 +293,7 @@ services:
       - no-new-privileges:true
     mem_limit: 128m
     pids_limit: 128
+    restart: unless-stopped
     healthcheck:
       # Replaces the image's HEALTHCHECK, which probes the renderer's /healthz.
       test: ["CMD", "python", "-c", "import socket; socket.create_connection(('127.0.0.1', 3128), 3).close()"]

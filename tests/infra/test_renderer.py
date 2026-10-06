@@ -8,6 +8,7 @@ import json
 import re
 import shutil
 import subprocess
+import tomllib
 from pathlib import Path
 
 import pytest
@@ -428,3 +429,26 @@ def test_test_image_adds_only_hash_pinned_pytest_to_the_renderer_image():
     assert instructions[-1].startswith('ENTRYPOINT ["python", "-m", "pytest"')
     pins = TEST_REQUIREMENTS.read_text()
     assert re.search(r'^pytest==\S+ \\$', pins, re.MULTILINE)
+
+
+@needs_docker
+@pytest.mark.parametrize('service', ['renderer', 'render-egress'])
+def test_renderer_services_restart_outside_prod_too(cfg, service):
+    # The renderer exits with status 70 when a render slot is stuck past its
+    # deadline (WP-1h R2-2); only a restart policy brings it back.
+    assert cfg['services'][service].get('restart') in {'always', 'unless-stopped'}
+
+
+def test_ci_type_checks_the_renderer_against_playwrights_real_types():
+    pyproject = tomllib.loads((REPO / 'pyproject.toml').read_text())
+    pinned = re.search(r'^playwright==(\S+)', REQUIREMENTS.read_text(), re.MULTILINE)
+    group = pyproject['dependency-groups'].get('renderer-types')
+    assert group == [f'playwright=={pinned.group(1)}']
+    # Not a default group: with Playwright installed, the browser tests in
+    # tests/worker would run in the unit job, which has no browser.
+    assert 'renderer-types' not in pyproject['tool']['uv']['default-groups']
+    # Installed, Playwright's own types are used; the playwright.* override only
+    # keeps a plain `uv run --locked mypy` (no group) working.
+    workflow = yaml.safe_load((REPO / '.github/workflows/integration.yml').read_text())
+    runs = [s.get('run', '') for s in workflow['jobs']['python']['steps']]
+    assert 'uv run --locked --isolated --group renderer-types mypy' in runs

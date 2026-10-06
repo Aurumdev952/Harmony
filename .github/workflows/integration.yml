@@ -56,7 +56,9 @@ jobs:
       - name: Mypy
         # Run it even if ruff fails, so we can see all the errors at once.
         if: '!cancelled()'
-        run: uv run --locked mypy
+        # --isolated: Playwright (the renderer-types group) stays out of the
+        # environment the tests run in.
+        run: uv run --locked --isolated --group renderer-types mypy
       - name: Pytest
         # Every directory under tests/ runs, each in its own process. The contract
         # replay needs the compose stack: it skips without CONTRACT_BASE_URL, and

@@ -1,6 +1,5 @@
 pipeline/out
 venv*
-pypy
 
 .git
 node_modules

@@ -111,8 +111,8 @@ def test_the_locked_environment_satisfies_every_installed_requirement(tmp_path):
 
 # The release that fixes each advisory pip-audit reported on the lock (security
 # review of WP-3b). setuptools stays below 82, the first release without
-# pkg_resources, which Flask 1.0, Werkzeug 0.16 and gunicorn 20 import at run time;
-# PYSEC-2026-3447 (fixed in 83.0.0) waits on WP-3c to WP-3e.
+# pkg_resources, which Flask 1.0 and Werkzeug 0.16 import at run time;
+# PYSEC-2026-3447 (fixed in 83.0.0) waits on WP-3d.
 ADVISORY_FLOORS = {
     "anyio": "4.14.2",
     "pyasn1": "0.6.4",

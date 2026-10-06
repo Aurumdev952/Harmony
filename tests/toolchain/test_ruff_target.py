@@ -26,4 +26,15 @@ def test_ruff_target_follows_requires_python():
         settings = ruff_settings(path)
         assert f'linter.unresolved_target_version = {version}\n' in settings
         assert f'formatter.unresolved_target_version = {version}\n' in settings
-        assert 'linter.per_file_target_version = {}' in settings, settings
+
+
+def test_the_renderer_alone_targets_its_image_python():
+    # Decision 0013: the renderer image runs the Playwright base's CPython 3.12,
+    # so its code must not use 3.13-only syntax. No other path has its own target.
+    pyproject = tomllib.loads((REPO / 'pyproject.toml').read_text())
+    assert pyproject['tool']['ruff'].get('per-file-target-version') == {
+        'harmony/worker/renderer/**': 'py312'
+    }
+    settings = ruff_settings('harmony/worker/renderer/server.py')
+    assert 'harmony/worker/renderer/**' in settings
+    assert '3.12' in settings.split('linter.per_file_target_version =')[1]

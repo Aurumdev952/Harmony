@@ -5,9 +5,9 @@ version = "0"
 requires-python = "==3.13.*"
 # Shared by the web server and the pipeline images.
 dependencies = [
-    # 78.1.1 fixes PYSEC-2025-49. Flask 1.0, Werkzeug 0.16 and gunicorn 20 import
-    # pkg_resources, which setuptools 82 removed, so the 83.0.0 fix (PYSEC-2026-3447)
-    # waits on WP-3c to WP-3e.
+    # 78.1.1 fixes PYSEC-2025-49. Flask 1.0 and Werkzeug 0.16 import pkg_resources,
+    # which setuptools 82 removed, so the 83.0.0 fix (PYSEC-2026-3447) waits on
+    # WP-3d.
     "setuptools==78.1.1",
     # Before 22.1, slotted classes (related.immutable) break zero-argument super()
     # on Python 3.11+; 24.1 is the first release supporting 3.13.
@@ -153,12 +153,17 @@ dev = [
     # BE-1: harmony.core imports no web framework (tests/core runs it).
     "import-linter==2.5.2",
 ]
+# Playwright's Python package, the version the renderer image pins
+# (harmony/worker/renderer/requirements.txt), so CI type-checks harmony/worker
+# against its real types. Not a default group: installed, it would make the
+# browser tests in tests/worker run in the unit job, which has no browser.
+renderer-types = ["playwright==1.63.0"]
 
 [tool.uv]
 package = false
 # Hashed build constraints (below) need 0.12.16; CI and the images run 0.12.23.
 required-version = ">=0.12.16"
-default-groups = "all"
+default-groups = ["web", "pipeline", "dev"]
 # Only CPython runs Harmony; the lock skips other implementations' forks.
 environments = ["platform_python_implementation == 'CPython'"]
 # `uv sync` builds 22 packages from source (2 git, 20 sdists), all with setuptools.
@@ -179,7 +184,10 @@ pylib = { git = "https://github.com/room77/py77.git", rev = "70280110ec342a6f6db
 [tool.ruff]
 line-length = 88
 extend-exclude = ["web/public", "node_modules"]
-# The target version comes from requires-python: every image runs that release.
+# The target version comes from requires-python: every image runs that release,
+# except the renderer, which runs the Playwright image's CPython 3.12 (decision
+# 0013; WP-7g lifts it).
+per-file-target-version = { "harmony/worker/renderer/**" = "py312" }
 
 [tool.ruff.format]
 # black --skip-string-normalization, which CI ran before ruff.
@@ -252,8 +260,9 @@ strict_equality = true
 strict_concatenate = true
 
 [[tool.mypy.overrides]]
-# Only the renderer image installs Playwright; there, browser.py is checked
-# against its real types (WP-1h infra request).
+# Playwright is installed only with the renderer-types group, which CI's mypy step
+# adds, so there harmony/worker is checked against its real types. A plain
+# `uv run --locked mypy` without the group treats it as untyped.
 module = ["playwright.*"]
 ignore_missing_imports = true
 
@@ -284,7 +293,6 @@ module = [
     "scipy.*",
     "psycopg2.*",
     "pandas.*",
-    "_pypyjson.*",
     "factory.*",
     "alchemy_mock.*",
     "rapidjson.*",

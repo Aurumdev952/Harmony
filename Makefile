@@ -67,7 +67,7 @@ minio-server-down: # Stop the minio server container.
 	DOCKER_HOST=$(DOCKER_HOST) docker compose --env-file $(ENV_FILE) -f docker-compose.minio.yaml down
 
 mypy: # Type-check with the [tool.mypy] settings in pyproject.toml.
-	uv run --locked mypy
+	uv run --locked --isolated --group renderer-types mypy
 
 test: # Run the Python suites as CI does: each tests/ suite in its own process on the uv.lock environment.
 	ci/pytest_suites.sh

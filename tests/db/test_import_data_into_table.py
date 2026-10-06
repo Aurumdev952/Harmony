@@ -11,10 +11,12 @@ from __future__ import annotations
 
 import importlib.util
 import os
+import secrets
 import zipfile
 from collections.abc import Iterator
 from pathlib import Path
 from types import SimpleNamespace
+from urllib.parse import urlsplit, urlunsplit
 
 import psycopg2
 from psycopg2 import sql
@@ -34,6 +36,18 @@ from scripts.data_catalog.import_db_tables import (
     DATA_CATALOG_TABLE_NAMES as IMPORTED_TABLES,
 )
 from util.file.compression.lz4 import LZ4Reader, LZ4Writer
+
+# Every test also runs on a server whose OIDs are past 2^31, as on a long-lived
+# cluster: the counter is cluster-wide, and temporary tables and TOAST values consume
+# it. Such an OID read as a signed integer turns negative.
+pytestmark = pytest.mark.parametrize(
+    "postgres_server",
+    [
+        pytest.param(None, id="new-cluster"),
+        pytest.param(3_000_000_000, id="oids-past-int4"),
+    ],
+    indirect=True,
+)
 
 # Tables the export does not carry whose rows reference catalogue rows.
 DEPENDENT_TABLES = (
@@ -157,10 +171,42 @@ def _last_modified_triggers(url: str) -> dict[str, str]:
     return states
 
 
-def _execute(url: str, statement: str) -> None:
+def _execute(url: str, statement: str | sql.Composable) -> None:
     with psycopg2.connect(url) as conn, conn.cursor() as cursor:
         cursor.execute(statement)
     conn.close()
+
+
+@pytest.fixture(name="role")
+def fixture_role(database: str) -> Iterator[tuple[sql.Identifier, str]]:
+    """A login role that is no superuser, and a URL to `database` as that role."""
+    name = f"importer_{secrets.token_hex(4)}"
+    password = secrets.token_hex(16)
+    role = sql.Identifier(name)
+    _execute(
+        database,
+        sql.SQL("CREATE ROLE {} LOGIN NOSUPERUSER PASSWORD {}").format(
+            role, sql.Literal(password)
+        ),
+    )
+    parts = urlsplit(database)
+    netloc = f"{name}:{password}@{parts.hostname}:{parts.port}"
+    yield role, urlunsplit(parts._replace(netloc=netloc))
+    _execute(
+        database,
+        sql.SQL("REASSIGN OWNED BY {0} TO CURRENT_USER; DROP OWNED BY {0}").format(
+            role
+        ),
+    )
+    _execute(database, sql.SQL("DROP ROLE {}").format(role))
+
+
+def _public_tables(url: str) -> list[str]:
+    with psycopg2.connect(url) as conn, conn.cursor() as cursor:
+        cursor.execute("SELECT tablename FROM pg_tables WHERE schemaname = 'public'")
+        tables = [table for (table,) in cursor.fetchall()]
+    conn.close()
+    return tables
 
 
 def _export(url: str, path: str) -> str:
@@ -404,3 +450,49 @@ def test_an_archive_missing_a_table_changes_nothing(database, tmp_path):
         _import(database, archive)
 
     assert _snapshot(database, [*IMPORTED_TABLES, *DEPENDENT_TABLES]) == before
+
+
+# Disabling the update_last_modified trigger needs ownership of each referenced
+# catalogue table, where TRUNCATE needed only the TRUNCATE privilege. Deployments run
+# migrations and the app as one role, which owns the tables and is no superuser.
+def test_a_role_that_owns_the_tables_imports_without_being_superuser(
+    database, role, tmp_path
+):
+    owner, url = role
+    for table in _public_tables(database):
+        _execute(
+            database,
+            sql.SQL("ALTER TABLE {} OWNER TO {}").format(sql.Identifier(table), owner),
+        )
+    archive = _export(database, str(tmp_path / "export.zip"))
+    exported = _snapshot(database, IMPORTED_TABLES)
+    dependents = _snapshot(database, DEPENDENT_TABLES)
+    _execute(database, "UPDATE category SET name = 'Renamed' WHERE id = 'cat_a'")
+
+    _import(url, archive)
+
+    assert _snapshot(database, IMPORTED_TABLES) == exported
+    assert _snapshot(database, DEPENDENT_TABLES) == dependents
+    assert _last_modified_triggers(database) == dict.fromkeys(IMPORTED_TABLES, "O")
+
+
+def test_a_role_with_every_privilege_but_not_ownership_cannot_import(
+    database, role, tmp_path
+):
+    grantee, url = role
+    _execute(
+        database,
+        sql.SQL(
+            "GRANT ALL ON ALL TABLES IN SCHEMA public TO {0};"
+            "GRANT ALL ON ALL SEQUENCES IN SCHEMA public TO {0}"
+        ).format(grantee),
+    )
+    archive = _export(database, str(tmp_path / "export.zip"))
+    _execute(database, "UPDATE category SET name = 'Renamed' WHERE id = 'cat_a'")
+    before = _snapshot(database, [*IMPORTED_TABLES, *DEPENDENT_TABLES])
+
+    with pytest.raises(psycopg2.errors.InsufficientPrivilege, match="must be owner"):
+        _import(url, archive)
+
+    assert _snapshot(database, [*IMPORTED_TABLES, *DEPENDENT_TABLES]) == before
+    assert _last_modified_triggers(database) == dict.fromkeys(IMPORTED_TABLES, "O")

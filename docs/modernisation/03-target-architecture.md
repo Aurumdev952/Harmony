@@ -199,4 +199,4 @@ The `ui/` library shrinks to the components HeroUI does not cover. The full mapp
 | UI kit | HeroUI v3 | Requested. Built on React Aria, so accessibility and Ethiopic calendar support are covered | HeroUI v2 (cannot coexist with v3, built on the old Tailwind) |
 | Typeface | Urbanist plus a figure face with tabular numerals | Requested. The figure face fixes the missing `tnum` | Urbanist alone |
 | Frontend shape | One SPA plus a PWA | Offline and mobile roadmap | Keep the multi-page app |
-| Exports | Self-hosted Playwright in a Celery worker | Cost and data sovereignty | urlbox.io |
+| Exports | Self-hosted Playwright in a sandboxed renderer sidecar, dispatched from the Celery worker after WP-5f (decision 0009) | Cost and data sovereignty | urlbox.io |

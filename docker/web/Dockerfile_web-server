@@ -39,6 +39,7 @@ RUN \
 
 # Copy over python code.
 COPY config config
+COPY harmony harmony
 COPY data data
 COPY db db
 COPY log log

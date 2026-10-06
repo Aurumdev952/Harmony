@@ -129,3 +129,16 @@ Added by decision 0006 after the WP-0i round-2 reviews.
   - Failing tests first: a forged Host (`attacker.invalid`, `real.org:@attacker.invalid`) and a forged `SCRIPT_NAME` on `forgot_password`, invite, access-granted and new-dashboard paths produce links on the configured origin; a look-alike username (`john_doe` for `john.doe`) no longer signs in as the other account.
   - Unit 1 records whether nginx-proxy 1.11.6 forwards the raw Host on a local stack.
   - The WP-2b pins flip in the same stack; the INV-3 rows are accepted by security and the human.
+
+## 0l. Match resource, role, group and user names exactly, never as patterns
+
+Added by decision 0012 after the WP-0k QA gate and a security rating.
+
+- **Changes.**
+  - `find_one_by_fields(..., case_sensitive=False)` compares `lower(field) == lower(value)`; `_` and `%` in a chosen name are literal.
+  - Sharing and share removal act on the resource and principals they were given; nothing re-finds a resource by its own name.
+  - 403 bodies from grant checks do not repeat resource names.
+  - Tests settle the three tracing notes in decision 0012 (resource type dropped by Python `and`; legacy `/roles` POST routes; empty `PATCH /roles` body).
+- **Verification.**
+  - Failing tests first (qa): sharing dashboard `a_b` never touches `axb`; removing a share for `john_doe@…` leaves `john.doe@…` untouched; adding `john_doe@…` to a group never adds `john.doe@…`.
+  - The WP-2b pins flip in the same stack; the INV-3 rows are accepted by security and the human.

@@ -1,0 +1,197 @@
+== stack down/up (harmony-wp2b-qafinal)
+ Container harmony-wp2b-qafinal-forward-1 Stopping 
+ Container harmony-wp2b-qafinal-forward-1 Stopped 
+ Container harmony-wp2b-qafinal-forward-1 Removing 
+ Container harmony-wp2b-qafinal-forward-1 Removed 
+ Container harmony-wp2b-qafinal-web-1 Stopping 
+ Container harmony-wp2b-qafinal-web-1 Stopped 
+ Container harmony-wp2b-qafinal-web-1 Removing 
+ Container harmony-wp2b-qafinal-web-1 Removed 
+ Container harmony-wp2b-qafinal-mailpit-1 Stopping 
+ Container harmony-wp2b-qafinal-hasura-1 Stopping 
+ Container harmony-wp2b-qafinal-redis-1 Stopping 
+ Container harmony-wp2b-qafinal-redis-1 Stopped 
+ Container harmony-wp2b-qafinal-redis-1 Removing 
+ Container harmony-wp2b-qafinal-mailpit-1 Stopped 
+ Container harmony-wp2b-qafinal-mailpit-1 Removing 
+ Container harmony-wp2b-qafinal-redis-1 Removed 
+ Container harmony-wp2b-qafinal-mailpit-1 Removed 
+ Container harmony-wp2b-qafinal-hasura-1 Stopped 
+ Container harmony-wp2b-qafinal-hasura-1 Removing 
+ Container harmony-wp2b-qafinal-hasura-1 Removed 
+ Container harmony-wp2b-qafinal-web-init-1 Stopping 
+ Container harmony-wp2b-qafinal-web-init-1 Stopped 
+ Container harmony-wp2b-qafinal-web-init-1 Removing 
+ Container harmony-wp2b-qafinal-web-init-1 Removed 
+ Container harmony-wp2b-qafinal-druid-stub-1 Stopping 
+ Container harmony-wp2b-qafinal-postgres-1 Stopping 
+ Container harmony-wp2b-qafinal-postgres-1 Stopped 
+ Container harmony-wp2b-qafinal-postgres-1 Removing 
+ Container harmony-wp2b-qafinal-postgres-1 Removed 
+ Container harmony-wp2b-qafinal-druid-stub-1 Stopped 
+ Container harmony-wp2b-qafinal-druid-stub-1 Removing 
+ Container harmony-wp2b-qafinal-druid-stub-1 Removed 
+ Network harmony-wp2b-qafinal_edge Removing 
+ Network harmony-wp2b-qafinal_internal Removing 
+ Network harmony-wp2b-qafinal_edge Removed 
+ Network harmony-wp2b-qafinal_internal Removed 
+#0 building with "rootless" instance using docker driver
+
+#1 [internal] load build definition from Dockerfile_web-server
+#1 transferring dockerfile: 1.53kB done
+#1 DONE 0.0s
+
+#2 [internal] load metadata for docker.io/library/python:3.8.20-bookworm@sha256:d411270700143fa2683cc8264d9fa5d3279fd3b6afff62ae81ea2f9d070e390c
+#2 DONE 1.4s
+
+#3 [internal] load .dockerignore
+#3 transferring context: 132B done
+#3 DONE 0.0s
+
+#4 [internal] load build context
+#4 transferring context: 123.04kB 0.5s done
+#4 DONE 0.6s
+
+#5 [ 1/17] FROM docker.io/library/python:3.8.20-bookworm@sha256:d411270700143fa2683cc8264d9fa5d3279fd3b6afff62ae81ea2f9d070e390c
+#5 resolve docker.io/library/python:3.8.20-bookworm@sha256:d411270700143fa2683cc8264d9fa5d3279fd3b6afff62ae81ea2f9d070e390c
+#5 resolve docker.io/library/python:3.8.20-bookworm@sha256:d411270700143fa2683cc8264d9fa5d3279fd3b6afff62ae81ea2f9d070e390c 0.7s done
+#5 DONE 0.7s
+
+#6 [11/17] COPY db db
+#6 CACHED
+
+#7 [16/17] COPY web/*.py web/
+#7 CACHED
+
+#8 [13/17] COPY models models
+#8 CACHED
+
+#9 [ 7/17] RUN   pip install   --cache-dir /pip.cache   --src /usr/local/src   -r requirements.txt &&   pip install   --cache-dir /pip.cache   --src /usr/local/src   -r requirements-web.txt
+#9 CACHED
+
+#10 [ 3/17] WORKDIR /zenysis
+#10 CACHED
+
+#11 [ 8/17] RUN   rm -rf /usr/local/lib/python3.8/site-packages/*/tests &&   rm -rf /usr/local/lib/python3.8/site-packages/*/*/tests &&   find /usr/local/lib/python3.8/site-packages -name '*.pyc' -delete
+#11 CACHED
+
+#12 [15/17] COPY util util
+#12 CACHED
+
+#13 [ 2/17] RUN mkdir -p /zenysis
+#13 CACHED
+
+#14 [ 6/17] COPY requirements-web.txt requirements-web.txt
+#14 CACHED
+
+#15 [ 5/17] COPY requirements.txt requirements.txt
+#15 CACHED
+
+#16 [14/17] COPY graphql graphql
+#16 CACHED
+
+#17 [ 9/17] COPY config config
+#17 CACHED
+
+#18 [ 4/17] RUN   export DEBIAN_FRONTEND=noninteractive &&   apt-get update &&   apt-get install --no-install-recommends -y lz4 &&   apt-get clean &&   rm -rf /var/lib/apt/lists/*
+#18 CACHED
+
+#19 [12/17] COPY log log
+#19 CACHED
+
+#20 [10/17] COPY data data
+#20 CACHED
+
+#21 [17/17] COPY web/server web/server
+#21 CACHED
+
+#22 exporting to image
+#22 exporting layers 0.0s done
+#22 exporting manifest sha256:8e97f1ef12a5d4ff1a064a451faf4eb344cfdeb270d9e4fd274dd26e1f4103c7 done
+#22 exporting config sha256:09bc0075ab08ea86a3df125e443c3704d97c043f5c0650469d1dbdf105efb194 done
+#22 exporting attestation manifest sha256:f68725597c0b98b17957234cbef4d5d43f41dc88d614bb33c2e91bb3a55b762e 0.0s done
+#22 exporting manifest list sha256:e80f2d0cdca882a08c1e91b701297f79a1067ead11151eaadc6d3bc5db48abb0 done
+#22 naming to docker.io/library/harmony-contract-web-server:f46617f35db7 done
+#22 unpacking to docker.io/library/harmony-contract-web-server:f46617f35db7
+#22 unpacking to docker.io/library/harmony-contract-web-server:f46617f35db7 0.2s done
+#22 DONE 0.3s
+
+ [33m1 warning found (use docker --debug to expand):
+[0m - LegacyKeyValueFormat: "ENV key=value" should be used instead of legacy "ENV key value" format (line 3)
+ Network harmony-wp2b-qafinal_internal Creating 
+ Network harmony-wp2b-qafinal_internal Creating 
+ Network harmony-wp2b-qafinal_internal Created 
+ Network harmony-wp2b-qafinal_internal Created 
+ Container harmony-wp2b-qafinal-mailpit-1 Creating 
+ Container harmony-wp2b-qafinal-druid-stub-1 Creating 
+ Container harmony-wp2b-qafinal-redis-1 Creating 
+ Container harmony-wp2b-qafinal-postgres-1 Creating 
+ Container harmony-wp2b-qafinal-postgres-1 Created 
+ Container harmony-wp2b-qafinal-redis-1 Created 
+ Container harmony-wp2b-qafinal-mailpit-1 Created 
+ Container harmony-wp2b-qafinal-druid-stub-1 Created 
+ Container harmony-wp2b-qafinal-redis-1 Starting 
+ Container harmony-wp2b-qafinal-postgres-1 Starting 
+ Container harmony-wp2b-qafinal-druid-stub-1 Starting 
+ Container harmony-wp2b-qafinal-mailpit-1 Starting 
+ Container harmony-wp2b-qafinal-redis-1 Started 
+ Container harmony-wp2b-qafinal-postgres-1 Started 
+ Container harmony-wp2b-qafinal-druid-stub-1 Started 
+ Container harmony-wp2b-qafinal-mailpit-1 Started 
+ Container harmony-wp2b-qafinal-postgres-1 Waiting 
+ Container harmony-wp2b-qafinal-mailpit-1 Waiting 
+ Container harmony-wp2b-qafinal-druid-stub-1 Waiting 
+ Container harmony-wp2b-qafinal-redis-1 Waiting 
+ Container harmony-wp2b-qafinal-redis-1 Healthy 
+ Container harmony-wp2b-qafinal-druid-stub-1 Healthy 
+ Container harmony-wp2b-qafinal-mailpit-1 Healthy 
+ Container harmony-wp2b-qafinal-postgres-1 Healthy 
+ Container harmony-wp2b-qafinal-mailpit-1 Running 
+ Container harmony-wp2b-qafinal-redis-1 Running 
+ Container harmony-wp2b-qafinal-druid-stub-1 Running 
+ Container harmony-wp2b-qafinal-postgres-1 Running 
+ Network harmony-wp2b-qafinal_edge Creating 
+ Container harmony-wp2b-qafinal-web-init-1 Creating 
+ Network harmony-wp2b-qafinal_edge Creating 
+ Network harmony-wp2b-qafinal_edge Created 
+ Network harmony-wp2b-qafinal_edge Created 
+ Container harmony-wp2b-qafinal-web-init-1 Created 
+ Container harmony-wp2b-qafinal-hasura-1 Creating 
+ Container harmony-wp2b-qafinal-hasura-1 Created 
+ Container harmony-wp2b-qafinal-web-1 Creating 
+ Container harmony-wp2b-qafinal-web-1 Created 
+ Container harmony-wp2b-qafinal-forward-1 Creating 
+ Container harmony-wp2b-qafinal-forward-1 Created 
+ Container harmony-wp2b-qafinal-postgres-1 Waiting 
+ Container harmony-wp2b-qafinal-postgres-1 Healthy 
+ Container harmony-wp2b-qafinal-web-init-1 Starting 
+ Container harmony-wp2b-qafinal-web-init-1 Started 
+ Container harmony-wp2b-qafinal-web-init-1 Waiting 
+ Container harmony-wp2b-qafinal-web-init-1 Exited 
+ Container harmony-wp2b-qafinal-hasura-1 Starting 
+ Container harmony-wp2b-qafinal-hasura-1 Started 
+ Container harmony-wp2b-qafinal-web-init-1 Waiting 
+ Container harmony-wp2b-qafinal-web-init-1 Exited 
+ Container harmony-wp2b-qafinal-web-1 Starting 
+ Container harmony-wp2b-qafinal-web-1 Started 
+ Container harmony-wp2b-qafinal-forward-1 Starting 
+ Container harmony-wp2b-qafinal-forward-1 Started 
+curl: (52) Empty reply from server
+curl: (52) Empty reply from server
+contract stack: web is up at http://127.0.0.1:58780
+20261005.165609.421 INFO apply_metadata_snapshot.py:main:83: Starting hasura metadata processing.
+20261005.165610.135 INFO apply_metadata_snapshot.py:main:109: Successfully applied metadata to http://hasura:8080/v1/metadata
+contract stack: seeded thumbnail_contract-dashboard
+/usr/local/lib/python3.8/site-packages/redis/utils.py:25: CryptographyDeprecationWarning: Python 3.8 is no longer supported by the Python core team and support for it is deprecated in cryptography. The next release of cryptography will remove support for Python 3.8.
+  import cryptography  # noqa
+== whole suite, stack env set (pure and live-stack layers)
+5255 passed in 237.08s (0:03:57)
+exit 0
+== live-stack layer, run 2
+580 passed, 4675 deselected in 195.19s (0:03:15)
+exit 0
+== live-stack layer, run 3
+580 passed, 4675 deselected in 206.38s (0:03:26)
+exit 0
+== left in the stack database
+users=0 groups=0 authz_roles=0 saved_queries=0 api_tokens=0

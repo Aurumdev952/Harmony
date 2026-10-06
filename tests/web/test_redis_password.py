@@ -1,7 +1,6 @@
 import os
 
 import pytest
-from flask import Flask
 from flask_caching import Cache
 from redis import Redis
 
@@ -60,18 +59,12 @@ def test_no_redis_configured_keeps_the_default_broker():
     assert get_broker_url() == DEFAULT_BROKER_URL
 
 
-def test_flask_cache_client_carries_the_password(redis_env):
+def test_flask_cache_client_carries_the_password(redis_env, bare_flask_app):
     redis_env.setenv('REDIS_HOST', 'redis')
     redis_env.setenv('REDIS_PASSWORD', AWKWARD_PASSWORD)
 
     cache_config = FlaskConfiguration().CACHES['default']
-    # Explicit paths: Flask 1.0 cannot locate a module loaded by pytest's rewrite hook.
-    app = Flask(
-        'tests.web',
-        root_path=os.path.dirname(__file__),
-        instance_path=os.path.dirname(__file__),
-    )
-    cache = Cache(app, config=cache_config)
+    cache = Cache(bare_flask_app(), config=cache_config)
 
     assert cache_config['CACHE_TYPE'] == 'RedisCache'
     # pylint: disable=protected-access

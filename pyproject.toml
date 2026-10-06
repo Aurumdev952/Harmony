@@ -63,6 +63,10 @@ dependencies = [
     "ijson-bigint==3.2.0.post1",
     "types-jsonschema==4.17.0.8",
     "future==0.18.3",
+    # harmony.core.settings (WP-4a). The last releases supporting CPython 3.8 and
+    # PyPy 3.8, which the web and pipeline images run until WP-3b.
+    "pydantic==2.10.6",
+    "pydantic-settings==2.8.1",
 ]
 
 [dependency-groups]
@@ -78,7 +82,7 @@ web = [
     "scipy>=1.2.1",
     "twilio==6.24.1",
     "PyJWT==1.7.1",
-    "typing_extensions==4.1.1",
+    "typing_extensions==4.12.2",
     "alembic>=1.7.1",
 ]
 # Exported to requirements-pipeline.txt.
@@ -98,7 +102,7 @@ pipeline = [
     "zeep==3.4.0 ; platform_python_implementation != 'PyPy'",
     "scikit-learn>=0.21.3 ; platform_python_implementation != 'PyPy'",
     "scipy>=1.2.1 ; platform_python_implementation != 'PyPy'",
-    "typing_extensions==4.1.1",
+    "typing_extensions==4.12.2",
     "netCDF4 ; platform_python_implementation != 'PyPy'",
     "dataclasses",
     "croniter==1.3.7",
@@ -144,6 +148,8 @@ dev = [
     "testfixtures==6.17.1",
     "alchemy-mock==0.4.3",
     "factory-boy==3.2.0",
+    # BE-1: harmony.core imports no web framework (tests/core runs it).
+    "import-linter==2.5.2",
 ]
 
 [tool.uv]
@@ -207,8 +213,8 @@ ignore = ["S603", "S607"]
 "tests/**" = ["S101", "S104", "S105", "S106", "S108", "S311"]
 
 [tool.mypy]
-files = ["web/server", "models", "db"]
-plugins = ["sqlmypy"]
+files = ["web/server", "models", "db", "harmony"]
+plugins = ["sqlmypy", "pydantic.mypy"]
 ignore_missing_imports = false
 show_error_codes = true
 namespace_packages = true
@@ -217,8 +223,47 @@ explicit_package_bases = true
 local_partial_types = true
 
 [[tool.mypy.overrides]]
+# --strict, which mypy only accepts globally.
+module = ["harmony.core", "harmony.core.*"]
+disallow_any_generics = true
+disallow_subclassing_any = true
+disallow_untyped_calls = true
+disallow_untyped_defs = true
+disallow_incomplete_defs = true
+check_untyped_defs = true
+disallow_untyped_decorators = true
+warn_unused_ignores = true
+warn_return_any = true
+no_implicit_reexport = true
+strict_equality = true
+strict_concatenate = true
+
+[[tool.mypy.overrides]]
 module = ["models.python.dashboard.*", "web.server.migrations.*"]
 ignore_errors = true
+
+[[tool.mypy.overrides]]
+# New code is strict. mypy takes `strict` only globally, so these are its
+# per-module flags.
+module = ["harmony.*"]
+disallow_any_generics = true
+disallow_subclassing_any = true
+disallow_untyped_calls = true
+disallow_untyped_defs = true
+disallow_incomplete_defs = true
+check_untyped_defs = true
+disallow_untyped_decorators = true
+warn_return_any = true
+warn_unused_ignores = true
+no_implicit_reexport = true
+strict_equality = true
+strict_concatenate = true
+
+[[tool.mypy.overrides]]
+# Only the renderer image installs Playwright; there, browser.py is checked
+# against its real types (ci/tools313 lane, WP-1h infra request).
+module = ["playwright.*"]
+ignore_missing_imports = true
 
 [[tool.mypy.overrides]]
 # config.* is loaded dynamically per deployment; the rest ship no type information.
@@ -256,6 +301,18 @@ module = [
     "boto3.*",
 ]
 ignore_missing_imports = true
+
+[tool.importlinter]
+# The legacy packages are in the graph so an import that reaches a web framework
+# through them breaks the contract too.
+root_packages = ["harmony", "config", "data", "db", "log", "models", "util", "web"]
+include_external_packages = true
+
+[[tool.importlinter.contracts]]
+name = "BE-1: harmony.core imports no web framework"
+type = "forbidden"
+source_modules = ["harmony.core"]
+forbidden_modules = ["flask", "fastapi", "starlette"]
 
 [tool.pytest.ini_options]
 pythonpath = ["."]

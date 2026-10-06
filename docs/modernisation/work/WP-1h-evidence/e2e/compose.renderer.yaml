@@ -1,0 +1,41 @@
+# WP-1h end-to-end overlay: the renderer on the stack's internal network, behind a
+# test-only tap that records each render request.
+services:
+  web:
+    environment:
+      RENDERER_URL: http://render-tap:8080
+      RENDER_WEB_ORIGIN: http://web:5000
+
+  # Dev-mode Flask proxies /build/* to a webpack dev server on localhost:8080.
+  # This serves a prebuilt client there instead, in web's network namespace.
+  webpack-static:
+    image: python:3.12-slim@sha256:f77ac9e44ae96ef2c90b8053ea08c31f8be030f824196b0ae4db6d462c84e51f
+    network_mode: service:web
+    volumes:
+      - ../../../web/public:/public:ro
+      - ./static_server.py:/srv/static_server.py:ro
+    command: ["python", "-u", "/srv/static_server.py"]
+
+  render-tap:
+    image: python:3.12-slim@sha256:f77ac9e44ae96ef2c90b8053ea08c31f8be030f824196b0ae4db6d462c84e51f
+    networks: [internal]
+    volumes:
+      - ./render_tap.py:/tap-src/render_tap.py:ro
+      - /tmp/wp1h-tap:/tap
+    command: ["python", "-u", "/tap-src/render_tap.py"]
+
+  renderer:
+    image: harmony-renderer:wp1h
+    networks: [internal]
+    environment:
+      RENDERER_ALLOWED_ORIGIN: http://web:5000
+    read_only: true
+    tmpfs:
+      - /tmp
+      - /home/pwuser:uid=1001,gid=1001,mode=0700
+    shm_size: 1gb
+    cap_drop: [ALL]
+    cap_add: [SYS_CHROOT]
+    security_opt:
+      - no-new-privileges:true
+      - seccomp=/tmp/wp1h-ctx/seccomp_profile.json

@@ -42,7 +42,7 @@ class PageRendererRouter:
             grid_dashboard_to_pdf(
                 locale,
                 dashboard.slug,
-                auth_user_email=current_user.username,
+                auth_user=current_user,
                 session_hash=session_hash,
             ),
             FULL_DASHBOARD_CONTENT,
@@ -52,9 +52,7 @@ class PageRendererRouter:
     def grid_dashboard_to_thumbnail(self, locale=None, name=None):
         dashboard = get_viewable_dashboard(name)
         return response_wrapper(
-            grid_dashboard_to_thumbnail(
-                locale, dashboard.slug, auth_user_email=current_user.username
-            ),
+            grid_dashboard_to_thumbnail(locale, dashboard.slug, auth_user=current_user),
             THUMBNAIL_CONTENT,
         )
 
@@ -65,7 +63,7 @@ class PageRendererRouter:
             grid_dashboard_to_image(
                 locale,
                 dashboard.slug,
-                auth_user_email=current_user.username,
+                auth_user=current_user,
                 session_hash=session_hash,
             ),
             JPEG_CONTENT,

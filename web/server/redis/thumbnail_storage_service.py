@@ -33,9 +33,7 @@ def get_thumbnail_storage_name(dashboard):
 
 
 def render_thumbnail(dashboard):
-    response = grid_dashboard_to_thumbnail(
-        name=dashboard.slug, auth_user_email=current_user.username
-    )
+    response = grid_dashboard_to_thumbnail(name=dashboard.slug, auth_user=current_user)
     if not response or response.status_code != 200:
         return ''
     return base64.b64encode(response.content).decode()

@@ -12,7 +12,7 @@ from urllib.parse import urlsplit
 import pytest
 from flask import g
 
-from render_fakes import DASHBOARDS, DASHBOARD_SLUG, DEPLOYMENT_ORIGIN
+from render_fakes import DASHBOARDS, DASHBOARD_SLUG, DEPLOYMENT_ORIGIN, USERS
 from web.server.routes.views.dashboard import get_email_attachments, send_email
 from web.server.util.deployment_links import deployment_origin
 
@@ -61,7 +61,7 @@ def test_emailed_render_sends_the_recipient_token_to_the_configured_origin(
     app, renderer, host
 ):
     with app.test_request_context('/', headers={'Host': host}):
-        get_email_attachments(VIEWER, SLUG, should_attach_pdf=True)
+        get_email_attachments(USERS[VIEWER], SLUG, should_attach_pdf=True)
 
     [call] = renderer.calls
     assert call.params['url'] == f'{PAGE}?screenshot=1&pdf=1'
@@ -89,7 +89,7 @@ def test_emailed_link_points_at_the_configured_origin(app, renderer, monkeypatch
     with app.test_request_context('/', headers={'Host': host}):
         g.request_logger = app.logger
         send_email(
-            VIEWER,
+            USERS[VIEWER],
             DASHBOARDS[SLUG],
             ['recipient@tests.invalid'],
             'body',
@@ -133,7 +133,7 @@ def test_thumbnail_retrieve_ignores_the_request_script_root(
 @pytest.mark.parametrize('script_name', HOSTILE_SCRIPT_NAMES)
 def test_emailed_render_ignores_the_request_script_root(app, renderer, script_name):
     with app.test_request_context('/', environ_overrides={'SCRIPT_NAME': script_name}):
-        get_email_attachments(VIEWER, SLUG, should_attach_pdf=True)
+        get_email_attachments(USERS[VIEWER], SLUG, should_attach_pdf=True)
 
     [call] = renderer.calls
     assert call.params['url'] == f'{PAGE}?screenshot=1&pdf=1'
@@ -150,7 +150,7 @@ def test_emailed_link_ignores_the_request_script_root(
     with app.test_request_context('/', environ_overrides={'SCRIPT_NAME': script_name}):
         g.request_logger = app.logger
         send_email(
-            VIEWER,
+            USERS[VIEWER],
             DASHBOARDS[SLUG],
             ['recipient@tests.invalid'],
             'body',

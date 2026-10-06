@@ -200,6 +200,12 @@ class StandInUser(BaseUserMixin):
     def is_authenticated(self):
         return self._signed_in
 
+    @property
+    def is_active(self):
+        # Signed-in principals are active accounts; WP-0k's
+        # authentication_required refuses any other.
+        return self._signed_in
+
     def get_permissions(self):
         return set(self.enumerate_permissions(self._transaction))
 

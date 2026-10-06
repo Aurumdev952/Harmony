@@ -21,6 +21,7 @@ from flask_login import LoginManager
 from flask_potion import Api
 
 from tests.authz.principals import (
+    SIGNED_IN_USER_ID,
     StandInUser,
     configuration,
     load_identity,
@@ -216,6 +217,8 @@ def test_render_route(principal, route, status, rendered_as, render_app, renders
     assert claims['user_claims'] == {
         'needs': [['view_resource', RESOURCE_ID, 'dashboard']],
         'query_needs': ['*'],
+        # WP-0k: bound to the account it renders as (C-5).
+        'user_id': SIGNED_IN_USER_ID,
     }
 
 

@@ -392,7 +392,7 @@ class DashboardManager(AuthorizationResourceManager):
 
 
 def get_email_attachments(
-    auth_user_email,
+    auth_user,
     slug,
     should_attach_pdf=False,
     should_embed_image=False,
@@ -405,7 +405,7 @@ def get_email_attachments(
         render_response = grid_dashboard_to_pdf(
             locale,
             slug,
-            auth_user_email=auth_user_email,
+            auth_user=auth_user,
             session_hash=session_hash,
         )
         if render_response is None or render_response.status_code != 200:
@@ -422,7 +422,7 @@ def get_email_attachments(
         image_render_response = grid_dashboard_to_image(
             locale,
             slug,
-            auth_user_email=auth_user_email,
+            auth_user=auth_user,
             session_hash=session_hash,
         )
         if image_render_response is None or image_render_response.status_code != 200:
@@ -441,12 +441,10 @@ def get_email_attachments(
     return attachments, image_name
 
 
-def send_email(
-    auth_user_email, dashboard, recipient_list, body, subject, sender, **kwargs
-):
+def send_email(auth_user, dashboard, recipient_list, body, subject, sender, **kwargs):
     '''Send an email to user with or without attachments
     Args:
-        auth_user_email (str): Authenticating user email
+        auth_user (User): The account the attachments are rendered as
         dashboard (Dashboard): Dashboard to be shared
         recipient_list (List): A list of recipient's emails
         body(str): Email body
@@ -468,7 +466,7 @@ def send_email(
     use_email_thread = kwargs.get('use_email_thread')
     slug = dashboard.slug
     attachments, image_name = get_email_attachments(
-        auth_user_email, slug, should_attach_pdf, should_embed_image, dashboard_url
+        auth_user, slug, should_attach_pdf, should_embed_image, dashboard_url
     )
 
     email_message = current_app.email_renderer.create_share_dashboard_pdf_message(
@@ -516,7 +514,6 @@ def share_dashboard_via_email(
         should_embed_image (bool): Value to embed image in email
         is_scheduled_report (bool): Value to schedule a report
     '''
-    current_user_email = current_user.username
     use_email_thread = kwargs.get('use_email_thread')
     for recipient in recipient_list:
         add_share_notification(
@@ -529,7 +526,7 @@ def share_dashboard_via_email(
         # use current user email for dashboard/pdf generation
         # and/or use a single email thread
         send_email(
-            current_user_email,
+            current_user,
             dashboard,
             recipient_list,
             body,
@@ -546,7 +543,9 @@ def share_dashboard_via_email(
         if recipient_user and recipient_user.status_id == UserStatusEnum.ACTIVE.value:
             # When user exists and is registered on the platform, use their
             # email as the token subject claim for dashboard/pdf generation
-            send_email(email, dashboard, [email], body, subject, sender, **kwargs)
+            send_email(
+                recipient_user, dashboard, [email], body, subject, sender, **kwargs
+            )
         elif (
             recipient_user and recipient_user.status_id == UserStatusEnum.PENDING.value
         ):
@@ -556,7 +555,7 @@ def share_dashboard_via_email(
             kwargs['should_attach_pdf'] = False
             kwargs['should_embed_image'] = False
             send_email(
-                email,
+                recipient_user,
                 dashboard,
                 [email],
                 body,
@@ -571,7 +570,7 @@ def share_dashboard_via_email(
             kwargs['should_attach_pdf'] = False
             kwargs['should_embed_image'] = False
             send_email(
-                current_user_email,
+                current_user,
                 dashboard,
                 [email],
                 body,

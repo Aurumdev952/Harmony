@@ -9,9 +9,7 @@ from flask_jwt_extended import create_access_token
 from config import settings
 from log import LOG
 from models.alchemy.dashboard import Dashboard
-from models.alchemy.user import User
 from web.server.data.data_access import Transaction
-from web.server.errors import ItemNotFound
 from web.server.security.signal_handlers import RENDER_TOKEN_QUERY_NEEDS
 from web.server.util.authentication import USER_ID_CLAIM
 from web.server.util.deployment_links import deployment_url
@@ -64,14 +62,15 @@ def get_dashboard_downloadable_url(locale, name, output_format, session_hash):
 def grid_dashboard_urlbox_renderer(
     output_format,
     name,
-    auth_user_email,
+    auth_user,
     locale=None,
     is_thumbnail=False,
     session_hash="",
     request_args=None,
 ):
     """Send a request to the urlbox.io to generate a PDF or image, signed in as
-    `auth_user_email`. `request_args` defaults to the current request's args.
+    the account `auth_user`. `request_args` defaults to the current request's
+    args.
     """
     dash_url = get_dashboard_downloadable_url(locale, name, output_format, session_hash)
     if is_thumbnail:
@@ -82,21 +81,15 @@ def grid_dashboard_urlbox_renderer(
         resource_id = (
             transaction.find_all_by_fields(Dashboard, {"slug": name}).one().resource_id
         )
-        # Callers pass a stored username, so it matches exactly.
-        account = transaction.find_one_by_fields(
-            User, True, {"username": auth_user_email}
-        )
-    if account is None:
-        raise ItemNotFound("user", {"username": auth_user_email})
     token = create_access_token(
-        identity=auth_user_email,
+        identity=auth_user.username,
         expires_delta=timedelta(seconds=JWT_TOKEN_EXPIRATION_TIME),
         user_claims={
             "needs": [
                 ["view_resource", resource_id, "dashboard"],
             ],
             "query_needs": RENDER_TOKEN_QUERY_NEEDS,
-            USER_ID_CLAIM: account.id,
+            USER_ID_CLAIM: auth_user.id,
         },
     )
 
@@ -161,22 +154,20 @@ def grid_dashboard_urlbox_renderer(
     return res
 
 
-def grid_dashboard_to_pdf(locale=None, name=None, *, auth_user_email, session_hash=""):
+def grid_dashboard_to_pdf(locale=None, name=None, *, auth_user, session_hash=""):
     return grid_dashboard_urlbox_renderer(
-        "pdf", name, auth_user_email, locale=locale, session_hash=session_hash
+        "pdf", name, auth_user, locale=locale, session_hash=session_hash
     )
 
 
-def grid_dashboard_to_thumbnail(locale=None, name=None, *, auth_user_email):
+def grid_dashboard_to_thumbnail(locale=None, name=None, *, auth_user):
     # A thumbnail is cached and shared, so no caller-supplied param may shape it.
     return grid_dashboard_urlbox_renderer(
-        "png", name, auth_user_email, locale=locale, is_thumbnail=True, request_args={}
+        "png", name, auth_user, locale=locale, is_thumbnail=True, request_args={}
     )
 
 
-def grid_dashboard_to_image(
-    locale=None, name=None, *, auth_user_email, session_hash=""
-):
+def grid_dashboard_to_image(locale=None, name=None, *, auth_user, session_hash=""):
     return grid_dashboard_urlbox_renderer(
-        "jpg", name, auth_user_email, locale=locale, session_hash=session_hash
+        "jpg", name, auth_user, locale=locale, session_hash=session_hash
     )

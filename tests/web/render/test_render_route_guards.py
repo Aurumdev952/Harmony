@@ -266,7 +266,9 @@ def test_emailed_render_loads_this_apps_dashboard_whatever_link_is_sent(
     app, renderer, link, page
 ):
     with app.test_request_context('/'):
-        get_email_attachments(VIEWER, SLUG, should_attach_pdf=True, dashboard_url=link)
+        get_email_attachments(
+            USERS[VIEWER], SLUG, should_attach_pdf=True, dashboard_url=link
+        )
 
     [call] = renderer.calls
     assert call.params['url'] == page

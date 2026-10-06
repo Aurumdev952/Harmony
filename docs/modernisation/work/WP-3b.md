@@ -83,6 +83,7 @@ instances:
       - db/druid/json_stream.py
       - harmony/core/settings.py
       - tests/druid/test_druid_response_parsing.py
+      - .claude/agent-memory/harmony-core-engineer/druid-response-streaming.md
 branch: "mig/WP-3b-cpython-313"
 requirements: [INV-1, INV-2, INV-8, SEC-9, QA-4, PERF-7]
 contracts_consumed: []

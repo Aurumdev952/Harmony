@@ -101,6 +101,11 @@ services:
       - perf_output:/data/output
     environment:
       <<: *perf-druid-env
+      # Indexing peons inherit every druid.* property of the middlemanager,
+      # after their java options, so the query services' 512 MiB buffer would
+      # replace the 128 MiB below: 2.5 GiB of direct memory for 1 GiB (WP-1g).
+      # The middlemanager answers no queries.
+      druid_processing_buffer_sizeBytes: "134217728"
       druid_worker_capacity: "2"
       druid_indexer_runner_javaOptsArray: '["-server", "-Xmx1g", "-Xms256m", "-XX:MaxDirectMemorySize=1g", "-XX:+UseG1GC", "-XX:+ExitOnOutOfMemoryError", "-Ddruid.processing.buffer.sizeBytes=134217728", "-Ddruid.processing.numMergeBuffers=2", "-Ddruid.processing.numThreads=2", "-Djava.util.logging.manager=org.apache.logging.log4j.jul.LogManager"]'
 

@@ -1,14 +1,13 @@
 # e2e overlay on tests/contract/stack/compose.yaml, added by e2e/run.sh
-# through CONTRACT_OVERLAYS. It changes three things:
+# through CONTRACT_OVERLAYS. It changes two things:
 #
 # - Queries: the mock query client is off and the metadata stub is replaced by
 #   druid_broker.py, so queries take the production Druid client and get
 #   deterministic, Druid-shaped answers.
 # - Dashboard export: RENDERER_URL points at renderer.py, a stand-in for the
 #   renderer service that checks the render token opens the dashboard.
-# - Data upload: the source tree is mounted read-only, so the upload folder
-#   (uploads/, relative to the working directory) is a tmpfs. run.sh creates
-#   its mount point, which the repository ignores.
+#
+# The upload folder's tmpfs comes from the contract stack itself.
 #
 # Relative paths resolve against tests/contract/stack, the first file's
 # directory.
@@ -20,11 +19,11 @@ x-e2e-web-env: &e2e-web-env
 services:
   druid-stub:
     image: ${CONTRACT_WEB_IMAGE:?}
-    working_dir: /zenysis
+    working_dir: /src
     volumes:
-      - ../../..:/zenysis:ro
+      - ../../..:/src:ro
     environment:
-      PYTHONPATH: /zenysis
+      PYTHONPATH: /src
       PYTHONDONTWRITEBYTECODE: "1"
       ZEN_ENV: harmony_demo
     command: ["python", "-u", "e2e/stack/druid_broker.py"]
@@ -43,8 +42,6 @@ services:
 
   web:
     environment: *e2e-web-env
-    tmpfs:
-      - /zenysis/uploads
     depends_on:
       renderer:
         condition: service_started

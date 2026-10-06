@@ -22,6 +22,9 @@
 # not at /zenysis: since WP-3b the image keeps its packages in /zenysis/.venv,
 # and a mount there hides them. An image older than WP-3b installs its packages
 # outside /zenysis, so a pre-3b reference runs the same way.
+# The app writes uploads to uploads/ under its working directory, so web and
+# web-reference get a tmpfs there; stack.sh creates its mount point in each
+# checkout (the repository ignores uploads/).
 name: ${PERF_PROJECT:?run scripts/perf/stack.sh}-web
 
 x-web-env: &web-env
@@ -117,6 +120,8 @@ services:
     working_dir: /src
     volumes:
       - ${PERF_REPO_ROOT:?}:/src:ro
+    tmpfs:
+      - /src/uploads
     environment:
       <<: *web-env
       ZEN_GUNICORN_WORKER_THREADS: "4"
@@ -156,6 +161,8 @@ services:
     working_dir: /src
     volumes:
       - ${PERF_REFERENCE_DIR:?}/src:/src:ro
+    tmpfs:
+      - /src/uploads
     environment:
       <<: *web-env
       REDIS_HOST: redis-reference

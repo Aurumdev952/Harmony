@@ -809,8 +809,8 @@ def test_builds_use_the_default_network_unless_perf_build_network_is_set(
     assert all(' --network host ' in f' {b} ' for b in builds)
 
 
-def _druid_build(tmp_path: Path, **env: str) -> dict:
-    """The extension loader's build section, as `stack.sh config druid` renders it."""
+def _druid_services(tmp_path: Path, **env: str) -> dict:
+    """Druid's services, as `stack.sh config druid` renders them."""
     import yaml
 
     done = subprocess.run(
@@ -826,7 +826,12 @@ def _druid_build(tmp_path: Path, **env: str) -> dict:
         check=False,
     )
     assert done.returncode == 0, done.stderr
-    services = yaml.safe_load(done.stdout)['services']
+    return yaml.safe_load(done.stdout)['services']
+
+
+def _druid_build(tmp_path: Path, **env: str) -> dict:
+    """The extension loader's build section."""
+    services = _druid_services(tmp_path, **env)
     builds = {name: s['build'] for name, s in services.items() if 'build' in s}
     assert set(builds) == {'extension_loader'}, set(builds)
     return builds['extension_loader']
@@ -843,6 +848,49 @@ def test_perf_build_network_reaches_the_extension_loader_build(tmp_path: Path):
     # `apk add` on a fresh project although the web image built on the host's
     # network.
     assert _druid_build(tmp_path, PERF_BUILD_NETWORK='host')['network'] == 'host'
+
+
+_SIZE = {'k': 1024, 'm': 1024**2, 'g': 1024**3}
+
+
+def _java_bytes(text: str) -> int:
+    return int(text[:-1]) * _SIZE[text[-1].lower()] if text[-1].isalpha() else int(text)
+
+
+def test_indexing_peons_have_the_direct_memory_their_buffers_need(tmp_path: Path):
+    # A fresh project could not index (WP-1g): the peons inherit every
+    # druid.* property of the middlemanager, and those come after the peons'
+    # java options on the command line, so the overlay's 512 MiB processing
+    # buffer replaced the 128 MiB in the java options. Druid then wanted
+    # buffer x (threads + merge buffers + 1) = 2.5 GiB of the peons' 1 GiB.
+    middlemanager = _druid_services(tmp_path)['middlemanager']
+    environment = middlemanager['environment']
+    options = json.loads(environment['druid_indexer_runner_javaOptsArray'])
+    flags = dict(o[2:].split('=', 1) for o in options if o.startswith('-D'))
+
+    def effective(name: str) -> int:
+        inherited = environment.get('druid_' + name.replace('.', '_'))
+        return int(inherited if inherited is not None else flags['druid.' + name])
+
+    for name in ('processing.buffer.sizeBytes', 'processing.numThreads'):
+        # No option the inherited property silently replaces.
+        if 'druid.' + name in flags:
+            assert int(flags['druid.' + name]) == effective(name), name
+    needed = effective('processing.buffer.sizeBytes') * (
+        effective('processing.numThreads') + effective('processing.numMergeBuffers') + 1
+    )
+    (direct,) = [
+        o.split('=', 1)[1] for o in options if o.startswith('-XX:MaxDirectMemorySize=')
+    ]
+    assert needed <= _java_bytes(direct), (needed, direct)
+
+
+def test_the_query_services_keep_the_baseline_processing_buffer(tmp_path: Path):
+    # The baseline method fixes 512 MiB for every service that answers queries.
+    services = _druid_services(tmp_path)
+    for name in ('broker', 'historical'):
+        env = services[name]['environment']
+        assert env['druid_processing_buffer_sizeBytes'] == '536870912', name
 
 
 def _image_tag(tree: Path) -> str:
@@ -1016,6 +1064,41 @@ def test_each_web_image_service_runs_its_own_checkout(tmp_path: Path):
         assert service['environment']['ZEN_HOME'] == target, name
         command = ' '.join(service['command'])
         assert '/zenysis/' not in command, (name, command)
+
+
+def _upload_folder() -> str:
+    flask = (baseline.HERE.parents[1] / 'web/server/configuration/flask.py').read_text()
+    (folder,) = re.findall(r"^DATA_UPLOAD_FOLDER = '([^']+)'$", flask, re.MULTILINE)
+    return folder
+
+
+def test_the_serving_web_services_can_write_the_upload_folder(tmp_path: Path):
+    # The app writes uploads/ under its working directory, and the checkout is
+    # mounted read-only, as on the contract stack.
+    services = _web_image_services(tmp_path)
+    for name in ('web', 'web-reference'):
+        service = services[name]
+        folder = PurePosixPath(service['working_dir']) / _upload_folder()
+        writable = [PurePosixPath(m.split(':')[0]) for m in service.get('tmpfs', [])]
+        assert any(folder == w or w in folder.parents for w in writable), (
+            name,
+            writable,
+        )
+
+
+def test_each_started_checkout_gets_its_upload_mount_point(tmp_path: Path):
+    # Docker cannot create a mount point inside the read-only checkout mount.
+    script = (
+        f'source {STACK_SH}\ncreate_mount_points {tmp_path}\ndeclare -f up reference\n'
+    )
+    done = subprocess.run(
+        ['bash', '-c', script], capture_output=True, text=True, check=False
+    )
+    assert done.returncode == 0, done.stderr
+    assert (tmp_path / 'uploads').is_dir()
+    up, reference = done.stdout.split('reference ()', 1)
+    assert 'create_mount_points "${ROOT}"' in up
+    assert 'create_mount_points "${src}"' in reference
 
 
 def test_the_stack_scripts_start_in_the_mounted_checkout():

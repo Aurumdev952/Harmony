@@ -11,6 +11,9 @@
 # web and web-init run the checkout, mounted read-only at /src. Not at
 # /zenysis: the image keeps its Python environment in /zenysis/.venv, and a
 # mount there would hide it.
+# The app writes uploads to uploads/ under its working directory, so web
+# gets a tmpfs there; stack.sh up creates its mount point in the checkout,
+# which the repository ignores.
 name: ${CONTRACT_PROJECT:?run tests/contract/stack/stack.sh}
 
 x-web-env: &web-env
@@ -109,6 +112,8 @@ services:
     working_dir: /src
     volumes:
       - ../../..:/src:ro
+    tmpfs:
+      - /src/uploads
     environment:
       <<: *web-env
       ZEN_GUNICORN_WORKER_THREADS: "2"

@@ -166,9 +166,6 @@ def _update_sitewide_resource_acl(resource, new_sitewide_resource_acl):
 def update_resource_roles(
     resource, user_roles=None, group_roles=None, sitewide_acl=None
 ):
-    # Update sitewide_acl. This can still be independent of other role updates
-    _update_sitewide_resource_acl(resource, sitewide_acl)
-
     session = get_db_adapter().session
     existing_roles = get_current_resource_roles(resource)
     user_acls = find_all_by_fields(UserAcl, {'resource_id': resource.id})
@@ -188,7 +185,7 @@ def update_resource_roles(
         remove_missing=group_roles is not None,
     )
 
-    # Nothing but the sitewide ACL is written until every name is resolved.
+    # Nothing is written until every name is resolved.
     if undefined_users or undefined_groups:
         errors = [
             {
@@ -211,6 +208,7 @@ def update_resource_roles(
             }
         )
 
+    _update_sitewide_resource_acl(resource, sitewide_acl)
     for user, role_names in users.items():
         update_user_resource_roles(user, role_names, resource, session, commit=False)
     for group, role_names in groups.items():

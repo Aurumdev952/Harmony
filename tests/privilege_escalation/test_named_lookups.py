@@ -22,6 +22,7 @@ from models.alchemy.permission import (
     ResourceRole,
     ResourceTypeEnum,
     Role,
+    SitewideResourceAcl,
 )
 from models.alchemy.security_group import Group, GroupAcl
 from models.alchemy.user import User, UserAcl, UserRoles, UserStatusEnum
@@ -282,6 +283,41 @@ def test_a_share_naming_an_unknown_user_writes_nothing(db, make_user):
     assert response.status_code == 404
     assert _user_acls(db, dashboard_id) == {(actor.id, 'dashboard_admin')}
     assert _group_acls(db, dashboard_id) == {(group_id, 'dashboard_viewer')}
+
+
+@pytest.mark.parametrize('unknown', ['user', 'look_alike'])
+def test_a_share_naming_no_one_leaves_the_sitewide_acl_alone(
+    app, db, make_user, unknown
+):
+    tag = _tag()
+    dashboard_id = _resource(db, f'dashboard-{tag}').id
+    actor = make_user()
+    _grant_user(db, actor.id, 'dashboard_admin', dashboard_id)
+    _account(app, db, f'{tag}.doe@named.test')
+    name = f'nobody-{tag}@named.test' if unknown == 'user' else f'{tag}_doe@named.test'
+
+    response = actor.request(
+        'POST',
+        f'/api2/resource/{dashboard_id}/roles',
+        {
+            'userRoles': {
+                actor.username: ['dashboard_admin'],
+                name: ['dashboard_viewer'],
+            },
+            'groupRoles': {},
+            'sitewideResourceAcl': {
+                'registeredResourceRole': 'dashboard_viewer',
+                'unregisteredResourceRole': '',
+            },
+        },
+    )
+
+    assert response.status_code == 404
+    db.session.expire_all()
+    assert (
+        db.session.query(SitewideResourceAcl).filter_by(resource_id=dashboard_id).all()
+        == []
+    )
 
 
 # Unit 3: refusals do not repeat the names of resources the caller cannot list.

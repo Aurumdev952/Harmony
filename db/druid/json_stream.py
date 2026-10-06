@@ -3,9 +3,14 @@ memory.
 
 Each element is decoded by the standard library's C scanner, so integers stay
 exact (Druid's Long.MIN_VALUE included) and doubles become correctly rounded
-floats. Only the element being decoded is buffered. NaN, the infinities and
-numbers out of double range are rejected: Druid quotes NaN and the infinities as
-strings, and the yajl parser used before WP-3b rejected them too.
+floats. NaN, the infinities and numbers out of double range are rejected: Druid
+quotes NaN and the infinities as strings, and the yajl parser used before WP-3b
+rejected them too.
+
+The buffer holds the text from the start of the element being decoded. While that
+element is incomplete, or malformed (the decoder cannot tell the two apart until
+the body ends), more of the body is read after it. Once that text passes
+_MAX_ELEMENT_CHARS the parse fails with ValueError.
 '''
 
 import codecs
@@ -15,7 +20,11 @@ import re
 from typing import IO, Any, Iterator
 
 _READ_BYTES = 1024 * 1024
+# Druid rows are a few hundred bytes. Padding or an unterminated token inside one
+# element must be buffered to decode it, so cap it (security gate F3).
+_MAX_ELEMENT_CHARS = 64 * 1024 * 1024
 _WHITESPACE = re.compile(r'[ \t\n\r]*')
+_NUMBER_TAIL = re.compile(r'(?:\.|[eE][+-]?)\Z')
 
 
 def _reject_constant(name: str) -> Any:
@@ -45,9 +54,15 @@ class _Buffer:
         self.eof = False
 
     def fill(self) -> None:
+        # Pending text is the start of one element still being decoded.
+        pending = len(self.text) - self.pos
+        if pending > _MAX_ELEMENT_CHARS:
+            raise ValueError(
+                f'one element of the JSON array is larger than {_MAX_ELEMENT_CHARS} '
+                'characters'
+            )
         # Read at least as much as is pending, so one element larger than a read
         # costs linear, not quadratic, time.
-        pending = len(self.text) - self.pos
         data = self.fp.read(max(_READ_BYTES, pending))
         self.eof = not data
         self.text = self.text[self.pos :] + self.decode(data, final=self.eof)
@@ -70,8 +85,12 @@ class _Buffer:
                     raise
                 self.fill()
                 continue
-            # A number that ends the buffer may continue in the next read.
-            if end == len(self.text) and not self.eof:
+            # A number that ends the buffer may continue in the next read: after its
+            # last digit ("12" of "123"), or after a decimal point or exponent
+            # marker ("0" of "0.5", "1.5" of "1.5e-3"), which raw_decode leaves.
+            if not self.eof and (
+                end == len(self.text) or _NUMBER_TAIL.match(self.text, end)
+            ):
                 self.fill()
                 continue
             self.pos = end

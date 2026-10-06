@@ -7,8 +7,10 @@ expected values are what the pre-WP-3b code returned on pandas 1.5.3.
 
 import math
 import os
+import warnings
 
 import pandas as pd
+import pytest
 from pydruid.query import Query
 
 os.environ.setdefault('ZEN_ENV', 'harmony_demo')
@@ -90,3 +92,28 @@ def test_filled_dates_follow_the_returned_rows():
         ['2024-03-01T00:00:00.000Z', 'Pará', None],
         ['2024-02-01T00:00:00.000Z', 'Acre', None],
     ]
+
+
+@pytest.mark.parametrize(
+    'granularity, last, expected',
+    [
+        ('day', '2024-01-03', ['2024-01-01', '2024-01-02', '2024-01-03']),
+        ('week', '2024-01-15', ['2024-01-01', '2024-01-08', '2024-01-15']),
+        ('month', '2024-03-01', ['2024-01-01', '2024-02-01', '2024-03-01']),
+        ('quarter', '2024-07-01', ['2024-01-01', '2024-04-01', '2024-07-01']),
+    ],
+)
+def test_result_dates_use_current_pandas_aliases(granularity, last, expected):
+    # pandas 2.2 deprecates the lower-case period aliases 'w', 'm' and 'q'.
+    query = PydruidQueryWrapper(
+        Query({'granularity': granularity, 'dimensions': []}, 'groupBy')
+    )
+    df = pd.DataFrame(
+        {'timestamp': ['2024-01-01T00:00:00.000Z', f'{last}T00:00:00.000Z']}
+    )
+
+    with warnings.catch_warnings():
+        warnings.simplefilter('error', FutureWarning)
+        dates = query._build_result_dates(df)  # pylint: disable=protected-access
+
+    assert dates == [f'{day}T00:00:00.000Z' for day in expected]

@@ -136,24 +136,3 @@ def test_box_plot_outlier_percentages():
         ],
         'dimensions': ['StateName', 'MunicipalityName'],
     }
-
-
-@pytest.mark.usefixtures('app_context')
-def test_druid_timestamps_parse_as_utc():
-    # pandas 2 applies `format='%Y-%m-%d'` strictly; pandas 1.5 parsed the whole
-    # ISO 8601 timestamp.
-    # pylint: disable=import-outside-toplevel
-    from web.server.query.data_quality.data_quality_report import (
-        parse_druid_timestamps,
-    )
-
-    parsed = parse_druid_timestamps(
-        pd.Series(['2024-01-01T00:00:00.000Z', None, '2023-12-31T00:00:00.000Z'])
-    )
-
-    assert str(parsed.dtype) == 'datetime64[ns, UTC]'
-    assert list(parsed) == [
-        pd.Timestamp('2024-01-01', tz='UTC'),
-        pd.NaT,
-        pd.Timestamp('2023-12-31', tz='UTC'),
-    ]

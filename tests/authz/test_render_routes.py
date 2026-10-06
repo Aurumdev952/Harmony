@@ -1,8 +1,8 @@
 '''The dashboard render routes (web/server/routes/page_renderer.py) and the
 thumbnail store (/api2/storage/retrieve), run in-process.
 
-The outbound render call (`requests.get` to urlbox) is replaced by a recorder:
-these tests never contact urlbox. The database lookups of a dashboard by slug
+The outbound render call (`requests.post` to the renderer service) is replaced
+by a recorder. The database lookups of a dashboard by slug
 are replaced by a fixed dashboard, Resource.id 7.
 '''
 
@@ -10,15 +10,19 @@ from __future__ import annotations
 
 import logging
 import os
+from contextlib import ExitStack
 from types import SimpleNamespace
+from unittest import mock
 
 import pytest
+import requests
 from flask import Blueprint, Flask, g, request
 from flask_jwt_extended import JWTManager, decode_token
 from flask_login import LoginManager
 from flask_potion import Api
 
 from tests.authz.principals import (
+    SIGNED_IN_USER_ID,
     StandInUser,
     configuration,
     load_identity,
@@ -26,6 +30,8 @@ from tests.authz.principals import (
 )
 from web.server.api import thumbnail_storage_models
 from web.server.routes import page_renderer as page_routes
+from web.server.routes.views import authentication as authentication_views
+from web.server.routes.views import dashboard as dashboard_views
 from web.server.routes.views import page_renderer as page_views
 
 _HERE = os.path.dirname(__file__)
@@ -62,30 +68,56 @@ class _Cache:
         del timeout
         self.values[key] = value
 
+    def add(self, key, value, timeout=None):
+        del timeout
+        if key in self.values:
+            return False
+        self.values[key] = value
+        return True
+
+    def delete(self, key):
+        self.values.pop(key, None)
+
 
 class _Rendered:
     status_code = 200
-    url = 'http://urlbox.invalid/rendered'
     content = b'rendered'
+
+    def __init__(self, content_type):
+        self.headers = {'Content-Type': content_type}
 
     def iter_content(self, chunk_size):
         del chunk_size
         yield self.content
+
+    def close(self):
+        pass
 
 
 @pytest.fixture(name='renders')
 def fixture_renders(monkeypatch) -> list:
     calls = []
 
-    def get(url, params, stream, timeout):
-        del stream, timeout
-        calls.append({'url': url, **params})
-        return _Rendered()
+    def post(url, json, timeout, stream):
+        del url, stream, timeout
+        calls.append({**json, 'cookie': 'accessKey=' + json['token']})
+        return _Rendered(page_views.CONTENT_TYPES[json['format']])
 
-    monkeypatch.setattr(page_views, 'requests', SimpleNamespace(get=get))
+    monkeypatch.setattr(
+        page_views,
+        'requests',
+        SimpleNamespace(post=post, RequestException=requests.RequestException),
+    )
     monkeypatch.setattr(page_views, 'Transaction', _Dashboards)
-    monkeypatch.setattr(page_routes, 'Transaction', _Dashboards)
-    monkeypatch.setattr(thumbnail_storage_models, 'Transaction', _Dashboards)
+    monkeypatch.setattr(
+        dashboard_views,
+        'get_dashboard',
+        lambda slug, session=None: (
+            SimpleNamespace(slug=SLUG, resource_id=RESOURCE_ID)
+            if slug == SLUG
+            else None
+        ),
+    )
     return calls
 
 
@@ -132,10 +164,21 @@ def fixture_render_app(app: Flask) -> Flask:
     return render_app
 
 
-def _get(render_app, principal, path):
+def _get(render_app, principal, path, headers=None):
     spec = principal_specs()[principal]
-    with configuration(spec.public_access):
-        return render_app.test_client().get(path, headers={PRINCIPAL_HEADER: principal})
+    # ExitStack, not a parenthesised `with`: the web image runs Python 3.8.
+    with ExitStack() as stack:
+        stack.enter_context(configuration(spec.public_access))
+        stack.enter_context(
+            mock.patch.object(
+                authentication_views,
+                'get_configuration',
+                lambda key: spec.public_access,
+            )
+        )
+        return render_app.test_client().get(
+            path, headers={PRINCIPAL_HEADER: principal, **(headers or {})}
+        )
 
 
 def _token_claims(render_app, call) -> dict:
@@ -145,18 +188,24 @@ def _token_claims(render_app, call) -> dict:
         return decode_token(cookie[len('accessKey=') :])
 
 
-# (principal, route, status, rendered as) for render routes, pinned as today.
-# `rendered as` is the identity the outbound render token carries, or None
-# when no render call is made.
 RENDER_ROUTES = [
-    ('anonymous', 'png/thumbnail', 200, 'renderbot@authz.invalid'),
-    ('role:query_runner', 'png/thumbnail', 200, 'renderbot@authz.invalid'),
+    ('anonymous', 'png/thumbnail', 401, None),
+    ('anonymous_public', 'png/thumbnail', 401, None),
+    ('role:query_runner', 'png/thumbnail', 403, None),
+    (
+        'dashboard_acl_viewer',
+        'png/thumbnail',
+        200,
+        'dashboard_acl_viewer@authz.invalid',
+    ),
     ('anonymous', 'pdf', 401, None),
+    ('anonymous_public', 'pdf', 401, None),
     ('anonymous', 'jpeg', 401, None),
-    ('role:query_runner', 'pdf', 401, None),
-    ('role:query_runner', 'jpeg', 401, None),
+    ('role:query_runner', 'pdf', 403, None),
+    ('role:query_runner', 'jpeg', 403, None),
     ('dashboard_acl_viewer', 'pdf', 200, 'dashboard_acl_viewer@authz.invalid'),
     ('dashboard_acl_viewer', 'jpeg', 200, 'dashboard_acl_viewer@authz.invalid'),
+    ('role:admin', 'pdf', 200, 'role:admin@authz.invalid'),
 ]
 
 
@@ -166,7 +215,6 @@ RENDER_ROUTES = [
     ids=[f'{p}|{r}|{s}' for p, r, s, _ in RENDER_ROUTES],
 )
 def test_render_route(principal, route, status, rendered_as, render_app, renders):
-    '''N1 (thumbnail rows): defect pinned as today; flips in WP-0i.'''
     response = _get(render_app, principal, f'/dashboard/{SLUG}/{route}')
 
     assert response.status_code == status
@@ -176,7 +224,16 @@ def test_render_route(principal, route, status, rendered_as, render_app, renders
     (call,) = renders
     claims = _token_claims(render_app, call)
     assert claims['identity'] == rendered_as
-    assert claims['user_claims'] == {
+    user_claims = dict(claims['user_claims'])
+    # C-5 (WP-1h): render tokens add `render`, `policy` and the account's
+    # `user_id`, the claim WP-0k binds every session with.
+    assert set(user_claims) - {'needs', 'query_needs'} <= {
+        'render',
+        'policy',
+        'user_id',
+    }
+    assert user_claims['user_id'] == SIGNED_IN_USER_ID
+    assert {k: user_claims[k] for k in ('needs', 'query_needs')} == {
         'needs': [['view_resource', RESOURCE_ID, 'dashboard']],
         'query_needs': ['*'],
     }
@@ -186,57 +243,84 @@ ATTACKER_URL = 'https://attacker.invalid/steal'
 
 
 @pytest.mark.parametrize(
-    'principal,route,rendered_as',
+    'principal,path,rendered_as',
     [
-        ('anonymous', 'png/thumbnail', 'renderbot@authz.invalid'),
-        ('dashboard_acl_viewer', 'pdf', 'dashboard_acl_viewer@authz.invalid'),
+        (
+            'dashboard_acl_viewer',
+            f'/dashboard/{SLUG}/png/thumbnail',
+            'dashboard_acl_viewer@authz.invalid',
+        ),
+        (
+            'dashboard_acl_viewer',
+            f'/dashboard/{SLUG}/pdf',
+            'dashboard_acl_viewer@authz.invalid',
+        ),
+        (
+            'role:admin',
+            f'/api2/storage/retrieve?key={SLUG}',
+            'role:admin@authz.invalid',
+        ),
     ],
 )
-def test_caller_chosen_url_receives_the_minted_render_token(
-    principal, route, rendered_as, render_app, renders
+def test_caller_chosen_url_does_not_receive_the_minted_render_token(
+    principal, path, rendered_as, render_app, renders
 ):
-    '''WP-0i N7: defect pinned as today; flips in WP-0i. `url` is one of
-    SUPPORTED_RENDERING_PARAMS, so a query-string `url` replaces the dashboard
-    page in the urlbox call while the cookie still carries the token minted for
-    the render.'''
+    '''WP-0i N7, flipped: `url` and `cookie` are no longer passed through to
+    urlbox, so the minted token only goes to this deployment's own dashboard
+    page on its configured DEPLOYMENT_BASE_URL.'''
+    render_app.cache.values.clear()
+    separator = '&' if '?' in path else '?'
     response = _get(
-        render_app, principal, f'/dashboard/{SLUG}/{route}?url={ATTACKER_URL}'
+        render_app,
+        principal,
+        f'{path}{separator}url={ATTACKER_URL}&cookie=accessKey=planted',
     )
 
     assert response.status_code == 200
     (call,) = renders
-    assert call['url'] == ATTACKER_URL
+    assert call['url'].startswith(f'{page_views.RENDER_WEB_ORIGIN}/dashboard/{SLUG}?')
     assert _token_claims(render_app, call)['identity'] == rendered_as
 
 
-def test_stored_thumbnail_is_rendered_by_the_render_bot_and_shared(render_app, renders):
-    '''N2: defect pinned as today; flips in WP-0i. dashboard_acl_viewer may
-    view the dashboard but holds no query policy, so its own queries see no
-    rows. Its thumbnail is rendered under the render bot's token with every
-    query need and cached on the slug alone, so a second viewer gets the same
-    image without a new render.'''
+def test_stored_thumbnail_is_rendered_as_each_policy_holder(render_app, renders):
     render_app.cache.values.clear()
 
-    first = _get(
+    admin = _get(render_app, 'role:admin', f'/api2/storage/retrieve?key={SLUG}')
+    viewer = _get(
         render_app, 'dashboard_acl_viewer', f'/api2/storage/retrieve?key={SLUG}'
     )
-    second = _get(
-        render_app, 'role:dashboard_viewer', f'/api2/storage/retrieve?key={SLUG}'
+    group_viewer = _get(
+        render_app, 'group_acl_viewer', f'/api2/storage/retrieve?key={SLUG}'
     )
 
-    assert first.status_code == second.status_code == 200
-    assert first.get_data() == second.get_data()
-    (call,) = renders
-    claims = _token_claims(render_app, call)
-    assert claims['identity'] == 'renderbot@authz.invalid'
-    assert claims['user_claims']['query_needs'] == ['*']
-    assert set(render_app.cache.values) == {f'thumbnail_{SLUG}'}
+    assert admin.status_code == viewer.status_code == group_viewer.status_code == 200
+    identities = [_token_claims(render_app, call)['identity'] for call in renders]
+    assert identities == [
+        'role:admin@authz.invalid',
+        'dashboard_acl_viewer@authz.invalid',
+    ]
+    assert len(render_app.cache.values) == 2
+    assert all(key.startswith('thumbnail:v2:7:') for key in render_app.cache.values)
 
 
 def test_stored_thumbnail_needs_view_on_the_dashboard(render_app, renders):
     render_app.cache.values.clear()
     response = _get(
         render_app, 'role:query_runner', f'/api2/storage/retrieve?key={SLUG}'
+    )
+    assert response.status_code == 403
+    assert renders == []
+
+
+def test_stored_thumbnail_needs_a_signed_in_caller_under_public_access(
+    render_app, renders
+):
+    render_app.cache.values.clear()
+    response = _get(
+        render_app,
+        'anonymous_public',
+        f'/api2/storage/retrieve?key={SLUG}',
+        headers={'Referer': 'http://harmony.invalid/overview'},
     )
     assert response.status_code == 401
     assert renders == []

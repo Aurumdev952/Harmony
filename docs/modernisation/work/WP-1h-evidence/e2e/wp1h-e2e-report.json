@@ -1,0 +1,63 @@
+{
+  "create_dashboard": 200,
+  "pdf": {
+    "status": 200,
+    "content_type": "application/pdf",
+    "bytes": 8117,
+    "seconds": 4.02,
+    "pdf_pages": 1,
+    "pdf_mediabox": "595.91998x842.88"
+  },
+  "jpeg": {
+    "status": 200,
+    "content_type": "image/jpeg",
+    "bytes": 34164,
+    "seconds": 3.39,
+    "pixels": [
+      1280,
+      1024
+    ]
+  },
+  "png_thumbnail": {
+    "status": 200,
+    "content_type": "image/png",
+    "bytes": 15486,
+    "seconds": 3.12,
+    "pixels": [
+      1280,
+      1024
+    ]
+  },
+  "renderer_calls": [
+    {
+      "url": "http://web:5000/dashboard/wp1h-render-check-3?screenshot=1&pdf=1",
+      "format": "pdf",
+      "timeout_seconds": 120
+    },
+    {
+      "url": "http://web:5000/dashboard/wp1h-render-check-3?screenshot=1",
+      "format": "jpeg",
+      "timeout_seconds": 120
+    },
+    {
+      "url": "http://web:5000/dashboard/wp1h-render-check-3?screenshot=1&thumbnail=1",
+      "format": "png",
+      "timeout_seconds": 120
+    }
+  ],
+  "token_reuse_after_render": {
+    "dashboard_page": [
+      302,
+      "http://127.0.0.1:58761/login?next=/dashboard/wp1h-render-check-3"
+    ],
+    "api2_dashboard": 401
+  },
+  "outsider_pdf": {
+    "status": 403,
+    "renderer_calls_made": 0
+  },
+  "anonymous_pdf": {
+    "status": 401,
+    "renderer_calls_made": 0
+  }
+}

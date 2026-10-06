@@ -7,6 +7,8 @@
 # hasura: graphql stuff worker and web need hasura.
 # worker: runs the celery worker
 # web: runs the flask web service
+# renderer: renders dashboards to PDF and images for web (headless Chromium)
+# render-egress: the renderer's only way out, a proxy to the map origins
 ##################################################################################
 
 version: '3.9'
@@ -25,6 +27,15 @@ volumes:
   nginx_vhost:
   nginx_html:
   redis-volume:
+
+networks:
+  # No route out: the renderer reaches web and render-egress and nothing else,
+  # even if the in-browser egress guard fails.
+  render:
+    internal: true
+  # A route out for render-egress alone, apart from the default network that
+  # redis and hasura are on.
+  render-egress:
 
 
 services:
@@ -152,12 +163,15 @@ services:
       - HASURA_ADMIN_SECRET=${HASURA_ADMIN_SECRET:?HASURA_ADMIN_SECRET must be set}
       - SQLALCHEMY_DATABASE_URI=${DATABASE_URL}
       - VIRTUAL_HOST=${WEB_VIRTUAL_HOST}
-      - URLBOX_API_KEY=${URLBOX_API_KEY:-}
-      - RENDERBOT_EMAIL=${RENDERBOT_EMAIL:-}
       - OBJECT_STORAGE_ALIAS=${OBJECT_STORAGE_ALIAS}
       - ZEN_GUNICORN_WORKER_THREADS=${ZEN_GUNICORN_WORKER_THREADS:-4}
       - LOG_FORMAT=json
       - LOG_STREAM=stdout
+      - RENDERER_URL=http://renderer:8080
+      # The renderer loads dashboards from here, never from the request's Host.
+      - RENDER_WEB_ORIGIN=http://web:5000
+    # Naming a network drops the implicit default, so list both.
+    networks: [default, render]
     volumes:
       # Map minio config folder
       - ${MC_CONFIG_PATH}:/root/.mc
@@ -188,8 +202,6 @@ services:
       - HASURA_HOST=http://hasura:8080
       - DRUID_HOST=${DRUID_HOST}
       - MAPBOX_ACCESS_TOKEN=${MAPBOX_ACCESS_TOKEN}
-      - URLBOX_API_KEY=${URLBOX_API_KEY:-}
-      - RENDERBOT_EMAIL=${RENDERBOT_EMAIL:-}
       - OBJECT_STORAGE_ALIAS=${OBJECT_STORAGE_ALIAS}
       - LOG_FORMAT=json
       - LOG_STREAM=stdout
@@ -214,5 +226,72 @@ services:
       interval: 60s
       timeout: 30s
       start_period: 5s
+      retries: 3
+    logging: *default-logging
+  renderer:
+    platform: linux/amd64
+    image: ${DOCKER_NAMESPACE:-ghcr.io/zenysis}/${DOCKER_IMAGE_PREFIX:-harmony}-renderer:${DOCKER_TAG:-latest}
+    # No published port: only web calls it, over the internal render network.
+    networks: [render]
+    environment:
+      - RENDERER_ALLOWED_ORIGIN=http://web:5000
+      - RENDERER_CONCURRENCY=${RENDERER_CONCURRENCY:-2}
+      # Map styles and tiles: fetched only through render-egress, which allows the
+      # same list.
+      - RENDERER_EGRESS_PROXY=http://render-egress:3128
+      - RENDERER_MAP_ORIGINS=${RENDERER_MAP_ORIGINS:-https://api.mapbox.com}
+    depends_on:
+      # Started, not healthy: only map exports need the proxy, and they fail fast
+      # with egress_blocked while it is down.
+      render-egress:
+        condition: service_started
+    read_only: true
+    tmpfs:
+      - /tmp
+      - /home/pwuser
+    # Chromium renders through /dev/shm; Docker's 64 MiB default crashes tabs.
+    shm_size: 1gb
+    # Reaps the Chromium helpers left behind when each render's browser closes.
+    init: true
+    cap_drop: [ALL]
+    # Chromium's sandbox chroots inside its own user namespace, and Docker allows
+    # the chroot syscall through the seccomp profile only with this capability.
+    # pwuser never holds it outside that namespace.
+    cap_add: [SYS_CHROOT]
+    security_opt:
+      - no-new-privileges:true
+      # Chromium keeps its sandbox, which needs user namespaces. This is Playwright
+      # v1.63.0's profile: Docker's default plus clone, setns and unshare. Without
+      # it Chromium refuses to start; the renderer never falls back to --no-sandbox.
+      - seccomp=./docker/renderer/seccomp_profile.json
+    mem_limit: 2g
+    pids_limit: 512
+    # The image's HEALTHCHECK probes GET /healthz.
+    logging: *default-logging
+  render-egress:
+    platform: linux/amd64
+    # The renderer image; the proxy is harmony/worker/renderer/egress_proxy.py,
+    # stdlib only. It tunnels to the map origins, drops Cookie and Authorization,
+    # and answers 403 to everything else before connecting.
+    image: ${DOCKER_NAMESPACE:-ghcr.io/zenysis}/${DOCKER_IMAGE_PREFIX:-harmony}-renderer:${DOCKER_TAG:-latest}
+    entrypoint: ["python", "-m", "harmony.worker.renderer.egress_proxy"]
+    # No published port: only the renderer uses it.
+    networks: [render, render-egress]
+    environment:
+      - EGRESS_PROXY_PORT=3128
+      - EGRESS_ALLOWED_ORIGINS=${RENDERER_MAP_ORIGINS:-https://api.mapbox.com}
+    read_only: true
+    # Python as PID 1 ignores SIGTERM; the init passes it on.
+    init: true
+    cap_drop: [ALL]
+    security_opt:
+      - no-new-privileges:true
+    mem_limit: 128m
+    pids_limit: 128
+    healthcheck:
+      # Replaces the image's HEALTHCHECK, which probes the renderer's /healthz.
+      test: ["CMD", "python", "-c", "import socket; socket.create_connection(('127.0.0.1', 3128), 3).close()"]
+      interval: 30s
+      timeout: 5s
       retries: 3
     logging: *default-logging

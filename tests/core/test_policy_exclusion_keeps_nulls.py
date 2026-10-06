@@ -14,10 +14,19 @@ from unittest import mock
 import pytest
 from flask_principal import Identity
 
+from tests.flask_isolation import restored_flask_globals
 from tests.golden import harness
 
 # The harness builds the caller from stored policy rows; _posted replaces it.
 NO_STORED_POLICIES: dict = {'query_policies': []}
+
+
+@pytest.fixture(autouse=True, scope='module')
+def _golden_app_for_this_module():
+    # harness.bootstrap() pushes its app context for the rest of the process and
+    # binds the query resources to its Api; undo both for the files that follow.
+    with restored_flask_globals():
+        yield
 
 
 def _excluding_identity(dimension: str, value: str, other: str) -> Identity:

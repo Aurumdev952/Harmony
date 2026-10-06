@@ -13,9 +13,11 @@ a case can use what an earlier one created. Keys of a case:
                    ``[]``/``{*}`` tokens pin the set of values (enums)
   maps             response paths that are maps keyed by data (see schema.infer)
   cookies          true to record which cookies the response sets or clears
+  seed             arguments to ``stack/stack.sh seed``, run before the request,
+                   for state no HTTP call can make (see runner.py)
   note             why the case looks the way it does
 
-``{name}`` in a path, query, body or key is replaced with a capture, and
+``{name}`` in a path, query, body, seed or key is replaced with a capture, and
 ``{env:NAME}`` with an environment variable (the login password, which
 therefore never appears in a case or a recording).
 
@@ -74,6 +76,7 @@ CASE_KEYS = {
     "pin",
     "maps",
     "cookies",
+    "seed",
     "note",
 }
 
@@ -93,6 +96,7 @@ class Case:
     pin: tuple[str, ...] = ()
     maps: frozenset[str] = frozenset()
     cookies: bool = False
+    seed: tuple[str, ...] = ()
     note: str = ""
 
     @classmethod
@@ -120,6 +124,7 @@ class Case:
             pin=tuple(raw.get("pin", [])),
             maps=frozenset(raw.get("maps", [])),
             cookies=bool(raw.get("cookies", False)),
+            seed=tuple(raw.get("seed", [])),
             note=raw.get("note", ""),
         )
 
@@ -246,7 +251,7 @@ def capture_value(document: Any, spec: str) -> Any:
 
 def placeholders(case: Case) -> Iterator[str]:
     """Capture names a case needs before it can run."""
-    text = json.dumps([case.path, case.query, case.body])
+    text = json.dumps([case.path, case.query, case.body, case.seed])
     for m in _PLACEHOLDER.finditer(text):
         if not m.group(1):
             yield m.group(2)

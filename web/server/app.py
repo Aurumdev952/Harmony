@@ -33,6 +33,7 @@ from web.server.database.setup import (
 )
 from web.server.errors.error_handlers import register_for_error_events
 from web.server.migrations.util import RevisionStatus
+from web.server.routes.views.page_renderer import deployment_origin
 from web.server.routes.views.query_policy import AuthorizedQueryClient
 from web.server.security.signal_handlers import register_for_signals
 from web.server.util.template_renderer import (
@@ -210,6 +211,7 @@ def _create_app_internal(
         # prevent errors from being thrown during server start.
         # Refuses to start on an unusable JWT key, so it runs before slow setup.
         initialize_jwt_manager(app)
+        validate_deployment_base_url(app)
         # NOTE: Initializing database seed values before app setup
         # so that if new database values are added, app setup won't error.
         initialize_database_seed_values(flask_config.SQLALCHEMY_DATABASE_URI)
@@ -306,6 +308,11 @@ def initialize_jwt_manager(app):
     # key is set here, checked, before the manager can issue a token.
     app.config['JWT_SECRET_KEY'] = require_jwt_secret_key(app.config['SECRET_KEY'])
     JWTManager(app)
+
+
+def validate_deployment_base_url(app):
+    # Renders send minted tokens, and emails send links, to this origin.
+    deployment_origin(app.zen_config.general.DEPLOYMENT_BASE_URL)
 
 
 def create_app(

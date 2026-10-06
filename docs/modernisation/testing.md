@@ -12,7 +12,7 @@ Today the repository has no automated tests. Every phase in this plan assumes th
 | Permissions and policies | `tests/authz/` | Every role allows and denies what it did before | every PR |
 | API contract | `tests/contract/` | Every endpoint the frontend or `web/python_client` calls keeps its request and response shape | every PR against the running stack |
 | Pipeline fixtures | `tests/pipeline/` | `process_csv` and `fill_dimension_data` produce the same rows | every PR |
-| Frontend unit | `web/client/**/*.test.ts` | Zen serialisers, `APIService`, token generation, date utilities including the Ethiopian calendar | every PR |
+| Frontend unit | `tests/frontend/unit/*.test.js` until WP-6a converts to TypeScript, then `web/client/**/*.test.ts` | Zen serialisers, `APIService`, token generation, date utilities including the Ethiopian calendar | every PR |
 | Storybook interaction | `web/client/**/*.stories.tsx` | Each primitive's keyboard, focus and state behaviour | every PR |
 | End-to-end smoke | `e2e/` (Playwright) | Log in; open every page; run one query per visualization type; open, edit, share, present and export a dashboard; each auth flow; upload wizard | every PR against `docker compose` with `harmony_demo` |
 | Visual | `e2e/visual/` | Screenshots of every page and chart type at three widths | UI PRs |

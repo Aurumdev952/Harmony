@@ -9,9 +9,12 @@
 - [Celery startup checks](celery_startup_checks.md) — refusals in worker_process_init are swallowed; put them at import of the -A module
 - [Template render diff](template_render_diff.md) — prove Jinja template edits without a running app; known baseline failures
 - [Flask web tests](flask_web_tests.md) — run tests/web on py3.8, call handlers directly, worktree-guard and auth/policy traps
+- [Potion route test harness](potion_route_test_harness.md) — test /api2 routes through the real app on a throwaway Postgres; WP-0h authz traps
+- [Flask route tests in-process](flask-route-tests-in-process.md) — conftest double import, subclass Potion resources, AUTHORIZABLE_DIMENSIONS, urlbox recorder
+- [Post-WP-2f tooling](post_wp2f_tooling.md) — dev env py3.9 but prod 3.8 until WP-3b, lint-gate and noqa traps, guard workarounds, graphql stub
+- [Absolute URLs and script root](absolute_urls_and_script_root.md) — Host and SCRIPT_NAME are caller-controlled; build token URLs from url_map on the configured origin
 - [Gunicorn server checks](gunicorn_server_checks.md) — test web/gunicorn_server.py despite its gevent patch, mypy strict on 3.8, live run with a stub app
 - [Request logging wiring](request_logging_wiring.md) — test create_app/create_celery log wiring: non-gunicorn path gaps, global Celery signals, mypy on tasks
-- [Post-WP-2f tooling](post_wp2f_tooling.md) — dev env py3.9 but prod 3.8 until WP-3b, lint-gate and noqa traps, guard workarounds, graphql stub
 - [Backend testing traps](backend-testing-traps.md) — real-Postgres fixture from tests/throwaway_postgres.py, contract stack, worktree guard, formatting
-- [Flask route tests in process](flask-route-tests-in-process.md) — blueprint plus Potion on a bare app: conftest double import, shared Potion classes, urlbox recorder
-- [Potion route test harness](potion_route_test_harness.md) — drive /api2 Potion routes through the real app with throwaway Postgres and header login
+- [Render token traps](render_token_traps.md) — WP-1h: internal vs public origin, one fingerprint, render-token cache keys in tests, lint on old branches
+- [Renderer round-2 traps](renderer_round2_traps.md) — WP-1h: render isolation and tree kill, Werkzeug cookie jar, atomic SET NX EX, mypy strict flags, docker builds

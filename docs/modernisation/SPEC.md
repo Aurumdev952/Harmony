@@ -1,6 +1,6 @@
 # Harmony modernisation specification
 
-Version 1.11, 2026-10-05 (decisions 0001, 0003, 0004, 0005, 0006, 0007, 0008, 0009, 0010, 0011). Status: approved for execution.
+Version 1.14, 2026-10-06 (decisions 0001, 0003 to 0014). Status: approved for execution.
 
 This is the binding guide for every agent and engineer working on the Harmony migration. Where this spec and another document disagree, this spec wins. The other documents explain why and describe the work in detail:
 
@@ -158,6 +158,7 @@ Each WP is one pull request, or a short stack of them. Detail lives in the named
 | 0i | Guard the dashboard render and thumbnail routes | backend | security, qa | none | yes |
 | 0j | Refuse username changes and password resets that reach a higher-privileged account | backend | security, qa | 0h | yes |
 | 0k | Build outgoing links from the configured origin; match usernames exactly; refuse deactivated accounts (decision 0010) | backend | security, qa | 0i | yes |
+| 0l | Match resource, role, group and user names exactly, never as patterns (decision 0012) | backend | security, qa, core | 0k | yes |
 | 1a | Performance baseline | qa | core | none | no |
 | 1b | Shared result cache | core | none | 1a | yes |
 | 1c | Columnar parsing | core | none | 1a, golden cases | no |
@@ -174,7 +175,7 @@ Each WP is one pull request, or a short stack of them. Detail lives in the named
 | 2f | uv, ruff, mypy, CI running every suite | infra | qa | 0f | yes |
 | 2g | Structured logging | infra | backend | none | no |
 | 3a | Config import hook on `find_spec` | core | none | 2a | no |
-| 3b | One CPython 3.13 interpreter everywhere | infra | pipeline | 3a, 2f | no |
+| 3b | One CPython 3.13 interpreter everywhere (one interpreter everywhere except the renderer sidecar, decision 0013) | infra | pipeline | 3a, 2f | no |
 | 3c | SQLAlchemy 1.4 with 2.0 warnings | core | none | 2a, 2b | no |
 | 3d | Flask 2.3, jwt-extended 4, PyJWT 2 | backend | none | 2c | yes |
 | 3e | SQLAlchemy 2.1 | core | none | 3c | no |

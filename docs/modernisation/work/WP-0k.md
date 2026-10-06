@@ -56,7 +56,6 @@ instances:
       - tests/privilege_escalation/test_group_and_role_grants.py
       - tests/privilege_escalation/test_user_username_case.py
       - tests/authz/principals.py
-      - tests/authz/http/test_api_tokens.py
       - docs/modernisation/work/WP-0k.md
       - docs/modernisation/work/WP-0k-evidence/**
       - .claude/agent-memory/harmony-backend-engineer/**

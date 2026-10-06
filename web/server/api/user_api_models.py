@@ -2,6 +2,7 @@
 
 User APIs Accessible via http://<server_uri>:5000/api2/user
 '''
+
 from http.client import BAD_REQUEST, OK, NO_CONTENT, UNAUTHORIZED
 
 from flask import current_app, g
@@ -55,6 +56,7 @@ from web.server.routes.views.users import (
     update_user_groups,
     update_user_roles_from_map,
 )
+from web.server.security.permission_cache import clear_permission_cache
 from web.server.security.permissions import (
     SuperUserPermission,
     principals,
@@ -392,7 +394,7 @@ def invalidate_user_identity_cache(sender, role=None, group=None):
     '''This will invalidate the user identity role after any
     user role change (deletion, addition)
     '''
-    sender.get_permissions.delete_memoized()
+    clear_permission_cache(sender)
 
 
 RESOURCE_TYPES = [UserAclResource, UserResource]

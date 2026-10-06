@@ -88,6 +88,14 @@ None.
 - 2026-10-06 qa-10 unit R2.11 (reviewer 10): the probe claims now rest on committed code. qa-9's `/tmp/wp1a_power_probe.py` and `/tmp/wp1a_alpha_probe.py` had absolute paths into a lost worktree, and the alpha probe's 4- and 10-round cases no longer run under the 30-round floor. Their claims are withdrawn and replaced by `scripts/perf/probes/level.py` (unit R2.7) and `rounds.py` (unit R2.9), which import `baseline.py` relative to their own path. This unit adds `sensitivity.py`, which rejudges any committed `.rounds.jsonl` at the current rule and prints the per-case detail the failing-run policy asks for, and `redis_isolation.sh`, the unit R2.3 check. Outputs are in `perf/probes/2026-10-06-*.txt`. In qa-9's terms, the committed figures are: at a true uniform 1.10x every simulated run fails at least one case under both synthetic stall models and real noise, which agrees with qa-9; A/A runs fail 3.0 to 6.6% of the time (qa-9 saw none in 16 runs, too few to show it). Check: ruff and shellcheck clean; `sensitivity.py` reproduces the unit R2.10 figures (1, 3 and 9 of 24 cases at 1.05, 1.08 and 1.10) and finds no case regressed in either committed run; `redis_isolation.sh` exits 0 on the live stack.
 - 2026-10-06 qa-10 unit R2.12 (reviewer 11): `image_tag` also hashes `pyproject.toml` and `uv.lock` when the tree has them. Since WP-2f the requirements files are exported from them, so a lock change the export missed still rebuilds; a tree without them, such as an old reference, hashes as before. Check: `test_the_image_tag_follows_pyproject_and_uv_lock_when_present` was seen failing first (one tag for four different trees) and passes now; 46 pass; shellcheck clean. Live: `PERF_BUILD_NETWORK=host stack.sh reference` built `harmony-perf-web:de1a720ef023` on the host network from cached layers (unit R2.6 end to end) and restarted the reference at `2ddc30c`.
 - 2026-10-06 qa-10 unit R2.13 (QA nit): the verdict table's header row in `paired_table` is a parenthesised implicit concatenation, not two bare literals in a list (ISC004). Check: `ruff check --select ISC --preview scripts/perf tests/perf` reported 1 finding at `baseline.py:398` before and passes now; 46 pass (the written-run test reads the header row).
+- 2026-10-06 qa-10 round 2 closing checks at the unit R2.13 head:
+  - `tests/perf`: 46 passed on the host and 46 on CPython 3.8.20;
+  - `py_compile` on 3.8 passes; the 3.8 syntax guard over CI's directories plus `tests/perf` reports 867 files and 0 problems;
+  - shellcheck is clean; `ci/lint_python.sh mig/integration` is clean;
+  - `ci/pytest_suites.sh`: all 14 suites passed;
+  - `task_gate.py WP-1a` reports only the status and the two open verdicts, with no claim or ownership problems.
+
+  `stack.sh stop` left no perf container running and kept the volumes. Status stays `review`; qa and reviewer verdicts are requested for round 2.
 
 ## Evidence
 
@@ -98,6 +106,12 @@ None.
 - Unit tests at `01d5bdf`: `cd scripts/perf && uv run --no-project --with pytest --with hypothesis --with requests python -m pytest -q` gives 38 passed. Black 22.6.0 (`--skip-string-normalization -t py39`), `ruff check --select E,F,I,UP,B,SIM --ignore E501` and shellcheck are clean.
 - Power and level probes, committed in round 2 under `scripts/perf/probes/` with paths relative to the repository, and their outputs under `docs/modernisation/perf/probes/`: `level.py` (A/A fail rates and power of whole runs, `2026-10-06-level-bounds.txt` and `-cases.txt`), `rounds.py` (a bound's level by round count, `2026-10-06-rounds.txt`), `sensitivity.py` (rejudges a committed run at the current rule, `2026-10-06-sensitivity.txt`), `redis_isolation.sh` (`2026-10-06-redis-isolation.txt`). The qa-9 log's figures from the uncommitted `/tmp/wp1a_power_probe.py` and `/tmp/wp1a_alpha_probe.py` are withdrawn; these replace them.
 - Usage for WP-1b to 1g: `docs/modernisation/perf/README.md`.
+- Round 2 (qa-10, 2026-10-06):
+  - Merged-tree paired run, `2ddc30c` against the merge: `docs/modernisation/perf/paired/2026-10-05-2ddc30cdb0-vs-b8b80deeb5-r2-merge-smoke.md` (3 cases and `perf-mixed-6`, 30 rounds each, exit 0).
+  - Unit tests now in `tests/perf` (46): `uv run --locked pytest -m 'not stack' -- tests/perf` on the host (CPython 3.9), and `uv run --no-project -p cpython-3.8.20 --with pytest --with hypothesis --with pyyaml python -m pytest tests/perf` on CPython 3.8. Both give 46 passed.
+  - Static checks: `ci/lint_python.sh mig/integration` (ruff check and format, 9 files) clean; `ci/check_py38_syntax.py` over CI's directories plus `tests/perf` reports 867 files, 0 problems; `py_compile` on 3.8 passes for every perf Python file; shellcheck clean on `stack.sh`, `stack/*.sh` and `probes/redis_isolation.sh`.
+  - Probes and their outputs: `scripts/perf/probes/` and `docs/modernisation/perf/probes/2026-10-06-*.txt`.
+  - `ci/pytest_suites.sh`: all 14 suites passed, `tests/perf` among them with 46 passed (log `/tmp/wp1a-r2-suites.log`, not committed).
 
 ## Verdicts
 

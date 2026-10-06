@@ -5,7 +5,7 @@ metadata:
   type: project
 ---
 
-The paired PERF-7 gate (`scripts/perf/baseline.py`, lead ruling 2026-10-05) fails a case when either of two ratios is over 1.10 with a paired-bootstrap lower bound over 1 (one-sided 5%, split across cases):
+The paired PERF-7 gate (`scripts/perf/baseline.py`, lead ruling 2026-10-05) fails a case when either of two ratios is over 1.10 with a paired-bootstrap lower bound over 1 (one-sided, 5% split over both bounds of every case, `case_alpha`, since round 2):
 - the p95 ratio;
 - the paired median ratio, the median over rounds of candidate/reference in the same round.
 
@@ -13,7 +13,8 @@ The paired PERF-7 gate (`scripts/perf/baseline.py`, lead ruling 2026-10-05) fail
 
 **How to apply:**
 - **Reviewing a paired run.** Read `detects`. It is exact, because p95, the median and the seeded bootstrap all scale with the candidate. A pass is only as strong as the largest `detects`.
-- **Small samples.** A bootstrap of p95 over fewer than about 20 pairs is anti-conservative: at 4 to 10 pairs, an A/A case fails 2 to 3 times as often as the level says. Paired mode refuses fewer than 20 rounds. A smoke run with 4 dashboard loads "failed" an A/A for exactly this reason.
+- **Small samples.** A bootstrap of p95 over few pairs is anti-conservative: at 4 to 10 pairs an A/A case fails 2 to 3 times as often as the level says, at 20 about 1.3 times. Paired mode refuses fewer than 30 rounds (decision 0011). A smoke run with 4 dashboard loads "failed" an A/A for exactly this reason.
+- **Measure, do not assume, the family rate.** Two bounds per case means the budget splits over 2 x cases. `scripts/perf/probes/level.py` simulates whole runs (real noise by swapping each committed A/A round's sides at random); `rounds.py` gives a bound's level by round count; `sensitivity.py` rejudges a committed run. Under heavy synthetic stalls (25%) the run still fails A/A about 6.6% of the time.
 - **Noise guards.** Before trusting one, push a known regression through it (a power check), not just an A/A run.
 
 See [[perf-stack-real-druid]].

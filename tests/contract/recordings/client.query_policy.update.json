@@ -1,0 +1,37 @@
+{
+  "content_type": "application/json",
+  "headers": [],
+  "id": "client.query_policy.update",
+  "pinned": {},
+  "response_schema": {
+    "properties": {
+      "$uri": {
+        "type": "string",
+        "x-format": "api-uri"
+      },
+      "dimension": {
+        "type": "string"
+      },
+      "dimensionValue": {
+        "type": "string"
+      },
+      "queryPolicyTypeId": {
+        "type": "integer"
+      },
+      "resource": {
+        "type": "string",
+        "x-format": "api-uri"
+      }
+    },
+    "required": [
+      "$uri",
+      "dimension",
+      "dimensionValue",
+      "queryPolicyTypeId",
+      "resource"
+    ],
+    "type": "object"
+  },
+  "route": "PATCH /api2/query_policy/<id>",
+  "status": 200
+}

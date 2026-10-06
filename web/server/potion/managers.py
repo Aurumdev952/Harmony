@@ -14,9 +14,11 @@ from flask_potion.exceptions import BackendConflict
 from flask_potion.instances import Pagination
 from flask_potion.utils import get_value
 
-from models.alchemy.permission import Role
 from models.alchemy.query_policy import QueryPolicyRole
 from web.server.data.data_access import Transaction
+from web.server.security.grants import held_role_ids, member_group_ids
+from web.server.security.hidden_users import administrators
+from web.server.security.permissions import SuperUserPermission
 
 from models.alchemy.base import Base, Pagination as SAPagination
 
@@ -304,34 +306,38 @@ class AuthorizationResourceManager(SQLAlchemyManager, metaclass=ABCMeta):
         pass
 
 
+# Item routes on roles and groups confer what they reach (`/users`), so the
+# reach follows web.server.security.grants: superuser is the identity, and a
+# non-superuser identity on an admin account (a narrowed token) does not hold
+# the admin role or a group carrying it.
+
+
 class RoleResourceManager(SQLAlchemyManager):
     def _query(self):
         query = super()._query()
-        user = current_user
-        if not user.is_superuser():
-            role_ids = [role.id for role in user.get_all_roles()]
-            return query.filter(getattr(self.model, 'id').in_(role_ids))
-        return query
+        if SuperUserPermission().can():
+            return query
+        return query.filter(getattr(self.model, 'id').in_(held_role_ids()))
 
 
 class GroupResourceManager(SQLAlchemyManager):
     def _query(self):
         query = super()._query()
-        user = current_user
-        if not user.is_superuser():
-            group_ids = [group.id for group in user.groups]
-            return query.filter(getattr(self.model, 'id').in_(group_ids))
-        return query
+        if SuperUserPermission().can():
+            return query
+        return query.filter(getattr(self.model, 'id').in_(member_group_ids()))
 
 
 class UserResourceManager(SQLAlchemyManager):
+    '''Administrators, direct or through a group, are hidden from every
+    non-superuser identity (decision 0010): no user route reaches them.
+    '''
+
     def _query(self):
         query = super()._query()
-        user = current_user
-        if not user.is_superuser():
-            admin_role = Role.query.filter(Role.name == 'admin').first()
-            return query.filter(~self.model.roles.any(Role.id == admin_role.id))
-        return query
+        if SuperUserPermission().can():
+            return query
+        return query.filter(~administrators())
 
 
 class QueryPolicyResourceManager(SQLAlchemyManager):
@@ -340,6 +346,7 @@ class QueryPolicyResourceManager(SQLAlchemyManager):
         user = current_user
         if not user.is_superuser():
             role_ids = [role.id for role in user.get_all_roles()]
+            # pylint: disable=no-member
             qps = [
                 query_policy.query_policy_id
                 for query_policy in QueryPolicyRole.query.filter(

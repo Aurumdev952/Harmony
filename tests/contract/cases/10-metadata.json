@@ -1,0 +1,276 @@
+{
+  "cases": [
+    {
+      "id": "pipeline_run_metadata.seed.all_sources",
+      "route": "POST /api2/pipeline_run_metadata",
+      "body": {
+        "source": "ALL_SOURCES",
+        "digestMetadata": {
+          "data_points_count": 120,
+          "start_date": "2020-01-01",
+          "end_date": "2020-12-31",
+          "fields_count": 1,
+          "start_ts": "2020-12-31T00:00:00",
+          "next_run": "2021-01-07T00:00:00",
+          "failed": false
+        },
+        "generationDatetime": {
+          "$date": 1704067200000
+        }
+      },
+      "capture": {
+        "pipeline_run_all_sources": "/$uri"
+      },
+      "note": "The pipeline writes these rows; no client does. Seeded so digest and pipeline queries return items. next_run, start_ts and failed are what populate_pipeline_run_metadata.py writes for a scheduled run; usePipelineTimesLastPipelineQuery reads next_run."
+    },
+    {
+      "id": "pipeline_run_metadata.seed.yellow_fever",
+      "route": "POST /api2/pipeline_run_metadata",
+      "body": {
+        "source": "yellow_fever",
+        "digestMetadata": {
+          "data_points_count": 120,
+          "start_date": "2020-01-01",
+          "end_date": "2020-12-31",
+          "fields_count": 1,
+          "start_ts": "2020-12-31T00:00:00"
+        },
+        "generationDatetime": {
+          "$date": 1704067200000
+        }
+      },
+      "capture": {
+        "pipeline_run_yellow_fever": "/$uri"
+      },
+      "note": "The pipeline writes these rows; no client does. Seeded so digest and pipeline queries return items."
+    },
+    {
+      "id": "metadata.server_version",
+      "route": "GET /api2/metadata/server_version",
+      "pin": [
+        ""
+      ]
+    },
+    {
+      "id": "metadata.data_sources",
+      "route": "GET /api2/metadata/data_sources"
+    },
+    {
+      "id": "configuration.list",
+      "route": "GET /api2/configuration",
+      "pin": [
+        "/[]/key"
+      ]
+    },
+    {
+      "id": "configuration.get",
+      "route": "GET /api2/configuration/<key>",
+      "path": "/api2/configuration/default_url",
+      "pin": [
+        "/key",
+        "/defaultValue"
+      ]
+    },
+    {
+      "id": "configuration.set",
+      "route": "POST /api2/configuration/<key>/set",
+      "path": "/api2/configuration/default_url/set",
+      "body": "/overview",
+      "pin": [
+        "/value"
+      ],
+      "note": "Sets the key to its default, so the run leaves no trace."
+    },
+    {
+      "id": "configuration.reset",
+      "route": "POST /api2/configuration/<key>/reset",
+      "path": "/api2/configuration/default_url/reset",
+      "body": {},
+      "pin": [
+        "/value"
+      ]
+    },
+    {
+      "id": "authorization.check",
+      "route": "POST /api/authorization",
+      "pin": [
+        "/success"
+      ],
+      "body": {
+        "permission": "view_query_form",
+        "resourceType": "SITE",
+        "resourceName": null
+      }
+    },
+    {
+      "id": "authorization.check_multi",
+      "route": "POST /api/authorization_multi",
+      "pin": [
+        "/0/authorized",
+        "/1/authorized"
+      ],
+      "body": [
+        {
+          "permission": "view_query_form",
+          "resourceType": "SITE",
+          "resourceName": null
+        },
+        {
+          "permission": "create_resource",
+          "resourceType": "DASHBOARD",
+          "resourceName": null
+        }
+      ]
+    },
+    {
+      "id": "resource_type.list",
+      "route": "GET /api2/resource-type",
+      "pin": [
+        "/[]/name"
+      ]
+    },
+    {
+      "id": "role.list",
+      "route": "GET /api2/role",
+      "query": {
+        "per_page": "1000"
+      },
+      "pin": [
+        "/[]/name"
+      ]
+    },
+    {
+      "id": "role.num_users",
+      "route": "GET /api2/role/num_users",
+      "maps": [
+        "$"
+      ],
+      "note": "Keyed by role name."
+    },
+    {
+      "id": "resource_role.list",
+      "route": "GET /api2/resource_role",
+      "query": {
+        "per_page": "1000"
+      }
+    },
+    {
+      "id": "query_policy.list",
+      "route": "GET /api2/query_policy",
+      "query": {
+        "per_page": "1000"
+      },
+      "pin": [
+        "/[]/queryPolicyTypeId"
+      ]
+    },
+    {
+      "id": "query.granularities",
+      "route": "GET /api2/query/granularities",
+      "pin": [
+        "/[]/id"
+      ]
+    },
+    {
+      "id": "query.dimension_values",
+      "route": "GET /api2/query/dimension_values"
+    },
+    {
+      "id": "query.dimension_values.frontend_cache",
+      "route": "GET /api2/query/dimension_values/frontend_cache"
+    },
+    {
+      "id": "query.dimension_values.search",
+      "route": "GET /api2/query/dimension_values/search/<dimension>",
+      "path": "/api2/query/dimension_values/search/StateName",
+      "query": {
+        "where": {
+          "name": {
+            "$icontains": "a"
+          }
+        }
+      }
+    },
+    {
+      "id": "query.fields.missing_route",
+      "route": "GET /api2/query/fields",
+      "note": "The client's FieldService calls this, but no server route exists; it returns 404 today."
+    },
+    {
+      "id": "query.categories.missing_route",
+      "route": "GET /api2/query/categories",
+      "note": "No server route; 404 today."
+    },
+    {
+      "id": "query.datasets.missing_route",
+      "route": "GET /api2/query/datasets",
+      "note": "No server route; 404 today."
+    },
+    {
+      "id": "query.dimensions.missing_route",
+      "route": "GET /api2/query/dimensions",
+      "note": "No server route; 404 today."
+    },
+    {
+      "id": "query.dimensions_authorized.missing_route",
+      "route": "GET /api2/query/dimensions/authorized",
+      "note": "No server route; 404 today."
+    },
+    {
+      "id": "query.field_metadata.missing_route",
+      "route": "GET /api2/query/field_metadata",
+      "note": "No server route; 404 today."
+    },
+    {
+      "id": "raw_pipeline_entity.search_metadata.missing_route",
+      "route": "GET /api2/raw_pipeline_entity/search_metadata",
+      "query": {
+        "entity_type_id": "1",
+        "metadata_name": "name",
+        "term": "a"
+      },
+      "note": "No server route; 404 today."
+    },
+    {
+      "id": "field.info",
+      "route": "GET /api/field/<field_ids>",
+      "path": "/api/field/yellow_fever_cases",
+      "note": "Since WP-0c the summary is policy-filtered and carries the formula even at count 0."
+    },
+    {
+      "id": "field.info.unknown_id",
+      "route": "GET /api/field/<field_ids>",
+      "path": "/api/field/contract_not_a_field",
+      "note": "Since WP-0c an id outside the indicator config is a 404 (an HTML error page, as for every /api 4xx)."
+    },
+    {
+      "id": "field.info.over_cap",
+      "route": "GET /api/field/<field_ids>",
+      "path": "/api/field/yellow_fever_cases,contract_field_01,contract_field_02,contract_field_03,contract_field_04,contract_field_05,contract_field_06,contract_field_07,contract_field_08,contract_field_09,contract_field_10,contract_field_11,contract_field_12,contract_field_13,contract_field_14,contract_field_15,contract_field_16,contract_field_17,contract_field_18,contract_field_19,contract_field_20",
+      "note": "Since WP-0c more than 20 ids is a 400."
+    },
+    {
+      "id": "field.names_csv",
+      "route": "GET /api/field_names"
+    },
+    {
+      "id": "pipeline_run_metadata.digest_overview",
+      "route": "GET /api2/pipeline_run_metadata/digest_overview",
+      "query": {
+        "lookbackWeeks": "5200"
+      },
+      "maps": [
+        "$"
+      ],
+      "note": "Keyed by source name. A wide lookback keeps the fixed-date seed rows inside the window."
+    },
+    {
+      "id": "data_upload.sources_date_ranges",
+      "route": "GET /api2/data_upload_file_summary/get_sources_date_ranges",
+      "maps": [
+        "$"
+      ],
+      "note": "Keyed by source id."
+    }
+  ]
+}

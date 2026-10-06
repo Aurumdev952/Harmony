@@ -1,0 +1,16 @@
+{
+  "description": "Policy: all states and all sources, so no filter is added.",
+  "endpoint": "bar_graph",
+  "policy": {
+    "query_policies": [
+      {
+        "dimension": "StateName",
+        "dimension_value": null
+      },
+      {
+        "dimension": "source",
+        "dimension_value": null
+      }
+    ]
+  }
+}

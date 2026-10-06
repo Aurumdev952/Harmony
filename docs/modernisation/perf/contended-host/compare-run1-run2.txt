@@ -1,0 +1,28 @@
+p95 of 2026-10-05-5b5a93d190-run2.jsonl against 2026-10-05-5b5a93d190-run1.jsonl (limit +10%):
+| case | base p95 ms | new p95 ms | change | verdict |
+|---|---:|---:|---:|---|
+| bar_graph_sum_by_state_month | 299.6 | 77.4 | -74.2% | ok |
+| bar_graph_box_plot | 243.0 | 102.8 | -57.7% | ok |
+| bar_graph_histogram | 265.6 | 76.7 | -71.1% | ok |
+| group_granularity_day | 1327.3 | 477.8 | -64.0% | ok |
+| line_graph_time_by_state | 370.3 | 102.4 | -72.3% | ok |
+| line_graph_bump_chart_quarter | 216.1 | 78.7 | -63.6% | ok |
+| line_graph_heat_tiles_week | 284.1 | 100.9 | -64.5% | ok |
+| table_by_state_sex_with_total | 144.1 | 57.9 | -59.8% | ok |
+| group_two_totals | 327.1 | 148.2 | -54.7% | ok |
+| calc_formula | 124.3 | 49.6 | -60.1% | ok |
+| calc_count_distinct_by_state | 138.4 | 56.3 | -59.3% | ok |
+| table_disaggregated | 2470.5 | 798.8 | -67.7% | ok |
+| map_by_municipality | 183.8 | 69.3 | -62.3% | ok |
+| map_by_state_month | 426.1 | 134.6 | -68.4% | ok |
+| hierarchy_expando_tree | 240.1 | 105.2 | -56.2% | ok |
+| hierarchy_sunburst | 452.7 | 121.1 | -73.2% | ok |
+| dq_data_quality | 1617.1 | 788.5 | -51.2% | ok |
+| dq_data_quality_table | 138.3 | 211.8 | +53.1% | REGRESSED |
+| dq_field_reporting_stats | 44.7 | 72.8 | +62.9% | REGRESSED |
+| dq_outliers_line_graph | 478.8 | 459.7 | -4.0% | ok |
+| dq_reporting_completeness_line_graph | 384.2 | 435.2 | +13.3% | REGRESSED |
+| perf-heavy-4 | 2269.0 | 3411.7 | +50.4% | REGRESSED |
+| perf-mixed-6 | 807.4 | 1377.2 | +70.6% | REGRESSED |
+| perf-wide-12 | 1708.2 | 2836.4 | +66.0% | REGRESSED |
+FAIL: dq_data_quality_table, dq_field_reporting_stats, dq_reporting_completeness_line_graph, perf-heavy-4, perf-mixed-6, perf-wide-12

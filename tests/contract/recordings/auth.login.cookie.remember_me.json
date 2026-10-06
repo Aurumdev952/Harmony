@@ -1,0 +1,22 @@
+{
+  "content_type": "application/json",
+  "cookies": [
+    "accessKey; persistent; httponly; path=/"
+  ],
+  "headers": [],
+  "id": "auth.login.cookie.remember_me",
+  "pinned": {},
+  "response_schema": {
+    "properties": {
+      "msg": {
+        "type": "string"
+      }
+    },
+    "required": [
+      "msg"
+    ],
+    "type": "object"
+  },
+  "route": "POST /api2/authentication/login",
+  "status": 200
+}

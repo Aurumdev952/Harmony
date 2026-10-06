@@ -1,0 +1,45 @@
+--- docker/pipeline/Dockerfile
++++ /tmp/wp0d-infra5/scratch/docker/pipeline/Dockerfile
+@@ -1,4 +1,4 @@
+-FROM ubuntu:22.04 as downloader
++FROM ubuntu:jammy-20260924.1@sha256:5ec03bb3441e8b0bf3b4f9cd4629a1ae763010dc3035bb8da3ae6cf026486401 AS downloader
+ ENV DEBIAN_FRONTEND noninteractive
+ 
+ RUN apt-get update \
+@@ -26,17 +26,18 @@
+     && apt-get clean \
+     && rm -rf /var/lib/apt/lists/*
+ 
+-# Download minio client
++# Download minio client. dl.min.io answers 410 Gone since MinIO archived mc, so
++# fetch the last GitHub release and verify it.
++ARG MC_RELEASE=RELEASE.2025-08-13T08-35-41Z
+ RUN case $(uname -m) in \
+-    "x86_64")\
+-    wget https://dl.minio.io/client/mc/release/linux-amd64/mc -O /usr/local/bin/mc;\
+-    ;;\
+-    "aarch64")\
+-    wget https://dl.minio.io/client/mc/release/linux-arm64/mc -O /usr/local/bin/mc;\
+-    ;;\
+-    esac;
++    "x86_64") arch=amd64; sha256=01f866e9c5f9b87c2b09116fa5d7c06695b106242d829a8bb32990c00312e891 ;; \
++    "aarch64") arch=arm64; sha256=14c8c9616cfce4636add161304353244e8de383b2e2752c0e9dad01d4c27c12c ;; \
++    *) echo "unsupported architecture $(uname -m)" >&2; exit 1 ;; \
++    esac; \
++    wget "https://github.com/minio/mc/releases/download/${MC_RELEASE}/mc.linux-${arch}.${MC_RELEASE}" -O /usr/local/bin/mc \
++    && echo "${sha256}  /usr/local/bin/mc" | sha256sum -c -
+ 
+-FROM ubuntu:22.04
++FROM ubuntu:jammy-20260924.1@sha256:5ec03bb3441e8b0bf3b4f9cd4629a1ae763010dc3035bb8da3ae6cf026486401
+ ENV DEBIAN_FRONTEND noninteractive
+ 
+ RUN apt-get update \
+@@ -120,6 +121,8 @@
+ COPY --chmod=755 --from=downloader /usr/local/bin/mc /usr/local/bin/mc
+ 
+ WORKDIR /zenysis
++# infra-5 scratch harness only: survive slow PyPI reads.
++ENV PIP_DEFAULT_TIMEOUT=300
+ # Best practice not to use root in Docker containers:
+ # Create a system user 'zenysis', with home directory '/home/zenysis'
+ # -r, --system: Create a system account

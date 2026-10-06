@@ -21,7 +21,6 @@ from models.alchemy.permission import (
     RESOURCE_ROLE_NAMES,
     SitewideResourceAcl,
 )
-from models.alchemy.schedule import SchedulerEntry
 from models.alchemy.security_group import Group
 from web.server.api.model_schemas import (
     QUERY_LINK_PATTERN,
@@ -35,6 +34,7 @@ from web.server.configuration.bots import BOT_USERS
 from web.server.data.data_access import Transaction
 from web.server.errors import NotificationError
 from web.server.potion.filters import UserFilter
+from web.server.security.hidden_users import visible_username
 from web.server.query.request import QueryRequest
 from web.server.routes.views.authorization import (
     AuthorizedOperation,
@@ -57,6 +57,7 @@ from web.server.routes.views.dashboard import (
 )
 from web.server.routes.views.users import get_current_user
 from web.server.security.permissions import SuperUserPermission, principals
+from web.server.security.render_tokens import is_render_request
 from web.server.util.util import EMAIL_PATTERN, get_dashboard_title
 
 
@@ -151,6 +152,7 @@ AUTHOR_USERNAME_SCHEMA = fields.Custom(
     fields.Email(pattern=EMAIL_PATTERN, nullable=True),
     description='The author\'s username. If not visible to the user, this will be null.',
     attribute='author_username',
+    formatter=visible_username,
     io='r',
 )
 
@@ -642,8 +644,7 @@ class DashboardResource(PrincipalResource):
         title='Update Dashboard \'official\' flag',
         description='Marks a Dashboard as official or not.',
         schema=fields.Boolean(
-            description='The updated value of the "isOfficial" flag for the '
-            'dashboard.'
+            description='The updated value of the "isOfficial" flag for the dashboard.'
         ),
     )
     @authorization_required('publish_resource', 'dashboard')
@@ -656,8 +657,7 @@ class DashboardResource(PrincipalResource):
         title='Update Dashboard \'favorite\' flag',
         description='Marks a Dashboard as a user favorite or not.',
         schema=fields.Boolean(
-            description='The updated value of the "isFavorite" flag for the '
-            'dashboard.'
+            description='The updated value of the "isFavorite" flag for the dashboard.'
         ),
     )
     def set_favorite(self, dashboard, is_favorite):
@@ -720,8 +720,7 @@ class DashboardResource(PrincipalResource):
     def read(self, id):
         with Transaction() as transaction:
             dashboard = super().read(id)
-            dashboard.total_views += 1
-            track_dashboard_access(dashboard.id)
+            record_dashboard_view(dashboard)
             dashboard = transaction.add_or_update(dashboard, flush=True)
 
         # NOTE: Dirty hack to check if the user requested the legacy spec
@@ -1072,6 +1071,15 @@ class DashboardResource(PrincipalResource):
                     transaction.add_or_update(dashboard)
             return None, NO_CONTENT
         return None, UNAUTHORIZED
+
+
+def record_dashboard_view(dashboard):
+    # An export renders the page signed in as the requesting user; that is not
+    # the user viewing the dashboard.
+    if is_render_request():
+        return
+    dashboard.total_views += 1
+    track_dashboard_access(dashboard.id)
 
 
 def track_dashboard_access(dashboard_id, edited=False, increment_view_count=True):

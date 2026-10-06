@@ -1,0 +1,37 @@
+{
+  "content_type": "application/json",
+  "headers": [],
+  "id": "authorization.check_multi",
+  "pinned": {
+    "/0/authorized": true,
+    "/1/authorized": true
+  },
+  "response_schema": {
+    "items": {
+      "properties": {
+        "authorized": {
+          "type": "boolean"
+        },
+        "permission": {
+          "type": "string"
+        },
+        "resourceName": {
+          "type": "null"
+        },
+        "resourceType": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "authorized",
+        "permission",
+        "resourceName",
+        "resourceType"
+      ],
+      "type": "object"
+    },
+    "type": "array"
+  },
+  "route": "POST /api/authorization_multi",
+  "status": 200
+}

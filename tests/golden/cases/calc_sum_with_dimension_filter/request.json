@@ -1,0 +1,43 @@
+{
+  "fields": [
+    {
+      "id": "yellow_fever_cases__d6",
+      "calculation": {
+        "type": "SUM",
+        "filter": {
+          "type": "AND",
+          "fields": [
+            {
+              "type": "FIELD",
+              "fieldId": "yellow_fever_cases"
+            },
+            {
+              "type": "SELECTOR",
+              "dimension": "Death",
+              "value": "1"
+            }
+          ]
+        }
+      }
+    }
+  ],
+  "filter": {
+    "type": "AND",
+    "fields": [
+      {
+        "type": "INTERVAL",
+        "start": "2024-01-01",
+        "end": "2024-04-01"
+      }
+    ]
+  },
+  "groups": [
+    {
+      "dimension": "StateName",
+      "includeAll": false,
+      "includeNull": false,
+      "includeTotal": false
+    }
+  ],
+  "type": "GROUP_BY"
+}

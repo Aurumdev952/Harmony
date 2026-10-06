@@ -1,0 +1,5 @@
+{
+  "description": "AVG calculation by state: sum and count aggregators with an expression post-aggregator.",
+  "endpoint": "table",
+  "policy": null
+}

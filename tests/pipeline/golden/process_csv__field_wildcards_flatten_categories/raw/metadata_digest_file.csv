@@ -1,0 +1,5 @@
+indicator_id,count,start_date,end_date
+demo_malaria_positive,2,2021-06-01,2021-06-02
+demo_referral_reason_fever,1,2021-06-01,2021-06-01
+demo_referral_reason_rash,1,2021-06-01,2021-06-01
+demo_referral_reason_other_reason,1,2021-06-02,2021-06-02

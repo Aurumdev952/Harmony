@@ -2,7 +2,10 @@ import related
 
 from pydruid.utils.filters import Dimension as DimensionFilter
 
-from data.query.models.query_filter.query_filter import QueryFilter
+from data.query.models.query_filter.query_filter import (
+    QueryFilter,
+    druid_dimension_value,
+)
 
 
 @QueryFilter.register_subtype
@@ -18,4 +21,4 @@ class SelectorFilter(QueryFilter):
     type = related.StringField('SELECTOR')
 
     def to_druid(self):
-        return DimensionFilter(self.dimension) == self.value
+        return DimensionFilter(self.dimension) == druid_dimension_value(self.value)

@@ -297,3 +297,20 @@ def test_an_id_used_again_does_not_inherit_rights_cached_after_the_delete(
 
     assert newcomer == boss
     assert _permissions(app, newcomer) == set()
+
+
+def test_a_rename_outside_the_orm_does_not_move_cached_rights(app):
+    # Bulk updates, SQL and Hasura skip the ORM hooks, so only the id key
+    # keeps eve from reading boss's entry here.
+    boss = _add_user(app, BOSS, admin=True)
+    eve = _add_user(app, EVE)
+    assert _permissions(app, boss) == ADMIN
+    db = _db(app)
+    table = User.__table__
+    db.session.execute(
+        table.update().where(table.c.id == boss).values(username='boss-renamed@example.org')
+    )
+    db.session.execute(table.update().where(table.c.id == eve).values(username=BOSS))
+    db.session.commit()
+
+    assert _permissions(app, eve) == set()

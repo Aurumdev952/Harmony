@@ -15,7 +15,7 @@ The host is shared. On 2026-10-05, two runs of one commit differed by up to 287%
 - Every round sends the case to both sides, alternating which side goes first.
 - Both sides therefore share the host's load.
 - Each side has its own Redis, so neither can answer from bytes the other cached.
-- From WP-1b on, both sides run with the result cache off (decision 0011), so a run measures the query path, not cache hits. The one exception is WP-1b's own hit-path check below. Core provides the switch with WP-1b; until it exists, there is no result cache to switch off.
+- From WP-1b on, both sides run with the result cache off (decision 0011), so a run measures the query path, not cache hits. The one exception is WP-1b's own hit-path check below. Core provides the switch with WP-1b, and qa then sets it in `scripts/perf/stack/web.yaml` for both `web` and `web-reference` (the open request in `work/WP-1a.md`). Until that wiring is committed, `stack.sh` runs the candidate with whatever cache it ships, so no paired run of a branch that contains the result cache is a valid PERF-7 verdict, WP-1b's gate run included.
 
 A case or dashboard fails when either of two ratios is over 1.10 and the lower bound of its paired bootstrap is over 1:
 
@@ -92,7 +92,7 @@ Use `--case <name>` (repeatable) for a quick look while you work. Only a full ru
 ## Notes per WP
 
 - **1b (result cache).**
-  - The gate run has the cache off on both sides, like every other WP's run: it shows that the query path did not slow down.
+  - The gate run has the cache off on both sides, like every other WP's run: it shows that the query path did not slow down. It is not valid until qa has wired core's cache switch into `scripts/perf/stack/web.yaml` for `web` and `web-reference`; check that `web.yaml` sets it before running, and ask qa if it does not.
   - The hit-path check is a second run with the cache on for the candidate only. Identical requests repeat, so after warm-up the candidate measures the hit path. The phase target, hit-path p50 below 50 ms, is read from the candidate's absolute p50. That run is evidence for the target, not a PERF-7 verdict.
   - The miss path with the cache on is not measured yet. Ask qa for a cache-busting variant before claiming that misses did not slow down.
 - **1c (columnar parsing) and 1e (table streaming).**

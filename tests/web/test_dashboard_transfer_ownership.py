@@ -110,6 +110,10 @@ class ResourceStub(ModelResource):
         include_fields = ('name',)
 
 
+# Potion adds the routes it registers to the resource.
+_DASHBOARD_ROUTES = dict(DashboardResource.routes)
+
+
 @pytest.fixture(name='app', scope='module')
 def fixture_app():
     here = os.path.dirname(__file__)
@@ -129,17 +133,26 @@ def fixture_app():
     install_identity_loader(Principal(app, use_sessions=False))
     identity_loaded.connect(on_identity_loaded, app)
     request_started.connect(initialize_request_logger, app)
-    # Potion lets a resource join only one Api, hence the module scope.
+    # Potion lets a resource join only one Api, hence the module scope; the
+    # app's DashboardResource is released for later modules' Apis.
     api = Api(app, prefix='/api2')
     api.add_resource(UserStub)
     api.add_resource(ResourceStub)
     api.add_resource(DashboardResource)
 
-    with app.app_context():
-        metadata = db.Model.metadata
-        metadata.create_all(db.engine, tables=[metadata.tables[n] for n in TABLES])
-        _seed_roles(db.session)
-        yield app
+    try:
+        with app.app_context():
+            # A lone run checks foreign keys as the full run does, where
+            # web.server.database.setup turns them on for every SQLite connection.
+            db.session.execute('PRAGMA foreign_keys=ON')
+            assert db.session.execute('PRAGMA foreign_keys').scalar() == 1
+            metadata = db.Model.metadata
+            metadata.create_all(db.engine, tables=[metadata.tables[n] for n in TABLES])
+            _seed_roles(db.session)
+            yield app
+    finally:
+        DashboardResource.api = None
+        DashboardResource.routes = dict(_DASHBOARD_ROUTES)
 
 
 def _seed_roles(session):
@@ -190,6 +203,9 @@ def _seed_dashboards(session):
                 id=resource_id, resource_type_id=DASHBOARD_TYPE, name=name, label=name
             )
         )
+        # Dashboard has no relationship to Resource to order the inserts, and
+        # importing web.server.app turns on SQLite foreign keys for every engine.
+        session.flush()
         session.add(
             Dashboard(
                 id=dashboard_id,

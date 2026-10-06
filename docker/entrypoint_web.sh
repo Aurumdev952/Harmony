@@ -1,12 +1,9 @@
 #!/bin/bash -eu
 set -o pipefail
 
-# A JSON line like the app's (WP-2g), so `docker compose logs web | jq` parses.
-# Messages are fixed strings without quotes or backslashes.
-log_json() {
-  printf '{"timestamp":"%s","level":"INFO","logger":"%s","message":"%s"}\n' \
-    "$(date -u +%Y-%m-%dT%H:%M:%S.000+00:00)" "${0##*/}" "$1"
-}
+# JSON log lines (WP-2g); the image copies docker/web/scripts/log_json.sh here.
+# shellcheck source=docker/web/scripts/log_json.sh
+source /zenysis/log_json.sh
 
 # Script called from docker to upgrade and run the web server in production.
 

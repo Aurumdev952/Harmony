@@ -2,11 +2,13 @@
 Flask-dependent code is here because pipeline servers don't have flask installed and
 flask can't be imported at them
 """
+
 from flask import current_app, has_app_context
 from flask_principal import ItemNeed, RoleNeed
 from sqlalchemy import event, inspect
 from werkzeug.utils import cached_property
 
+from log import LOG
 from models.alchemy.permission import SitewideResourceAcl, ResourceTypeEnum
 from web.server.data.data_access import Transaction
 
@@ -114,11 +116,18 @@ class BaseWebUserMixin:
             yield ItemNeed(permission.permission, resource_id, 'alert_definitions')
 
 
-# The id key keeps accounts apart. Clearing on delete also covers an id that is
-# used again, which a restore can do. Clearing on rename is belt and braces.
+# The id key keeps accounts apart. Clearing on delete and on insert covers an id
+# that is used again, which a restore can do, including rights a request cached
+# between the delete's flush and its commit. Clearing on rename is belt and braces.
 def _forget_permissions(_mapper, _connection, user):
-    if has_app_context():
-        user.get_permissions.delete_memoized()
+    # Scripts and some test apps have an app context but no cache.
+    if has_app_context() and getattr(current_app, 'cache', None) is not None:
+        try:
+            user.get_permissions.delete_memoized()
+        except Exception:  # pylint: disable=broad-except
+            # These run inside the flush: a cache outage must not fail the write.
+            # The entry then lasts until its timeout.
+            LOG.exception('Could not clear the cached permissions of user %s', user.id)
 
 
 def _forget_permissions_on_rename(mapper, connection, user):
@@ -127,6 +136,7 @@ def _forget_permissions_on_rename(mapper, connection, user):
 
 
 event.listen(BaseWebUserMixin, 'after_delete', _forget_permissions, propagate=True)
+event.listen(BaseWebUserMixin, 'after_insert', _forget_permissions, propagate=True)
 event.listen(
     BaseWebUserMixin, 'after_update', _forget_permissions_on_rename, propagate=True
 )

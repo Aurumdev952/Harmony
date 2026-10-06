@@ -11,6 +11,15 @@ The buffer holds the text from the start of the element being decoded. While tha
 element is incomplete, or malformed (the decoder cannot tell the two apart until
 the body ends), more of the body is read after it. Once that text passes
 _MAX_ELEMENT_CHARS the parse fails with ValueError.
+
+The cap counts characters, because the memory a str takes depends on its widest
+character, not on its UTF-8 length: one astral character (an emoji) stores the
+ASCII after it in 4 bytes a character too. The worst case is such an element
+just under the cap. The last read before the cap doubles it, so the old text,
+the read bytes, their decoded text and the joined text are alive together, about
+14 bytes per character of the cap: 224 MiB (235 MB) for the 16 Mi characters
+below. A cap on UTF-8 bytes would not lower it, because such an element takes
+about one UTF-8 byte a character.
 '''
 
 import codecs
@@ -21,8 +30,9 @@ from typing import IO, Any, Iterator
 
 _READ_BYTES = 1024 * 1024
 # Druid rows are a few hundred bytes. Padding or an unterminated token inside one
-# element must be buffered to decode it, so cap it (security gate F3).
-_MAX_ELEMENT_CHARS = 64 * 1024 * 1024
+# element must be buffered to decode it, so cap it (security gate F3; the module
+# docstring gives the worst-case memory).
+_MAX_ELEMENT_CHARS = 16 * 1024 * 1024
 _WHITESPACE = re.compile(r'[ \t\n\r]*')
 _NUMBER_TAIL = re.compile(r'(?:\.|[eE][+-]?)\Z')
 

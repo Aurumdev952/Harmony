@@ -76,6 +76,14 @@ instances:
   - name: "lead-1"
     files:
       - .gitignore
+  # Supporting role, on mig/WP-3b-followup-core from integration 6c61e8f2: the two
+  # core follow-ups (security F3 residual, reviewer follow-up 5).
+  - name: "core-2"
+    files:
+      - db/druid/json_stream.py
+      - harmony/core/settings.py
+      - tests/druid/test_druid_response_parsing.py
+      - .claude/agent-memory/harmony-core-engineer/druid-response-streaming.md
 branch: "mig/WP-3b-cpython-313"
 requirements: [INV-1, INV-2, INV-8, SEC-9, QA-4, PERF-7]
 contracts_consumed: []
@@ -169,8 +177,8 @@ Each item names the owner, the change, and what it blocks. Reproduce on this bra
 - [ ] **infra, at WP-3d (deferred): setuptools 83.0.0 (PYSEC-2026-3447).** Flask 1.0 and Werkzeug 0.16 import `pkg_resources`, which setuptools 82 removed, so the runtime pin stays at 78.1.1 and the hashed build constraint at 82.0.1 until WP-3d moves Flask and Werkzeug.
 - [ ] **human (before deploying this image): the MinIO client config must be readable by uid 1000.** web reads `${MC_CONFIG_PATH}/config.json` and worker `${DATA_PATH}/ubuntu/.mc/config.json`, both mounted read-only at `/etc/zenysis/mc/config.json` (the image's `~/.mc` links there); the root entrypoint that copied it is gone. The pipeline (uid 1000) already needs the same file readable.
 
-- [ ] **core (non-blocking, security F3 residual):** `db/druid/json_stream.py`'s element cap counts characters (64 Mi), so the worst case is about 910 MB as UCS-4. Lower it to 16 Mi characters or count bytes, and give the worst case in the docstring.
-- [ ] **core (non-blocking, reviewer follow-up 5):** `harmony/core/settings.py:8` says every image runs CPython 3.13; since decision 0013 the renderer runs 3.12. Suggested: "Every image that loads these settings runs CPython 3.13 since WP-3b." The ownership hook refused infra's edit.
+- [x] **core (non-blocking, security F3 residual):** `db/druid/json_stream.py`'s element cap counts characters (64 Mi), so the worst case is about 910 MB as UCS-4. Lower it to 16 Mi characters or count bytes, and give the worst case in the docstring. Done by core-2 in `58974e71`: the cap is 16 Mi characters, and the docstring gives the worst case, 224 MiB (235 MB). It stays a character count, because a cap on UTF-8 bytes would not lower the bound: one astral character makes the buffer UCS-4, and the ASCII after it costs 1 UTF-8 byte but 4 bytes in memory per character.
+- [x] **core (non-blocking, reviewer follow-up 5):** Done by core-2 in `36970de0`, with the suggested wording. `harmony/core/settings.py:8` says every image runs CPython 3.13; since decision 0013 the renderer runs 3.12. Suggested: "Every image that loads these settings runs CPython 3.13 since WP-3b." The ownership hook refused infra's edit.
 - [ ] **backend (non-blocking, reviewer follow-up 3):** `web/server/routes/views/page_renderer.py:58-64` keeps copies of the renderer's `WIDTHS`, `HEIGHTS` and `PDF_PAGE_SIZES` "because this app's image runs Python 3.8". The 3.13 web image imports `harmony.worker.renderer.spec` (sweep: OK), so import the ranges from there and drop the copies; `tests/worker/test_renderer_web_drift.py` can then go or shrink.
 - [ ] **pipeline (non-blocking, reviewer follow-up 5):** the TODOs "Upgrade the Python version on the pipeline machines to be 3.8 or greater" in `data/pipeline/field_setup/util.py:7-8` and `data/pipeline/self_serve/scripts/process_csv_wrapper.py:19-20` are done; delete them, and the `TYPE_CHECKING` fallbacks they guard if you like. The ownership hook refused infra's edit.
 
@@ -224,6 +232,7 @@ Each item names the owner, the change, and what it blocks. Reproduce on this bra
   - `5f89dbf` (reviewer 3 to 6): stale 3.8 and 3.9 text in `tests/worker/test_renderer_web_drift.py`, `tests/authz/test_render_routes.py` (qa-1), `tests/golden/README.md` (qa-1) and `tests/core/test_config_import_hook.py`. `tests/pipeline/run.sh` drops `PIPELINE_FIXTURE_PYTHON` and `tests/pipeline/requirements.txt` goes (qa-1), because no image runs 3.9 or PyPy. On core's behalf: the memory note says `uv sync --locked`, not `--all-groups` (reviewer 4). The core, pipeline and backend edits went to Requests because the ownership hook refused them.
   - `53d1b40` (security L1, L2): web and worker `cap_drop: [ALL]` and `no-new-privileges` in the base file (dev's web resets `cap_drop`: it runs the dev image as root over the checkout). The mc config moves to `/etc/zenysis/mc/config.json:ro` with a root-owned `~/.mc` symlink. 7 failed before, 14 pass after, and the restart probe checks that the app reads the mounted config through the link. On the `d4` stack, web and worker are healthy as `1000:1000` with `CapDrop [ALL]` and `no-new-privileges`, and the HTTP probe matches.
   - F3 residual to core (Requests).
+- 2026-10-06 core-2 (supporting, `mig/WP-3b-followup-core` from integration `6c61e8f2`), the two core requests. `58974e71`: `_MAX_ELEMENT_CHARS` goes from 64 Mi to 16 Mi characters, and the module docstring gives the worst case (Evidence, "Core-2: element cap"). `36970de0`: the settings docstring says that only the images that load settings run CPython 3.13. INV-2: no parsed value changes. Only an element of 16 Mi to 64 Mi characters changes, and it now fails closed; Druid rows are a few hundred bytes. Check: the new `test_element_cap_bounds_memory_for_astral_text` failed at `6c61e8f2` (899 MiB extrapolated) and passes after (225 MiB, budget 256 MiB); `tests/druid` 258 passed (11 live-Druid skips), `tests/golden` 272, `tests/core` 188; `record.py --check` 86 cases, 0 drift; `ci/lint_python.sh 6c61e8f2` clean; `uv run --locked --isolated --group renderer-types mypy` 533 files, no issues. uv 0.12.23 through `uvx --from uv==0.12.23 uv` and the `/tmp/lead/bin` shim.
 
 ## Evidence
 
@@ -432,6 +441,12 @@ Images `local/wp3b-infra3d/*:d3` were built from `2156d70` plus the core-3 merge
 - **gunicorn 22** (`gcompare.sh`): `g20` and `g22` images built from the same tree, each run on the stack with the same probe. The probe output is identical, timestamps and pids aside. After normalising each JSON log line to level, logger, message (numbers masked), access field names and status, the counts match except the celery hostname and one SQLAlchemy relationship SAWarning, logged 12 times on `g20` and 14 on `g22`. There are no non-JSON lines, and the web log names the worker as `gevent`.
 - **F1 probes** (`tests/infra/test_web_runs_unprivileged.py`). The image under test is `docker/web/Dockerfile_web` built on stand-ins for the client and server images: the server image's own base and app-user lines. Its entrypoint, `USER` and scripts are therefore the real ones. Before the fix, web and worker run as Compose runs them, with uid 1000 replacing `~/.mc` by a symlink to `/usr/local/bin`; after one restart, `/usr/local/bin` was `1000:1000`. After the fix it stays `0:0`. For the hand-over, a root-written layout with symlinks in `/data/output`, `zenysis_static` and uploads, plus a hardlink to hasura's log, is run through the `data-owner` service's user, capabilities and security options. The app's files become `1000:1000`, while `/usr/local/bin` and hasura's log stay `0:0`.
 
+
+### Core-2: element cap (security F3 residual)
+
+- **Worst case.** An element that starts with one astral character, followed by ASCII padding, makes the buffer UCS-4. On the last read before the cap, the old text (4 bytes per cap character), the read bytes (1), their decoded text (1) and the joined text (8) are alive together: about 14 bytes per cap character. A traced run at the real scale (`/tmp/core3bf/probe.py db/druid/json_stream.py 16777216 trace astral-then-whitespace`) peaks at 224.2 MiB and fails with `ValueError`. With `rss` instead of `trace`, the RSS growth is 192 MiB. All-ASCII padding at the same cap grows RSS by 51 MiB.
+- **Test.** `test_element_cap_bounds_memory_for_astral_text` measures the traced peak at 1/16 scale (cap 1 Mi characters, reads of 64 KiB) through the gzip client and scales it to `_MAX_ELEMENT_CHARS`. Old cap: 899 MiB, which fails the 256 MiB budget. New cap: 224.8 MiB over five runs (225.5 MiB on the first). `test_astral_element_at_the_cap_parses` shows that the cap counts characters, not UTF-8 bytes. The run takes under 0.5 s and allocates under 20 MiB.
+- **Why characters, not bytes.** A str's memory depends on its widest character, and UTF-8 length does not show that. A 16 MiB UTF-8 byte cap would allow the same 224 MiB worst case, because the ASCII after one emoji takes 1 byte per character. Capping the str's size in memory (`sys.getsizeof`) would depend on CPython internals. It would also let all-ASCII elements grow to 64 Mi characters, about 5 bytes per character, or 320 MiB.
 
 ## PR summary
 

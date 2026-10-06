@@ -276,6 +276,37 @@ def test_element_at_the_cap_parses(monkeypatch):
     assert parsed == [['x' * 100]]
 
 
+def test_astral_element_at_the_cap_parses(monkeypatch):
+    # The cap counts characters, not UTF-8 bytes.
+    element = '["' + '\U0001f600' * 100 + '"]'
+    monkeypatch.setattr(json_stream, '_MAX_ELEMENT_CHARS', len(element))
+    body = ('[' + element + ']').encode()
+    parsed = list(json_stream.iter_json_array(_Trickle(body, 7)))
+    assert parsed == [['\U0001f600' * 100]]
+
+
+def test_element_cap_bounds_memory_for_astral_text(monkeypatch):
+    # Security F3 residual. One astral character makes the buffered text UCS-4,
+    # 4 bytes per character even for the ASCII after it. Measure the peak per cap
+    # character at 1/16 of production scale and scale it to the real cap.
+    cap, read = 1024 * 1024, json_stream._READ_BYTES // 16
+    max_element_chars = json_stream._MAX_ELEMENT_CHARS
+    monkeypatch.setattr(json_stream, '_MAX_ELEMENT_CHARS', cap)
+    monkeypatch.setattr(json_stream, '_READ_BYTES', read)
+    body = '[[0], ["\U0001f600",'.encode() + b' ' * (2 * cap) + b'1]]'
+    wire = gzip.compress(body, compresslevel=9)
+    with _client_answering(wire) as client:
+        tracemalloc.start()
+        try:
+            with pytest.raises(ValueError, match='larger than'):
+                list(client.run_raw_query({'queryType': 'groupBy'}, streaming=True))
+            _, peak = tracemalloc.get_traced_memory()
+        finally:
+            tracemalloc.stop()
+    worst_case = peak / cap * max_element_chars
+    assert worst_case < 256 * 1024 * 1024, f'{worst_case / 2**20:.0f} MiB'
+
+
 class _Trickle:
     '''A binary file that returns at most `size` bytes per read.'''
 

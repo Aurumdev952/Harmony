@@ -36,6 +36,7 @@ COPY --from=client-build /client/ web/public/
 # Copy over various utilities.
 COPY docker/entrypoint_web.sh docker/entrypoint_web.sh
 COPY docker/web/run_as_zenysis.sh /usr/local/bin/run_as_zenysis
+COPY docker/web/hand_over_data.sh /usr/local/bin/hand_over_data
 COPY scripts scripts
 
 # Copy all utilities used by the docker web container to the source root.
@@ -44,7 +45,9 @@ COPY docker/web/scripts/* ./
 # Web server runs on port 5000.
 EXPOSE 5000
 
-# Starts as root to hand the writable mounts to zenysis, then runs the command as
-# zenysis (see the script).
+# The app never runs as root. Root-owned data from older images is handed over
+# by the one-shot data-owner service (docker/web/hand_over_data.sh).
+ENV HOME=/home/zenysis USER=zenysis
+USER 1000:1000
 ENTRYPOINT ["run_as_zenysis"]
 CMD ["./docker/entrypoint_web.sh"]

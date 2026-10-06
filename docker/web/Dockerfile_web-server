@@ -33,7 +33,7 @@ RUN --mount=type=cache,target=/var/cache/apt,sharing=locked \
   apt-get update && \
   apt-get install --no-install-recommends -y lz4
 
-# The web and worker processes run as this user (docker/web/run_as_zenysis.sh). Its
+# The web and worker processes run as this user (USER in Dockerfile_web). Its
 # uid matches the host user that owns the deployments' data directories.
 RUN groupadd --gid 1000 zenysis && \
   useradd --uid 1000 --gid zenysis --create-home --shell /bin/bash zenysis

@@ -159,8 +159,8 @@ services:
       - LOG_FORMAT=json
       - LOG_STREAM=stdout
     volumes:
-      # Map minio config folder
-      - ${MC_CONFIG_PATH}:/root/.mc
+      # The MinIO client config, read-only in the app user's home.
+      - ${MC_CONFIG_PATH}/config.json:/home/zenysis/.mc/config.json:ro
     healthcheck:
       test: "timeout 10s bash -c ':> /dev/tcp/127.0.0.1/5000'"
       interval: 30s

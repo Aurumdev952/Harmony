@@ -209,7 +209,7 @@ Security asks the human to accept:
   - (f) R-1: `POST /api2/authentication/register` with `invite_token: ""` and the username of an account never reset: 200 and signed in as it today, 400 after;
   - the pins qa-0k listed beyond (a) to (e) for qa-0k-pins.
   - The never-used-token control stays 401.
-- [ ] lead: `scripts/create_user.py -o` should name its target by exact spelling (reviewer 7): the change and its test are in `WP-0k-evidence/requests/create_user.md`, section 2. (Section 1, the `ILIKE` lookup, was done in 299c632.)
+- [x] lead: `scripts/create_user.py -o` should name its target by exact spelling (reviewer 7): the change and its test are in `WP-0k-evidence/requests/create_user.md`, section 2. (Section 1, the `ILIKE` lookup, was done in 299c632.) Done by the lead on 2026-10-06: the script names its target with find_named_account (exact spelling, any status); the new test passes (failed before: account 10 overwritten and renamed).
 - [ ] core (optional, not blocking): a migration giving `user.created` a server default, and making it `timestamptz` (`USING created AT TIME ZONE current_setting('TimeZone')`), so rows written outside the ORM are checked and neither a `TimeZone` change nor daylight saving can shift T-3. `signal_handlers.database_time_from_epoch` then becomes `to_timestamp(iat)`.
 - [ ] infra (optional): run `tests/web/usernames -m stack` in a CI job with docker, or split a `postgres` marker from `stack`.
 - [ ] lead: land WP-0j and WP-0k together (section "Merging with WP-0j"). The merge applies `WP-0k-evidence/merge-with-0j/privilege_escalation.patch`.

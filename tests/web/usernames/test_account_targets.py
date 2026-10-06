@@ -165,3 +165,13 @@ def test_create_user_script_refuses_a_username_two_accounts_equal(
 
     with app.app_context():
         assert User.query.filter(User.username == 'ANN@moh.gov.rw').count() == 0
+
+
+def test_create_user_script_overwrites_the_exactly_spelled_pending_account(
+    app, create_user
+):
+    create_user('dup.shell@moh.gov.rw', overwrite=True)
+
+    assert _column(app, 11, 'first_name') == 'Script'
+    assert _column(app, 10, 'first_name') == 'First'
+    assert _column(app, 10, 'username') == 'Dup.Shell@moh.gov.rw'

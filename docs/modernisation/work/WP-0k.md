@@ -1,7 +1,7 @@
 ---
 wp: "0k"
 title: "Build outgoing links from the configured origin; match usernames exactly"
-status: review
+status: ready
 owner_role: "backend"
 instances:
   - name: "lead-1"
@@ -270,6 +270,14 @@ Security asks the human to accept:
     - mypy: no issues in 533 files.
   - **Joint merge with WP-0j dd186b0b** (scratch, not pushed): no conflicts; with the harness patch, `tests/privilege_escalation` 179 passed and `tests/web` 618 passed.
 
+- 2026-10-06 backend-0k round 5:
+  - 6e44b914 makes the reset's conditional write also require an active or pending status, so a deactivation made after the checks is not undone. Check: its test fails before the change (`DID NOT RAISE`).
+  - The QA r4 pins merged (6826399a, 5358 passed); reviewer, security and QA approvals recorded.
+  - a567518f pins the empty-token guard for a pending account and the early token compare before bcrypt; each test fails with its guard removed. It also fixes the legacy-token comment and the R-5/R-7 wording (`USER_AUTO_LOGIN` is off on `main`).
+  - Merged `origin/mig/integration` at b1aa182f exactly (7d5c1f85).
+  - Check on 7d5c1f85: `ci/pytest_suites.sh` all 16 suites passed (authz 4681 passed, 677 skipped; privilege_escalation 91; web 621, 12 `stack` deselected, 1 xfailed); the Postgres clock tests 12 passed; `ci/lint_python.sh b1aa182f` clean (61 files); 3.8 guard 913 files, 0 problems; mypy no issues in 533 files.
+  - Status `ready`.
+
 ## Interrogate (units 6 to 9)
 
 `pstack:interrogate` on `git diff f701e1c..84f0049 -- web/server`, three reviewers (opus, fable, sonnet), prompt at `/tmp/wp0k-interrogate-prompt.md`. The lead received A's and C's reports and ruled on them (round 2); B's report reached me. Outcome:
@@ -298,6 +306,6 @@ Security asks the human to accept:
 
 | Role | Verdict | Notes |
 |---|---|---|
-| qa | changes-requested | 2026-10-06 qa r4 at cce8ed1a (code 73219005): round-2 findings closed; 15 suites green; fail-first confirmed for 8305190d, 9b8e5e2a, b90bcf60; joint merge with 0j dd186b0b clean (privilege_escalation 179); live: 57 probes pass (single-use reset, races one winner, create_user refusals, T-5/T-6); integration code with head pins flips exactly 84. Blocking: (1) qa-owned pin test_api_tokens.py:221 fails on head (shell keeps a password; clear it so it models a pending invitation; log says 5352, actual 5351+1); add R-7 live pins. (2) front matter: add qa-0k-pins instance for tests/authz/http/{conftest,stack,test_accounts,test_links}.py and tests/authz/stack.sh. (3) optional: reset _spend_token should also require status in (ACTIVE, PENDING) so a concurrent deactivation is not undone. |
+| qa | approved | 2026-10-06 qa r5 at af27489d: head pins 5358 passed 0 failed on one fresh stack; finding 3 closed by 6e44b914 (fail-before confirmed); tests/web 619+1 xfail; static clean; round-4 results stand (15 suites, clock tests, joint merge with 0j, 84 flips on integration, live probes). |
 | reviewer | approved | 2026-10-06 rev r2 at cce8ed1a: both round-2 findings closed (old sessions count any account except a password-less pending invitation; single-use conditional token write, spent == forged; mutants killed except the redundant constant-time compare); 15 suites green on head and on the joint 0j dd186b0b + 0l 4f29d746 merge (privilege_escalation 252, web 644+1, authz 4681) resolved per 0l's notes (keep find_named_account in try_get_user, take 0l resource.py, drop two unused imports, no_mail patches deployment_url, strict xfail flips); condition: qa-0k-pins instance (landed af27489d); lows: reset write status condition (landed 6e44b914), empty-token registration test missing in test_registration.py, duplicate token check (keep as early exit before bcrypt with a test), wording nits (test_username_matching.py:69-71; R-5/R-7 Before wording: USER_AUTO_LOGIN False on main). |
 | security | approved | 2026-10-06 sec r4 at cce8ed1a (code 73219005), live stack: F-C fixed (spent, second-use, older, empty, forged, deactivated reset tokens all 400 with unchanged hash; four-way races admit one writer on reset and register, closes I-1); F-B fixed (legacy session with pending-with-password twin signs in nobody, no regression); semgrep 0 on the range; R-7 matches live behaviour. F-A permission cache keyed by username is pre-existing High on main, out of this diff: hotfix PR #25. Human must accept rows L-1..L-5, U-1..U-8, R-1..R-7, T-1..T-6, D-1..D-4 and carried risks (unhashed tokens to 5d). |

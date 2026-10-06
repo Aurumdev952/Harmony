@@ -1210,3 +1210,29 @@ def test_signing_in_with_a_look_alike_username_never_acts_as_its_account(app, db
     )
 
     assert response.status_code in (401, 403)
+
+
+# Round 3 (reviewer r2 F2): sharing the second of two same-named resources with
+# a group lands on that one. Both rows are equal by name, so only acting on the
+# resource in the URL can pick the second.
+
+
+def test_sharing_the_second_twin_with_a_group_lands_on_it(db, make_user):
+    name = f't{_tag()}_x'
+    first_id = _resource(db, name).id
+    second_id = _resource(db, name).id
+    actor = make_user()
+    _grant_user(db, actor.id, 'dashboard_admin', second_id)
+    group = _group(db, f'group-{_tag()}')
+    group_id, group_name = group.id, group.name
+
+    response = _share(
+        actor,
+        second_id,
+        {actor.username: ['dashboard_admin']},
+        {group_name: ['dashboard_viewer']},
+    )
+
+    assert response.status_code == 204
+    assert _group_acls(db, second_id) == {(group_id, 'dashboard_viewer')}
+    assert _group_acls(db, first_id) == set()

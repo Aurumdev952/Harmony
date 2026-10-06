@@ -120,13 +120,19 @@ placeholder_env() {
   done
 }
 
-# image_tag <repo root>: the web image's inputs from that tree. Since WP-2f the
-# requirements files are exported from pyproject.toml and uv.lock, so those
-# count too where the tree has them: a lock change the export missed still
-# rebuilds.
+# image_tag <repo root>: the web image's inputs from that tree. Before WP-3b the
+# image installed the requirements files (exported from pyproject.toml and
+# uv.lock since WP-2f); from WP-3b it installs uv.lock and the requirements files
+# are gone. Each counts where the tree has it, in a fixed order, so an older
+# reference keeps its tag and its cached image.
 image_tag() {
-  local inputs=("$1/requirements.txt" "$1/requirements-web.txt"
-    "$1/docker/web/Dockerfile_web-server" "${HERE}/stack/Dockerfile") name
+  local inputs=() name
+  for name in requirements.txt requirements-web.txt; do
+    if [[ -f "$1/${name}" ]]; then
+      inputs+=("$1/${name}")
+    fi
+  done
+  inputs+=("$1/docker/web/Dockerfile_web-server" "${HERE}/stack/Dockerfile")
   for name in pyproject.toml uv.lock; do
     if [[ -f "$1/${name}" ]]; then
       inputs+=("$1/${name}")

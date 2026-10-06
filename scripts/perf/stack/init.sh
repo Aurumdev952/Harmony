@@ -4,7 +4,7 @@
 # WP-2c's tests/contract/stack/init.sh), then registers the newest Druid
 # datasource as the pipeline's validate step does. Runs inside web-init.
 set -euo pipefail
-cd /zenysis
+cd /src
 : "${PERF_PASSWORD:?set by scripts/perf/stack.sh up}"
 
 echo 'perf-init: flask db upgrade'

@@ -17,12 +17,17 @@
 #   baseline.py's paired runs. The reference has its own Redis: from WP-1b the
 #   result cache lives there, and a shared one would let either side answer
 #   from bytes the other cached (decision 0011).
+#
+# Every service that runs a web image runs a checkout mounted read-only at /src,
+# not at /zenysis: since WP-3b the image keeps its packages in /zenysis/.venv,
+# and a mount there hides them. An image older than WP-3b installs its packages
+# outside /zenysis, so a pre-3b reference runs the same way.
 name: ${PERF_PROJECT:?run scripts/perf/stack.sh}-web
 
 x-web-env: &web-env
   ZEN_ENV: harmony_demo
-  ZEN_HOME: /zenysis
-  PYTHONPATH: /zenysis
+  ZEN_HOME: /src
+  PYTHONPATH: /src
   PYTHONDONTWRITEBYTECODE: "1"
   DATABASE_URL: postgresql://postgres:${POSTGRES_PASSWORD:?}@postgres:5432/harmony_demo-local
   SQLALCHEMY_DATABASE_URI: postgresql://postgres:${POSTGRES_PASSWORD:?}@postgres:5432/harmony_demo-local
@@ -83,14 +88,14 @@ services:
   web-init:
     image: ${PERF_WEB_IMAGE:?}
     networks: [internal, druid]
-    working_dir: /zenysis
+    working_dir: /src
     volumes:
-      - ${PERF_REPO_ROOT:?}:/zenysis:ro
+      - ${PERF_REPO_ROOT:?}:/src:ro
     environment:
       <<: *web-env
       PERF_USERNAME: ${PERF_USERNAME:?}
       PERF_PASSWORD: ${PERF_PASSWORD:?}
-    command: ["/bin/bash", "/zenysis/scripts/perf/stack/init.sh"]
+    command: ["/bin/bash", "/src/scripts/perf/stack/init.sh"]
     depends_on:
       postgres:
         condition: service_healthy
@@ -109,9 +114,9 @@ services:
   web:
     image: ${PERF_WEB_IMAGE:?}
     networks: [internal, druid, edge]
-    working_dir: /zenysis
+    working_dir: /src
     volumes:
-      - ${PERF_REPO_ROOT:?}:/zenysis:ro
+      - ${PERF_REPO_ROOT:?}:/src:ro
     environment:
       <<: *web-env
       ZEN_GUNICORN_WORKER_THREADS: "4"
@@ -148,9 +153,9 @@ services:
     image: ${PERF_REFERENCE_IMAGE:?}
     profiles: [reference]
     networks: [internal, druid, edge]
-    working_dir: /zenysis
+    working_dir: /src
     volumes:
-      - ${PERF_REFERENCE_DIR:?}/src:/zenysis:ro
+      - ${PERF_REFERENCE_DIR:?}/src:/src:ro
     environment:
       <<: *web-env
       REDIS_HOST: redis-reference
@@ -179,16 +184,16 @@ services:
     image: ${PERF_WEB_IMAGE:?}
     profiles: [index]
     networks: [druid]
-    working_dir: /zenysis
+    working_dir: /src
     volumes:
-      - ${PERF_REPO_ROOT:?}:/zenysis:ro
+      - ${PERF_REPO_ROOT:?}:/src:ro
       - share:/home/share
       - ${PERF_SCRATCH:?}/pipeline/out:/pipeline-out:ro
     environment:
       ZEN_ENV: harmony_demo
-      ZEN_HOME: /zenysis
-      PYTHONPATH: /zenysis
+      ZEN_HOME: /src
+      PYTHONPATH: /src
       PYTHONDONTWRITEBYTECODE: "1"
       DRUID_HOST: http://druid
       DEFAULT_SECRET_KEY: ${DEFAULT_SECRET_KEY:?}
-    command: ["/bin/bash", "/zenysis/scripts/perf/stack/index.sh"]
+    command: ["/bin/bash", "/src/scripts/perf/stack/index.sh"]

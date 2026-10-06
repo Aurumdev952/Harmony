@@ -7,13 +7,15 @@ scripts/perf on the path.
 
 from __future__ import annotations
 
+import hashlib
 import json
 import math
 import os
 import random
+import re
 import statistics
 import subprocess
-from pathlib import Path
+from pathlib import Path, PurePosixPath
 
 import baseline
 import pytest
@@ -835,6 +837,156 @@ def test_the_image_tag_follows_pyproject_and_uv_lock_when_present(tmp_path: Path
     tags = [without_lock, with_lock, lock_changed, pyproject_changed]
     assert all(len(tag) == 12 for tag in tags)
     assert len(set(tags)) == 4
+
+
+def test_the_image_tag_needs_no_requirements_files(tmp_path: Path):
+    # WP-3b deleted requirements*.txt: the image installs from uv.lock alone.
+    (tmp_path / 'docker/web').mkdir(parents=True)
+    (tmp_path / 'docker/web/Dockerfile_web-server').write_text('FROM python\n')
+    (tmp_path / 'pyproject.toml').write_text('[project]\n')
+    (tmp_path / 'uv.lock').write_text('version = 1\n')
+    result = subprocess.run(
+        ['bash', '-c', f'source {STACK_SH}\nimage_tag {tmp_path}\n'],
+        capture_output=True,
+        text=True,
+        check=False,
+    )
+    assert result.returncode == 0, result.stderr
+    assert result.stderr == ''
+    before = result.stdout.strip()
+    (tmp_path / 'uv.lock').write_text('version = 2\n')
+    assert _image_tag(tmp_path) != before
+
+
+def test_a_pre_wp_3b_tree_keeps_its_image_tag(tmp_path: Path):
+    # A reference older than WP-3b has the requirements files; its tag must not
+    # move, so its cached image is reused.
+    files = {
+        'requirements.txt': 'flask==1.0.1\n',
+        'requirements-web.txt': 'gunicorn\n',
+        'docker/web/Dockerfile_web-server': 'FROM python\n',
+        'pyproject.toml': '[project]\n',
+        'uv.lock': 'version = 1\n',
+    }
+    for name, text in files.items():
+        (tmp_path / name).parent.mkdir(parents=True, exist_ok=True)
+        (tmp_path / name).write_text(text)
+    overlay = (baseline.HERE / 'stack/Dockerfile').read_bytes()
+    ordered = [
+        files['requirements.txt'].encode(),
+        files['requirements-web.txt'].encode(),
+        files['docker/web/Dockerfile_web-server'].encode(),
+        overlay,
+        files['pyproject.toml'].encode(),
+        files['uv.lock'].encode(),
+    ]
+    expected = hashlib.sha256(b''.join(ordered)).hexdigest()[:12]
+    assert _image_tag(tmp_path) == expected
+
+
+# --- web.yaml: where the checkout is mounted ------------------------------------
+
+_PERF_COMPOSE_ENV = {
+    name: 'x'
+    for name in (
+        'DEFAULT_SECRET_KEY',
+        'HASURA_ADMIN_SECRET',
+        'JWT_SECRET_KEY',
+        'PERF_PASSWORD',
+        'POSTGRES_PASSWORD',
+        'REDIS_PASSWORD',
+        'PERF_USERNAME',
+    )
+} | {
+    'PERF_WEB_IMAGE': 'perf-candidate-image',
+    'PERF_REFERENCE_IMAGE': 'perf-reference-image',
+    'PERF_PROJECT': 'perf-test',
+    'PERF_REFERENCE_DIR': '/tmp/perf-test/reference',
+    'PERF_REPO_ROOT': '/tmp/perf-test/repo',
+    'PERF_SCRATCH': '/tmp/perf-test',
+    'PERF_STACK_DIR': '/tmp/perf-test/stack',
+    'PERF_WEB_PORT': '1',
+    'PERF_UI_PORT': '2',
+    'PERF_REFERENCE_WEB_PORT': '3',
+    'PERF_REFERENCE_UI_PORT': '4',
+}
+_CHECKOUTS = {
+    'perf-candidate-image': '/tmp/perf-test/repo',
+    'perf-reference-image': '/tmp/perf-test/reference/src',
+}
+
+
+def _image_venv() -> PurePosixPath:
+    """Where the web image keeps its Python environment (WP-3b)."""
+    dockerfile = (
+        baseline.HERE.parents[1] / 'docker/web/Dockerfile_web-server'
+    ).read_text()
+    (venv,) = re.findall(r'UV_PROJECT_ENVIRONMENT=(\S+)', dockerfile)
+    return PurePosixPath(venv)
+
+
+def _web_image_services(tmp_path: Path) -> dict[str, dict]:
+    """Every service that runs a web image, as Compose renders web.yaml with
+    every profile."""
+    profiles = [
+        arg for name in ('reference', 'index', 'ui') for arg in ('--profile', name)
+    ]
+    done = subprocess.run(
+        ['docker', 'compose', '-f', str(baseline.HERE / 'stack/web.yaml'), *profiles]
+        + ['config', '--format', 'json'],
+        env={'PATH': os.environ['PATH'], 'HOME': str(tmp_path), **_PERF_COMPOSE_ENV},
+        capture_output=True,
+        text=True,
+        check=False,
+    )
+    assert done.returncode == 0, done.stderr
+    services = json.loads(done.stdout)['services']
+    return {
+        name: service
+        for name, service in services.items()
+        if service.get('image') in _CHECKOUTS
+    }
+
+
+def test_every_web_image_service_is_found(tmp_path: Path):
+    assert set(_web_image_services(tmp_path)) == {
+        'web-init',
+        'web',
+        'web-reference',
+        'indexer',
+    }
+
+
+def test_no_mount_hides_the_image_venv(tmp_path: Path):
+    # A mount at the venv or above it hides the image's packages: web-init
+    # exited 127 (`/zenysis/.venv/bin/flask: cannot execute`).
+    venv = _image_venv()
+    for name, service in _web_image_services(tmp_path).items():
+        for volume in service.get('volumes', []):
+            target = PurePosixPath(volume['target'])
+            assert not (venv == target or target in venv.parents), (name, volume)
+
+
+def test_each_web_image_service_runs_its_own_checkout(tmp_path: Path):
+    # The candidate runs this checkout and the reference its unpacked commit,
+    # from the directory they are mounted at, whatever the image holds.
+    for name, service in _web_image_services(tmp_path).items():
+        checkout = _CHECKOUTS[service['image']]
+        (mount,) = [v for v in service['volumes'] if v['source'] == checkout]
+        assert mount['read_only'] is True, name
+        target = mount['target']
+        assert service['working_dir'] == target, name
+        assert service['environment']['PYTHONPATH'] == target, name
+        assert service['environment']['ZEN_HOME'] == target, name
+        command = ' '.join(service['command'])
+        assert '/zenysis/' not in command, (name, command)
+
+
+def test_the_stack_scripts_start_in_the_mounted_checkout():
+    # init.sh and index.sh cd to the checkout before running anything.
+    for script in ('init.sh', 'index.sh'):
+        text = (baseline.HERE / 'stack' / script).read_text()
+        assert re.search(r'^cd /src$', text, re.MULTILINE), script
 
 
 def _git(repo: Path, *args: str) -> str:

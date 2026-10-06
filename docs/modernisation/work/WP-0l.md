@@ -1,7 +1,7 @@
 ---
 wp: "0l"
 title: "Match resource, role, group and user names exactly, never as patterns"
-status: changes-requested
+status: review
 owner_role: "backend"
 instances:
   - name: "backend-0l"
@@ -56,6 +56,20 @@ Units, in order. Each line names the change and the check that ends it. Every un
 6. INV-3 table with the decision 0012 rows, and a live before/after on one stack.
 7. Full checks: `tests/web`, `tests/privilege_escalation`, the `tests/authz` pure layer, lint, mypy, `ci/check_py38_syntax.py` on CPython 3.8.20, `ci/pytest_suites.sh`, `task_gate.py WP-0l`. Then `status: review`.
 
+Round 2 (reviewer, QA and security verdicts at 3be8206). Each item is test-first with one commit, in the lead's order. Reviewer items:
+- 2: one-dashboard transfer.
+- 5: sitewide ACL after name resolution.
+- 4: twin pins.
+- 6: ACLs resolved by `$uri`, plus security's existence-oracle follow-up.
+- 1: the merge-order pin and INV-3 row 15.
+- 3: merge notes.
+- 7: tracked evidence.
+- 8: rows 3 and 6, with the `DELETE /roles` pin.
+- 9: the twin-name 404 pin.
+- 11: leftovers, with QA's row 11 item.
+
+Security items 2 and 3 (the log line and the null `resourceType`) are also done. Reviewer item 10 (delete the `POST /roles` routes, giving 405) is optional and not done: the routes answer 400, and deleting them would change the contract inventory for no security gain.
+
 ## Contract changes
 
 None.
@@ -105,6 +119,21 @@ One line per finished unit: `YYYY-MM-DD <instance> unit N: <what>; check: <comma
 - 2026-10-06 qa-0l-tests: contract `user.update_roles.assign` and `group.update_roles.assign` re-recorded 500 to 400 on a fresh stack from the WP-0l tree. This is the WP-0l behaviour: a non-empty legacy role map never wrote anything (it built `UserRoles`/`GroupRoles` with a `resource_id` they lack and a resource role id as `role_id`) and is now refused with `{message, status}`. The empty-map `*.update_roles.clear` cases are unchanged. No contract case covers `POST /api2/{user,group}/<id>/roles` (no client calls it). check: replay on that stack 233 passed, 1 failed (`storage.retrieve.unknown_slug` recorded 500, served 404: WP-0i's change, unrelated to WP-0l, not re-recorded here).
 - 2026-10-06 backend-0l security round 1, items 2 and 3 (25ec859): the cleared-roles log line names the username only; `get_resource_by_type_and_name` refuses a missing or non-string type or name with 400. Check: both new pins failed before (`'NoneType' object has no attribute 'upper'`; log line carried names and `IP:127.0.0.1`). `ci/pytest_suites.sh` all 13 suites pass (privilege_escalation 137, web 309); mypy clean; the 3.8 guard finds 0 problems. Lint is clean on every file except security's `WP-0l-evidence/security/probe.py` (round 2 unit 7).
 - 2026-10-06 backend-0l unit 6: INV-3 table (rows 1 to 13, with row 6 being decision 0012's amended path H) and the live before and after on one contract stack at a time (7c34bca, then bf75d1c). Merged qa fe2bb60 and `mig/integration` 290cd65 (cf395af). Check on cf395af: `ci/pytest_suites.sh` all 13 suites pass, including privilege_escalation 134, web 309 and authz 4681 ([log](WP-0l-evidence/pytest_suites_cf395af.txt)); contract replay on a fresh stack passes 234/234; `ci/lint_python.sh origin/mig/integration` clean; mypy clean; the 3.8 guard finds 0 problems in 871 files.
+- 2026-10-06 backend-0l round 2, one commit per item. Every pin failed before its fix, on the tree named, for the reason given:
+  - Item 2, 3ceb8b2: one-dashboard transfer. Before, the dashboard did not move. Row 14.
+  - Item 5, a2cf4269: sitewide ACL after name resolution. Before, the sitewide ACL row was stored on a 404. Row 9.
+  - Item 4, 58933475: twin pins. On 90a26f5 all three failed. Evidence: [twin_pins_on_90a26f5.txt](WP-0l-evidence/twin_pins_on_90a26f5.txt).
+  - Item 6, aed7d825: ACLs by `$uri`. Before, 404 instead of 200, 403 and 400.
+  - Security's oracle follow-up, 21221343: a resource the caller cannot see answers the same 404 as a missing one. Before, it answered 403. Row 7.
+  - Item 1, a14b76d9: merge-order pin. On this branch alone the sign-in gets 200 (strict xfail); on 290cd65 it passes. Row 15.
+  - Item 3, 8b681706: merge notes against WP-0k fa44242.
+  - Item 7, 277ee609: evidence tracked as `.txt`; `probe.py` exempt from lint.
+  - Item 8, 3d560908: `DELETE /roles` pin, which fails on 7c34bca. Rows 3 and 6.
+  - Item 9, c9685a49: a name two resources of a type share finds neither. Fails on 90a26f5.
+  - Item 11 and QA item 4, d78e755e and 8d9dafd4: a map naming no role still strips. Passes on 7c34bca, failed on the previous head. Row 11 rewritten; leftovers removed.
+  - QA merged: d975a521, cb4f3906 and 42555666.
+  
+  Check on a58c77fc: `ci/pytest_suites.sh` all 13 suites pass, including privilege_escalation 158 with 1 xfailed, web 309 and authz 4681 ([log](WP-0l-evidence/pytest_suites_round2.txt)). Contract replay on a fresh stack passes 234/234 ([log](WP-0l-evidence/contract_replay_round2.txt)). Lint and mypy are clean; the 3.8 guard finds 0 problems in 871 files.
 
 ## Evidence
 

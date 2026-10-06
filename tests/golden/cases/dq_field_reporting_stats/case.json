@@ -1,0 +1,5 @@
+{
+  "description": "Field reporting stats (indicator about panel).",
+  "endpoint": "field_reporting_stats",
+  "policy": null
+}

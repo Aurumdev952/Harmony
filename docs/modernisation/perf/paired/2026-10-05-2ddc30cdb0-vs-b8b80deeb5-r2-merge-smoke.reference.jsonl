@@ -1,0 +1,4 @@
+{"case_id": "bar_graph_sum_by_state_month", "endpoint": "bar_graph", "p50_ms": 85.4, "p95_ms": 243.2, "bytes": 159498, "druid_ms": 27.0, "n": 30, "min_ms": 54.4, "max_ms": 370.0, "druid_queries": 1}
+{"case_id": "line_graph_time_by_state", "endpoint": "line_graph", "p50_ms": 121.6, "p95_ms": 157.1, "bytes": 153390, "druid_ms": 38.5, "n": 30, "min_ms": 76.8, "max_ms": 163.4, "druid_queries": 2}
+{"case_id": "dq_data_quality_table", "endpoint": "data_quality_table", "p50_ms": 143.0, "p95_ms": 237.9, "bytes": 163081, "druid_ms": 80.0, "n": 30, "min_ms": 83.9, "max_ms": 520.1, "druid_queries": 2}
+{"case_id": "perf-mixed-6", "endpoint": "dashboard", "p50_ms": 827.8, "p95_ms": 999.6, "bytes": 1859680, "druid_ms": null, "n": 30, "min_ms": 697.7, "max_ms": 1238.9, "druid_queries": null}

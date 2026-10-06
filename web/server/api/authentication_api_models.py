@@ -1,7 +1,7 @@
+import hmac
 import json
 from http.client import OK, BAD_REQUEST
 from datetime import timedelta
-from http.client import OK
 
 from flask import current_app, jsonify, make_response, request
 from flask_potion import fields, Resource
@@ -9,6 +9,7 @@ from flask_potion.routes import Route
 from flask_potion.schema import FieldSet
 from flask_user.emails import send_password_changed_email
 from flask_user.signals import user_registered, user_reset_password
+from sqlalchemy import and_, update
 from werkzeug.exceptions import BadRequest
 
 from models.alchemy.user import User, UserStatusEnum
@@ -21,10 +22,35 @@ from web.server.api.authentication_api_schemas import (
 )
 from web.server.data.data_access import Transaction
 from web.server.errors import ItemNotFound
-from web.server.routes.views.admin import send_reset_password
+from web.server.routes.views.admin import (
+    may_set_password_from_reset,
+    send_reset_password,
+)
 from web.server.routes.views.authentication import try_authenticate_user
 from web.server.util.api_validation import GenericValidationError
+from web.server.security.usernames import username_taken
 from web.server.util.authentication import create_user_access_token, login_user
+
+
+def _spend_token(
+    session, user_id: int, token: str, password_hash: str, *conditions
+) -> bool:
+    '''Set account `user_id`'s password, activate it and clear its token, only
+    while it still holds `token`: of concurrent requests carrying one token,
+    one writes. The names typed at registration are not stored; `User` has no
+    columns for them (WP-5d).'''
+    result = session.execute(
+        update(User.__table__)
+        .where(
+            and_(User.id == user_id, User.reset_password_token == token, *conditions)
+        )
+        .values(
+            password=password_hash,
+            status_id=UserStatusEnum.ACTIVE.value,
+            reset_password_token='',
+        )
+    )
+    return result.rowcount == 1
 
 
 class AuthenticationResource(Resource):
@@ -70,10 +96,13 @@ class AuthenticationResource(Resource):
         # but the whole refresh token magic is too complicated for now
         expires = timedelta(days=365)
 
+        # The token names the account that signed in, not what the user typed.
         if set_cookie:
-            return login_user("login_successful", email, remember_me, expires)
+            return login_user(
+                "login_successful", user_authenticated, remember_me, expires
+            )
 
-        access_token = create_user_access_token(email, expires)
+        access_token = create_user_access_token(user_authenticated, expires)
         return jsonify(access_token=access_token)
 
     @Route.POST(
@@ -87,14 +116,24 @@ class AuthenticationResource(Resource):
         user_manager = current_app.user_manager
         with Transaction() as transaction:
             email = payload['email']
-            firstname = payload['firstname']
-            lastname = payload['lastname']
             password = payload['password']
             invite_token = payload['invite_token']
 
-            # if the token does not correspond to any user, do not allow registration
-            pending_user = transaction.find_one_by_fields(
-                User, True, {'reset_password_token': invite_token}
+            # Only a pending invitation registers. `reset_password_token`
+            # defaults to the empty string and also holds forgot-password
+            # tokens, so an empty token, or the token of an account that is
+            # not pending, would set another account's password.
+            pending_user = (
+                transaction.find_one_by_fields(
+                    User,
+                    True,
+                    {
+                        'reset_password_token': invite_token,
+                        'status_id': UserStatusEnum.PENDING.value,
+                    },
+                )
+                if invite_token
+                else None
             )
             if not pending_user:
                 raise BadRequest("Invalid invitation link")
@@ -102,24 +141,31 @@ class AuthenticationResource(Resource):
             if email != pending_user.username:
                 raise BadRequest("Registered email does not match the invited email")
 
-            # Enable user account
-            pending_user.status_id = UserStatusEnum.ACTIVE.value
+            # A pending account made by the case-blind invitations before WP-0k
+            # must not become a second active account equal to another
+            # ignoring case: that would move older sessions to it.
+            if username_taken(
+                pending_user.username,
+                transaction.run_raw(),
+                except_user_id=pending_user.id,
+                ignore_pending=True,
+            ):
+                raise BadRequest("Another account has this email address")
 
-            # Hash password field
-            hashed_password = user_manager.hash_password(password)
-            pending_user.password = hashed_password
-
-            pending_user.firstname = firstname
-            pending_user.lastname = lastname
-
-            # Add User record using named arguments 'user_fields'
-            transaction.add_or_update(pending_user)
+            if not _spend_token(
+                transaction.run_raw(),
+                pending_user.id,
+                invite_token,
+                user_manager.hash_password(password),
+                User.status_id == UserStatusEnum.PENDING.value,
+            ):
+                raise BadRequest("Invalid invitation link")
 
         # Send user_registered signal
         # pylint: disable=protected-access
         user_registered.send(current_app._get_current_object(), user=pending_user)
 
-        return login_user("registration_successful", email)
+        return login_user("registration_successful", pending_user)
 
     @Route.POST(
         '/forgot_password',
@@ -160,12 +206,30 @@ class AuthenticationResource(Resource):
             raise GenericValidationError({"token": "expired_token"})
 
         user = user_manager.get_user_by_id(user_id)
+        # The signature and age alone would let a token work for two days after
+        # it was used or replaced: it must still be the one the account holds.
+        if (
+            user is None
+            or not user.reset_password_token
+            or not hmac.compare_digest(user.reset_password_token, token)
+            or not may_set_password_from_reset(user)
+        ):
+            raise GenericValidationError({"token": "invalid_reset_link"})
 
-        hashed_password = current_app.user_manager.hash_password(password)
-        user.password = hashed_password
-
+        # A pending account that follows a reset link, as an admin can send to an
+        # invitee, sets its first password: it is registering.
         with Transaction() as transaction:
-            transaction.add_or_update(user)
+            if not _spend_token(
+                transaction.run_raw(),
+                user.id,
+                token,
+                user_manager.hash_password(password),
+                # A deactivation made after the checks above is not undone.
+                User.status_id.in_(
+                    [UserStatusEnum.ACTIVE.value, UserStatusEnum.PENDING.value]
+                ),
+            ):
+                raise GenericValidationError({"token": "invalid_reset_link"})
 
         if user_manager.enable_email and user_manager.send_password_changed_email:
             send_password_changed_email(user)
@@ -175,7 +239,7 @@ class AuthenticationResource(Resource):
         user_reset_password.send(current_app._get_current_object(), user=user)
 
         if user_manager.auto_login_after_reset_password:
-            return login_user("password_reset_success", user.username)
+            return login_user("password_reset_success", user)
 
         return make_response(
             jsonify({"msg": "password_reset_success"}),

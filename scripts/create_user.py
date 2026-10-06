@@ -13,16 +13,16 @@ from models.alchemy.user import User, UserRoles, UserStatusEnum
 from util.credentials.generate import generate_secure_password
 from util.credentials.provider import CredentialProvider
 from web.server.data.data_access import Transaction
+from web.server.security.usernames import find_named_account, username_taken
 from web.server.configuration.instance import load_instance_configuration_from_file
 
-# I have to import this model since it is referenced by the `User` model
-# pylint:disable=W0611
-# pylint:disable=ungrouped-imports
-from models.alchemy.api_token import APIToken
-from models.alchemy.dashboard import Dashboard
+# Imported for their side effect: the `User` model's relationships name these
+# models, so SQLAlchemy needs them registered before the mappers configure.
+from models.alchemy.api_token import APIToken  # noqa: F401
+from models.alchemy.dashboard import Dashboard  # noqa: F401
 from models.alchemy.permission import Permission, Role, RolePermissions
-from models.alchemy.query_policy import QueryPolicy, QueryPolicyRole
-from models.alchemy.security_group import GroupUsers
+from models.alchemy.query_policy import QueryPolicy, QueryPolicyRole  # noqa: F401
+from models.alchemy.security_group import GroupUsers  # noqa: F401
 
 PASSWORD_ENCRYPTION_SCHEME = ['bcrypt']
 PERMISSIVE_EMAIL_REGEX = re.compile(r'[^@]+@[^@]+\.[^@]+')
@@ -42,7 +42,7 @@ def get_user_string(user):
 
 
 def is_email_address(username):
-    return PERMISSIVE_EMAIL_REGEX.match(username) != None
+    return PERMISSIVE_EMAIL_REGEX.match(username) is not None
 
 
 def hash_password(password):
@@ -103,9 +103,32 @@ def create_user(
 
     hashed_password = hash_password(plaintext_password)
 
-    existing_user = transaction.find_one_by_fields(User, False, {'username': username})
+    # Equality ignoring case, never a LIKE pattern: `-o john_doe@…` must not
+    # overwrite `john.doe@…`. A username two accounts equal, neither exactly,
+    # names none of them, and a new account may not add a third.
+    session = transaction.run_raw()
+    existing_user = find_named_account(username, session)
+    if not existing_user and username_taken(username, session):
+        message = (
+            'Another account has username \'%s\' in another case. '
+            'Use its exact username.' % username
+        )
+        LOG.error(message)
+        raise ValueError(message)
 
     if existing_user and overwrite_user:
+        # Overwriting may not register a second account of a case-only pair:
+        # the result would leave two registered accounts equal ignoring case,
+        # which renames, registration and resets all refuse.
+        if status != UserStatusEnum.PENDING and username_taken(
+            username, session, except_user_id=existing_user.id, ignore_pending=True
+        ):
+            message = (
+                'Another registered account has username \'%s\' in another case; '
+                'overwriting would register a second one.' % username
+            )
+            LOG.error(message)
+            raise ValueError(message)
         LOG.info('User \'%s\' already exists but will be overwritten.', username)
     elif existing_user:
         message = (
@@ -237,8 +260,7 @@ def main():
         '--password',
         type=str,
         required=False,
-        help='The user\'s password. If none specified, this will be '
-        'auto-generated. ',
+        help='The user\'s password. If none specified, this will be auto-generated. ',
     )
     Flags.PARSER.add_argument(
         '-s',
@@ -346,11 +368,15 @@ def main():
             Flags.ARGS.test_user,
         )
         LOG.info(
-            'Successfully created/updated User \'%s\' with status \'%s\' and password \'%s\'.',
+            'Successfully created/updated User \'%s\' with status \'%s\'.',
             get_user_string(new_user),
             status.name,
-            plaintext_password,
         )
+        if not Flags.ARGS.password:
+            # The operator never saw a generated password; print it once, outside the log.
+            print(
+                f'Generated password for {get_user_string(new_user)}: {plaintext_password}'
+            )
 
     return 0
 

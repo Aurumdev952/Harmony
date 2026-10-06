@@ -1,0 +1,65 @@
+# How each Flask-Potion resource under /api2 is wired into authorisation, as it
+# is on main. ZenysisPrincipalMixin (web/server/security/permissions.py) maps the
+# CRUD methods onto four permissions, whatever a resource's Meta says:
+#
+#   read -> view_resource, create -> create_resource,
+#   update -> edit_resource, delete -> delete_resource
+#
+# and each one passes on RoleNeed('admin'), on the sitewide
+# ItemNeed(<op>, None, <type>), or on the item's ItemNeed(<op>, <id>, <type>).
+#
+# Reads never evaluate an item: list and item GETs filter the SQL query to the
+# ids the identity holds `view_resource` on (`identity_get_item_needs`), matched
+# against `list_filter_id`. Create, update and delete evaluate the item.
+#
+# `item_id` is an id at least one fixture principal holds a write need on for
+# that type (principals.yaml; test_every_item_id_is_held_as_a_write_need). The
+# stand-in item carries it in its id attribute and a different value in every
+# other id column. Types no principal holds per-item needs on have no item_id
+# and are checked on an id nobody holds.
+#
+# The query resources (query, query/granularities, query/dimension_values) need
+# the app's Druid metadata to register and are not covered here.
+
+methods: {read: view_resource, create: create_resource, update: edit_resource, delete: delete_resource}
+
+principal_resources:
+  UserAclResource: {type: user_acl, id: id}
+  UserResource: {type: user, id: id}                       # Meta {read: yes} has no effect (P2)
+  GroupAclResource: {type: group_acl, id: id}
+  GroupResource: {type: group, id: id}
+  BackendTypeResource: {type: resource-type, id: id}
+  BackendResource: {type: resource, id: id}
+  BackendResourceRole: {type: resource_role, id: id}
+  RoleResource: {type: role, id: id}
+  ConfigurationResource: {type: configuration, id: key}    # Meta {read: yes} has no effect (P2)
+  DashboardResource: {type: dashboard, id: resource_id, item_id: 7}
+  AlertDefinitionResource: {type: alert_definitions, id: authorization_resource_id, item_id: 11}
+  AlertNotificationResource:
+    type: alert_notifications
+    id: id
+    # Read is checked on the parent alert definition. The list filter joins on
+    # the parent's authorization_resource_id (correct). The item-level check
+    # (HybridRelationshipNeed.__call__) reads the parent's own primary key
+    # instead; no HTTP path calls it today (finding "Alert read_via").
+    read_via:
+      attribute: alert_definition
+      type: alert_definitions
+      item_id: 11
+      list_filter_id: authorization_resource_id
+      item_check_id: id
+  QueryPolicyResource: {type: query_policy, id: id}
+  PipelineRunMetadataResource: {type: pipeline_run_metadata, id: id}
+  DataUploadFileSummaryResource: {type: data_upload_file_summary, id: id}
+  SourceConfigResource: {type: source_config, id: id}
+  APITokenResource: {type: api-token, id: id}
+
+# No item-level permission at all: signing in (or public access with a Referer
+# header) is the only gate, plus whatever checks each custom route makes (P1).
+unprotected_resources:
+  - ShareAnalysisResource
+  - MetadataResource
+  - DataDigestResource
+  - UserQuerySessionResource
+  - ThumbnailStorageResource
+  - DashboardSessionResource

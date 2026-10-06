@@ -1,0 +1,34 @@
+[
+  [
+    {
+      "result": {
+        "yellow_fever_cases": 182.64,
+        "yellow_fever_cases__count": 43
+      },
+      "timestamp": "2024-01-01T00:00:00.000Z"
+    },
+    {
+      "result": {
+        "yellow_fever_cases": 210.0,
+        "yellow_fever_cases__count": 57
+      },
+      "timestamp": "2024-02-01T00:00:00.000Z"
+    },
+    {
+      "result": {
+        "yellow_fever_cases": 139.0,
+        "yellow_fever_cases__count": 42
+      },
+      "timestamp": "2024-03-01T00:00:00.000Z"
+    }
+  ],
+  [
+    {
+      "result": {
+        "yellow_fever_cases": 118.0,
+        "yellow_fever_cases__count": 5
+      },
+      "timestamp": "2024-01-01T00:00:00.000Z"
+    }
+  ]
+]

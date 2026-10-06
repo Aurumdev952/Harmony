@@ -1,0 +1,7 @@
+{"key": {"StateName": "", "MunicipalityName": "140005", "Age": "34", "Sex": "M", "Death": "NAO"}, "data": {"yellow_fever_cases": 2, "yellow_fever_test_indicator": 10}, "Real_Date": "2020-01-15", "source": "yellow_fever"}
+{"key": {"StateName": "", "MunicipalityName": "140005", "Age": "29", "Sex": "F", "Death": "SIM"}, "data": {"yellow_fever_cases": 1, "yellow_fever_test_indicator": 5}, "Real_Date": "2020-01-15", "source": "yellow_fever"}
+{"key": {"StateName": "", "MunicipalityName": "140045", "Age": "41", "Sex": "F", "Death": "NAO"}, "data": {"yellow_fever_cases": 2, "yellow_fever_test_indicator": 10}, "Real_Date": "2020-02-15", "source": "yellow_fever"}
+{"key": {"StateName": "", "MunicipalityName": "210060", "Age": "8", "Sex": "M", "Death": "NAO"}, "data": {"yellow_fever_cases": 1, "yellow_fever_test_indicator": 5}, "Real_Date": "2020-03-04", "source": "yellow_fever"}
+{"key": {"StateName": "", "MunicipalityName": "210060", "Age": "8", "Sex": "M", "Death": "NAO"}, "data": {"yellow_fever_cases": 1, "yellow_fever_test_indicator": 5}, "Real_Date": "2020-03-04", "source": "yellow_fever"}
+{"key": {"StateName": "", "MunicipalityName": "150270", "Age": "55", "Sex": "M", "Death": "SIM"}, "data": {"yellow_fever_cases": 2, "yellow_fever_test_indicator": 10}, "Real_Date": "2019-12-31", "source": "yellow_fever"}
+{"key": {"StateName": "", "MunicipalityName": "140045", "Age": "70", "Sex": "M", "Death": "IGN"}, "data": {"yellow_fever_cases": 1, "yellow_fever_test_indicator": 5}, "Real_Date": "2018-07-01", "source": "yellow_fever"}

@@ -1,0 +1,49 @@
+{
+  "git_dirty": false,
+  "started_utc": "2026-10-05T20:54:29+00:00",
+  "host": {
+    "cpu": "Intel(R) Core(TM) Ultra 9 285H",
+    "logical_cpus": 16,
+    "memory_gib": 62.2,
+    "kernel": "7.0.0-38-generic",
+    "load_average_at_start": [
+      12.94,
+      19.63,
+      15.57
+    ],
+    "load_average_at_end": [
+      20.11,
+      15.47,
+      14.32
+    ]
+  },
+  "method": {
+    "rounds": 100,
+    "warmup_rounds": 3,
+    "concurrency": 1,
+    "interval": "2023-01-01/2026-01-01",
+    "interval_overrides": {
+      "table_disaggregated": "2025-12-01/2026-01-01"
+    },
+    "caches": "warm (Druid broker and historical caches on, as druid_setup ships them)",
+    "percentiles": "linear interpolation between closest ranks",
+    "druid_ms": "median over rounds of the summed broker query/time per request",
+    "pairing": "reference and candidate apps on one host against one Druid; each round sends the case to both, reference first in even rounds and candidate first in odd ones; a case regresses when its p95 ratio or its paired median ratio (median over rounds of candidate over reference time) is above 1.10 with a paired-bootstrap lower bound above 1; every request on a new connection",
+    "dashboards": {
+      "rounds": 30,
+      "warmup_rounds": 2,
+      "view": "?screenshot=1 at 1440x900, fresh browser context per load, requests leaving the stack aborted",
+      "end": "first frame with every query tile rendered",
+      "bytes": "median of headers plus encoded bodies received before the last tile"
+    }
+  },
+  "docker": "29.8.2",
+  "druid_version": "0.23.0",
+  "datasources": [
+    "harmony_demo_20261004"
+  ],
+  "reference_sha": "01d5bdf47fb8660e4f50525b3b8161bca37774e2",
+  "candidate_sha": "01d5bdf47fb8660e4f50525b3b8161bca37774e2",
+  "dataset": "scripts/perf/dataset.py seed 20261004: 200,000 yellow-fever cases, 2023-01-01..2025-12-31, 579 municipalities; 387,918 Druid rows in harmony_demo_20261004",
+  "finished_utc": "2026-10-05T21:15:07+00:00"
+}

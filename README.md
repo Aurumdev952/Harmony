@@ -141,6 +141,12 @@ DRUID_HOST=<druid host goes here>
 ZEN_ENV=<environment>
 DEV=1
 DOCKER_HOST=
+# Secrets. Compose refuses to start when any of these is missing; generate each with `openssl rand -hex 32`.
+DEFAULT_SECRET_KEY=
+JWT_SECRET_KEY=
+HASURA_ADMIN_SECRET=
+REDIS_PASSWORD=
+POSTGRES_PASSWORD=
 ```
 
 > `DEV=1` indicates to the Makefile that you are in "development" mode, and uses the appropriate docker compose files.
@@ -386,8 +392,17 @@ Before deploying the web server, we need to setup some configuration to ensure e
 Create a `.env` file and copy paste the below, updating all values as needed.
 
 ```properties
+# secrets: required; Compose refuses to start without them. Generate each with `openssl rand -hex 32`.
+# Upgrading an existing deployment: set these before pulling; users sign in again once (JWT key is now
+# separate from the session key) and API tokens must be reissued.
+DEFAULT_SECRET_KEY=
+JWT_SECRET_KEY=
+HASURA_ADMIN_SECRET=
+REDIS_PASSWORD=
+POSTGRES_PASSWORD=
+
 # docker related:
-DOCKER_NAMESPACE=zengineering
+DOCKER_NAMESPACE=ghcr.io/zenysis
 DOCKER_TAG=latest
 # DOCKER_HOST=ssh://<WEB_REMOTE>
 WEB_REMOTE=<ip or dns that maps to the web server, usually some private ip/dns>
@@ -426,7 +441,7 @@ MAPBOX_ACCESS_TOKEN=<mapbox access token>
 
 #### Pre-built
 
-There are pre-built Harmony Docker images that can be found at [hub.docker.com](https://hub.docker.com/r/zengineering/harmony-web) for:
+There are pre-built Harmony Docker images published by the GitHub Actions workflows to the GitHub Container Registry under `ghcr.io/zenysis` (the Docker Hub `zengineering` images stopped being updated in November 2023) for:
 
 - harmony-web-server
 - harmony-web-client
@@ -436,7 +451,7 @@ There are pre-built Harmony Docker images that can be found at [hub.docker.com](
 
 In certain cases you would want to make changes to Harmony or setup your own config pre-built in the Docker image, for that you can run the below:
 
-> Set DOCKER_NAMESPACE, DOCKER_TAG in your .env file
+> Set DOCKER_NAMESPACE and DOCKER_TAG in your .env file. `make push` publishes the images `make build` produced.
 
 ```bash
 # build everything

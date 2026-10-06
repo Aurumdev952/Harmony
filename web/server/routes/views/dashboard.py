@@ -8,8 +8,9 @@ import sqlalchemy
 from sqlalchemy.orm import aliased
 from slugify import slugify
 
-from flask import current_app, g, url_for
+from flask import current_app, g
 from flask_user import current_user
+from werkzeug.exceptions import Forbidden, NotFound
 
 from log import LOG
 from models.alchemy.dashboard import Dashboard, DashboardUserMetadata
@@ -26,7 +27,7 @@ from models.python.dashboard import (
 from models.python.dashboard.latest.model import (
     DashboardItemHolder,
 )
-from web.server.data.data_access import find_one_by_fields, find_by_id, Transaction
+from web.server.data.data_access import find_by_id, get_db_adapter, Transaction
 from web.server.data.dashboard_specification import ValidationFault, ValidationResult
 from web.server.errors import (
     BadDashboardSpecification,
@@ -39,10 +40,13 @@ from web.server.routes.views.authorization import is_authorized
 from web.server.routes.views.feed import add_share_notification
 from web.server.routes.views.users import add_user_acl, get_current_user, try_get_user
 from web.server.routes.views.page_renderer import (
+    EMAIL_SLOT_WAIT_SECONDS,
+    RendersInFlight,
     grid_dashboard_to_pdf,
     grid_dashboard_to_image,
 )
 
+from web.server.util.deployment_links import page_args, shared_page_url
 from web.server.util.util import get_user_string, get_dashboard_title
 
 
@@ -109,9 +113,26 @@ def upgrade_dashboard_specification(specification):
 
 
 def get_dashboard(slug, session=None) -> Dashboard:
-    return find_one_by_fields(
-        Dashboard, case_sensitive=False, search_fields={'slug': slug}, session=session
+    # Equal ignoring case, not ILIKE: '%' and '_' in a requested slug are not
+    # wildcards, so a 403 versus a 404 does not reveal which slugs exist.
+    session = session or get_db_adapter().session
+    return (
+        session.query(Dashboard)
+        .filter(sqlalchemy.func.lower(Dashboard.slug) == sqlalchemy.func.lower(slug))
+        .first()
     )
+
+
+def get_viewable_dashboard(slug) -> Dashboard:
+    '''The dashboard page's lookup and `view_resource` check, answered with a
+    status code (404 or 403) instead of a page.
+    '''
+    dashboard = get_dashboard(slug)
+    if not dashboard:
+        raise NotFound()
+    if not is_authorized('view_resource', 'dashboard', dashboard.resource_id):
+        raise Forbidden()
+    return dashboard
 
 
 def add_item_holder_to_dashboard(dashboard: Dashboard, raw_item_holder: dict):
@@ -162,7 +183,7 @@ def convert_and_upgrade_specification(dashboard_specification):
 
 
 def format_and_upgrade_specification(
-    dashboard_specification: Dict[str, Any]
+    dashboard_specification: Dict[str, Any],
 ) -> Dict[str, Any]:
     try:
         final_specification = convert_and_upgrade_specification(dashboard_specification)
@@ -187,7 +208,7 @@ class SpecificationTuple(TypedDict):
 
 # pylint: disable=invalid-name
 def format_and_upgrade_specification_list(
-    spec_list: Union[List[SpecificationTuple], List[Tuple[str, Dict[str, Any]]]]
+    spec_list: Union[List[SpecificationTuple], List[Tuple[str, Dict[str, Any]]]],
 ) -> List[SpecificationTuple]:
     '''This function is used to upgrade a list of dashboard specifications,
     not just a single one. This function will attempt to upgrade ALL the
@@ -372,6 +393,24 @@ class DashboardManager(AuthorizationResourceManager):
         ).first()
 
 
+def _render_for_email(render, locale, slug, auth_user_email, session_hash):
+    '''A render for an email, or None if it failed. It waits a while for the
+    sender's render slot. A share has already sent its notifications, so a
+    sender whose slot stays busy gets a failed render, as any other failure,
+    rather than a 503.
+    '''
+    try:
+        return render(
+            locale,
+            slug,
+            auth_user_email=auth_user_email,
+            session_hash=session_hash,
+            slot_wait_seconds=EMAIL_SLOT_WAIT_SECONDS,
+        )
+    except RendersInFlight:
+        return None
+
+
 def get_email_attachments(
     auth_user_email,
     slug,
@@ -381,26 +420,27 @@ def get_email_attachments(
 ):
     attachments = []
     image_name = None
+    locale, session_hash = page_args(dashboard_url, 'dashboard.grid_dashboard')
     if should_attach_pdf:
-        render_response = grid_dashboard_to_pdf(
-            name=slug, dashboard_url=dashboard_url, auth_user_email=auth_user_email
+        rendered_pdf = _render_for_email(
+            grid_dashboard_to_pdf, locale, slug, auth_user_email, session_hash
         )
-        if render_response.status_code != 200:
-            g.request_logger.error(f'Failed to render dashboard: "{slug}" to PDF')
+        if rendered_pdf is None:
+            LOG.error(f'Failed to render dashboard: "{slug}" to PDF')
             return None, None
         attachments.append(
             (
                 'attachment',
-                (f'{slug}.pdf', base64.encodebytes(render_response.content).decode()),
+                (f'{slug}.pdf', base64.encodebytes(rendered_pdf.content).decode()),
             )
         )
 
     if should_embed_image:
-        image_render_response = grid_dashboard_to_image(
-            name=slug, dashboard_url=dashboard_url, auth_user_email=auth_user_email
+        rendered_image = _render_for_email(
+            grid_dashboard_to_image, locale, slug, auth_user_email, session_hash
         )
-        if image_render_response.status_code != 200:
-            g.request_logger.error(f'Failed to render dashboard: "{slug}" to JPEG')
+        if rendered_image is None:
+            LOG.error(f'Failed to render dashboard: "{slug}" to JPEG')
             return None, None
         image_name = f'{slug}.jpeg'
         attachments.append(
@@ -408,7 +448,7 @@ def get_email_attachments(
                 "inline",
                 (
                     f'{slug}.jpeg',
-                    base64.encodebytes(image_render_response.content).decode(),
+                    base64.encodebytes(rendered_image.content).decode(),
                 ),
             )
         )
@@ -431,11 +471,10 @@ def send_email(
         should_embed_image (bool): Value to embed image in email
         is_scheduled_report (bool): Value to schedule a report
     '''
-    dashboard_url = kwargs.get('dashboard_url')
-    if not dashboard_url:
-        dashboard_url = url_for(
-            'dashboard.grid_dashboard', name=dashboard.slug, _external=True
-        )
+    # The caller's link contributes only its locale and session hash.
+    dashboard_url = shared_page_url(
+        kwargs.get('dashboard_url'), 'dashboard.grid_dashboard', name=dashboard.slug
+    )
 
     should_attach_pdf = kwargs.get('should_attach_pdf')
     should_embed_image = kwargs.get('should_embed_image')
@@ -527,7 +566,8 @@ def share_dashboard_via_email(
         ):
             # When user exists but is unregistered on the platform, send email
             # but do not generate dashboard/pdf attachments
-            # NOTE: This prevents urlbox JWT from triggering identifies events
+            # A pending user has not signed up, so no render token is minted
+            # as them.
             kwargs['should_attach_pdf'] = False
             kwargs['should_embed_image'] = False
             send_email(
@@ -573,7 +613,7 @@ def attach_my_roles_to_dashboard_query(query, user_id=None):
         )
         .with_entities(
             sqlalchemy.func.array_agg(ResourceRole.name)
-            .filter(ResourceRole.name != None)  # pylint:disable=C0121
+            .filter(ResourceRole.name.isnot(None))
             .label('my_roles'),
             Dashboard.id.label('dashboard_id'),
         )
@@ -602,9 +642,7 @@ def attach_metadata_to_dashboard_query(
 
     # NOTE: I don't think a transaction is necessary for this
     # read only query, but it is an easy way to access the session.
-    with Transaction() as transaction:
-        session = transaction.run_raw()
-
+    with Transaction():
         # Include all dashboard columns. Otherwise, a new query will be issued EACH
         # TIME we access a dashboard value in the query result.
         dashboard_columns = [
@@ -647,9 +685,8 @@ def attach_metadata_to_dashboard_query(
                 query.with_entities(Dashboard.id), user_id
             )
             # Attach user info so we can extract the author username.
-            .outerjoin(User, Dashboard.author_id == User.id).add_columns(
-                *required_columns
-            )
+            .outerjoin(User, Dashboard.author_id == User.id)
+            .add_columns(*required_columns)
         )
 
         return full_query.group_by(Dashboard.id, User.id)
@@ -689,7 +726,7 @@ def _downgrade_dashboard_specification(specification):
 
 
 def format_and_downgrade_specification(
-    dashboard_specification: Dict[str, Any]
+    dashboard_specification: Dict[str, Any],
 ) -> Dict[str, Any]:
     raw_specification = json.loads(json.dumps(dashboard_specification))
     return _downgrade_dashboard_specification(raw_specification)

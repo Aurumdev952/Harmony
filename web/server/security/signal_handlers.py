@@ -1,12 +1,15 @@
+import hashlib
 import itertools
+import json
+from typing import Optional
 from logging import LoggerAdapter
-from uuid import uuid4
 
 from flask import g, request, request_started, session, current_app
 from flask_jwt_extended import (
     get_jwt_identity,
     verify_jwt_in_request_optional,
     get_jwt_claims,
+    get_raw_jwt,
 )
 from flask_user import user_logged_in, user_logged_out, current_user, user_registered
 from flask_potion.signals import before_create, before_update, before_delete
@@ -18,20 +21,32 @@ from flask_principal import (
     identity_changed,
     identity_loaded,
 )
-from jwt import ExpiredSignatureError
+from jwt import ExpiredSignatureError, InvalidSignatureError
+from sqlalchemy import DateTime, or_
+from sqlalchemy.ext.compiler import compiles
+from sqlalchemy.sql.expression import FunctionElement
 from werkzeug.exceptions import BadRequest
 
 from log import LOG
+from log.context import current_request_id, new_request_id
 from models.alchemy.api_token import APIToken
-from models.alchemy.user import User
+from models.alchemy.user import User, UserStatusEnum
 from models.python.permissions import DimensionFilter, QueryNeed
-from web.server.data.data_access import Transaction, get_db_adapter
+from web.server.data.data_access import get_db_adapter
 from web.server.routes.views.authentication import try_authenticate_user
 from web.server.routes.views.authorization import (
     AuthorizedOperation,
     WhitelistedPermission,
 )
+from web.server.routes.views.query_policy import canonical_policy
 from web.server.security.permissions import SuperUserPermission
+from web.server.security.usernames import find_legacy_token_account
+from web.server.util.authentication import USER_ID_CLAIM
+from web.server.security.render_tokens import (
+    RENDER_POLICY_CLAIM,
+    RENDER_TOKEN_QUERY_NEEDS,
+    is_spent_render_token,
+)
 from web.server.util.util import get_user_string, get_remote_ip_address
 
 
@@ -53,8 +68,8 @@ def initialize_request_logger(app, **kwargs):
     messages associated with a specific request by a user.
     '''
 
-    # Generate a unique Request ID
-    request_id = uuid4()
+    # The id the request id middleware bound, which the response header also carries.
+    request_id = current_request_id() or new_request_id()
     username = ''
     user_id = -1
     ip_address = get_remote_ip_address()
@@ -66,7 +81,7 @@ def initialize_request_logger(app, **kwargs):
     log_fields = {
         'username': username,
         'ip_address': ip_address,
-        'request_id': str(request_id),
+        'request_id': request_id,
         'user_id': user_id,
     }
 
@@ -162,6 +177,25 @@ def _compute_token_query_needs(token_query_needs):
     return result
 
 
+def render_token_query_needs():
+    '''The query needs a `query_needs: ['*']` token issued to the current user
+    resolves to: the policy a dashboard render made as that user runs under.
+    '''
+    return _compute_token_query_needs(RENDER_TOKEN_QUERY_NEEDS)
+
+
+def query_policy_fingerprint():
+    '''A stable digest of the query policy a render made as the current user runs
+    under. Two users share a cached thumbnail only when it is the same, and a
+    render token is refused once its user's digest no longer matches.
+    '''
+    if SuperUserPermission().can():
+        policy = 'superuser'
+    else:
+        policy = canonical_policy(render_token_query_needs())
+    return hashlib.sha256(json.dumps(policy, sort_keys=True).encode()).hexdigest()
+
+
 def _compute_token_provides(claims):
     needs = claims.get('needs', [])
     query_needs = claims.get('query_needs', [])
@@ -191,7 +225,14 @@ def _install_token_needs(identity):
 
     There's also a special dimension name `source` to control what sources are allowed.
     """
-    identity.provides = _compute_token_provides(get_jwt_claims())
+    claims = get_jwt_claims()
+    pinned_policy = claims.get(RENDER_POLICY_CLAIM)
+    if pinned_policy is not None and pinned_policy != query_policy_fingerprint():
+        # The user's policy changed after the render was requested; the render
+        # may be cached under the old digest, so it gets nothing.
+        identity.provides = set()
+        return
+    identity.provides = _compute_token_provides(claims)
 
 
 def on_identity_loaded(sender, identity):
@@ -275,45 +316,119 @@ def install_user_events_handlers(app):
         user.get_permissions.delete_memoized()
 
 
-def check_token_validity(token_id: str) -> bool:
+def api_token_user_id(token_id: str) -> Optional[int]:
+    '''The id of the account an API token was issued to, or None once the
+    token is revoked or deleted.'''
     db_session = get_db_adapter().session
     token = db_session.query(APIToken).filter_by(id=token_id).first()
-    return bool(token and not token.is_revoked)
+    return token.user_id if token and not token.is_revoked else None
+
+
+class database_time_from_epoch(FunctionElement):  # pylint: disable=invalid-name
+    '''Epoch seconds as a naive timestamp in the time zone `user.created` is
+    written in by `current_timestamp()`: the session time zone on Postgres,
+    UTC on SQLite. Both sides share a time zone, not a clock: if the server's
+    `TimeZone` setting changes, rows written before the change are misread by
+    the difference (WP-0k INV-3, T-3).'''
+
+    type = DateTime()
+    name = 'database_time_from_epoch'
+
+
+@compiles(database_time_from_epoch)
+def _unsupported_time_from_epoch(element, compiler, **kwargs):
+    raise NotImplementedError(f'database_time_from_epoch on {compiler.dialect.name}')
+
+
+@compiles(database_time_from_epoch, 'postgresql')
+def _postgres_time_from_epoch(element, compiler, **kwargs):
+    return f'CAST(to_timestamp({compiler.process(element.clauses, **kwargs)}) AS TIMESTAMP)'
+
+
+@compiles(database_time_from_epoch, 'sqlite')
+def _sqlite_time_from_epoch(element, compiler, **kwargs):
+    return f"datetime({compiler.process(element.clauses, **kwargs)}, 'unixepoch')"
+
+
+def account_for_token(
+    username: str, claims: dict, issued_at: Optional[int]
+) -> Optional[User]:
+    '''The active account a JWT was issued to, or None.
+
+    The token names its account by id: an API token through its `api_token`
+    row, read on every request so nothing outlives a revoke or a user delete; a
+    session or a render token through its `user_id` claim; a render token only
+    while its render is live (single use, SEC-7). A token with
+    neither, a session issued before WP-0k, gets the one account its username
+    can mean. The account must still be active, still have the exact username
+    the token names, and not have been created in a later second than the
+    token was issued (`iat`), so a token never signs in a later account that
+    reuses an id or a username. The database compares the times, in one time
+    zone. An account with no `created` (written before the column existed, or
+    outside the ORM) is not checked against `iat`.
+    '''
+    if issued_at is None or is_spent_render_token(claims):
+        return None
+    if 'id' in claims:
+        issued_to = api_token_user_id(claims['id'])
+        if issued_to is None:
+            return None
+    else:
+        issued_to = claims.get(USER_ID_CLAIM)
+    if issued_to is None:
+        legacy = find_legacy_token_account(username)
+        if legacy is None:
+            return None
+        issued_to, username = legacy.id, legacy.username
+    return active_account(issued_to, username, issued_at)
+
+
+def active_account(user_id: int, username: str, issued_at: int) -> Optional[User]:
+    '''Account `user_id`, if it is active, still has exactly `username` and was
+    not created in a later second than `issued_at`.'''
+    return (
+        get_db_adapter()
+        .session.query(User)
+        .filter(
+            User.id == user_id,
+            User.username == username,
+            User.status_id == UserStatusEnum.ACTIVE.value,
+            or_(
+                User.created.is_(None),
+                User.created < database_time_from_epoch(issued_at + 1),
+            ),
+        )
+        .first()
+    )
 
 
 def install_login_manager_signal_handlers(app, login_manager):
-    memoized_check_token_validity = app.cache.memoize()(check_token_validity)
-
     @login_manager.request_loader
     def login_from_request(request_object=None):
         request_object = request_object or request
 
         try:
             verify_jwt_in_request_optional()
-        except ExpiredSignatureError:
-            # bypass jwt-extended's expiration callback for now, our own
+        except (ExpiredSignatureError, InvalidSignatureError):
+            # bypass jwt-extended's error callbacks for now, our own
             # `auth_decorator` will return JSON for API calls and redirects
-            # otherwise, and it's not really feasible with the callback
+            # otherwise, and it's not really feasible with the callback.
+            # A bad signature (a token signed with a previous JWT_SECRET_KEY, or a
+            # forged one) makes the request anonymous, like an expired token.
             pass
 
         auth_email = get_jwt_identity()
-        is_token_valid = True
-        if auth_email:
-            claims = get_jwt_claims()
-            if 'id' in claims:
-                is_token_valid = memoized_check_token_validity(claims['id'])
-
-        if auth_email and is_token_valid:
+        user = (
+            account_for_token(auth_email, get_jwt_claims(), get_raw_jwt().get('iat'))
+            if auth_email
+            else None
+        )
+        if user:
             # NOTE: if we found JWT then we don't need the session
             session.permanent = False
             session.modified = False
-            with Transaction() as transaction:
-                user = transaction.find_one_by_fields(
-                    User, False, {'username': auth_email}
-                )
-            if user:
-                user.from_jwt = True
-                return user
+            user.from_jwt = True
+            return user
 
         try:
             username = request.headers.get('X-Username')

@@ -2,7 +2,7 @@ from datetime import datetime
 from http.client import NO_CONTENT, OK, UNAUTHORIZED
 import re
 
-from flask import g, url_for, current_app, request as flask_request
+from flask import g, current_app, request as flask_request
 from flask_potion import fields
 from flask_potion.schema import FieldSet
 from flask_potion.contrib.alchemy import fields as alchemy_fields
@@ -21,7 +21,6 @@ from models.alchemy.permission import (
     RESOURCE_ROLE_NAMES,
     SitewideResourceAcl,
 )
-from models.alchemy.schedule import SchedulerEntry
 from models.alchemy.security_group import Group
 from web.server.api.model_schemas import (
     QUERY_LINK_PATTERN,
@@ -57,6 +56,8 @@ from web.server.routes.views.dashboard import (
 )
 from web.server.routes.views.users import get_current_user
 from web.server.security.permissions import SuperUserPermission, principals
+from web.server.security.render_tokens import is_render_request
+from web.server.util.deployment_links import deployment_url
 from web.server.util.util import EMAIL_PATTERN, get_dashboard_title
 
 
@@ -642,8 +643,7 @@ class DashboardResource(PrincipalResource):
         title='Update Dashboard \'official\' flag',
         description='Marks a Dashboard as official or not.',
         schema=fields.Boolean(
-            description='The updated value of the "isOfficial" flag for the '
-            'dashboard.'
+            description='The updated value of the "isOfficial" flag for the dashboard.'
         ),
     )
     @authorization_required('publish_resource', 'dashboard')
@@ -656,8 +656,7 @@ class DashboardResource(PrincipalResource):
         title='Update Dashboard \'favorite\' flag',
         description='Marks a Dashboard as a user favorite or not.',
         schema=fields.Boolean(
-            description='The updated value of the "isFavorite" flag for the '
-            'dashboard.'
+            description='The updated value of the "isFavorite" flag for the dashboard.'
         ),
     )
     def set_favorite(self, dashboard, is_favorite):
@@ -720,8 +719,7 @@ class DashboardResource(PrincipalResource):
     def read(self, id):
         with Transaction() as transaction:
             dashboard = super().read(id)
-            dashboard.total_views += 1
-            track_dashboard_access(dashboard.id)
+            record_dashboard_view(dashboard)
             dashboard = transaction.add_or_update(dashboard, flush=True)
 
         # NOTE: Dirty hack to check if the user requested the legacy spec
@@ -1074,6 +1072,15 @@ class DashboardResource(PrincipalResource):
         return None, UNAUTHORIZED
 
 
+def record_dashboard_view(dashboard):
+    # An export renders the page signed in as the requesting user; that is not
+    # the user viewing the dashboard.
+    if is_render_request():
+        return
+    dashboard.total_views += 1
+    track_dashboard_access(dashboard.id)
+
+
 def track_dashboard_access(dashboard_id, edited=False, increment_view_count=True):
     if get_current_user().username in BOT_USERS:
         # Don't count views by bots.
@@ -1095,7 +1102,7 @@ def track_dashboard_access(dashboard_id, edited=False, increment_view_count=True
 # Suppressing this warning because this is the method signature for signal handlers.
 @after_create.connect_via(DashboardResource)
 def send_email_after_create(sender, item):
-    dashboard_link = url_for('dashboard.grid_dashboard', name=item.slug, _external=True)
+    dashboard_link = deployment_url('dashboard.grid_dashboard', name=item.slug)
     message = current_app.email_renderer.create_new_dashboard_message(
         item.author,
         current_app.zen_config.general.DEPLOYMENT_FULL_NAME,

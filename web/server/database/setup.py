@@ -1,9 +1,10 @@
-'''A module containing initialization logic for the User Database.
-'''
+'''A module containing initialization logic for the User Database.'''
+
 import sqlite3
 
+from flask import redirect
 from flask_user import UserManager, SQLAlchemyAdapter
-from flask_login import AnonymousUserMixin, LoginManager
+from flask_login import AnonymousUserMixin, LoginManager, current_user
 from sqlalchemy import create_engine, event
 from sqlalchemy.engine import Engine
 from sqlalchemy.orm.session import sessionmaker
@@ -13,10 +14,12 @@ from log import LOG
 from models.alchemy.user import User
 from models.alchemy.user.base_user import BaseUserMixin
 from web.server.configuration.settings import _populate_configuration_table
+from web.server.security.usernames import find_user_by_username, username_taken
 from web.server.routes.views.flask_user_views import (
     unauthenticated,
     logout,
 )
+from web.server.util.deployment_links import deployment_url
 from web.server.util.util import validate_email, validate_password
 
 
@@ -26,13 +29,48 @@ class AnonymousUser(BaseUserMixin, AnonymousUserMixin):
         return f'<{cls.__name__}>'
 
 
+class UsernameAdapter(SQLAlchemyAdapter):
+    '''flask-user's adapter, except that it finds a user by username with an
+    equality ignoring case instead of an ILIKE pattern, where `_` and `%` are
+    wildcards. Its only other such lookup, by email, names a column `User`
+    does not have and fails as before.
+    '''
+
+    def ifind_first_object(self, ObjectClass, **kwargs):
+        if ObjectClass is User and list(kwargs) == ['username']:
+            return find_user_by_username(kwargs['username'], self.db.session)
+        return super().ifind_first_object(ObjectClass, **kwargs)
+
+
+class HarmonyUserManager(UserManager):
+    def username_is_available(self, new_username):
+        '''For a rename on flask-user's change-username page: no other
+        account may equal the new username ignoring case. Keeping one's own
+        username is not a rename, so an account of a case-only pair made
+        before WP-0k can still submit the page.'''
+        if current_user.is_authenticated:
+            if new_username == current_user.username:
+                return True
+            own_id = current_user.id
+        else:
+            own_id = None
+        return not username_taken(new_username, self.db_adapter.db.session, own_id)
+
+
+def open_reset_page(token):
+    '''flask-user's `/user/reset-password/<token>`: Harmony's reset page, which
+    posts to `/api2/authentication/reset_password`, is the one place a reset
+    token sets a password, so this view only sends the browser there.'''
+    return redirect(deployment_url('auth.reset_password', token=token))
+
+
 def initialize_user_manager(app, db):
-    db_adapter = SQLAlchemyAdapter(db, UserClass=User)
+    db_adapter = UsernameAdapter(db, UserClass=User)
     login_manager = LoginManager()
     login_manager.anonymous_user = AnonymousUser
 
     # Initialize Flask-User.
-    UserManager(
+    HarmonyUserManager(
         db_adapter,
         app,
         password_validator=validate_password,
@@ -41,7 +79,16 @@ def initialize_user_manager(app, db):
         logout_view_function=logout,
         unauthenticated_view_function=unauthenticated,
         unauthorized_view_function=app.user_authentication_router.unauthorized,
+        reset_password_view_function=open_reset_page,
     )
+
+    # Replaces flask-user's loader: a flask-login session signs in its account
+    # only while it is active. flask-user's own reset and confirm views still
+    # find accounts of every status through `get_user_by_id`.
+    @login_manager.user_loader
+    def load_active_user(user_id):
+        user = app.user_manager.get_user_by_id(int(user_id))
+        return user if user is not None and user.is_active else None
 
 
 def initialize_database_seed_values(database_connection_string):

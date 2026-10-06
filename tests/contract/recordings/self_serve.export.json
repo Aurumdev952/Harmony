@@ -1,0 +1,12 @@
+{
+  "content_type": "application/zip",
+  "headers": [
+    "content-disposition"
+  ],
+  "id": "self_serve.export",
+  "non_empty": true,
+  "pinned": {},
+  "response_schema": null,
+  "route": "GET /api/export_self_serve",
+  "status": 200
+}

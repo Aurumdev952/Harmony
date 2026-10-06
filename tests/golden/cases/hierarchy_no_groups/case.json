@@ -1,0 +1,5 @@
+{
+  "description": "Hierarchy with no groups: a root node only.",
+  "endpoint": "hierarchy",
+  "policy": null
+}

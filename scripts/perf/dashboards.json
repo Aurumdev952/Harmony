@@ -1,0 +1,3527 @@
+{
+ "perf-heavy-4": {
+  "commonSettings": {
+   "filterSettings": {
+    "enabledCategories": [],
+    "enabledFilterHierarchy": [],
+    "excludedTiles": [],
+    "items": [],
+    "visible": false
+   },
+   "groupingSettings": {
+    "enabledCategories": [],
+    "excludedTiles": [],
+    "items": [],
+    "visible": false
+   },
+   "panelAlignment": "LEFT"
+  },
+  "items": [
+   {
+    "id": "tile-0",
+    "item": {
+     "queryResultSpec": {
+      "customFields": [],
+      "dataFilters": [],
+      "groupBySettings": {
+       "groupings": {
+        "MunicipalityName": {
+         "displayValueFormat": "DEFAULT",
+         "id": "MunicipalityName",
+         "label": "Municipality",
+         "nullValueDisplay": "null",
+         "type": "STRING"
+        },
+        "timestamp": {
+         "displayValueFormat": "month",
+         "id": "timestamp",
+         "label": "Month",
+         "nullValueDisplay": "null",
+         "type": "DATE"
+        }
+       }
+      },
+      "titleSettings": {
+       "subtitle": "",
+       "subtitleFontSize": "18px",
+       "title": "Cases and tests by municipality and month",
+       "titleFontColor": "black",
+       "titleFontFamily": "Arial",
+       "titleFontSize": "16px"
+      },
+      "viewTypes": [
+       "TABLE"
+      ],
+      "visualizationSettings": {
+       "BAR_GRAPH": null,
+       "BOX_PLOT": null,
+       "BUBBLE_CHART": null,
+       "BUMP_CHART": null,
+       "EPICURVE": null,
+       "EXPANDOTREE": null,
+       "HEATTILES": null,
+       "MAP": null,
+       "NUMBER_TREND": null,
+       "PIE": null,
+       "SUNBURST": null,
+       "TABLE": {
+        "legendSettings": {
+         "consolidateRules": true,
+         "legendFontColor": "black",
+         "legendFontFamily": "Arial",
+         "legendFontSize": "16px",
+         "legendPlacement": "bottom",
+         "overlapLegendWithChart": false,
+         "showLegend": true
+        },
+        "seriesSettings": {
+         "dataActionRules": [],
+         "seriesObjects": {
+          "yellow_fever_cases": {
+           "barLabelPosition": "top",
+           "color": "#4E79A7",
+           "dataLabelFontSize": "12px",
+           "dataLabelFormat": "none",
+           "id": "yellow_fever_cases",
+           "isVisible": true,
+           "label": "Yellow Fever Cases",
+           "nullValueDisplay": "No data",
+           "showSeriesValue": false,
+           "visualDisplayShape": "bar",
+           "yAxis": "y1Axis"
+          },
+          "yellow_fever_test_indicator": {
+           "barLabelPosition": "top",
+           "color": "#F28E2B",
+           "dataLabelFontSize": "12px",
+           "dataLabelFormat": "none",
+           "id": "yellow_fever_test_indicator",
+           "isVisible": true,
+           "label": "Yellow Fever Test Indicator",
+           "nullValueDisplay": "No data",
+           "showSeriesValue": false,
+           "visualDisplayShape": "bar",
+           "yAxis": "y1Axis"
+          }
+         },
+         "seriesOrder": [
+          "yellow_fever_cases",
+          "yellow_fever_test_indicator"
+         ]
+        },
+        "viewSpecificSettings": {
+         "activeTheme": "Default",
+         "addTotalRow": false,
+         "customTheme": null,
+         "enableAutoExpand": false,
+         "enableCasePageLinking": false,
+         "enablePagination": true,
+         "fitWidth": true,
+         "footerBackground": "#fff",
+         "footerBorderColor": "#fff",
+         "footerColor": "black",
+         "footerFontFamily": "Arial",
+         "footerFontSize": "12px",
+         "headerBorderColor": "#d9d9d9",
+         "invertedFields": [],
+         "maxColumnWidth": "500",
+         "mergeTableCells": false,
+         "minColumnWidth": "150",
+         "pivotedDimensions": [
+          "field"
+         ],
+         "rowHeight": 30.0,
+         "tableFormat": "table",
+         "userSort": null,
+         "wrapColumnTitles": false
+        },
+        "viewType": "TABLE"
+       },
+       "TIME": null
+      }
+     },
+     "querySelections": {
+      "fields": [
+       {
+        "calculation": {
+         "filter": {
+          "fieldId": "yellow_fever_cases",
+          "type": "FIELD"
+         },
+         "type": "SUM"
+        },
+        "canonicalName": "Yellow Fever Cases",
+        "customizableFilterItems": [],
+        "id": "yellow_fever_cases",
+        "shortName": "Yellow Fever Cases",
+        "showNullAsZero": false,
+        "userDefinedLabel": ""
+       },
+       {
+        "calculation": {
+         "filter": {
+          "fieldId": "yellow_fever_test_indicator",
+          "type": "FIELD"
+         },
+         "type": "SUM"
+        },
+        "canonicalName": "Yellow Fever Test Indicator",
+        "customizableFilterItems": [],
+        "id": "yellow_fever_test_indicator",
+        "shortName": "Yellow Fever Test Indicator",
+        "showNullAsZero": false,
+        "userDefinedLabel": ""
+       }
+      ],
+      "filters": [],
+      "groups": [
+       {
+        "item": {
+         "dimension": "MunicipalityName",
+         "includeAll": false,
+         "includeNull": false,
+         "includeTotal": false,
+         "name": "Municipality"
+        },
+        "type": "GROUPING_DIMENSION"
+       },
+       {
+        "item": {
+         "granularity": "month",
+         "includeTotal": false,
+         "name": "Month"
+        },
+        "type": "GROUPING_GRANULARITY"
+       }
+      ]
+     },
+     "type": "QUERY_ITEM",
+     "visualizationType": "TABLE"
+    },
+    "position": {
+     "columnCount": 50,
+     "rowCount": 40,
+     "x": 0
+    }
+   },
+   {
+    "id": "tile-1",
+    "item": {
+     "queryResultSpec": {
+      "customFields": [],
+      "dataFilters": [],
+      "groupBySettings": {
+       "groupings": {
+        "StateName": {
+         "displayValueFormat": "DEFAULT",
+         "id": "StateName",
+         "label": "State",
+         "nullValueDisplay": "null",
+         "type": "STRING"
+        },
+        "timestamp": {
+         "displayValueFormat": "week",
+         "id": "timestamp",
+         "label": "Week",
+         "nullValueDisplay": "null",
+         "type": "DATE"
+        }
+       }
+      },
+      "titleSettings": {
+       "subtitle": "",
+       "subtitleFontSize": "18px",
+       "title": "Cases by week and state",
+       "titleFontColor": "black",
+       "titleFontFamily": "Arial",
+       "titleFontSize": "16px"
+      },
+      "viewTypes": [
+       "HEATTILES"
+      ],
+      "visualizationSettings": {
+       "BAR_GRAPH": null,
+       "BOX_PLOT": null,
+       "BUBBLE_CHART": null,
+       "BUMP_CHART": null,
+       "EPICURVE": null,
+       "EXPANDOTREE": null,
+       "HEATTILES": {
+        "axesSettings": {
+         "xAxis": {
+          "additionalAxisTitleDistance": "0px",
+          "labelsFontColor": "black",
+          "labelsFontFamily": "Arial",
+          "labelsFontSize": "16px",
+          "title": "",
+          "titleFontColor": "black",
+          "titleFontFamily": "Arial",
+          "titleFontSize": "18px"
+         },
+         "y1Axis": {
+          "additionalAxisTitleDistance": "0px",
+          "labelsFontColor": "black",
+          "labelsFontFamily": "Arial",
+          "labelsFontSize": "16px",
+          "rangeFrom": null,
+          "rangeTo": null,
+          "title": "",
+          "titleFontColor": "black",
+          "titleFontFamily": "Arial",
+          "titleFontSize": "18px"
+         },
+         "y2Axis": {
+          "additionalAxisTitleDistance": "0px",
+          "labelsFontColor": "black",
+          "labelsFontFamily": "Arial",
+          "labelsFontSize": "16px",
+          "rangeFrom": null,
+          "rangeTo": null,
+          "title": "",
+          "titleFontColor": "black",
+          "titleFontFamily": "Arial",
+          "titleFontSize": "18px"
+         }
+        },
+        "seriesSettings": {
+         "dataActionRules": [],
+         "seriesObjects": {
+          "yellow_fever_cases": {
+           "barLabelPosition": "top",
+           "color": "#4E79A7",
+           "dataLabelFontSize": "12px",
+           "dataLabelFormat": "none",
+           "id": "yellow_fever_cases",
+           "isVisible": true,
+           "label": "Yellow Fever Cases",
+           "nullValueDisplay": "No data",
+           "showSeriesValue": false,
+           "visualDisplayShape": "bar",
+           "yAxis": "y1Axis"
+          }
+         },
+         "seriesOrder": [
+          "yellow_fever_cases"
+         ]
+        },
+        "viewSpecificSettings": {
+         "divergentColoration": true,
+         "firstYaxisSelections": [],
+         "invertColoration": false,
+         "logScaling": true,
+         "resultLimit": 100,
+         "selectedField": "yellow_fever_cases",
+         "showTimeOnYAxis": true,
+         "sortOn": "",
+         "sortOrder": "DESC",
+         "useEthiopianDates": false
+        },
+        "viewType": "HEATTILES"
+       },
+       "MAP": null,
+       "NUMBER_TREND": null,
+       "PIE": null,
+       "SUNBURST": null,
+       "TABLE": null,
+       "TIME": null
+      }
+     },
+     "querySelections": {
+      "fields": [
+       {
+        "calculation": {
+         "filter": {
+          "fieldId": "yellow_fever_cases",
+          "type": "FIELD"
+         },
+         "type": "SUM"
+        },
+        "canonicalName": "Yellow Fever Cases",
+        "customizableFilterItems": [],
+        "id": "yellow_fever_cases",
+        "shortName": "Yellow Fever Cases",
+        "showNullAsZero": false,
+        "userDefinedLabel": ""
+       }
+      ],
+      "filters": [],
+      "groups": [
+       {
+        "item": {
+         "granularity": "week",
+         "includeTotal": false,
+         "name": "Week"
+        },
+        "type": "GROUPING_GRANULARITY"
+       },
+       {
+        "item": {
+         "dimension": "StateName",
+         "includeAll": false,
+         "includeNull": false,
+         "includeTotal": false,
+         "name": "State"
+        },
+        "type": "GROUPING_DIMENSION"
+       }
+      ]
+     },
+     "type": "QUERY_ITEM",
+     "visualizationType": "HEATTILES"
+    },
+    "position": {
+     "columnCount": 50,
+     "rowCount": 40,
+     "x": 50
+    }
+   },
+   {
+    "id": "tile-2",
+    "item": {
+     "queryResultSpec": {
+      "customFields": [],
+      "dataFilters": [],
+      "groupBySettings": {
+       "groupings": {
+        "MunicipalityName": {
+         "displayValueFormat": "DEFAULT",
+         "id": "MunicipalityName",
+         "label": "Municipality",
+         "nullValueDisplay": "null",
+         "type": "STRING"
+        },
+        "timestamp": {
+         "displayValueFormat": "week",
+         "id": "timestamp",
+         "label": "Week",
+         "nullValueDisplay": "null",
+         "type": "DATE"
+        }
+       }
+      },
+      "titleSettings": {
+       "subtitle": "",
+       "subtitleFontSize": "18px",
+       "title": "Cases by week and municipality",
+       "titleFontColor": "black",
+       "titleFontFamily": "Arial",
+       "titleFontSize": "16px"
+      },
+      "viewTypes": [
+       "TIME"
+      ],
+      "visualizationSettings": {
+       "BAR_GRAPH": null,
+       "BOX_PLOT": null,
+       "BUBBLE_CHART": null,
+       "BUMP_CHART": null,
+       "EPICURVE": null,
+       "EXPANDOTREE": null,
+       "HEATTILES": null,
+       "MAP": null,
+       "NUMBER_TREND": null,
+       "PIE": null,
+       "SUNBURST": null,
+       "TABLE": null,
+       "TIME": {
+        "axesSettings": {
+         "xAxis": {
+          "additionalAxisTitleDistance": "0px",
+          "labelsFontColor": "black",
+          "labelsFontFamily": "Arial",
+          "labelsFontSize": "16px",
+          "title": "",
+          "titleFontColor": "black",
+          "titleFontFamily": "Arial",
+          "titleFontSize": "18px"
+         },
+         "y1Axis": {
+          "additionalAxisTitleDistance": "0px",
+          "labelsFontColor": "black",
+          "labelsFontFamily": "Arial",
+          "labelsFontSize": "16px",
+          "rangeFrom": null,
+          "rangeTo": null,
+          "title": "",
+          "titleFontColor": "black",
+          "titleFontFamily": "Arial",
+          "titleFontSize": "18px"
+         },
+         "y2Axis": {
+          "additionalAxisTitleDistance": "0px",
+          "labelsFontColor": "black",
+          "labelsFontFamily": "Arial",
+          "labelsFontSize": "16px",
+          "rangeFrom": null,
+          "rangeTo": null,
+          "title": "",
+          "titleFontColor": "black",
+          "titleFontFamily": "Arial",
+          "titleFontSize": "18px"
+         }
+        },
+        "seriesSettings": {
+         "dataActionRules": [],
+         "seriesObjects": {
+          "yellow_fever_cases": {
+           "barLabelPosition": "top",
+           "color": "#4E79A7",
+           "dataLabelFontSize": "12px",
+           "dataLabelFormat": "none",
+           "id": "yellow_fever_cases",
+           "isVisible": true,
+           "label": "Yellow Fever Cases",
+           "nullValueDisplay": "No data",
+           "showSeriesValue": false,
+           "visualDisplayShape": "bar",
+           "yAxis": "y1Axis"
+          }
+         },
+         "seriesOrder": [
+          "yellow_fever_cases"
+         ]
+        },
+        "viewSpecificSettings": {
+         "bands": [],
+         "bucketMean": false,
+         "bucketType": "MONTH",
+         "logScaling": false,
+         "resultLimit": 5,
+         "rotateLabels": true,
+         "showDataLabels": false,
+         "sortOn": "",
+         "sortOrder": "DESC",
+         "useEthiopianDates": false
+        },
+        "viewType": "TIME"
+       }
+      }
+     },
+     "querySelections": {
+      "fields": [
+       {
+        "calculation": {
+         "filter": {
+          "fieldId": "yellow_fever_cases",
+          "type": "FIELD"
+         },
+         "type": "SUM"
+        },
+        "canonicalName": "Yellow Fever Cases",
+        "customizableFilterItems": [],
+        "id": "yellow_fever_cases",
+        "shortName": "Yellow Fever Cases",
+        "showNullAsZero": false,
+        "userDefinedLabel": ""
+       }
+      ],
+      "filters": [],
+      "groups": [
+       {
+        "item": {
+         "granularity": "week",
+         "includeTotal": false,
+         "name": "Week"
+        },
+        "type": "GROUPING_GRANULARITY"
+       },
+       {
+        "item": {
+         "dimension": "MunicipalityName",
+         "includeAll": false,
+         "includeNull": false,
+         "includeTotal": false,
+         "name": "Municipality"
+        },
+        "type": "GROUPING_DIMENSION"
+       }
+      ]
+     },
+     "type": "QUERY_ITEM",
+     "visualizationType": "LINE"
+    },
+    "position": {
+     "columnCount": 50,
+     "rowCount": 40,
+     "x": 0
+    }
+   },
+   {
+    "id": "tile-3",
+    "item": {
+     "queryResultSpec": {
+      "customFields": [],
+      "dataFilters": [],
+      "groupBySettings": {
+       "groupings": {
+        "MunicipalityName": {
+         "displayValueFormat": "DEFAULT",
+         "id": "MunicipalityName",
+         "label": "Municipality",
+         "nullValueDisplay": "null",
+         "type": "STRING"
+        },
+        "Sex": {
+         "displayValueFormat": "DEFAULT",
+         "id": "Sex",
+         "label": "Sex",
+         "nullValueDisplay": "null",
+         "type": "STRING"
+        },
+        "StateName": {
+         "displayValueFormat": "DEFAULT",
+         "id": "StateName",
+         "label": "State",
+         "nullValueDisplay": "null",
+         "type": "STRING"
+        }
+       }
+      },
+      "titleSettings": {
+       "subtitle": "",
+       "subtitleFontSize": "18px",
+       "title": "Cases by state, municipality and sex",
+       "titleFontColor": "black",
+       "titleFontFamily": "Arial",
+       "titleFontSize": "16px"
+      },
+      "viewTypes": [
+       "EXPANDOTREE"
+      ],
+      "visualizationSettings": {
+       "BAR_GRAPH": null,
+       "BOX_PLOT": null,
+       "BUBBLE_CHART": null,
+       "BUMP_CHART": null,
+       "EPICURVE": null,
+       "EXPANDOTREE": {
+        "seriesSettings": {
+         "dataActionRules": [],
+         "seriesObjects": {
+          "yellow_fever_cases": {
+           "barLabelPosition": "top",
+           "color": "#4E79A7",
+           "dataLabelFontSize": "12px",
+           "dataLabelFormat": "none",
+           "id": "yellow_fever_cases",
+           "isVisible": true,
+           "label": "Yellow Fever Cases",
+           "nullValueDisplay": "No data",
+           "showSeriesValue": false,
+           "visualDisplayShape": "bar",
+           "yAxis": "y1Axis"
+          }
+         },
+         "seriesOrder": [
+          "yellow_fever_cases"
+         ]
+        },
+        "viewSpecificSettings": {
+         "selectedField": "yellow_fever_cases"
+        },
+        "viewType": "EXPANDOTREE"
+       },
+       "HEATTILES": null,
+       "MAP": null,
+       "NUMBER_TREND": null,
+       "PIE": null,
+       "SUNBURST": null,
+       "TABLE": null,
+       "TIME": null
+      }
+     },
+     "querySelections": {
+      "fields": [
+       {
+        "calculation": {
+         "filter": {
+          "fieldId": "yellow_fever_cases",
+          "type": "FIELD"
+         },
+         "type": "SUM"
+        },
+        "canonicalName": "Yellow Fever Cases",
+        "customizableFilterItems": [],
+        "id": "yellow_fever_cases",
+        "shortName": "Yellow Fever Cases",
+        "showNullAsZero": false,
+        "userDefinedLabel": ""
+       }
+      ],
+      "filters": [],
+      "groups": [
+       {
+        "item": {
+         "dimension": "StateName",
+         "includeAll": false,
+         "includeNull": false,
+         "includeTotal": false,
+         "name": "State"
+        },
+        "type": "GROUPING_DIMENSION"
+       },
+       {
+        "item": {
+         "dimension": "MunicipalityName",
+         "includeAll": false,
+         "includeNull": false,
+         "includeTotal": false,
+         "name": "Municipality"
+        },
+        "type": "GROUPING_DIMENSION"
+       },
+       {
+        "item": {
+         "dimension": "Sex",
+         "includeAll": false,
+         "includeNull": false,
+         "includeTotal": false,
+         "name": "Sex"
+        },
+        "type": "GROUPING_DIMENSION"
+       }
+      ]
+     },
+     "type": "QUERY_ITEM",
+     "visualizationType": "HIERARCHY"
+    },
+    "position": {
+     "columnCount": 50,
+     "rowCount": 40,
+     "x": 50
+    }
+   }
+  ],
+  "legacy": false,
+  "options": {
+   "columnCount": 100,
+   "title": "Perf: four large tiles"
+  },
+  "version": "2023-06-30"
+ },
+ "perf-mixed-6": {
+  "commonSettings": {
+   "filterSettings": {
+    "enabledCategories": [],
+    "enabledFilterHierarchy": [],
+    "excludedTiles": [],
+    "items": [],
+    "visible": false
+   },
+   "groupingSettings": {
+    "enabledCategories": [],
+    "excludedTiles": [],
+    "items": [],
+    "visible": false
+   },
+   "panelAlignment": "LEFT"
+  },
+  "items": [
+   {
+    "id": "tile-0",
+    "item": {
+     "queryResultSpec": {
+      "customFields": [],
+      "dataFilters": [],
+      "groupBySettings": {
+       "groupings": {
+        "StateName": {
+         "displayValueFormat": "DEFAULT",
+         "id": "StateName",
+         "label": "State",
+         "nullValueDisplay": "null",
+         "type": "STRING"
+        }
+       }
+      },
+      "titleSettings": {
+       "subtitle": "",
+       "subtitleFontSize": "18px",
+       "title": "Cases by state",
+       "titleFontColor": "black",
+       "titleFontFamily": "Arial",
+       "titleFontSize": "16px"
+      },
+      "viewTypes": [
+       "BAR_GRAPH"
+      ],
+      "visualizationSettings": {
+       "BAR_GRAPH": {
+        "axesSettings": {
+         "xAxis": {
+          "additionalAxisTitleDistance": "0px",
+          "labelsFontColor": "black",
+          "labelsFontFamily": "Arial",
+          "labelsFontSize": "16px",
+          "title": "",
+          "titleFontColor": "black",
+          "titleFontFamily": "Arial",
+          "titleFontSize": "18px"
+         },
+         "y1Axis": {
+          "additionalAxisTitleDistance": "0px",
+          "labelsFontColor": "black",
+          "labelsFontFamily": "Arial",
+          "labelsFontSize": "16px",
+          "rangeFrom": null,
+          "rangeTo": null,
+          "title": "",
+          "titleFontColor": "black",
+          "titleFontFamily": "Arial",
+          "titleFontSize": "18px"
+         },
+         "y2Axis": {
+          "additionalAxisTitleDistance": "0px",
+          "labelsFontColor": "black",
+          "labelsFontFamily": "Arial",
+          "labelsFontSize": "16px",
+          "rangeFrom": null,
+          "rangeTo": null,
+          "title": "",
+          "titleFontColor": "black",
+          "titleFontFamily": "Arial",
+          "titleFontSize": "18px"
+         }
+        },
+        "legendSettings": {
+         "consolidateRules": true,
+         "legendFontColor": "black",
+         "legendFontFamily": "Arial",
+         "legendFontSize": "16px",
+         "legendPlacement": "bottom",
+         "overlapLegendWithChart": false,
+         "showLegend": true
+        },
+        "seriesSettings": {
+         "dataActionRules": [],
+         "seriesObjects": {
+          "yellow_fever_cases": {
+           "barLabelPosition": "top",
+           "color": "#4E79A7",
+           "dataLabelFontSize": "12px",
+           "dataLabelFormat": "none",
+           "id": "yellow_fever_cases",
+           "isVisible": true,
+           "label": "Yellow Fever Cases",
+           "nullValueDisplay": "No data",
+           "showSeriesValue": false,
+           "visualDisplayShape": "bar",
+           "yAxis": "y1Axis"
+          }
+         },
+         "seriesOrder": [
+          "yellow_fever_cases"
+         ]
+        },
+        "viewSpecificSettings": {
+         "alwaysShowFocusWindow": false,
+         "applyMinimumBarHeight": true,
+         "barDirection": "vertical",
+         "barTreatment": "sequential",
+         "goalLines": [],
+         "resultLimit": 50,
+         "rotateInnerGroupLabels": true,
+         "sortOn": "",
+         "sortOrder": "DESC",
+         "unPivot": false,
+         "valueTextAngle": "auto"
+        },
+        "viewType": "BAR_GRAPH"
+       },
+       "BOX_PLOT": null,
+       "BUBBLE_CHART": null,
+       "BUMP_CHART": null,
+       "EPICURVE": null,
+       "EXPANDOTREE": null,
+       "HEATTILES": null,
+       "MAP": null,
+       "NUMBER_TREND": null,
+       "PIE": null,
+       "SUNBURST": null,
+       "TABLE": null,
+       "TIME": null
+      }
+     },
+     "querySelections": {
+      "fields": [
+       {
+        "calculation": {
+         "filter": {
+          "fieldId": "yellow_fever_cases",
+          "type": "FIELD"
+         },
+         "type": "SUM"
+        },
+        "canonicalName": "Yellow Fever Cases",
+        "customizableFilterItems": [],
+        "id": "yellow_fever_cases",
+        "shortName": "Yellow Fever Cases",
+        "showNullAsZero": false,
+        "userDefinedLabel": ""
+       }
+      ],
+      "filters": [],
+      "groups": [
+       {
+        "item": {
+         "dimension": "StateName",
+         "includeAll": false,
+         "includeNull": false,
+         "includeTotal": false,
+         "name": "State"
+        },
+        "type": "GROUPING_DIMENSION"
+       }
+      ]
+     },
+     "type": "QUERY_ITEM",
+     "visualizationType": "BAR"
+    },
+    "position": {
+     "columnCount": 50,
+     "rowCount": 40,
+     "x": 0
+    }
+   },
+   {
+    "id": "tile-1",
+    "item": {
+     "queryResultSpec": {
+      "customFields": [],
+      "dataFilters": [],
+      "groupBySettings": {
+       "groupings": {
+        "StateName": {
+         "displayValueFormat": "DEFAULT",
+         "id": "StateName",
+         "label": "State",
+         "nullValueDisplay": "null",
+         "type": "STRING"
+        },
+        "timestamp": {
+         "displayValueFormat": "month",
+         "id": "timestamp",
+         "label": "Month",
+         "nullValueDisplay": "null",
+         "type": "DATE"
+        }
+       }
+      },
+      "titleSettings": {
+       "subtitle": "",
+       "subtitleFontSize": "18px",
+       "title": "Cases by month and state",
+       "titleFontColor": "black",
+       "titleFontFamily": "Arial",
+       "titleFontSize": "16px"
+      },
+      "viewTypes": [
+       "TIME"
+      ],
+      "visualizationSettings": {
+       "BAR_GRAPH": null,
+       "BOX_PLOT": null,
+       "BUBBLE_CHART": null,
+       "BUMP_CHART": null,
+       "EPICURVE": null,
+       "EXPANDOTREE": null,
+       "HEATTILES": null,
+       "MAP": null,
+       "NUMBER_TREND": null,
+       "PIE": null,
+       "SUNBURST": null,
+       "TABLE": null,
+       "TIME": {
+        "axesSettings": {
+         "xAxis": {
+          "additionalAxisTitleDistance": "0px",
+          "labelsFontColor": "black",
+          "labelsFontFamily": "Arial",
+          "labelsFontSize": "16px",
+          "title": "",
+          "titleFontColor": "black",
+          "titleFontFamily": "Arial",
+          "titleFontSize": "18px"
+         },
+         "y1Axis": {
+          "additionalAxisTitleDistance": "0px",
+          "labelsFontColor": "black",
+          "labelsFontFamily": "Arial",
+          "labelsFontSize": "16px",
+          "rangeFrom": null,
+          "rangeTo": null,
+          "title": "",
+          "titleFontColor": "black",
+          "titleFontFamily": "Arial",
+          "titleFontSize": "18px"
+         },
+         "y2Axis": {
+          "additionalAxisTitleDistance": "0px",
+          "labelsFontColor": "black",
+          "labelsFontFamily": "Arial",
+          "labelsFontSize": "16px",
+          "rangeFrom": null,
+          "rangeTo": null,
+          "title": "",
+          "titleFontColor": "black",
+          "titleFontFamily": "Arial",
+          "titleFontSize": "18px"
+         }
+        },
+        "seriesSettings": {
+         "dataActionRules": [],
+         "seriesObjects": {
+          "yellow_fever_cases": {
+           "barLabelPosition": "top",
+           "color": "#4E79A7",
+           "dataLabelFontSize": "12px",
+           "dataLabelFormat": "none",
+           "id": "yellow_fever_cases",
+           "isVisible": true,
+           "label": "Yellow Fever Cases",
+           "nullValueDisplay": "No data",
+           "showSeriesValue": false,
+           "visualDisplayShape": "bar",
+           "yAxis": "y1Axis"
+          }
+         },
+         "seriesOrder": [
+          "yellow_fever_cases"
+         ]
+        },
+        "viewSpecificSettings": {
+         "bands": [],
+         "bucketMean": false,
+         "bucketType": "MONTH",
+         "logScaling": false,
+         "resultLimit": 5,
+         "rotateLabels": true,
+         "showDataLabels": false,
+         "sortOn": "",
+         "sortOrder": "DESC",
+         "useEthiopianDates": false
+        },
+        "viewType": "TIME"
+       }
+      }
+     },
+     "querySelections": {
+      "fields": [
+       {
+        "calculation": {
+         "filter": {
+          "fieldId": "yellow_fever_cases",
+          "type": "FIELD"
+         },
+         "type": "SUM"
+        },
+        "canonicalName": "Yellow Fever Cases",
+        "customizableFilterItems": [],
+        "id": "yellow_fever_cases",
+        "shortName": "Yellow Fever Cases",
+        "showNullAsZero": false,
+        "userDefinedLabel": ""
+       }
+      ],
+      "filters": [],
+      "groups": [
+       {
+        "item": {
+         "granularity": "month",
+         "includeTotal": false,
+         "name": "Month"
+        },
+        "type": "GROUPING_GRANULARITY"
+       },
+       {
+        "item": {
+         "dimension": "StateName",
+         "includeAll": false,
+         "includeNull": false,
+         "includeTotal": false,
+         "name": "State"
+        },
+        "type": "GROUPING_DIMENSION"
+       }
+      ]
+     },
+     "type": "QUERY_ITEM",
+     "visualizationType": "LINE"
+    },
+    "position": {
+     "columnCount": 50,
+     "rowCount": 40,
+     "x": 50
+    }
+   },
+   {
+    "id": "tile-2",
+    "item": {
+     "queryResultSpec": {
+      "customFields": [],
+      "dataFilters": [],
+      "groupBySettings": {
+       "groupings": {
+        "Sex": {
+         "displayValueFormat": "DEFAULT",
+         "id": "Sex",
+         "label": "Sex",
+         "nullValueDisplay": "null",
+         "type": "STRING"
+        },
+        "StateName": {
+         "displayValueFormat": "DEFAULT",
+         "id": "StateName",
+         "label": "State",
+         "nullValueDisplay": "null",
+         "type": "STRING"
+        }
+       }
+      },
+      "titleSettings": {
+       "subtitle": "",
+       "subtitleFontSize": "18px",
+       "title": "Cases by state and sex",
+       "titleFontColor": "black",
+       "titleFontFamily": "Arial",
+       "titleFontSize": "16px"
+      },
+      "viewTypes": [
+       "TABLE"
+      ],
+      "visualizationSettings": {
+       "BAR_GRAPH": null,
+       "BOX_PLOT": null,
+       "BUBBLE_CHART": null,
+       "BUMP_CHART": null,
+       "EPICURVE": null,
+       "EXPANDOTREE": null,
+       "HEATTILES": null,
+       "MAP": null,
+       "NUMBER_TREND": null,
+       "PIE": null,
+       "SUNBURST": null,
+       "TABLE": {
+        "legendSettings": {
+         "consolidateRules": true,
+         "legendFontColor": "black",
+         "legendFontFamily": "Arial",
+         "legendFontSize": "16px",
+         "legendPlacement": "bottom",
+         "overlapLegendWithChart": false,
+         "showLegend": true
+        },
+        "seriesSettings": {
+         "dataActionRules": [],
+         "seriesObjects": {
+          "yellow_fever_cases": {
+           "barLabelPosition": "top",
+           "color": "#4E79A7",
+           "dataLabelFontSize": "12px",
+           "dataLabelFormat": "none",
+           "id": "yellow_fever_cases",
+           "isVisible": true,
+           "label": "Yellow Fever Cases",
+           "nullValueDisplay": "No data",
+           "showSeriesValue": false,
+           "visualDisplayShape": "bar",
+           "yAxis": "y1Axis"
+          }
+         },
+         "seriesOrder": [
+          "yellow_fever_cases"
+         ]
+        },
+        "viewSpecificSettings": {
+         "activeTheme": "Default",
+         "addTotalRow": false,
+         "customTheme": null,
+         "enableAutoExpand": false,
+         "enableCasePageLinking": false,
+         "enablePagination": true,
+         "fitWidth": true,
+         "footerBackground": "#fff",
+         "footerBorderColor": "#fff",
+         "footerColor": "black",
+         "footerFontFamily": "Arial",
+         "footerFontSize": "12px",
+         "headerBorderColor": "#d9d9d9",
+         "invertedFields": [],
+         "maxColumnWidth": "500",
+         "mergeTableCells": false,
+         "minColumnWidth": "150",
+         "pivotedDimensions": [
+          "field"
+         ],
+         "rowHeight": 30.0,
+         "tableFormat": "table",
+         "userSort": null,
+         "wrapColumnTitles": false
+        },
+        "viewType": "TABLE"
+       },
+       "TIME": null
+      }
+     },
+     "querySelections": {
+      "fields": [
+       {
+        "calculation": {
+         "filter": {
+          "fieldId": "yellow_fever_cases",
+          "type": "FIELD"
+         },
+         "type": "SUM"
+        },
+        "canonicalName": "Yellow Fever Cases",
+        "customizableFilterItems": [],
+        "id": "yellow_fever_cases",
+        "shortName": "Yellow Fever Cases",
+        "showNullAsZero": false,
+        "userDefinedLabel": ""
+       }
+      ],
+      "filters": [],
+      "groups": [
+       {
+        "item": {
+         "dimension": "StateName",
+         "includeAll": false,
+         "includeNull": false,
+         "includeTotal": false,
+         "name": "State"
+        },
+        "type": "GROUPING_DIMENSION"
+       },
+       {
+        "item": {
+         "dimension": "Sex",
+         "includeAll": false,
+         "includeNull": false,
+         "includeTotal": false,
+         "name": "Sex"
+        },
+        "type": "GROUPING_DIMENSION"
+       }
+      ]
+     },
+     "type": "QUERY_ITEM",
+     "visualizationType": "TABLE"
+    },
+    "position": {
+     "columnCount": 50,
+     "rowCount": 40,
+     "x": 0
+    }
+   },
+   {
+    "id": "tile-3",
+    "item": {
+     "queryResultSpec": {
+      "customFields": [],
+      "dataFilters": [],
+      "groupBySettings": {
+       "groupings": {
+        "MunicipalityName": {
+         "displayValueFormat": "DEFAULT",
+         "id": "MunicipalityName",
+         "label": "Municipality",
+         "nullValueDisplay": "null",
+         "type": "STRING"
+        }
+       }
+      },
+      "titleSettings": {
+       "subtitle": "",
+       "subtitleFontSize": "18px",
+       "title": "Cases by municipality",
+       "titleFontColor": "black",
+       "titleFontFamily": "Arial",
+       "titleFontSize": "16px"
+      },
+      "viewTypes": [
+       "MAP"
+      ],
+      "visualizationSettings": {
+       "BAR_GRAPH": null,
+       "BOX_PLOT": null,
+       "BUBBLE_CHART": null,
+       "BUMP_CHART": null,
+       "EPICURVE": null,
+       "EXPANDOTREE": null,
+       "HEATTILES": null,
+       "MAP": {
+        "legendSettings": {
+         "consolidateRules": true,
+         "legendFontColor": "black",
+         "legendFontFamily": "Arial",
+         "legendFontSize": "16px",
+         "legendPlacement": "bottom",
+         "overlapLegendWithChart": false,
+         "showLegend": true
+        },
+        "seriesSettings": {
+         "dataActionRules": [],
+         "seriesObjects": {
+          "yellow_fever_cases": {
+           "barLabelPosition": "top",
+           "color": "#4E79A7",
+           "dataLabelFontSize": "12px",
+           "dataLabelFormat": "none",
+           "id": "yellow_fever_cases",
+           "isVisible": true,
+           "label": "Yellow Fever Cases",
+           "nullValueDisplay": "No data",
+           "showSeriesValue": false,
+           "visualDisplayShape": "bar",
+           "yAxis": "y1Axis"
+          }
+         },
+         "seriesOrder": [
+          "yellow_fever_cases"
+         ]
+        },
+        "viewSpecificSettings": {
+         "adminBoundariesColor": "#313234",
+         "adminBoundariesWidth": "normal",
+         "autoFitToVisibleData": false,
+         "baseLayer": "Streets",
+         "currentDisplay": "dots",
+         "entityLayerProperties": {},
+         "fillOpacity": 0.8,
+         "mapCenter": [
+          0.0,
+          0.0
+         ],
+         "overlayLayers": [
+          "Administrative"
+         ],
+         "playbackSettings": {
+          "playbackSpeed": "normal",
+          "reversePlayback": false,
+          "startFromMostRecentDate": false
+         },
+         "selectedField": "yellow_fever_cases",
+         "selectedGeoTiles": "",
+         "selectedLabelsToDisplay": {},
+         "shapeOutlineWidth": "normal",
+         "showAdminBoundaries": true,
+         "showLabels": false,
+         "tooltipBackgroundColor": {
+          "a": 0.75,
+          "b": 255,
+          "g": 255,
+          "r": 255
+         },
+         "tooltipBold": false,
+         "tooltipFontColor": "black",
+         "tooltipFontFamily": "Arial",
+         "tooltipFontSize": "12px",
+         "visibleMarkerLayers": [],
+         "zoomLevel": 1.0
+        },
+        "viewType": "MAP"
+       },
+       "NUMBER_TREND": null,
+       "PIE": null,
+       "SUNBURST": null,
+       "TABLE": null,
+       "TIME": null
+      }
+     },
+     "querySelections": {
+      "fields": [
+       {
+        "calculation": {
+         "filter": {
+          "fieldId": "yellow_fever_cases",
+          "type": "FIELD"
+         },
+         "type": "SUM"
+        },
+        "canonicalName": "Yellow Fever Cases",
+        "customizableFilterItems": [],
+        "id": "yellow_fever_cases",
+        "shortName": "Yellow Fever Cases",
+        "showNullAsZero": false,
+        "userDefinedLabel": ""
+       }
+      ],
+      "filters": [],
+      "groups": [
+       {
+        "item": {
+         "dimension": "MunicipalityName",
+         "includeAll": false,
+         "includeNull": false,
+         "includeTotal": false,
+         "name": "Municipality"
+        },
+        "type": "GROUPING_DIMENSION"
+       }
+      ]
+     },
+     "type": "QUERY_ITEM",
+     "visualizationType": "MAP"
+    },
+    "position": {
+     "columnCount": 50,
+     "rowCount": 40,
+     "x": 50
+    }
+   },
+   {
+    "id": "tile-4",
+    "item": {
+     "queryResultSpec": {
+      "customFields": [],
+      "dataFilters": [],
+      "groupBySettings": {
+       "groupings": {
+        "MunicipalityName": {
+         "displayValueFormat": "DEFAULT",
+         "id": "MunicipalityName",
+         "label": "Municipality",
+         "nullValueDisplay": "null",
+         "type": "STRING"
+        },
+        "StateName": {
+         "displayValueFormat": "DEFAULT",
+         "id": "StateName",
+         "label": "State",
+         "nullValueDisplay": "null",
+         "type": "STRING"
+        }
+       }
+      },
+      "titleSettings": {
+       "subtitle": "",
+       "subtitleFontSize": "18px",
+       "title": "Cases by state and municipality",
+       "titleFontColor": "black",
+       "titleFontFamily": "Arial",
+       "titleFontSize": "16px"
+      },
+      "viewTypes": [
+       "EXPANDOTREE"
+      ],
+      "visualizationSettings": {
+       "BAR_GRAPH": null,
+       "BOX_PLOT": null,
+       "BUBBLE_CHART": null,
+       "BUMP_CHART": null,
+       "EPICURVE": null,
+       "EXPANDOTREE": {
+        "seriesSettings": {
+         "dataActionRules": [],
+         "seriesObjects": {
+          "yellow_fever_cases": {
+           "barLabelPosition": "top",
+           "color": "#4E79A7",
+           "dataLabelFontSize": "12px",
+           "dataLabelFormat": "none",
+           "id": "yellow_fever_cases",
+           "isVisible": true,
+           "label": "Yellow Fever Cases",
+           "nullValueDisplay": "No data",
+           "showSeriesValue": false,
+           "visualDisplayShape": "bar",
+           "yAxis": "y1Axis"
+          }
+         },
+         "seriesOrder": [
+          "yellow_fever_cases"
+         ]
+        },
+        "viewSpecificSettings": {
+         "selectedField": "yellow_fever_cases"
+        },
+        "viewType": "EXPANDOTREE"
+       },
+       "HEATTILES": null,
+       "MAP": null,
+       "NUMBER_TREND": null,
+       "PIE": null,
+       "SUNBURST": null,
+       "TABLE": null,
+       "TIME": null
+      }
+     },
+     "querySelections": {
+      "fields": [
+       {
+        "calculation": {
+         "filter": {
+          "fieldId": "yellow_fever_cases",
+          "type": "FIELD"
+         },
+         "type": "SUM"
+        },
+        "canonicalName": "Yellow Fever Cases",
+        "customizableFilterItems": [],
+        "id": "yellow_fever_cases",
+        "shortName": "Yellow Fever Cases",
+        "showNullAsZero": false,
+        "userDefinedLabel": ""
+       }
+      ],
+      "filters": [],
+      "groups": [
+       {
+        "item": {
+         "dimension": "StateName",
+         "includeAll": false,
+         "includeNull": false,
+         "includeTotal": false,
+         "name": "State"
+        },
+        "type": "GROUPING_DIMENSION"
+       },
+       {
+        "item": {
+         "dimension": "MunicipalityName",
+         "includeAll": false,
+         "includeNull": false,
+         "includeTotal": false,
+         "name": "Municipality"
+        },
+        "type": "GROUPING_DIMENSION"
+       }
+      ]
+     },
+     "type": "QUERY_ITEM",
+     "visualizationType": "HIERARCHY"
+    },
+    "position": {
+     "columnCount": 50,
+     "rowCount": 40,
+     "x": 0
+    }
+   },
+   {
+    "id": "tile-5",
+    "item": {
+     "queryResultSpec": {
+      "customFields": [],
+      "dataFilters": [],
+      "groupBySettings": {
+       "groupings": {
+        "Sex": {
+         "displayValueFormat": "DEFAULT",
+         "id": "Sex",
+         "label": "Sex",
+         "nullValueDisplay": "null",
+         "type": "STRING"
+        }
+       }
+      },
+      "titleSettings": {
+       "subtitle": "",
+       "subtitleFontSize": "18px",
+       "title": "Cases by sex",
+       "titleFontColor": "black",
+       "titleFontFamily": "Arial",
+       "titleFontSize": "16px"
+      },
+      "viewTypes": [
+       "PIE"
+      ],
+      "visualizationSettings": {
+       "BAR_GRAPH": null,
+       "BOX_PLOT": null,
+       "BUBBLE_CHART": null,
+       "BUMP_CHART": null,
+       "EPICURVE": null,
+       "EXPANDOTREE": null,
+       "HEATTILES": null,
+       "MAP": null,
+       "NUMBER_TREND": null,
+       "PIE": {
+        "seriesSettings": {
+         "dataActionRules": [],
+         "seriesObjects": {
+          "yellow_fever_cases": {
+           "barLabelPosition": "top",
+           "color": "#4E79A7",
+           "dataLabelFontSize": "12px",
+           "dataLabelFormat": "none",
+           "id": "yellow_fever_cases",
+           "isVisible": true,
+           "label": "Yellow Fever Cases",
+           "nullValueDisplay": "No data",
+           "showSeriesValue": false,
+           "visualDisplayShape": "bar",
+           "yAxis": "y1Axis"
+          }
+         },
+         "seriesOrder": [
+          "yellow_fever_cases"
+         ]
+        },
+        "viewSpecificSettings": {
+         "breakdown": "field",
+         "displayLabelType": "percent",
+         "drilldownSelection": null,
+         "palette": [
+          "#4e79a7",
+          "#f28e2c",
+          "#e15759",
+          "#76b7b2",
+          "#59a14f",
+          "#edc949",
+          "#af7aa1",
+          "#ff9da7",
+          "#9c755f",
+          "#bab0ab"
+         ],
+         "selectedSegments": []
+        },
+        "viewType": "PIE"
+       },
+       "SUNBURST": null,
+       "TABLE": null,
+       "TIME": null
+      }
+     },
+     "querySelections": {
+      "fields": [
+       {
+        "calculation": {
+         "filter": {
+          "fieldId": "yellow_fever_cases",
+          "type": "FIELD"
+         },
+         "type": "SUM"
+        },
+        "canonicalName": "Yellow Fever Cases",
+        "customizableFilterItems": [],
+        "id": "yellow_fever_cases",
+        "shortName": "Yellow Fever Cases",
+        "showNullAsZero": false,
+        "userDefinedLabel": ""
+       }
+      ],
+      "filters": [],
+      "groups": [
+       {
+        "item": {
+         "dimension": "Sex",
+         "includeAll": false,
+         "includeNull": false,
+         "includeTotal": false,
+         "name": "Sex"
+        },
+        "type": "GROUPING_DIMENSION"
+       }
+      ]
+     },
+     "type": "QUERY_ITEM",
+     "visualizationType": "PIE"
+    },
+    "position": {
+     "columnCount": 50,
+     "rowCount": 40,
+     "x": 50
+    }
+   }
+  ],
+  "legacy": false,
+  "options": {
+   "columnCount": 100,
+   "title": "Perf: six tiles, one per visualization family"
+  },
+  "version": "2023-06-30"
+ },
+ "perf-wide-12": {
+  "commonSettings": {
+   "filterSettings": {
+    "enabledCategories": [],
+    "enabledFilterHierarchy": [],
+    "excludedTiles": [],
+    "items": [],
+    "visible": false
+   },
+   "groupingSettings": {
+    "enabledCategories": [],
+    "excludedTiles": [],
+    "items": [],
+    "visible": false
+   },
+   "panelAlignment": "LEFT"
+  },
+  "items": [
+   {
+    "id": "tile-0",
+    "item": {
+     "queryResultSpec": {
+      "customFields": [],
+      "dataFilters": [],
+      "groupBySettings": {
+       "groupings": {
+        "StateName": {
+         "displayValueFormat": "DEFAULT",
+         "id": "StateName",
+         "label": "State",
+         "nullValueDisplay": "null",
+         "type": "STRING"
+        }
+       }
+      },
+      "titleSettings": {
+       "subtitle": "",
+       "subtitleFontSize": "18px",
+       "title": "Cases by state",
+       "titleFontColor": "black",
+       "titleFontFamily": "Arial",
+       "titleFontSize": "16px"
+      },
+      "viewTypes": [
+       "BAR_GRAPH"
+      ],
+      "visualizationSettings": {
+       "BAR_GRAPH": {
+        "axesSettings": {
+         "xAxis": {
+          "additionalAxisTitleDistance": "0px",
+          "labelsFontColor": "black",
+          "labelsFontFamily": "Arial",
+          "labelsFontSize": "16px",
+          "title": "",
+          "titleFontColor": "black",
+          "titleFontFamily": "Arial",
+          "titleFontSize": "18px"
+         },
+         "y1Axis": {
+          "additionalAxisTitleDistance": "0px",
+          "labelsFontColor": "black",
+          "labelsFontFamily": "Arial",
+          "labelsFontSize": "16px",
+          "rangeFrom": null,
+          "rangeTo": null,
+          "title": "",
+          "titleFontColor": "black",
+          "titleFontFamily": "Arial",
+          "titleFontSize": "18px"
+         },
+         "y2Axis": {
+          "additionalAxisTitleDistance": "0px",
+          "labelsFontColor": "black",
+          "labelsFontFamily": "Arial",
+          "labelsFontSize": "16px",
+          "rangeFrom": null,
+          "rangeTo": null,
+          "title": "",
+          "titleFontColor": "black",
+          "titleFontFamily": "Arial",
+          "titleFontSize": "18px"
+         }
+        },
+        "legendSettings": {
+         "consolidateRules": true,
+         "legendFontColor": "black",
+         "legendFontFamily": "Arial",
+         "legendFontSize": "16px",
+         "legendPlacement": "bottom",
+         "overlapLegendWithChart": false,
+         "showLegend": true
+        },
+        "seriesSettings": {
+         "dataActionRules": [],
+         "seriesObjects": {
+          "yellow_fever_cases": {
+           "barLabelPosition": "top",
+           "color": "#4E79A7",
+           "dataLabelFontSize": "12px",
+           "dataLabelFormat": "none",
+           "id": "yellow_fever_cases",
+           "isVisible": true,
+           "label": "Yellow Fever Cases",
+           "nullValueDisplay": "No data",
+           "showSeriesValue": false,
+           "visualDisplayShape": "bar",
+           "yAxis": "y1Axis"
+          }
+         },
+         "seriesOrder": [
+          "yellow_fever_cases"
+         ]
+        },
+        "viewSpecificSettings": {
+         "alwaysShowFocusWindow": false,
+         "applyMinimumBarHeight": true,
+         "barDirection": "vertical",
+         "barTreatment": "sequential",
+         "goalLines": [],
+         "resultLimit": 50,
+         "rotateInnerGroupLabels": true,
+         "sortOn": "",
+         "sortOrder": "DESC",
+         "unPivot": false,
+         "valueTextAngle": "auto"
+        },
+        "viewType": "BAR_GRAPH"
+       },
+       "BOX_PLOT": null,
+       "BUBBLE_CHART": null,
+       "BUMP_CHART": null,
+       "EPICURVE": null,
+       "EXPANDOTREE": null,
+       "HEATTILES": null,
+       "MAP": null,
+       "NUMBER_TREND": null,
+       "PIE": null,
+       "SUNBURST": null,
+       "TABLE": null,
+       "TIME": null
+      }
+     },
+     "querySelections": {
+      "fields": [
+       {
+        "calculation": {
+         "filter": {
+          "fieldId": "yellow_fever_cases",
+          "type": "FIELD"
+         },
+         "type": "SUM"
+        },
+        "canonicalName": "Yellow Fever Cases",
+        "customizableFilterItems": [],
+        "id": "yellow_fever_cases",
+        "shortName": "Yellow Fever Cases",
+        "showNullAsZero": false,
+        "userDefinedLabel": ""
+       }
+      ],
+      "filters": [],
+      "groups": [
+       {
+        "item": {
+         "dimension": "StateName",
+         "includeAll": false,
+         "includeNull": false,
+         "includeTotal": false,
+         "name": "State"
+        },
+        "type": "GROUPING_DIMENSION"
+       }
+      ]
+     },
+     "type": "QUERY_ITEM",
+     "visualizationType": "BAR"
+    },
+    "position": {
+     "columnCount": 50,
+     "rowCount": 40,
+     "x": 0
+    }
+   },
+   {
+    "id": "tile-1",
+    "item": {
+     "queryResultSpec": {
+      "customFields": [],
+      "dataFilters": [],
+      "groupBySettings": {
+       "groupings": {
+        "StateName": {
+         "displayValueFormat": "DEFAULT",
+         "id": "StateName",
+         "label": "State",
+         "nullValueDisplay": "null",
+         "type": "STRING"
+        },
+        "timestamp": {
+         "displayValueFormat": "month",
+         "id": "timestamp",
+         "label": "Month",
+         "nullValueDisplay": "null",
+         "type": "DATE"
+        }
+       }
+      },
+      "titleSettings": {
+       "subtitle": "",
+       "subtitleFontSize": "18px",
+       "title": "Cases by month and state",
+       "titleFontColor": "black",
+       "titleFontFamily": "Arial",
+       "titleFontSize": "16px"
+      },
+      "viewTypes": [
+       "TIME"
+      ],
+      "visualizationSettings": {
+       "BAR_GRAPH": null,
+       "BOX_PLOT": null,
+       "BUBBLE_CHART": null,
+       "BUMP_CHART": null,
+       "EPICURVE": null,
+       "EXPANDOTREE": null,
+       "HEATTILES": null,
+       "MAP": null,
+       "NUMBER_TREND": null,
+       "PIE": null,
+       "SUNBURST": null,
+       "TABLE": null,
+       "TIME": {
+        "axesSettings": {
+         "xAxis": {
+          "additionalAxisTitleDistance": "0px",
+          "labelsFontColor": "black",
+          "labelsFontFamily": "Arial",
+          "labelsFontSize": "16px",
+          "title": "",
+          "titleFontColor": "black",
+          "titleFontFamily": "Arial",
+          "titleFontSize": "18px"
+         },
+         "y1Axis": {
+          "additionalAxisTitleDistance": "0px",
+          "labelsFontColor": "black",
+          "labelsFontFamily": "Arial",
+          "labelsFontSize": "16px",
+          "rangeFrom": null,
+          "rangeTo": null,
+          "title": "",
+          "titleFontColor": "black",
+          "titleFontFamily": "Arial",
+          "titleFontSize": "18px"
+         },
+         "y2Axis": {
+          "additionalAxisTitleDistance": "0px",
+          "labelsFontColor": "black",
+          "labelsFontFamily": "Arial",
+          "labelsFontSize": "16px",
+          "rangeFrom": null,
+          "rangeTo": null,
+          "title": "",
+          "titleFontColor": "black",
+          "titleFontFamily": "Arial",
+          "titleFontSize": "18px"
+         }
+        },
+        "seriesSettings": {
+         "dataActionRules": [],
+         "seriesObjects": {
+          "yellow_fever_cases": {
+           "barLabelPosition": "top",
+           "color": "#4E79A7",
+           "dataLabelFontSize": "12px",
+           "dataLabelFormat": "none",
+           "id": "yellow_fever_cases",
+           "isVisible": true,
+           "label": "Yellow Fever Cases",
+           "nullValueDisplay": "No data",
+           "showSeriesValue": false,
+           "visualDisplayShape": "bar",
+           "yAxis": "y1Axis"
+          }
+         },
+         "seriesOrder": [
+          "yellow_fever_cases"
+         ]
+        },
+        "viewSpecificSettings": {
+         "bands": [],
+         "bucketMean": false,
+         "bucketType": "MONTH",
+         "logScaling": false,
+         "resultLimit": 5,
+         "rotateLabels": true,
+         "showDataLabels": false,
+         "sortOn": "",
+         "sortOrder": "DESC",
+         "useEthiopianDates": false
+        },
+        "viewType": "TIME"
+       }
+      }
+     },
+     "querySelections": {
+      "fields": [
+       {
+        "calculation": {
+         "filter": {
+          "fieldId": "yellow_fever_cases",
+          "type": "FIELD"
+         },
+         "type": "SUM"
+        },
+        "canonicalName": "Yellow Fever Cases",
+        "customizableFilterItems": [],
+        "id": "yellow_fever_cases",
+        "shortName": "Yellow Fever Cases",
+        "showNullAsZero": false,
+        "userDefinedLabel": ""
+       }
+      ],
+      "filters": [],
+      "groups": [
+       {
+        "item": {
+         "granularity": "month",
+         "includeTotal": false,
+         "name": "Month"
+        },
+        "type": "GROUPING_GRANULARITY"
+       },
+       {
+        "item": {
+         "dimension": "StateName",
+         "includeAll": false,
+         "includeNull": false,
+         "includeTotal": false,
+         "name": "State"
+        },
+        "type": "GROUPING_DIMENSION"
+       }
+      ]
+     },
+     "type": "QUERY_ITEM",
+     "visualizationType": "LINE"
+    },
+    "position": {
+     "columnCount": 50,
+     "rowCount": 40,
+     "x": 50
+    }
+   },
+   {
+    "id": "tile-2",
+    "item": {
+     "queryResultSpec": {
+      "customFields": [],
+      "dataFilters": [],
+      "groupBySettings": {
+       "groupings": {
+        "Sex": {
+         "displayValueFormat": "DEFAULT",
+         "id": "Sex",
+         "label": "Sex",
+         "nullValueDisplay": "null",
+         "type": "STRING"
+        },
+        "StateName": {
+         "displayValueFormat": "DEFAULT",
+         "id": "StateName",
+         "label": "State",
+         "nullValueDisplay": "null",
+         "type": "STRING"
+        }
+       }
+      },
+      "titleSettings": {
+       "subtitle": "",
+       "subtitleFontSize": "18px",
+       "title": "Cases by state and sex",
+       "titleFontColor": "black",
+       "titleFontFamily": "Arial",
+       "titleFontSize": "16px"
+      },
+      "viewTypes": [
+       "TABLE"
+      ],
+      "visualizationSettings": {
+       "BAR_GRAPH": null,
+       "BOX_PLOT": null,
+       "BUBBLE_CHART": null,
+       "BUMP_CHART": null,
+       "EPICURVE": null,
+       "EXPANDOTREE": null,
+       "HEATTILES": null,
+       "MAP": null,
+       "NUMBER_TREND": null,
+       "PIE": null,
+       "SUNBURST": null,
+       "TABLE": {
+        "legendSettings": {
+         "consolidateRules": true,
+         "legendFontColor": "black",
+         "legendFontFamily": "Arial",
+         "legendFontSize": "16px",
+         "legendPlacement": "bottom",
+         "overlapLegendWithChart": false,
+         "showLegend": true
+        },
+        "seriesSettings": {
+         "dataActionRules": [],
+         "seriesObjects": {
+          "yellow_fever_cases": {
+           "barLabelPosition": "top",
+           "color": "#4E79A7",
+           "dataLabelFontSize": "12px",
+           "dataLabelFormat": "none",
+           "id": "yellow_fever_cases",
+           "isVisible": true,
+           "label": "Yellow Fever Cases",
+           "nullValueDisplay": "No data",
+           "showSeriesValue": false,
+           "visualDisplayShape": "bar",
+           "yAxis": "y1Axis"
+          }
+         },
+         "seriesOrder": [
+          "yellow_fever_cases"
+         ]
+        },
+        "viewSpecificSettings": {
+         "activeTheme": "Default",
+         "addTotalRow": false,
+         "customTheme": null,
+         "enableAutoExpand": false,
+         "enableCasePageLinking": false,
+         "enablePagination": true,
+         "fitWidth": true,
+         "footerBackground": "#fff",
+         "footerBorderColor": "#fff",
+         "footerColor": "black",
+         "footerFontFamily": "Arial",
+         "footerFontSize": "12px",
+         "headerBorderColor": "#d9d9d9",
+         "invertedFields": [],
+         "maxColumnWidth": "500",
+         "mergeTableCells": false,
+         "minColumnWidth": "150",
+         "pivotedDimensions": [
+          "field"
+         ],
+         "rowHeight": 30.0,
+         "tableFormat": "table",
+         "userSort": null,
+         "wrapColumnTitles": false
+        },
+        "viewType": "TABLE"
+       },
+       "TIME": null
+      }
+     },
+     "querySelections": {
+      "fields": [
+       {
+        "calculation": {
+         "filter": {
+          "fieldId": "yellow_fever_cases",
+          "type": "FIELD"
+         },
+         "type": "SUM"
+        },
+        "canonicalName": "Yellow Fever Cases",
+        "customizableFilterItems": [],
+        "id": "yellow_fever_cases",
+        "shortName": "Yellow Fever Cases",
+        "showNullAsZero": false,
+        "userDefinedLabel": ""
+       }
+      ],
+      "filters": [],
+      "groups": [
+       {
+        "item": {
+         "dimension": "StateName",
+         "includeAll": false,
+         "includeNull": false,
+         "includeTotal": false,
+         "name": "State"
+        },
+        "type": "GROUPING_DIMENSION"
+       },
+       {
+        "item": {
+         "dimension": "Sex",
+         "includeAll": false,
+         "includeNull": false,
+         "includeTotal": false,
+         "name": "Sex"
+        },
+        "type": "GROUPING_DIMENSION"
+       }
+      ]
+     },
+     "type": "QUERY_ITEM",
+     "visualizationType": "TABLE"
+    },
+    "position": {
+     "columnCount": 50,
+     "rowCount": 40,
+     "x": 0
+    }
+   },
+   {
+    "id": "tile-3",
+    "item": {
+     "queryResultSpec": {
+      "customFields": [],
+      "dataFilters": [],
+      "groupBySettings": {
+       "groupings": {
+        "MunicipalityName": {
+         "displayValueFormat": "DEFAULT",
+         "id": "MunicipalityName",
+         "label": "Municipality",
+         "nullValueDisplay": "null",
+         "type": "STRING"
+        }
+       }
+      },
+      "titleSettings": {
+       "subtitle": "",
+       "subtitleFontSize": "18px",
+       "title": "Cases by municipality",
+       "titleFontColor": "black",
+       "titleFontFamily": "Arial",
+       "titleFontSize": "16px"
+      },
+      "viewTypes": [
+       "MAP"
+      ],
+      "visualizationSettings": {
+       "BAR_GRAPH": null,
+       "BOX_PLOT": null,
+       "BUBBLE_CHART": null,
+       "BUMP_CHART": null,
+       "EPICURVE": null,
+       "EXPANDOTREE": null,
+       "HEATTILES": null,
+       "MAP": {
+        "legendSettings": {
+         "consolidateRules": true,
+         "legendFontColor": "black",
+         "legendFontFamily": "Arial",
+         "legendFontSize": "16px",
+         "legendPlacement": "bottom",
+         "overlapLegendWithChart": false,
+         "showLegend": true
+        },
+        "seriesSettings": {
+         "dataActionRules": [],
+         "seriesObjects": {
+          "yellow_fever_cases": {
+           "barLabelPosition": "top",
+           "color": "#4E79A7",
+           "dataLabelFontSize": "12px",
+           "dataLabelFormat": "none",
+           "id": "yellow_fever_cases",
+           "isVisible": true,
+           "label": "Yellow Fever Cases",
+           "nullValueDisplay": "No data",
+           "showSeriesValue": false,
+           "visualDisplayShape": "bar",
+           "yAxis": "y1Axis"
+          }
+         },
+         "seriesOrder": [
+          "yellow_fever_cases"
+         ]
+        },
+        "viewSpecificSettings": {
+         "adminBoundariesColor": "#313234",
+         "adminBoundariesWidth": "normal",
+         "autoFitToVisibleData": false,
+         "baseLayer": "Streets",
+         "currentDisplay": "dots",
+         "entityLayerProperties": {},
+         "fillOpacity": 0.8,
+         "mapCenter": [
+          0.0,
+          0.0
+         ],
+         "overlayLayers": [
+          "Administrative"
+         ],
+         "playbackSettings": {
+          "playbackSpeed": "normal",
+          "reversePlayback": false,
+          "startFromMostRecentDate": false
+         },
+         "selectedField": "yellow_fever_cases",
+         "selectedGeoTiles": "",
+         "selectedLabelsToDisplay": {},
+         "shapeOutlineWidth": "normal",
+         "showAdminBoundaries": true,
+         "showLabels": false,
+         "tooltipBackgroundColor": {
+          "a": 0.75,
+          "b": 255,
+          "g": 255,
+          "r": 255
+         },
+         "tooltipBold": false,
+         "tooltipFontColor": "black",
+         "tooltipFontFamily": "Arial",
+         "tooltipFontSize": "12px",
+         "visibleMarkerLayers": [],
+         "zoomLevel": 1.0
+        },
+        "viewType": "MAP"
+       },
+       "NUMBER_TREND": null,
+       "PIE": null,
+       "SUNBURST": null,
+       "TABLE": null,
+       "TIME": null
+      }
+     },
+     "querySelections": {
+      "fields": [
+       {
+        "calculation": {
+         "filter": {
+          "fieldId": "yellow_fever_cases",
+          "type": "FIELD"
+         },
+         "type": "SUM"
+        },
+        "canonicalName": "Yellow Fever Cases",
+        "customizableFilterItems": [],
+        "id": "yellow_fever_cases",
+        "shortName": "Yellow Fever Cases",
+        "showNullAsZero": false,
+        "userDefinedLabel": ""
+       }
+      ],
+      "filters": [],
+      "groups": [
+       {
+        "item": {
+         "dimension": "MunicipalityName",
+         "includeAll": false,
+         "includeNull": false,
+         "includeTotal": false,
+         "name": "Municipality"
+        },
+        "type": "GROUPING_DIMENSION"
+       }
+      ]
+     },
+     "type": "QUERY_ITEM",
+     "visualizationType": "MAP"
+    },
+    "position": {
+     "columnCount": 50,
+     "rowCount": 40,
+     "x": 50
+    }
+   },
+   {
+    "id": "tile-4",
+    "item": {
+     "queryResultSpec": {
+      "customFields": [],
+      "dataFilters": [],
+      "groupBySettings": {
+       "groupings": {
+        "MunicipalityName": {
+         "displayValueFormat": "DEFAULT",
+         "id": "MunicipalityName",
+         "label": "Municipality",
+         "nullValueDisplay": "null",
+         "type": "STRING"
+        },
+        "StateName": {
+         "displayValueFormat": "DEFAULT",
+         "id": "StateName",
+         "label": "State",
+         "nullValueDisplay": "null",
+         "type": "STRING"
+        }
+       }
+      },
+      "titleSettings": {
+       "subtitle": "",
+       "subtitleFontSize": "18px",
+       "title": "Cases by state and municipality",
+       "titleFontColor": "black",
+       "titleFontFamily": "Arial",
+       "titleFontSize": "16px"
+      },
+      "viewTypes": [
+       "EXPANDOTREE"
+      ],
+      "visualizationSettings": {
+       "BAR_GRAPH": null,
+       "BOX_PLOT": null,
+       "BUBBLE_CHART": null,
+       "BUMP_CHART": null,
+       "EPICURVE": null,
+       "EXPANDOTREE": {
+        "seriesSettings": {
+         "dataActionRules": [],
+         "seriesObjects": {
+          "yellow_fever_cases": {
+           "barLabelPosition": "top",
+           "color": "#4E79A7",
+           "dataLabelFontSize": "12px",
+           "dataLabelFormat": "none",
+           "id": "yellow_fever_cases",
+           "isVisible": true,
+           "label": "Yellow Fever Cases",
+           "nullValueDisplay": "No data",
+           "showSeriesValue": false,
+           "visualDisplayShape": "bar",
+           "yAxis": "y1Axis"
+          }
+         },
+         "seriesOrder": [
+          "yellow_fever_cases"
+         ]
+        },
+        "viewSpecificSettings": {
+         "selectedField": "yellow_fever_cases"
+        },
+        "viewType": "EXPANDOTREE"
+       },
+       "HEATTILES": null,
+       "MAP": null,
+       "NUMBER_TREND": null,
+       "PIE": null,
+       "SUNBURST": null,
+       "TABLE": null,
+       "TIME": null
+      }
+     },
+     "querySelections": {
+      "fields": [
+       {
+        "calculation": {
+         "filter": {
+          "fieldId": "yellow_fever_cases",
+          "type": "FIELD"
+         },
+         "type": "SUM"
+        },
+        "canonicalName": "Yellow Fever Cases",
+        "customizableFilterItems": [],
+        "id": "yellow_fever_cases",
+        "shortName": "Yellow Fever Cases",
+        "showNullAsZero": false,
+        "userDefinedLabel": ""
+       }
+      ],
+      "filters": [],
+      "groups": [
+       {
+        "item": {
+         "dimension": "StateName",
+         "includeAll": false,
+         "includeNull": false,
+         "includeTotal": false,
+         "name": "State"
+        },
+        "type": "GROUPING_DIMENSION"
+       },
+       {
+        "item": {
+         "dimension": "MunicipalityName",
+         "includeAll": false,
+         "includeNull": false,
+         "includeTotal": false,
+         "name": "Municipality"
+        },
+        "type": "GROUPING_DIMENSION"
+       }
+      ]
+     },
+     "type": "QUERY_ITEM",
+     "visualizationType": "HIERARCHY"
+    },
+    "position": {
+     "columnCount": 50,
+     "rowCount": 40,
+     "x": 0
+    }
+   },
+   {
+    "id": "tile-5",
+    "item": {
+     "queryResultSpec": {
+      "customFields": [],
+      "dataFilters": [],
+      "groupBySettings": {
+       "groupings": {
+        "Sex": {
+         "displayValueFormat": "DEFAULT",
+         "id": "Sex",
+         "label": "Sex",
+         "nullValueDisplay": "null",
+         "type": "STRING"
+        }
+       }
+      },
+      "titleSettings": {
+       "subtitle": "",
+       "subtitleFontSize": "18px",
+       "title": "Cases by sex",
+       "titleFontColor": "black",
+       "titleFontFamily": "Arial",
+       "titleFontSize": "16px"
+      },
+      "viewTypes": [
+       "PIE"
+      ],
+      "visualizationSettings": {
+       "BAR_GRAPH": null,
+       "BOX_PLOT": null,
+       "BUBBLE_CHART": null,
+       "BUMP_CHART": null,
+       "EPICURVE": null,
+       "EXPANDOTREE": null,
+       "HEATTILES": null,
+       "MAP": null,
+       "NUMBER_TREND": null,
+       "PIE": {
+        "seriesSettings": {
+         "dataActionRules": [],
+         "seriesObjects": {
+          "yellow_fever_cases": {
+           "barLabelPosition": "top",
+           "color": "#4E79A7",
+           "dataLabelFontSize": "12px",
+           "dataLabelFormat": "none",
+           "id": "yellow_fever_cases",
+           "isVisible": true,
+           "label": "Yellow Fever Cases",
+           "nullValueDisplay": "No data",
+           "showSeriesValue": false,
+           "visualDisplayShape": "bar",
+           "yAxis": "y1Axis"
+          }
+         },
+         "seriesOrder": [
+          "yellow_fever_cases"
+         ]
+        },
+        "viewSpecificSettings": {
+         "breakdown": "field",
+         "displayLabelType": "percent",
+         "drilldownSelection": null,
+         "palette": [
+          "#4e79a7",
+          "#f28e2c",
+          "#e15759",
+          "#76b7b2",
+          "#59a14f",
+          "#edc949",
+          "#af7aa1",
+          "#ff9da7",
+          "#9c755f",
+          "#bab0ab"
+         ],
+         "selectedSegments": []
+        },
+        "viewType": "PIE"
+       },
+       "SUNBURST": null,
+       "TABLE": null,
+       "TIME": null
+      }
+     },
+     "querySelections": {
+      "fields": [
+       {
+        "calculation": {
+         "filter": {
+          "fieldId": "yellow_fever_cases",
+          "type": "FIELD"
+         },
+         "type": "SUM"
+        },
+        "canonicalName": "Yellow Fever Cases",
+        "customizableFilterItems": [],
+        "id": "yellow_fever_cases",
+        "shortName": "Yellow Fever Cases",
+        "showNullAsZero": false,
+        "userDefinedLabel": ""
+       }
+      ],
+      "filters": [],
+      "groups": [
+       {
+        "item": {
+         "dimension": "Sex",
+         "includeAll": false,
+         "includeNull": false,
+         "includeTotal": false,
+         "name": "Sex"
+        },
+        "type": "GROUPING_DIMENSION"
+       }
+      ]
+     },
+     "type": "QUERY_ITEM",
+     "visualizationType": "PIE"
+    },
+    "position": {
+     "columnCount": 50,
+     "rowCount": 40,
+     "x": 50
+    }
+   },
+   {
+    "id": "tile-6",
+    "item": {
+     "queryResultSpec": {
+      "customFields": [],
+      "dataFilters": [],
+      "groupBySettings": {
+       "groupings": {
+        "timestamp": {
+         "displayValueFormat": "week",
+         "id": "timestamp",
+         "label": "Week",
+         "nullValueDisplay": "null",
+         "type": "DATE"
+        }
+       }
+      },
+      "titleSettings": {
+       "subtitle": "",
+       "subtitleFontSize": "18px",
+       "title": "Cases by week",
+       "titleFontColor": "black",
+       "titleFontFamily": "Arial",
+       "titleFontSize": "16px"
+      },
+      "viewTypes": [
+       "TIME"
+      ],
+      "visualizationSettings": {
+       "BAR_GRAPH": null,
+       "BOX_PLOT": null,
+       "BUBBLE_CHART": null,
+       "BUMP_CHART": null,
+       "EPICURVE": null,
+       "EXPANDOTREE": null,
+       "HEATTILES": null,
+       "MAP": null,
+       "NUMBER_TREND": null,
+       "PIE": null,
+       "SUNBURST": null,
+       "TABLE": null,
+       "TIME": {
+        "axesSettings": {
+         "xAxis": {
+          "additionalAxisTitleDistance": "0px",
+          "labelsFontColor": "black",
+          "labelsFontFamily": "Arial",
+          "labelsFontSize": "16px",
+          "title": "",
+          "titleFontColor": "black",
+          "titleFontFamily": "Arial",
+          "titleFontSize": "18px"
+         },
+         "y1Axis": {
+          "additionalAxisTitleDistance": "0px",
+          "labelsFontColor": "black",
+          "labelsFontFamily": "Arial",
+          "labelsFontSize": "16px",
+          "rangeFrom": null,
+          "rangeTo": null,
+          "title": "",
+          "titleFontColor": "black",
+          "titleFontFamily": "Arial",
+          "titleFontSize": "18px"
+         },
+         "y2Axis": {
+          "additionalAxisTitleDistance": "0px",
+          "labelsFontColor": "black",
+          "labelsFontFamily": "Arial",
+          "labelsFontSize": "16px",
+          "rangeFrom": null,
+          "rangeTo": null,
+          "title": "",
+          "titleFontColor": "black",
+          "titleFontFamily": "Arial",
+          "titleFontSize": "18px"
+         }
+        },
+        "seriesSettings": {
+         "dataActionRules": [],
+         "seriesObjects": {
+          "yellow_fever_cases": {
+           "barLabelPosition": "top",
+           "color": "#4E79A7",
+           "dataLabelFontSize": "12px",
+           "dataLabelFormat": "none",
+           "id": "yellow_fever_cases",
+           "isVisible": true,
+           "label": "Yellow Fever Cases",
+           "nullValueDisplay": "No data",
+           "showSeriesValue": false,
+           "visualDisplayShape": "bar",
+           "yAxis": "y1Axis"
+          }
+         },
+         "seriesOrder": [
+          "yellow_fever_cases"
+         ]
+        },
+        "viewSpecificSettings": {
+         "bands": [],
+         "bucketMean": false,
+         "bucketType": "MONTH",
+         "logScaling": false,
+         "resultLimit": 5,
+         "rotateLabels": true,
+         "showDataLabels": false,
+         "sortOn": "",
+         "sortOrder": "DESC",
+         "useEthiopianDates": false
+        },
+        "viewType": "TIME"
+       }
+      }
+     },
+     "querySelections": {
+      "fields": [
+       {
+        "calculation": {
+         "filter": {
+          "fieldId": "yellow_fever_cases",
+          "type": "FIELD"
+         },
+         "type": "SUM"
+        },
+        "canonicalName": "Yellow Fever Cases",
+        "customizableFilterItems": [],
+        "id": "yellow_fever_cases",
+        "shortName": "Yellow Fever Cases",
+        "showNullAsZero": false,
+        "userDefinedLabel": ""
+       }
+      ],
+      "filters": [],
+      "groups": [
+       {
+        "item": {
+         "granularity": "week",
+         "includeTotal": false,
+         "name": "Week"
+        },
+        "type": "GROUPING_GRANULARITY"
+       }
+      ]
+     },
+     "type": "QUERY_ITEM",
+     "visualizationType": "LINE"
+    },
+    "position": {
+     "columnCount": 50,
+     "rowCount": 40,
+     "x": 0
+    }
+   },
+   {
+    "id": "tile-7",
+    "item": {
+     "queryResultSpec": {
+      "customFields": [],
+      "dataFilters": [],
+      "groupBySettings": {
+       "groupings": {
+        "StateName": {
+         "displayValueFormat": "DEFAULT",
+         "id": "StateName",
+         "label": "State",
+         "nullValueDisplay": "null",
+         "type": "STRING"
+        },
+        "timestamp": {
+         "displayValueFormat": "week",
+         "id": "timestamp",
+         "label": "Week",
+         "nullValueDisplay": "null",
+         "type": "DATE"
+        }
+       }
+      },
+      "titleSettings": {
+       "subtitle": "",
+       "subtitleFontSize": "18px",
+       "title": "Cases by week and state",
+       "titleFontColor": "black",
+       "titleFontFamily": "Arial",
+       "titleFontSize": "16px"
+      },
+      "viewTypes": [
+       "HEATTILES"
+      ],
+      "visualizationSettings": {
+       "BAR_GRAPH": null,
+       "BOX_PLOT": null,
+       "BUBBLE_CHART": null,
+       "BUMP_CHART": null,
+       "EPICURVE": null,
+       "EXPANDOTREE": null,
+       "HEATTILES": {
+        "axesSettings": {
+         "xAxis": {
+          "additionalAxisTitleDistance": "0px",
+          "labelsFontColor": "black",
+          "labelsFontFamily": "Arial",
+          "labelsFontSize": "16px",
+          "title": "",
+          "titleFontColor": "black",
+          "titleFontFamily": "Arial",
+          "titleFontSize": "18px"
+         },
+         "y1Axis": {
+          "additionalAxisTitleDistance": "0px",
+          "labelsFontColor": "black",
+          "labelsFontFamily": "Arial",
+          "labelsFontSize": "16px",
+          "rangeFrom": null,
+          "rangeTo": null,
+          "title": "",
+          "titleFontColor": "black",
+          "titleFontFamily": "Arial",
+          "titleFontSize": "18px"
+         },
+         "y2Axis": {
+          "additionalAxisTitleDistance": "0px",
+          "labelsFontColor": "black",
+          "labelsFontFamily": "Arial",
+          "labelsFontSize": "16px",
+          "rangeFrom": null,
+          "rangeTo": null,
+          "title": "",
+          "titleFontColor": "black",
+          "titleFontFamily": "Arial",
+          "titleFontSize": "18px"
+         }
+        },
+        "seriesSettings": {
+         "dataActionRules": [],
+         "seriesObjects": {
+          "yellow_fever_cases": {
+           "barLabelPosition": "top",
+           "color": "#4E79A7",
+           "dataLabelFontSize": "12px",
+           "dataLabelFormat": "none",
+           "id": "yellow_fever_cases",
+           "isVisible": true,
+           "label": "Yellow Fever Cases",
+           "nullValueDisplay": "No data",
+           "showSeriesValue": false,
+           "visualDisplayShape": "bar",
+           "yAxis": "y1Axis"
+          }
+         },
+         "seriesOrder": [
+          "yellow_fever_cases"
+         ]
+        },
+        "viewSpecificSettings": {
+         "divergentColoration": true,
+         "firstYaxisSelections": [],
+         "invertColoration": false,
+         "logScaling": true,
+         "resultLimit": 100,
+         "selectedField": "yellow_fever_cases",
+         "showTimeOnYAxis": true,
+         "sortOn": "",
+         "sortOrder": "DESC",
+         "useEthiopianDates": false
+        },
+        "viewType": "HEATTILES"
+       },
+       "MAP": null,
+       "NUMBER_TREND": null,
+       "PIE": null,
+       "SUNBURST": null,
+       "TABLE": null,
+       "TIME": null
+      }
+     },
+     "querySelections": {
+      "fields": [
+       {
+        "calculation": {
+         "filter": {
+          "fieldId": "yellow_fever_cases",
+          "type": "FIELD"
+         },
+         "type": "SUM"
+        },
+        "canonicalName": "Yellow Fever Cases",
+        "customizableFilterItems": [],
+        "id": "yellow_fever_cases",
+        "shortName": "Yellow Fever Cases",
+        "showNullAsZero": false,
+        "userDefinedLabel": ""
+       }
+      ],
+      "filters": [],
+      "groups": [
+       {
+        "item": {
+         "granularity": "week",
+         "includeTotal": false,
+         "name": "Week"
+        },
+        "type": "GROUPING_GRANULARITY"
+       },
+       {
+        "item": {
+         "dimension": "StateName",
+         "includeAll": false,
+         "includeNull": false,
+         "includeTotal": false,
+         "name": "State"
+        },
+        "type": "GROUPING_DIMENSION"
+       }
+      ]
+     },
+     "type": "QUERY_ITEM",
+     "visualizationType": "HEATTILES"
+    },
+    "position": {
+     "columnCount": 50,
+     "rowCount": 40,
+     "x": 50
+    }
+   },
+   {
+    "id": "tile-8",
+    "item": {
+     "queryResultSpec": {
+      "customFields": [],
+      "dataFilters": [],
+      "groupBySettings": {
+       "groupings": {
+        "Sex": {
+         "displayValueFormat": "DEFAULT",
+         "id": "Sex",
+         "label": "Sex",
+         "nullValueDisplay": "null",
+         "type": "STRING"
+        },
+        "timestamp": {
+         "displayValueFormat": "month",
+         "id": "timestamp",
+         "label": "Month",
+         "nullValueDisplay": "null",
+         "type": "DATE"
+        }
+       }
+      },
+      "titleSettings": {
+       "subtitle": "",
+       "subtitleFontSize": "18px",
+       "title": "Cases by month and sex",
+       "titleFontColor": "black",
+       "titleFontFamily": "Arial",
+       "titleFontSize": "16px"
+      },
+      "viewTypes": [
+       "BAR_GRAPH"
+      ],
+      "visualizationSettings": {
+       "BAR_GRAPH": {
+        "axesSettings": {
+         "xAxis": {
+          "additionalAxisTitleDistance": "0px",
+          "labelsFontColor": "black",
+          "labelsFontFamily": "Arial",
+          "labelsFontSize": "16px",
+          "title": "",
+          "titleFontColor": "black",
+          "titleFontFamily": "Arial",
+          "titleFontSize": "18px"
+         },
+         "y1Axis": {
+          "additionalAxisTitleDistance": "0px",
+          "labelsFontColor": "black",
+          "labelsFontFamily": "Arial",
+          "labelsFontSize": "16px",
+          "rangeFrom": null,
+          "rangeTo": null,
+          "title": "",
+          "titleFontColor": "black",
+          "titleFontFamily": "Arial",
+          "titleFontSize": "18px"
+         },
+         "y2Axis": {
+          "additionalAxisTitleDistance": "0px",
+          "labelsFontColor": "black",
+          "labelsFontFamily": "Arial",
+          "labelsFontSize": "16px",
+          "rangeFrom": null,
+          "rangeTo": null,
+          "title": "",
+          "titleFontColor": "black",
+          "titleFontFamily": "Arial",
+          "titleFontSize": "18px"
+         }
+        },
+        "legendSettings": {
+         "consolidateRules": true,
+         "legendFontColor": "black",
+         "legendFontFamily": "Arial",
+         "legendFontSize": "16px",
+         "legendPlacement": "bottom",
+         "overlapLegendWithChart": false,
+         "showLegend": true
+        },
+        "seriesSettings": {
+         "dataActionRules": [],
+         "seriesObjects": {
+          "yellow_fever_cases": {
+           "barLabelPosition": "top",
+           "color": "#4E79A7",
+           "dataLabelFontSize": "12px",
+           "dataLabelFormat": "none",
+           "id": "yellow_fever_cases",
+           "isVisible": true,
+           "label": "Yellow Fever Cases",
+           "nullValueDisplay": "No data",
+           "showSeriesValue": false,
+           "visualDisplayShape": "bar",
+           "yAxis": "y1Axis"
+          }
+         },
+         "seriesOrder": [
+          "yellow_fever_cases"
+         ]
+        },
+        "viewSpecificSettings": {
+         "alwaysShowFocusWindow": false,
+         "applyMinimumBarHeight": true,
+         "barDirection": "vertical",
+         "barTreatment": "sequential",
+         "goalLines": [],
+         "resultLimit": 50,
+         "rotateInnerGroupLabels": true,
+         "sortOn": "",
+         "sortOrder": "DESC",
+         "unPivot": false,
+         "valueTextAngle": "auto"
+        },
+        "viewType": "BAR_GRAPH"
+       },
+       "BOX_PLOT": null,
+       "BUBBLE_CHART": null,
+       "BUMP_CHART": null,
+       "EPICURVE": null,
+       "EXPANDOTREE": null,
+       "HEATTILES": null,
+       "MAP": null,
+       "NUMBER_TREND": null,
+       "PIE": null,
+       "SUNBURST": null,
+       "TABLE": null,
+       "TIME": null
+      }
+     },
+     "querySelections": {
+      "fields": [
+       {
+        "calculation": {
+         "filter": {
+          "fieldId": "yellow_fever_cases",
+          "type": "FIELD"
+         },
+         "type": "SUM"
+        },
+        "canonicalName": "Yellow Fever Cases",
+        "customizableFilterItems": [],
+        "id": "yellow_fever_cases",
+        "shortName": "Yellow Fever Cases",
+        "showNullAsZero": false,
+        "userDefinedLabel": ""
+       }
+      ],
+      "filters": [],
+      "groups": [
+       {
+        "item": {
+         "granularity": "month",
+         "includeTotal": false,
+         "name": "Month"
+        },
+        "type": "GROUPING_GRANULARITY"
+       },
+       {
+        "item": {
+         "dimension": "Sex",
+         "includeAll": false,
+         "includeNull": false,
+         "includeTotal": false,
+         "name": "Sex"
+        },
+        "type": "GROUPING_DIMENSION"
+       }
+      ]
+     },
+     "type": "QUERY_ITEM",
+     "visualizationType": "BAR_STACKED"
+    },
+    "position": {
+     "columnCount": 50,
+     "rowCount": 40,
+     "x": 0
+    }
+   },
+   {
+    "id": "tile-9",
+    "item": {
+     "queryResultSpec": {
+      "customFields": [],
+      "dataFilters": [],
+      "groupBySettings": {
+       "groupings": {
+        "MunicipalityName": {
+         "displayValueFormat": "DEFAULT",
+         "id": "MunicipalityName",
+         "label": "Municipality",
+         "nullValueDisplay": "null",
+         "type": "STRING"
+        },
+        "timestamp": {
+         "displayValueFormat": "month",
+         "id": "timestamp",
+         "label": "Month",
+         "nullValueDisplay": "null",
+         "type": "DATE"
+        }
+       }
+      },
+      "titleSettings": {
+       "subtitle": "",
+       "subtitleFontSize": "18px",
+       "title": "Cases by municipality and month",
+       "titleFontColor": "black",
+       "titleFontFamily": "Arial",
+       "titleFontSize": "16px"
+      },
+      "viewTypes": [
+       "TABLE"
+      ],
+      "visualizationSettings": {
+       "BAR_GRAPH": null,
+       "BOX_PLOT": null,
+       "BUBBLE_CHART": null,
+       "BUMP_CHART": null,
+       "EPICURVE": null,
+       "EXPANDOTREE": null,
+       "HEATTILES": null,
+       "MAP": null,
+       "NUMBER_TREND": null,
+       "PIE": null,
+       "SUNBURST": null,
+       "TABLE": {
+        "legendSettings": {
+         "consolidateRules": true,
+         "legendFontColor": "black",
+         "legendFontFamily": "Arial",
+         "legendFontSize": "16px",
+         "legendPlacement": "bottom",
+         "overlapLegendWithChart": false,
+         "showLegend": true
+        },
+        "seriesSettings": {
+         "dataActionRules": [],
+         "seriesObjects": {
+          "yellow_fever_cases": {
+           "barLabelPosition": "top",
+           "color": "#4E79A7",
+           "dataLabelFontSize": "12px",
+           "dataLabelFormat": "none",
+           "id": "yellow_fever_cases",
+           "isVisible": true,
+           "label": "Yellow Fever Cases",
+           "nullValueDisplay": "No data",
+           "showSeriesValue": false,
+           "visualDisplayShape": "bar",
+           "yAxis": "y1Axis"
+          },
+          "yellow_fever_test_indicator": {
+           "barLabelPosition": "top",
+           "color": "#F28E2B",
+           "dataLabelFontSize": "12px",
+           "dataLabelFormat": "none",
+           "id": "yellow_fever_test_indicator",
+           "isVisible": true,
+           "label": "Yellow Fever Test Indicator",
+           "nullValueDisplay": "No data",
+           "showSeriesValue": false,
+           "visualDisplayShape": "bar",
+           "yAxis": "y1Axis"
+          }
+         },
+         "seriesOrder": [
+          "yellow_fever_cases",
+          "yellow_fever_test_indicator"
+         ]
+        },
+        "viewSpecificSettings": {
+         "activeTheme": "Default",
+         "addTotalRow": false,
+         "customTheme": null,
+         "enableAutoExpand": false,
+         "enableCasePageLinking": false,
+         "enablePagination": true,
+         "fitWidth": true,
+         "footerBackground": "#fff",
+         "footerBorderColor": "#fff",
+         "footerColor": "black",
+         "footerFontFamily": "Arial",
+         "footerFontSize": "12px",
+         "headerBorderColor": "#d9d9d9",
+         "invertedFields": [],
+         "maxColumnWidth": "500",
+         "mergeTableCells": false,
+         "minColumnWidth": "150",
+         "pivotedDimensions": [
+          "field"
+         ],
+         "rowHeight": 30.0,
+         "tableFormat": "table",
+         "userSort": null,
+         "wrapColumnTitles": false
+        },
+        "viewType": "TABLE"
+       },
+       "TIME": null
+      }
+     },
+     "querySelections": {
+      "fields": [
+       {
+        "calculation": {
+         "filter": {
+          "fieldId": "yellow_fever_cases",
+          "type": "FIELD"
+         },
+         "type": "SUM"
+        },
+        "canonicalName": "Yellow Fever Cases",
+        "customizableFilterItems": [],
+        "id": "yellow_fever_cases",
+        "shortName": "Yellow Fever Cases",
+        "showNullAsZero": false,
+        "userDefinedLabel": ""
+       },
+       {
+        "calculation": {
+         "filter": {
+          "fieldId": "yellow_fever_test_indicator",
+          "type": "FIELD"
+         },
+         "type": "SUM"
+        },
+        "canonicalName": "Yellow Fever Test Indicator",
+        "customizableFilterItems": [],
+        "id": "yellow_fever_test_indicator",
+        "shortName": "Yellow Fever Test Indicator",
+        "showNullAsZero": false,
+        "userDefinedLabel": ""
+       }
+      ],
+      "filters": [],
+      "groups": [
+       {
+        "item": {
+         "dimension": "MunicipalityName",
+         "includeAll": false,
+         "includeNull": false,
+         "includeTotal": false,
+         "name": "Municipality"
+        },
+        "type": "GROUPING_DIMENSION"
+       },
+       {
+        "item": {
+         "granularity": "month",
+         "includeTotal": false,
+         "name": "Month"
+        },
+        "type": "GROUPING_GRANULARITY"
+       }
+      ]
+     },
+     "type": "QUERY_ITEM",
+     "visualizationType": "TABLE"
+    },
+    "position": {
+     "columnCount": 50,
+     "rowCount": 40,
+     "x": 50
+    }
+   },
+   {
+    "id": "tile-10",
+    "item": {
+     "queryResultSpec": {
+      "customFields": [],
+      "dataFilters": [],
+      "groupBySettings": {
+       "groupings": {}
+      },
+      "titleSettings": {
+       "subtitle": "",
+       "subtitleFontSize": "18px",
+       "title": "Total cases",
+       "titleFontColor": "black",
+       "titleFontFamily": "Arial",
+       "titleFontSize": "16px"
+      },
+      "viewTypes": [
+       "NUMBER_TREND"
+      ],
+      "visualizationSettings": {
+       "BAR_GRAPH": null,
+       "BOX_PLOT": null,
+       "BUBBLE_CHART": null,
+       "BUMP_CHART": null,
+       "EPICURVE": null,
+       "EXPANDOTREE": null,
+       "HEATTILES": null,
+       "MAP": null,
+       "NUMBER_TREND": {
+        "seriesSettings": {
+         "dataActionRules": [],
+         "seriesObjects": {
+          "yellow_fever_cases": {
+           "barLabelPosition": "top",
+           "color": "#4E79A7",
+           "dataLabelFontSize": "12px",
+           "dataLabelFormat": "none",
+           "id": "yellow_fever_cases",
+           "isVisible": true,
+           "label": "Yellow Fever Cases",
+           "nullValueDisplay": "No data",
+           "showSeriesValue": false,
+           "visualDisplayShape": "bar",
+           "yAxis": "y1Axis"
+          }
+         },
+         "seriesOrder": [
+          "yellow_fever_cases"
+         ]
+        },
+        "viewSpecificSettings": {
+         "displayValueAsPill": false,
+         "secondarySelectedField": null,
+         "selectedField": "yellow_fever_cases",
+         "showLastValue": false
+        },
+        "viewType": "NUMBER_TREND"
+       },
+       "PIE": null,
+       "SUNBURST": null,
+       "TABLE": null,
+       "TIME": null
+      }
+     },
+     "querySelections": {
+      "fields": [
+       {
+        "calculation": {
+         "filter": {
+          "fieldId": "yellow_fever_cases",
+          "type": "FIELD"
+         },
+         "type": "SUM"
+        },
+        "canonicalName": "Yellow Fever Cases",
+        "customizableFilterItems": [],
+        "id": "yellow_fever_cases",
+        "shortName": "Yellow Fever Cases",
+        "showNullAsZero": false,
+        "userDefinedLabel": ""
+       }
+      ],
+      "filters": [],
+      "groups": []
+     },
+     "type": "QUERY_ITEM",
+     "visualizationType": "NUMBER_TREND"
+    },
+    "position": {
+     "columnCount": 50,
+     "rowCount": 40,
+     "x": 0
+    }
+   },
+   {
+    "id": "tile-11",
+    "item": {
+     "queryResultSpec": {
+      "customFields": [],
+      "dataFilters": [],
+      "groupBySettings": {
+       "groupings": {
+        "StateName": {
+         "displayValueFormat": "DEFAULT",
+         "id": "StateName",
+         "label": "State",
+         "nullValueDisplay": "null",
+         "type": "STRING"
+        },
+        "timestamp": {
+         "displayValueFormat": "quarter",
+         "id": "timestamp",
+         "label": "Quarter",
+         "nullValueDisplay": "null",
+         "type": "DATE"
+        }
+       }
+      },
+      "titleSettings": {
+       "subtitle": "",
+       "subtitleFontSize": "18px",
+       "title": "Cases by quarter and state",
+       "titleFontColor": "black",
+       "titleFontFamily": "Arial",
+       "titleFontSize": "16px"
+      },
+      "viewTypes": [
+       "TIME"
+      ],
+      "visualizationSettings": {
+       "BAR_GRAPH": null,
+       "BOX_PLOT": null,
+       "BUBBLE_CHART": null,
+       "BUMP_CHART": null,
+       "EPICURVE": null,
+       "EXPANDOTREE": null,
+       "HEATTILES": null,
+       "MAP": null,
+       "NUMBER_TREND": null,
+       "PIE": null,
+       "SUNBURST": null,
+       "TABLE": null,
+       "TIME": {
+        "axesSettings": {
+         "xAxis": {
+          "additionalAxisTitleDistance": "0px",
+          "labelsFontColor": "black",
+          "labelsFontFamily": "Arial",
+          "labelsFontSize": "16px",
+          "title": "",
+          "titleFontColor": "black",
+          "titleFontFamily": "Arial",
+          "titleFontSize": "18px"
+         },
+         "y1Axis": {
+          "additionalAxisTitleDistance": "0px",
+          "labelsFontColor": "black",
+          "labelsFontFamily": "Arial",
+          "labelsFontSize": "16px",
+          "rangeFrom": null,
+          "rangeTo": null,
+          "title": "",
+          "titleFontColor": "black",
+          "titleFontFamily": "Arial",
+          "titleFontSize": "18px"
+         },
+         "y2Axis": {
+          "additionalAxisTitleDistance": "0px",
+          "labelsFontColor": "black",
+          "labelsFontFamily": "Arial",
+          "labelsFontSize": "16px",
+          "rangeFrom": null,
+          "rangeTo": null,
+          "title": "",
+          "titleFontColor": "black",
+          "titleFontFamily": "Arial",
+          "titleFontSize": "18px"
+         }
+        },
+        "seriesSettings": {
+         "dataActionRules": [],
+         "seriesObjects": {
+          "yellow_fever_cases": {
+           "barLabelPosition": "top",
+           "color": "#4E79A7",
+           "dataLabelFontSize": "12px",
+           "dataLabelFormat": "none",
+           "id": "yellow_fever_cases",
+           "isVisible": true,
+           "label": "Yellow Fever Cases",
+           "nullValueDisplay": "No data",
+           "showSeriesValue": false,
+           "visualDisplayShape": "bar",
+           "yAxis": "y1Axis"
+          }
+         },
+         "seriesOrder": [
+          "yellow_fever_cases"
+         ]
+        },
+        "viewSpecificSettings": {
+         "bands": [],
+         "bucketMean": false,
+         "bucketType": "MONTH",
+         "logScaling": false,
+         "resultLimit": 5,
+         "rotateLabels": true,
+         "showDataLabels": false,
+         "sortOn": "",
+         "sortOrder": "DESC",
+         "useEthiopianDates": false
+        },
+        "viewType": "TIME"
+       }
+      }
+     },
+     "querySelections": {
+      "fields": [
+       {
+        "calculation": {
+         "filter": {
+          "fieldId": "yellow_fever_cases",
+          "type": "FIELD"
+         },
+         "type": "SUM"
+        },
+        "canonicalName": "Yellow Fever Cases",
+        "customizableFilterItems": [],
+        "id": "yellow_fever_cases",
+        "shortName": "Yellow Fever Cases",
+        "showNullAsZero": false,
+        "userDefinedLabel": ""
+       }
+      ],
+      "filters": [],
+      "groups": [
+       {
+        "item": {
+         "granularity": "quarter",
+         "includeTotal": false,
+         "name": "Quarter"
+        },
+        "type": "GROUPING_GRANULARITY"
+       },
+       {
+        "item": {
+         "dimension": "StateName",
+         "includeAll": false,
+         "includeNull": false,
+         "includeTotal": false,
+         "name": "State"
+        },
+        "type": "GROUPING_DIMENSION"
+       }
+      ]
+     },
+     "type": "QUERY_ITEM",
+     "visualizationType": "LINE"
+    },
+    "position": {
+     "columnCount": 50,
+     "rowCount": 40,
+     "x": 50
+    }
+   }
+  ],
+  "legacy": false,
+  "options": {
+   "columnCount": 100,
+   "title": "Perf: twelve tiles"
+  },
+  "version": "2023-06-30"
+ }
+}

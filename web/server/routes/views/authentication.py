@@ -44,7 +44,11 @@ def authentication_required(is_api_request=False, force_authentication=False):
     def auth_decorator(protected_operation):
         @wraps(protected_operation)
         def auth_decorator_inner(*args, **kwargs):
-            user_is_authenticated = current_user.is_authenticated
+            # The login loaders never return a deactivated account; this
+            # agrees with them for any other way a user gets signed in.
+            user_is_authenticated = (
+                current_user.is_authenticated and current_user.is_active
+            )
             # NOTE: this second part of how `public_access_enabled` is worked out
             # is a temporary solution to make it look like our API works correctly
             # when public access is enabled and API token is revoked (see T11664)
@@ -111,11 +115,14 @@ def try_authenticate_user(username, password):
     user = None
     user = user_manager.find_user_by_username(username)
 
-    # Handle successful authentication
+    # Handle successful authentication. A deactivated account is refused like
+    # a wrong password, and only after the password is checked, so neither the
+    # answer nor its timing says which.
     if (
         user
         and user_manager.get_password(user)
         and user_manager.verify_password(password, user)
+        and user.is_active
     ):
         return user
 

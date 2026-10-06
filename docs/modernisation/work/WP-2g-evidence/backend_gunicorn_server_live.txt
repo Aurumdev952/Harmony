@@ -1,0 +1,14 @@
+X-Request-ID: 69bb5d255f564f10bc80005b265e553a
+--- stdout
+{"timestamp": "2026-10-04T20:52:05.493+00:00", "level": "INFO", "logger": "gunicorn.error", "message": "Starting gunicorn 20.0.4", "source": "glogging.py:info:262", "deployment": "rw"}
+{"timestamp": "2026-10-04T20:52:05.494+00:00", "level": "INFO", "logger": "gunicorn.error", "message": "Listening at: http://127.0.0.1:18761 (323912)", "source": "glogging.py:info:262", "deployment": "rw"}
+{"timestamp": "2026-10-04T20:52:05.494+00:00", "level": "INFO", "logger": "gunicorn.error", "message": "Using worker: gevent", "source": "glogging.py:info:262", "deployment": "rw"}
+{"timestamp": "2026-10-04T20:52:05.497+00:00", "level": "INFO", "logger": "gunicorn.error", "message": "Booting worker with pid: 323937", "source": "glogging.py:info:262", "deployment": "rw"}
+{"timestamp": "2026-10-04T20:52:05.527+00:00", "level": "INFO", "logger": "wp2g.view", "message": "handled ping", "source": "backend_gunicorn_server_live.py:ping:21", "deployment": "rw", "request_id": "7aafc41b114844c9b70d45f593f47216"}
+{"timestamp": "2026-10-04T20:52:05.528+00:00", "level": "INFO", "logger": "gunicorn.access", "message": "GET /ping 200", "source": "glogging.py:access:344", "deployment": "rw", "request_id": "7aafc41b114844c9b70d45f593f47216", "http": {"method": "GET", "path": "/ping", "status": 200, "bytes": 2, "duration_s": 0.002129}}
+{"timestamp": "2026-10-04T20:52:05.538+00:00", "level": "INFO", "logger": "wp2g.view", "message": "handled ping", "source": "backend_gunicorn_server_live.py:ping:21", "deployment": "rw", "request_id": "69bb5d255f564f10bc80005b265e553a"}
+{"timestamp": "2026-10-04T20:52:05.539+00:00", "level": "INFO", "logger": "gunicorn.access", "message": "GET /ping 200", "source": "glogging.py:access:344", "deployment": "rw", "request_id": "69bb5d255f564f10bc80005b265e553a", "http": {"method": "GET", "path": "/ping", "status": 200, "bytes": 2, "duration_s": 0.000871}}
+{"timestamp": "2026-10-04T20:52:06.044+00:00", "level": "INFO", "logger": "gunicorn.error", "message": "Handling signal: term", "source": "glogging.py:info:262", "deployment": "rw"}
+{"timestamp": "2026-10-04T20:52:06.510+00:00", "level": "INFO", "logger": "gunicorn.error", "message": "Worker exiting (pid: 323937)", "source": "glogging.py:info:262", "deployment": "rw"}
+{"timestamp": "2026-10-04T20:52:06.646+00:00", "level": "INFO", "logger": "gunicorn.error", "message": "Shutting down: Master", "source": "glogging.py:info:262", "deployment": "rw"}
+--- stderr

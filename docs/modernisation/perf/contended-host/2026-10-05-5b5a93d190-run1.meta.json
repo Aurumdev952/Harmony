@@ -1,0 +1,42 @@
+{
+  "git_sha": "5b5a93d190c3bf5b1755d5b9f4ab7bc7a066e68b",
+  "git_dirty": false,
+  "started_utc": "2026-10-05T16:06:00+00:00",
+  "host": {
+    "cpu": "Intel(R) Core(TM) Ultra 9 285H",
+    "logical_cpus": 16,
+    "memory_gib": 62.2,
+    "kernel": "7.0.0-38-generic",
+    "load_average_at_start": [
+      45.93,
+      53.37,
+      37.62
+    ]
+  },
+  "method": {
+    "rounds": 100,
+    "warmup_rounds": 3,
+    "concurrency": 1,
+    "interval": "2023-01-01/2026-01-01",
+    "interval_overrides": {
+      "table_disaggregated": "2025-12-01/2026-01-01"
+    },
+    "caches": "warm (Druid broker and historical caches on, as druid_setup ships them)",
+    "percentiles": "linear interpolation between closest ranks",
+    "druid_ms": "median over rounds of the summed broker query/time per request",
+    "dashboards": {
+      "rounds": 30,
+      "warmup_rounds": 2,
+      "view": "?screenshot=1 at 1440x900, fresh browser context per load, requests leaving the stack aborted",
+      "end": "first frame with every query tile rendered",
+      "bytes": "median of headers plus encoded bodies received before the last tile"
+    }
+  },
+  "docker": "29.8.2",
+  "druid_version": "0.23.0",
+  "datasources": [
+    "harmony_demo_20261004"
+  ],
+  "dataset": "scripts/perf/dataset.py seed 20261004: 200,000 yellow-fever cases, 2023-01-01..2025-12-31, 579 municipalities; 387,918 Druid rows in harmony_demo_20261004",
+  "finished_utc": "2026-10-05T16:21:33+00:00"
+}

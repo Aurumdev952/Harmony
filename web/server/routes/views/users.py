@@ -1,15 +1,16 @@
 from collections import defaultdict, namedtuple
 from typing import Any, Dict, List, Optional, Tuple, TYPE_CHECKING, TypedDict, Union
 
-from flask import g, current_app
+from flask import g
 from flask_user import current_user
+from sqlalchemy import func
 from sqlalchemy.dialects.postgresql import insert
 
 from models.alchemy.api_token import APIToken
 from models.alchemy.alerts import AlertDefinition
 from models.alchemy.dashboard import Dashboard
 from models.alchemy.security_group import Group
-from models.alchemy.permission import Role, Resource
+from models.alchemy.permission import Resource, ResourceRole, Role
 from models.alchemy.user import UserRoles, User, UserAcl, UserStatusEnum
 from web.server.data.data_access import (
     get_db_adapter,
@@ -22,8 +23,8 @@ from web.server.data.data_access import (
 from web.server.errors import UserAlreadyInvited
 from web.server.routes.views.core import try_get_role_and_resource
 from web.server.routes.views.invite import send_invite_emails
+from web.server.security.usernames import find_named_account
 from web.server.util.util import get_user_string, Success
-from web.server.potion.access import get_id_from_uri
 from web.server.potion.signals import after_user_role_change, before_user_role_change
 
 if TYPE_CHECKING:
@@ -75,12 +76,7 @@ APITokenType = TypedDict('APITokenType', {'$uri': str, 'is_revoked': bool, 'id':
 
 
 def try_get_user(username: str, session: 'Optional[Session]' = None) -> Optional[User]:
-    return find_one_by_fields(
-        User,
-        case_sensitive=False,
-        search_fields={'username': username},
-        session=session,
-    )
+    return find_named_account(username, session)
 
 
 def try_get_user_acl(
@@ -184,9 +180,7 @@ def add_user_role(
 
     if not entity:
         exists = True
-        entity = UserRoles(
-            user_id=user.id, role_id=role.id, resource_id=resource_id
-        )  # type: ignore
+        entity = UserRoles(user_id=user.id, role_id=role.id, resource_id=resource_id)  # type: ignore
         before_user_role_change.send(user, role=role)
         add_entity(session, entity, flush, commit)
         after_user_role_change.send(user, role=role)
@@ -259,13 +253,12 @@ def update_user_roles_from_map(
 ) -> List[Union[UserRoles, UserAcl, None]]:
     session = session or get_db_adapter().session
     new_role_entities = []
-    roles = user.roles
 
     # NOTE: type suppression is necessary here because SQL Alchemy model attributes
     # do not contain __iter__ attributes so mypy will complain that `roles` is not iterable
-    for role in roles:  # type: ignore
+    for role in list(user.roles):  # type: ignore
         before_user_role_change.send(user, role=role)
-        session.delete(role)
+        user.roles.remove(role)  # type: ignore[attr-defined]
         after_user_role_change.send(user, role=role)
 
     for resource_type in list(role_mapping.keys()):
@@ -363,35 +356,44 @@ def update_user_resource_roles(
     return new_role_entities
 
 
-def update_user_acls(user: User, acls: List[AclType]) -> None:
-    resource_roles_map = []
-    for acl in acls:
-        resource = acl['resource']
-        resource_roles_map.append(
-            {
-                'role_name': acl['resourceRole']['name'],
-                'resource_type': resource.get('resourceType'),
-                'resource_name': resource.get('name'),
-            }
+def replace_user_acls(user: User, grants: List[Tuple[ResourceRole, Resource]]) -> None:
+    '''Replaces the user's ACLs with `grants`, `(resource_role, resource)` pairs
+    already resolved and authorised by `verify_acl_grants`.
+    '''
+    session = get_db_adapter().session
+    for acl in list_resource_roles_for_user(user.id):
+        session.delete(acl)
+    for resource_role_id, resource_id in {
+        (resource_role.id, resource.id) for resource_role, resource in grants
+    }:
+        session.add(
+            UserAcl(
+                user_id=user.id,
+                resource_role_id=resource_role_id,
+                resource_id=resource_id,
+            )
         )
-    update_user_resource_roles(user, resource_roles_map)
+    session.commit()
 
 
-def update_user_groups(user: User, new_groups: List[str]) -> None:
-    with Transaction() as transaction:
-        groups = []
-        for group_uri in new_groups:
-            group = transaction.find_by_id(Group, get_id_from_uri(group_uri))
-            if group:
-                groups.append(group)
+def update_user_groups(user: User, groups: List[Group]) -> None:
+    with Transaction():
         # TODO: fix type error
         user.groups = groups  # type: ignore
 
 
-def update_user_api_tokens(user: User, tokens: List[APITokenType]):
-    # pylint: disable=import-outside-toplevel
-    from web.server.security.signal_handlers import check_token_validity
+def issue_api_token(user: User) -> APIToken:
+    '''Generates an API token for `user` and stores it, so the token authenticates as
+    soon as the caller has it.'''
+    token = APIToken.generate_token(user)
+    # generate_token sets the user through a view-only relationship, which is not saved.
+    token.user_id = user.id
+    with Transaction() as transaction:
+        transaction.add_or_update(token)
+    return token
 
+
+def update_user_api_tokens(user: User, tokens: List[APITokenType]):
     if not tokens:
         # nothing to do here
         return
@@ -417,26 +419,15 @@ def update_user_api_tokens(user: User, tokens: List[APITokenType]):
 
         # now revoke tokens to be revoked, we don't allow un-revoke them
         user.api_tokens.filter(  # type: ignore[attr-defined]
-            # pylint: disable=singleton-comparison
-            APIToken.is_revoked == False,
+            APIToken.is_revoked.is_(False),
             APIToken.id.in_(to_revoke),
         ).update({'is_revoked': True}, synchronize_session=False)
 
-        # invalidate validity caches because the state of the tokens has changed
-        memoized = current_app.cache.memoize()(check_token_validity)
-        for token in tokens:
-            current_app.cache.delete_memoized(memoized, token['id'])
 
-
-def build_user_updates(user_obj: UserObject) -> Dict[str, Any]:
-    '''Gather necessary components that need to be updated in a user'''
-    roles = []
-    with Transaction() as transaction:
-        for role_uri in user_obj['roles']:
-            role = transaction.find_by_id(Role, get_id_from_uri(role_uri))
-            if role:
-                roles.append(role)
-
+def build_user_updates(user_obj: UserObject, roles: List[Role]) -> Dict[str, Any]:
+    '''Gather necessary components that need to be updated in a user. `roles`
+    are already resolved and authorised.
+    '''
     user_updates = {
         'username': user_obj['username'],
         'first_name': user_obj['first_name'],
@@ -522,11 +513,13 @@ def invite_users(invitees: List[Invitee]) -> List[User]:
         pending_users = []
         # pylint:disable=E1101
         existing_users = User.query.filter(
-            User.username.in_(emails), User.status_id != UserStatusEnum.PENDING.value
+            func.lower(User.username).in_(emails),
+            User.status_id != UserStatusEnum.PENDING.value,
         ).all()
         # pylint:disable=E1101
         existing_pending_users = User.query.filter(
-            User.username.in_(emails), User.status_id == UserStatusEnum.PENDING.value
+            func.lower(User.username).in_(emails),
+            User.status_id == UserStatusEnum.PENDING.value,
         ).all()
 
         existing_username_to_user = {}
@@ -564,8 +557,8 @@ def invite_users(invitees: List[Invitee]) -> List[User]:
 def get_anonymous_user() -> User:
     '''Fetch anonymous user. Create if it doesn't already exist.'''
     with Transaction() as transaction:
-        maybe_anon_user = transaction.find_one_by_fields(
-            User, False, {'username': UNREGISTERED_USER_USERNAME}
+        maybe_anon_user = find_named_account(
+            UNREGISTERED_USER_USERNAME, transaction.run_raw()
         )
         if maybe_anon_user:
             return maybe_anon_user

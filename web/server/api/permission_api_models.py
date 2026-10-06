@@ -3,16 +3,19 @@
 Resource APIs Accessible via http://<server_uri>:5000/api2/resource
 Role APIs Accessible via http://<server_uri>:5000/api2/role
 '''
+
 # pylint: disable=C0413
 from collections import defaultdict
 from http.client import METHOD_NOT_ALLOWED, NO_CONTENT, NOT_ACCEPTABLE, OK, UNAUTHORIZED
 
-from flask import g, current_app, url_for
+from flask import g, current_app
 from flask_user import current_user
 from flask_potion import fields
 from flask_potion.routes import ItemRoute, Relation, Route
 from flask_potion.schema import FieldSet
+from werkzeug.exceptions import Forbidden
 
+from models.alchemy.dashboard import Dashboard
 from models.alchemy.permission import (
     Permission,
     Resource,
@@ -43,16 +46,20 @@ from web.server.errors import ItemNotFound, NotificationError
 from web.server.potion.filters import ResourceTypeFilter
 from web.server.potion.managers import RoleResourceManager
 from web.server.potion.signals import after_roles_update
-from web.server.routes.views.authorization import AuthorizedOperation
-from web.server.routes.views.feed import create_dashboard_permission_updates
+from web.server.routes.views.authorization import (
+    AuthorizedOperation,
+    current_user_is_superuser,
+)
 from web.server.routes.views.permission import build_role, add_current_user_to_role
 from web.server.routes.views.resource import (
     update_resource_roles,
     get_current_resource_roles,
     update_role_users,
 )
+from web.server.security.grants import holds_everything_in, verify_role_grants
 from web.server.security.permissions import SuperUserPermission, principals
-from web.server.util.util import get_resource_string
+from web.server.util.deployment_links import deployment_url
+from web.server.util.util import get_resource_string, get_user_string
 
 
 class BackendTypeResource(PrincipalResource):
@@ -264,9 +271,19 @@ class BackendResource(PrincipalResource):
 def send_email(sender, existing_roles, new_roles):
     recepients = list(set(new_roles['userRoles']) - set(existing_roles['userRoles']))
     if sender.resource_type.name == ResourceTypeEnum.DASHBOARD and recepients:
-        dashboard_url = url_for(
-            'dashboard.grid_dashboard', name=sender.name, _external=True
-        )
+        # The resource name is the slug with `-` replaced by `_`, so link the
+        # dashboard's own slug.
+        with Transaction() as transaction:
+            dashboard = transaction.find_one_by_fields(
+                Dashboard, True, {'resource_id': sender.id}
+            )
+        if not (dashboard and dashboard.slug):
+            g.request_logger.error(
+                'No dashboard slug for resource %s; no access-granted email sent',
+                sender.id,
+            )
+            return
+        dashboard_url = deployment_url('dashboard.grid_dashboard', name=dashboard.slug)
         try:
             for recepient in recepients:
                 msg = current_app.email_renderer.create_add_dashboard_user_message(
@@ -379,11 +396,22 @@ class RoleResource(PrincipalResource):
         response_schema=fields.Inline('self'),
     )
     def create_role(self, obj):
-        unique_name = obj['label'].lower().replace(' ', '_')
+        if not self.manager.can_create_item(obj):
+            raise Forbidden()
         new_role = build_role(obj)
-        new_role['name'] = unique_name
-        role = self.manager.create(new_role)
-        add_current_user_to_role(role.id, current_user)
+        verify_role_grants(new_role)
+        unique_name = obj['label'].lower().replace(' ', '_')
+        role = self.manager.create({**new_role, 'name': unique_name})
+        if current_user_is_superuser():
+            return role
+        if holds_everything_in(role):
+            add_current_user_to_role(role.id, current_user)
+        else:
+            g.request_logger.info(
+                'Did not add \'%s\' to new role \'%s\': it grants more than they hold.',
+                get_user_string(current_user),
+                role.name,
+            )
         return role
 
     @ItemRoute.PATCH(
@@ -394,8 +422,12 @@ class RoleResource(PrincipalResource):
         response_schema=fields.Inline('self'),
     )
     def update_role(self, role, obj):
+        if not self.manager.can_update_item(role):
+            raise Forbidden()
+        new_role = build_role(obj)
+        verify_role_grants(new_role, role)
         role.invalidate_involved_users_permission_caches()
-        return self.manager.update(role, build_role(obj))
+        return self.manager.update(role, new_role)
 
     @ItemRoute.DELETE(
         '',

@@ -2,18 +2,18 @@
 
 User APIs Accessible via http://<server_uri>:5000/api2/user
 '''
+
 from http.client import BAD_REQUEST, OK, NO_CONTENT, UNAUTHORIZED
 
 from flask import current_app, g
 from flask_potion import fields
 from flask_potion.routes import ItemRoute, Route
 from flask_potion.schema import FieldSet
-from flask_potion.signals import before_delete, after_delete
+from flask_potion.signals import before_create, before_delete, after_delete
 from flask_user import current_user
-from werkzeug.exceptions import BadRequest
+from werkzeug.exceptions import BadRequest, Forbidden
 
-from models.alchemy.api_token import APIToken
-from models.alchemy.user import User, UserAcl
+from models.alchemy.user import User, UserAcl, UserStatusEnum
 from web.server.api.api_models import PrincipalResource
 from web.server.api.model_schemas import (
     USER_ROLES_SCHEMA,
@@ -34,7 +34,7 @@ from web.server.potion.managers import UserResourceManager
 from web.server.routes.views.authorization import (
     AuthorizedOperation,
 )
-from web.server.routes.views.admin import send_reset_password
+from web.server.routes.views.admin import send_reset_password_for_account
 from web.server.api.user_api_schemas import (
     FRONTEND_USER_UPDATE_SCHEMA,
     INVITE_OBJECT_SCHEMA,
@@ -50,10 +50,18 @@ from web.server.routes.views.users import (
     force_delete_user,
     get_user_owned_resources,
     invite_users,
-    update_user_acls,
+    issue_api_token,
+    replace_user_acls,
     update_user_api_tokens,
     update_user_groups,
     update_user_roles_from_map,
+)
+from web.server.data.data_access import get_db_adapter
+from web.server.security.usernames import username_taken
+from web.server.security.grants import (
+    held_roles_from_uris,
+    member_groups_from_uris,
+    verify_acl_grants,
 )
 from web.server.security.permissions import (
     SuperUserPermission,
@@ -138,13 +146,35 @@ class UserResource(PrincipalResource):
     )
     def update_user(self, db_user, obj):
         with AuthorizedOperation('edit_user', 'site'):
+            if obj['username'] != db_user.username and username_taken(
+                obj['username'], except_user_id=db_user.id
+            ):
+                raise BadRequest('Another account has this username.')
+            # Activating one account of a case-only pair made before WP-0k
+            # would leave two registered accounts equal ignoring case.
+            activating = (
+                obj.get('status_id') == UserStatusEnum.ACTIVE.value
+                and db_user.status_id != UserStatusEnum.ACTIVE.value
+            )
+            if activating and username_taken(
+                obj['username'], except_user_id=db_user.id, ignore_pending=True
+            ):
+                raise BadRequest('Another account has this username.')
             # NOTE: this whole block must run in the same transaction
             # and can leave db in incosistent state like this but should be
             # addressed seaparately of why I'm here and requires quite a big refactoring
-            updates = build_user_updates(obj)
-            updated_user = self.manager.update(db_user, updates)
-            update_user_acls(updated_user, obj.get('acls', []))
-            update_user_groups(updated_user, obj.get('groups', []))
+            if not self.manager.can_update_item(db_user):
+                raise Forbidden()
+            roles = held_roles_from_uris(obj['roles'], existing=db_user.roles)
+            groups = member_groups_from_uris(
+                obj.get('groups', []), existing=db_user.groups
+            )
+            acl_grants = verify_acl_grants(
+                obj.get('acls', []), existing_acls=db_user.acls
+            )
+            updated_user = self.manager.update(db_user, build_user_updates(obj, roles))
+            replace_user_acls(updated_user, acl_grants)
+            update_user_groups(updated_user, groups)
             update_user_api_tokens(updated_user, obj.get('apiTokens', []))
             invalidate_user_identity_cache(db_user, None)
             return update_user_groups, OK
@@ -162,7 +192,7 @@ class UserResource(PrincipalResource):
         # to gain access to the account, so their security considerations are kind of
         # identical
         with AuthorizedOperation('change_password', 'user', db_user.id):
-            return APIToken.generate_token(db_user)
+            return issue_api_token(db_user)
 
     # The parameter is coming directly from the API which uses camelCase instead of
     # snake_case
@@ -210,7 +240,7 @@ class UserResource(PrincipalResource):
                 message = f'User {username} does not have a valid e-mail address.'
                 return StandardResponse(message, BAD_REQUEST, False), BAD_REQUEST
 
-            send_reset_password(username)
+            send_reset_password_for_account(user.id)
 
             message = (
                 f'User password has been reset and instructions e-mailed to {username}.'
@@ -373,6 +403,16 @@ class UserResource(PrincipalResource):
     def get_is_user_in_group(self, user, group_name):
         group_names = [group.name for group in user.groups]
         return group_name in group_names
+
+
+@before_create.connect_via(UserResource)
+def before_create_user(sender, item):
+    '''`POST /api2/user` may not add an account equal to another ignoring
+    case. The new item may already be in the session, so no flush runs first.'''
+    session = get_db_adapter().session
+    with session.no_autoflush:
+        if username_taken(item.username, session):
+            raise BadRequest('Another account has this username.')
 
 
 @before_delete.connect_via(UserResource)

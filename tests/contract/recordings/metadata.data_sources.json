@@ -1,0 +1,26 @@
+{
+  "content_type": "application/json",
+  "headers": [],
+  "id": "metadata.data_sources",
+  "pinned": {},
+  "response_schema": {
+    "properties": {
+      "current_datasource": {
+        "type": "string"
+      },
+      "datasource_list": {
+        "items": {
+          "type": "string"
+        },
+        "type": "array"
+      }
+    },
+    "required": [
+      "current_datasource",
+      "datasource_list"
+    ],
+    "type": "object"
+  },
+  "route": "GET /api2/metadata/data_sources",
+  "status": 200
+}

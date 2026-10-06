@@ -11,6 +11,7 @@ from models.alchemy.feed import FeedUpdateTypeEnum
 from web.server.api.model_schemas import SHARE_ANALYSIS_EMAIL_SCHEMA
 from web.server.errors import NotificationError
 from web.server.routes.views.feed import add_share_notification
+from web.server.util.deployment_links import shared_page_url
 
 SHARE_ANALYSIS_MESSAGE = 'Analysis shared successfully'
 SHARE_ANALYSIS_PREVIEW_MESSAGE = 'A preview email was sent to {recipient}'
@@ -61,6 +62,8 @@ class ShareAnalysisResource(Resource):
         else:
             shared_image_name = ''
         recipients = kwargs['recipients']
+        # The caller's link contributes only its locale and session hash.
+        query_url = shared_page_url(kwargs['query_url'], 'index.advanced_query')
         for recipient in recipients:
             msg = current_app.email_renderer.create_share_analysis_email(
                 subject=kwargs['subject'],
@@ -68,7 +71,7 @@ class ShareAnalysisResource(Resource):
                 reply_to=kwargs['sender'],
                 body=kwargs['message'],
                 attachments=attachments,
-                query_url=kwargs['query_url'],
+                query_url=query_url,
                 image=shared_image_name,
             )
             try:
@@ -77,7 +80,7 @@ class ShareAnalysisResource(Resource):
                     FeedUpdateTypeEnum.ANALYSIS_SHARED.value,
                     g.identity.id,
                     recipient,
-                    {'query_url': kwargs['query_url']},
+                    {'query_url': query_url},
                 )
             except NotificationError:
                 error = f'Failed to send share analysis email to: \'{recipient}\''

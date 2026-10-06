@@ -1,0 +1,258 @@
+"""WP-0k: usernames match exactly, ignoring case, never as a LIKE pattern.
+
+Before WP-0k, JWT login and flask-user resolved a username with `ILIKE` and
+`first()`, so `_` and `%` were wildcards, and the JWT identity was the string
+the user typed. A look-alike account (`jane_doe` for `jane.doe`) that
+registered through an invitation was signed in as the older account, with its
+roles and query policy.
+"""
+
+import pytest
+import sqlalchemy
+from flask import current_app
+from flask_jwt_extended import decode_token
+from flask_login import current_user
+
+from models.alchemy.user import User
+from tests.web.usernames.accounts import ACCOUNTS, PASSWORD
+from tests.web.usernames.tokens import (
+    login,
+    session_token_without_account_id,
+    signed_in_id,
+)
+from web.server.api.authentication_api_models import AuthenticationResource
+from web.server.errors import UserAlreadyInvited
+from web.server.routes.views import users
+
+# (what the caller sends, the id it must resolve to; None means nobody)
+LOOKUPS = [
+    ('john.doe@moh.gov.rw', 1),
+    ('john_doe@moh.gov.rw', 2),
+    ('JOHN.DOE@MOH.GOV.RW', 1),
+    ('John_Doe@moh.gov.rw', 2),
+    ('mixed.case@moh.gov.rw', 3),
+    ('Mixed.Case@moh.gov.rw', 3),
+    ('ann@moh.gov.rw', 6),
+    ('Ann@moh.gov.rw', 5),
+    # Two accounts equal this ignoring case and neither exactly.
+    ('ANN@moh.gov.rw', None),
+    ('percent%sign@moh.gov.rw', 7),
+    ('PERCENT%SIGN@moh.gov.rw', 7),
+    ('j_hn.doe@moh.gov.rw', None),
+    ('john%@moh.gov.rw', None),
+    ('%', None),
+    ('_%', None),
+    ('jane_doe@moh.gov.rw', 9),
+    ('pending.user@moh.gov.rw', 4),
+    # The active account wins over a pending one equal to it ignoring case.
+    ('dup.shell@moh.gov.rw', 10),
+    ('Dup.Shell@moh.gov.rw', 10),
+    ('DUP.SHELL@moh.gov.rw', 10),
+]
+# Where a target lookup differs from sign-in's: `dup.shell@` is spelled exactly
+# by the pending account 11, and `DUP.SHELL@` equals both 10 and 11.
+TARGET_OVERRIDES = {
+    'dup.shell@moh.gov.rw': 11,
+    'DUP.SHELL@moh.gov.rw': None,
+}
+CASES = pytest.mark.parametrize(
+    'sent, expected_id', LOOKUPS, ids=[c[0] for c in LOOKUPS]
+)
+
+
+def _signed_in_id(app, identity):
+    return signed_in_id(app, session_token_without_account_id(app, identity))
+
+
+# A session minted before WP-0k holds the string the user typed, which signed
+# in the first account its ILIKE pattern matched, so its spelling says nothing
+# about which account it was issued to. It signs in the account only when that
+# pattern matches exactly one account that could sign in on `main`: any
+# account except a pending invitation with no password (nothing checked the
+# status there). It signs in nobody otherwise. Typing `john_doe` signed in
+# `john.doe` or `john_doe`; such a token now signs in neither.
+LEGACY_TOKEN_LOOKUPS = [
+    ('john.doe@moh.gov.rw', 1),
+    ('john_doe@moh.gov.rw', None),
+    ('JOHN.DOE@MOH.GOV.RW', 1),
+    ('John_Doe@moh.gov.rw', None),
+    ('mixed.case@moh.gov.rw', 3),
+    ('Mixed.Case@moh.gov.rw', 3),
+    ('ann@moh.gov.rw', None),
+    ('Ann@moh.gov.rw', None),
+    ('ANN@moh.gov.rw', None),
+    ('percent%sign@moh.gov.rw', 7),
+    ('PERCENT%SIGN@moh.gov.rw', 7),
+    # Only john.doe matched this pattern, so only john.doe's password minted it.
+    ('j_hn.doe@moh.gov.rw', 1),
+    ('john%@moh.gov.rw', None),
+    ('%', None),
+    ('_%', None),
+    # jane_doe is a pending invitation; only jane.doe could have signed in.
+    ('jane_doe@moh.gov.rw', 8),
+    ('pending.user@moh.gov.rw', None),
+    ('dup.shell@moh.gov.rw', 10),
+    ('Dup.Shell@moh.gov.rw', 10),
+    ('DUP.SHELL@moh.gov.rw', 10),
+]
+
+
+@pytest.mark.parametrize(
+    'sent, expected_id', LEGACY_TOKEN_LOOKUPS, ids=[c[0] for c in LEGACY_TOKEN_LOOKUPS]
+)
+def test_jwt_identity_signs_in_the_matching_account(app, sent, expected_id):
+    assert _signed_in_id(app, sent) == expected_id
+
+
+@pytest.mark.parametrize(
+    'sent, pending_id', [('jane_doe@moh.gov.rw', 9), ('dup.shell@moh.gov.rw', 11)]
+)
+def test_a_pre_wp0k_session_that_may_name_a_pending_account_with_a_password_signs_in_nobody(
+    app, sent, pending_id
+):
+    """Before WP-0k nothing checked the status, so a pending account given a
+    password could sign in, and a session typed for it may be its own: it must
+    not sign in the active neighbour its pattern also matches."""
+    with app.app_context():
+        engine = app.extensions['sqlalchemy'].db.engine
+        with engine.begin() as connection:
+            connection.execute(
+                sqlalchemy.text("UPDATE \"user\" SET password = 'set' WHERE id = :id"),
+                {'id': pending_id},
+            )
+
+    assert _signed_in_id(app, sent) is None
+
+
+@CASES
+def test_flask_user_lookup_matches_exactly(app, request_ctx, sent, expected_id):
+    user = current_app.user_manager.find_user_by_username(sent)
+    assert (user.id if user else None) == expected_id
+
+
+# A caller naming a target (role and group membership, transfers, role
+# assignment by username) means the exact spelling, whatever its status; else
+# the one account equal to it ignoring case; else nobody. Sign-in's
+# preference for active accounts does not apply.
+TARGET_LOOKUPS = [
+    (sent, TARGET_OVERRIDES.get(sent, expected_id)) for sent, expected_id in LOOKUPS
+]
+
+
+@pytest.mark.parametrize(
+    'sent, expected_id', TARGET_LOOKUPS, ids=[c[0] for c in TARGET_LOOKUPS]
+)
+def test_a_named_target_is_the_exact_spelling_whatever_its_status(
+    app, request_ctx, sent, expected_id
+):
+    user = users.try_get_user(sent)
+    assert (user.id if user else None) == expected_id
+
+
+def test_a_named_target_is_not_the_active_twin_of_a_deactivated_account(
+    app, request_ctx
+):
+    with app.app_context():
+        engine = app.extensions['sqlalchemy'].db.engine
+        with engine.begin() as connection:
+            connection.execute(
+                sqlalchemy.text('UPDATE "user" SET status_id = 2 WHERE id = 6')
+            )
+
+    assert users.try_get_user('ann@moh.gov.rw').id == 6
+
+
+@pytest.mark.parametrize(
+    'typed, username',
+    [
+        ('john_doe@moh.gov.rw', 'john_doe@moh.gov.rw'),
+        ('JOHN.DOE@moh.gov.rw', 'john.doe@moh.gov.rw'),
+        ('mixed.case@moh.gov.rw', 'Mixed.Case@moh.gov.rw'),
+        ('dup.shell@moh.gov.rw', 'Dup.Shell@moh.gov.rw'),
+    ],
+)
+def test_login_token_names_the_stored_username(app, typed, username):
+    token = login(app, typed)
+
+    expected_id = next(i for i, name, *_ in ACCOUNTS if name == username)
+    with app.app_context():
+        claims = decode_token(token)
+    assert claims['identity'] == username
+    assert claims['user_claims']['user_id'] == expected_id
+    assert signed_in_id(app, token) == expected_id
+
+
+def test_registering_a_look_alike_signs_in_the_new_account(app):
+    register = AuthenticationResource.register_user.view_func
+    with app.test_request_context('/api2/authentication/register', method='POST'):
+        response = register(
+            None,
+            email='jane_doe@moh.gov.rw',
+            firstname='Jane',
+            lastname='Look-alike',
+            password=PASSWORD,
+            invite_token='invite-9',
+        )
+        cookie = response.headers['Set-Cookie'].split(';', 1)[0]
+
+    with app.test_request_context('/', headers={'Cookie': cookie}):
+        assert current_user.id == 9
+
+
+@pytest.mark.parametrize(
+    'email, existing',
+    [('mixed.case@moh.gov.rw', 'Mixed.Case@moh.gov.rw'), ('ANN@moh.gov.rw', None)],
+)
+def test_inviting_an_existing_account_in_another_case_is_refused(
+    app, request_ctx, monkeypatch, email, existing
+):
+    monkeypatch.setattr(users, 'send_invite_emails', lambda pending: None)
+
+    with pytest.raises(UserAlreadyInvited):
+        users.invite_users([users.Invitee(name='Someone', email=email)])
+
+    assert _usernames_like(email) == {
+        name for _, name, *_ in ACCOUNTS if name.lower() == email.lower()
+    }
+    assert existing is None or existing in _usernames_like(email)
+
+
+def test_reinviting_a_pending_account_in_another_case_reuses_it(
+    app, request_ctx, monkeypatch
+):
+    sent = []
+    monkeypatch.setattr(users, 'send_invite_emails', sent.extend)
+
+    invited = users.invite_users(
+        [users.Invitee(name='Pending', email='pending.user@moh.gov.rw')]
+    )
+
+    assert [user.id for user in invited] == [4]
+    assert [user.id for user in sent] == [4]
+    assert _usernames_like('pending.user@moh.gov.rw') == {'Pending.User@moh.gov.rw'}
+
+
+def _usernames_like(email):
+    rows = User.query.all()  # pylint: disable=no-member
+    return {row.username for row in rows if row.username.lower() == email.lower()}
+
+
+@pytest.mark.parametrize(
+    'wanted, available',
+    [
+        ('brand.new@moh.gov.rw', True),
+        ('BRAND.NEW@moh.gov.rw', True),
+        # Taken ignoring case, including by two accounts at once.
+        ('MIXED.CASE@moh.gov.rw', False),
+        ('ANN@moh.gov.rw', False),
+        ('JOHN_DOE@moh.gov.rw', False),
+        ('dup.shell@moh.gov.rw', False),
+        # `_` and `%` are not wildcards here either.
+        ('john_doe@moh.gov.rwx', True),
+        ('j%@moh.gov.rw', True),
+    ],
+)
+def test_username_is_available_only_if_no_account_equals_it_ignoring_case(
+    app, request_ctx, wanted, available
+):
+    assert current_app.user_manager.username_is_available(wanted) is available

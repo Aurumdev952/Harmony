@@ -1,0 +1,42 @@
+{
+  "data": [
+    {
+      "StateName": "Acre",
+      "case_fatality_rate": 813.8791,
+      "yellow_fever_cases__a3": 674.0637,
+      "yellow_fever_cases__k2": 202.89,
+      "yellow_fever_cases__m4": 221.0,
+      "yellow_fever_cases__s1": 246.0,
+      "yellow_fever_cases__x5": 144.8
+    },
+    {
+      "StateName": "Pará",
+      "case_fatality_rate": 456.6993,
+      "yellow_fever_cases__a3": 278.4076,
+      "yellow_fever_cases__k2": 110.0,
+      "yellow_fever_cases__m4": 16.0,
+      "yellow_fever_cases__s1": 83.0,
+      "yellow_fever_cases__x5": 79.73
+    },
+    {
+      "StateName": "Roraima",
+      "case_fatality_rate": 894.3852,
+      "yellow_fever_cases__a3": 271.1062,
+      "yellow_fever_cases__k2": 87.4,
+      "yellow_fever_cases__m4": 20.0,
+      "yellow_fever_cases__s1": 363.49,
+      "yellow_fever_cases__x5": 201.0
+    }
+  ],
+  "dimensions": [
+    "StateName"
+  ],
+  "fields": [
+    "yellow_fever_cases__s1",
+    "yellow_fever_cases__k2",
+    "yellow_fever_cases__a3",
+    "yellow_fever_cases__m4",
+    "yellow_fever_cases__x5",
+    "case_fatality_rate"
+  ]
+}

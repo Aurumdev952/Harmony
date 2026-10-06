@@ -140,8 +140,11 @@ def test_a_case_sensitive_lookup_still_respects_case(session):
 
 
 def test_role_and_resource_lookup_resolves_the_named_dashboard(session):
-    """Path A: `add_user_acl` and `add_group_acl` resolve the dashboard they
-    store the ACL on through this lookup."""
+    """Path A, before WP-0l: `add_user_acl` and `add_group_acl` resolved the
+    dashboard they stored the ACL on through this lookup; they now take the
+    resource itself. User and group ACLs sent with an empty `$uri`
+    (`verify_acl_grants`) and the legacy `DELETE .../roles` routes
+    (`delete_user_role`, `delete_group_role`) still resolve by name here."""
     _, named_id = _store(session, _dashboard("axb"), _dashboard("a_b"))
 
     _, _, resource = try_get_role_and_resource(

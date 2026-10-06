@@ -105,6 +105,13 @@ None.
   - `stack.sh` gains `default_reference <root>` (`git merge-base HEAD mig/integration`), which `reference` uses. `test_the_default_reference_is_the_merge_base_with_integration` checks it in a throwaway git repo where `main`, the integration tip and the merge base all differ.
 
   Check: the default-reference test was seen failing first (exit 127, no function). Each new test is killed by its mutant: without `|| return 1` on line 162 the overlay test fails, and with `main` as the default the reference test fails. 51 pass; shellcheck clean. `dashboards.mjs`'s alternation is left unpinned: it sits inline in the browser loop, and testing it would mean restructuring the script. `baseline.py`'s own alternation stays pinned by `test_each_round_runs_every_side_once_and_the_lead_alternates`.
+- 2026-10-06 qa-10 round 3 closing checks at `399c130`:
+  - `tests/perf`: 51 passed on CPython 3.8.20 and in `ci/pytest_suites.sh`;
+  - `ci/pytest_suites.sh`: all 14 suites passed (heavy host load; `tests/db` took 266 s; log `/tmp/wp1a-r3-suites.log`, not committed);
+  - `py_compile` on 3.8 passes; the 3.8 guard reports 867 files and 0 problems;
+  - shellcheck is clean; `ci/lint_python.sh mig/integration` is clean.
+
+  The perf stack was not touched in round 3 while QA's re-check runs on it. Status stays `review`.
 
 ## Evidence
 

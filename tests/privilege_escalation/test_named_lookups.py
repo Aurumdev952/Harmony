@@ -706,3 +706,48 @@ def test_clearing_a_users_roles_logs_the_target_by_username_only(make_user):
     assert [line for line in handler.lines if 'every role' in line] == [
         f'Removed every role from user \'{target.username}\'.'
     ]
+
+
+# Round 2: transferring one dashboard moves that dashboard and nothing else.
+
+
+def test_transferring_a_dashboard_moves_only_that_dashboard(app, db, make_user):
+    owner = make_user()
+    new_owner = make_user()
+    # A user whose id equals the transferred dashboard's id: the transfer once
+    # moved every dashboard that user authored.
+    clash_id = 900000 + int(_tag()[:5], 16)
+    victim = User(
+        id=clash_id,
+        username=f'victim-{_tag()}@named.test',
+        password=app.user_manager.hash_password(_PASSWORD),
+        first_name='Named',
+        last_name='Victim',
+        status_id=UserStatusEnum.ACTIVE.value,
+    )
+    db.session.add(victim)
+    resource = _resource(db, f'dashboard-{_tag()}')
+    resource_id = resource.id
+    db.session.add(
+        Dashboard(
+            id=clash_id,
+            slug=resource.name,
+            specification={'options': {'title': resource.name}},
+            resource_id=resource_id,
+            author_id=owner.id,
+        )
+    )
+    db.session.commit()
+    _grant_user(db, owner.id, 'dashboard_admin', resource_id)
+    victims_dashboard_id = _dashboard_by(db, clash_id)
+
+    response = owner.request(
+        'POST',
+        f'/api2/dashboard/{resource_id}/transfer/username',
+        new_owner.username,
+    )
+
+    assert response.status_code == 204
+    assert _author_of(db, clash_id) == new_owner.id
+    assert _author_of(db, victims_dashboard_id) == clash_id
+    assert (new_owner.id, 'dashboard_admin') in _user_acls(db, resource_id)

@@ -640,6 +640,19 @@ def test_a_resource_is_found_by_type_and_name_not_by_name_alone(app, db):
             get_resource_by_type_and_name('dashboard', name)
 
 
+def test_a_name_two_resources_of_the_type_share_finds_neither(app, db):
+    # pylint: disable=import-outside-toplevel
+    from web.server.routes.views.resource import get_resource_by_type_and_name
+
+    name = f't{_tag()}_x'
+    _resource(db, name)
+    _resource(db, name)
+
+    with app.test_request_context():
+        with pytest.raises(ItemNotFound):
+            get_resource_by_type_and_name('dashboard', name)
+
+
 @pytest.mark.parametrize('target', ['user', 'group'])
 def test_the_legacy_single_role_post_is_refused_cleanly(app, db, make_user, target):
     admin = make_user(['admin'])

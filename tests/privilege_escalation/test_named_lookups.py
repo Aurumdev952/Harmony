@@ -11,6 +11,7 @@ from __future__ import annotations
 
 import logging
 import uuid
+from unittest import mock
 
 import pytest
 
@@ -787,3 +788,89 @@ def test_transferring_a_dashboard_moves_only_that_dashboard(app, db, make_user):
     assert _author_of(db, clash_id) == new_owner.id
     assert _author_of(db, victims_dashboard_id) == clash_id
     assert (new_owner.id, 'dashboard_admin') in _user_acls(db, resource_id)
+
+
+# Round 2: twins. The slugs `t-x` and `t_x` both slugify to the resource name
+# `t_x`, so exact matching alone cannot tell them apart: only acting on the
+# resource object the code already holds lands each grant on the right twin.
+
+
+@pytest.fixture(name='no_mail')
+def fixture_no_mail(app, monkeypatch):
+    '''Creating or sharing a dashboard mails a link to the dashboard page; this
+    app has neither the page blueprint nor a mailer.'''
+    for module in ('dashboard_api_models', 'permission_api_models'):
+        monkeypatch.setattr(
+            f'web.server.api.{module}.url_for',
+            lambda *args, **kwargs: 'http://dashboard.invalid/',
+        )
+    monkeypatch.setattr(app, 'email_renderer', mock.Mock(), raising=False)
+    monkeypatch.setattr(app, 'notification_service', mock.Mock(), raising=False)
+
+
+def _twin(db, make_user, slug: str):
+    '''A dashboard with `slug`, created through the API by a new creator, who
+    is returned with the dashboard's resource id.'''
+    creator = make_user(['dashboard_creator'])
+    response = creator.request(
+        'POST',
+        '/api2/dashboard',
+        {'slug': slug, 'specification': {'options': {'title': slug}}},
+    )
+    assert response.status_code in (200, 201)
+    db.session.expire_all()
+    return creator, db.session.query(Dashboard).filter_by(slug=slug).one().resource_id
+
+
+def test_creating_a_twin_makes_its_author_admin_of_that_twin(db, make_user, no_mail):
+    del no_mail
+    tag = _tag()
+    first_creator, first_id = _twin(db, make_user, f't{tag}-x')
+    second_creator, second_id = _twin(db, make_user, f't{tag}_x')
+
+    assert _user_acls(db, first_id) == {(first_creator.id, 'dashboard_admin')}
+    assert _user_acls(db, second_id) == {(second_creator.id, 'dashboard_admin')}
+
+
+def test_sharing_a_twin_by_id_stores_its_acls_on_that_twin(db, make_user, no_mail):
+    del no_mail
+    tag = _tag()
+    first_creator, first_id = _twin(db, make_user, f't{tag}-x')
+    second_creator, second_id = _twin(db, make_user, f't{tag}_x')
+    other = make_user()
+
+    response = _share(
+        second_creator,
+        second_id,
+        {
+            second_creator.username: ['dashboard_admin'],
+            other.username: ['dashboard_viewer'],
+        },
+    )
+
+    assert response.status_code == 204
+    assert _user_acls(db, first_id) == {(first_creator.id, 'dashboard_admin')}
+    assert _user_acls(db, second_id) == {
+        (second_creator.id, 'dashboard_admin'),
+        (other.id, 'dashboard_viewer'),
+    }
+
+
+def test_transferring_a_twin_makes_the_new_owner_admin_of_that_twin(
+    db, make_user, no_mail
+):
+    del no_mail
+    tag = _tag()
+    first_creator, first_id = _twin(db, make_user, f't{tag}-x')
+    second_creator, second_id = _twin(db, make_user, f't{tag}_x')
+    new_owner = make_user()
+
+    response = second_creator.request(
+        'POST',
+        f'/api2/dashboard/{second_id}/transfer/username',
+        new_owner.username,
+    )
+
+    assert response.status_code == 204
+    assert _user_acls(db, first_id) == {(first_creator.id, 'dashboard_admin')}
+    assert (new_owner.id, 'dashboard_admin') in _user_acls(db, second_id)

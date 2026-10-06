@@ -3,7 +3,7 @@
 # way pipeline/harmony_demo/index/run/00_druid/00_index expects it, then runs that
 # step's commands. Only --concurrent_subtasks differs (one file needs one subtask).
 set -euo pipefail
-cd /zenysis
+cd /src
 
 share=/home/share
 current="${share}/data/harmony_demo/yellow_fever/current"

@@ -981,6 +981,35 @@ def test_an_acl_uri_naming_no_resource_is_refused(app, db, make_user, uri, statu
     assert db.session.query(User).get(target_id).acls == []
 
 
+@pytest.mark.parametrize('target', ['user', 'group'])
+def test_deleting_a_role_on_a_look_alike_name_removes_nothing(
+    app, db, make_user, target
+):
+    admin = make_user(['admin'])
+    tag = _tag()
+    look_alike_id = _resource(db, f'{tag}x{tag}').id
+    if target == 'user':
+        target_id = _account(app, db, f'target-{tag}@named.test')
+        _grant_user(db, target_id, 'dashboard_viewer', look_alike_id)
+    else:
+        target_id = _group(db, f'group-{tag}').id
+        _grant_group(db, target_id, 'dashboard_viewer', look_alike_id)
+
+    response = admin.request(
+        'DELETE',
+        f'/api2/{target}/{target_id}/roles',
+        {
+            'roleName': 'dashboard_viewer',
+            'resourceType': 'DASHBOARD',
+            'resourceName': f'{tag}_{tag}',
+        },
+    )
+
+    assert response.status_code == 404
+    held = _user_acls(db, look_alike_id) | _group_acls(db, look_alike_id)
+    assert held == {(target_id, 'dashboard_viewer')}
+
+
 # Round 2, reviewer item 1: WP-0l must not merge without WP-0k. Before WP-0k,
 # login checks the typed username with Flask-User's case-insensitive LIKE and
 # signs the typed string into the JWT; the session loader then resolves that

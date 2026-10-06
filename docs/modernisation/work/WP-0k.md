@@ -103,14 +103,17 @@ Each unit starts with a failing test.
 ## Contract changes
 
 **C-5, additive.** I own C-5.
-- Old: a session JWT's `user_claims` are `needs`, `query_needs` and `remember_me`, and `identity` is the username as typed. API tokens add `id` (their `api_token` row). Render tokens carry narrowed `needs`.
-- New: session and render tokens' `user_claims` also carry `user_id`, the account id, and `identity` is the stored `user.username`. API tokens keep their layout. WP-1h's render tokens also carry `render` (a live render id) and `policy`.
+
+Terms. A token's *identity* is its identity claim (`identity` today; WP-3d keeps that name with `JWT_IDENTITY_CLAIM='identity'`). Its *custom claims* are the claims the issuer added: nested under `user_claims` in tokens minted by flask-jwt-extended 3 (every token before WP-3d), at the top level in tokens minted by version 4 (WP-3d). A reader takes them from either layout, as WP-3d's `access_tokens.custom_claims` and `get_jwt_claims` do. The rules below name custom claims, not a layout.
+
+- Old: a session token's custom claims are `needs`, `query_needs` and `remember_me`, and its identity is the username as typed. API tokens add `id` (their `api_token` row). Render tokens carry narrowed `needs`.
+- New: session and render tokens' custom claims also carry `user_id`, the account id, and the identity is the stored `user.username`. API tokens keep their claims. WP-1h's render tokens also carry `render` (a live render id) and `policy`.
 - Rules every reader of C-5 must enforce (`account_for_token` in `web/server/security/signal_handlers.py`):
-  1. A token with no `iat`, or a render token whose render is no longer live (`render_tokens.is_spent_render_token(claims)`, WP-1h), signs in nobody, before any account lookup (single use, SEC-7).
-  2. The account id comes from the `api_token` row named by `user_claims.id` (read on every request; revoked or missing means nobody), else from `user_claims.user_id`, else, for a session issued before WP-0k, from the one account that is not a pending invitation and that `identity`, read as the ILIKE pattern sign-in used before WP-0k, matches (none, or two, means nobody).
-  3. That account must be active, must have exactly the username in `identity`, and must not have a `created` in a later second than the token's `iat` (`active_account`). The database compares the times in the time zone that wrote `created`.
-- Writers: `create_user_access_token(user)` (login, registration, reset) and WP-1h's `render_token(account, …)` both take the account and mint `user_id`.
-- Consumers: the Flask login loader (this WP). The FastAPI `PrincipalDep` (WP-5a and later) must port all three rules. Cookies issued before WP-0k stay valid under rule 2's last branch, so nothing is reissued.
+  1. A token with no `iat` (a registered claim, always top level), or a render token whose render is no longer live (`render_tokens.is_spent_render_token(claims)`, WP-1h), signs in nobody, before any account lookup (single use, SEC-7).
+  2. The account id comes from the `api_token` row named by the custom claim `id` (read on every request; revoked or missing means nobody), else from the custom claim `user_id`, else, for a session issued before WP-0k (always the version 3 layout), from the one account that could sign in on `main` (any account except a pending invitation with no password) and that the identity, read as the ILIKE pattern sign-in used before WP-0k, matches (none, or two, means nobody).
+  3. That account must be active, must have exactly the username in the identity, and must not have a `created` in a later second than the token's `iat` (`active_account`). The database compares the times in the time zone that wrote `created`.
+- Writers: `create_user_access_token(user)` (login, registration, reset) and WP-1h's `render_token(account, …)` both take the account and mint `user_id`. After WP-3d both mint through `access_tokens.mint_access_token`, so `user_id` sits at the top level.
+- Consumers: the Flask login loader (this WP). The FastAPI `PrincipalDep` (WP-5a and later) must port all three rules and read custom claims in both layouts until the last version 3 token expires. Cookies issued before WP-0k stay valid under rule 2's last branch, so nothing is reissued.
 
 **Merge with WP-1h (security F2), done in this branch's merge of integration efc7abd (7dd2930).** WP-1h.md's Contract changes section records the same rule.
 - `account_for_token` applies rule 1 and replaces WP-1h's `elif is_spent_render_token(claims)` branch in `login_from_request`.
@@ -134,6 +137,37 @@ Trial merge, round 4: `mig/WP-0j-rename-reset-guard` dd186b0b into this branch a
 - `_token_caller` passes the `User` to `create_user_access_token`, which takes the account since WP-0k. The WP-0h harness on integration (`conftest.py`, `test_group_and_role_grants.py`) already gets the same change on this branch.
 
 With them the joint merge gives `tests/privilege_escalation` 179 passed (round 3: 172). (qa's 119 passed, 40 failed at 299c632 came from WP-2g's logger propagation double-counting WP-0j's caplog refusals; WP-0j's 6c7e4d6 counts on a handler of the app logger, and the merge no longer shows it.)
+
+## Merging with WP-3d
+
+WP-3d (Flask 2.3, flask-jwt-extended 4, Flask-Login 0.6) lands after WP-0j, WP-0k and WP-0l. Its "Merging with WP-0j, 0k and 0l" section in `docs/modernisation/work/WP-3d.md` and its `WP-3d-evidence/merge-0k.patch` hold the edits. These notes are for the lead at that merge; nothing here changes WP-0k's code now.
+
+The edits that fall on WP-0k's files are below, each confirmed against this branch at fdcad802. Method: in a scratch worktree, merge WP-3d 11de4403 into fdcad802; resolve the four conflicts as below; apply the test hunks of `merge-0k.patch`; run the suites. `merge-0k.patch` was written against WP-0k 6e44b914. Its hunks for the four conflicted files no longer apply as a patch at fdcad802, so make those edits by hand. Its test hunks apply cleanly (one hunk at an offset of one line).
+
+| File | Edit at the merge | Confirmed at fdcad802 |
+|---|---|---|
+| `web/server/database/setup.py` | conflict: `HarmonyUserManager(...)` keeps both `make_safe_url_function=same_origin_path` (WP-3d) and `reset_password_view_function=open_reset_page` (WP-0k) | yes |
+| `web/server/security/signal_handlers.py` | conflict: drop WP-0k's `from flask_jwt_extended import (get_jwt_identity, verify_jwt_in_request_optional, get_jwt_claims, get_raw_jwt)` block and import `get_verified_payload` with the other `access_tokens` names; `get_raw_jwt().get('iat')` becomes `get_verified_payload().get('iat')` in `login_from_request` | yes |
+| `web/server/util/authentication.py` | conflict: keep both import blocks (the `access_tokens` imports, then `if TYPE_CHECKING: from models.alchemy.user import User`); `create_user_access_token(user, …)` returns `mint_access_token(user.username, {'needs': ['*'], 'query_needs': ['*'], REMEMBER_ME_CLAIM: remember_me, USER_ID_CLAIM: user.id}, expires_delta)`, so `user_id` sits at the top level | yes |
+| `tests/web/test_api_token_issue.py` | conflict: import `custom_claims` (WP-3d) and `api_token_user_id` (WP-0k); `check_token_validity` is gone | yes |
+| `tests/web/usernames/tokens.py` | patch: `session_token_without_account_id` mints the version 3 nested layout (`additional_claims={'user_claims': {…}}`), the only layout a pre-WP-0k session can have; `api_token` mints through `mint_access_token`; `signed_in_id` runs in its own app context | yes |
+| `tests/web/usernames/conftest.py` | patch: `JWT_IDENTITY_CLAIM='identity'` (version 4 reads `sub` otherwise) | yes |
+| `tests/web/usernames/test_inactive_accounts.py` | patch: the session key is `_user_id` (Flask-Login 0.6) | yes |
+| `tests/web/usernames/test_username_matching.py` | patch: `custom_claims(claims)['user_id']` in place of `claims['user_claims']['user_id']` | yes, one hunk at an offset of one line |
+| `tests/web/render/test_render_tokens.py` | patch: the WP-0k session in `test_an_ordinary_session_token_is_not_a_render_request` mints through `mint_access_token` | yes |
+| `tests/web/test_legacy_tokens.py` | patch: ported onto a SQLite `user` table and an `api_token` row in place of patching `Transaction` and `check_token_validity`, which WP-0k removes | yes |
+| `tests/flask_isolation.py` | patch: read Flask 2.2+'s context variables (from integration, reached through WP-0k's integration merges) | yes |
+
+WP-0k's files added after 6e44b914 need no edit: `test_registration.py`, `test_reset_single_use.py`, `test_reset_paths.py` and `test_render_token_accounts.py` mint and read tokens through `tokens.py` and `create_user_access_token`, which the edits above cover. The same holds for `test_account_targets.py` and `test_renames.py`.
+
+Result of the trial (scratch, not committed or pushed):
+- `tests/web`: 801 passed, 1 xfailed, 12 `stack` deselected;
+- the 12 Postgres clock tests passed;
+- `tests/authz` pure layer: 4681 passed, 677 skipped;
+- `tests/privilege_escalation`: 91 passed;
+- `uv run --locked mypy`: no issues in 533 files.
+
+The C-5 rules in "Contract changes" are restated in terms of custom claims, read in either layout, as WP-3d asks.
 
 ## INV-3 difference table
 
@@ -276,6 +310,8 @@ Security asks the human to accept:
   - Merged `origin/mig/integration` at b1aa182f exactly (7d5c1f85).
   - Check on 7d5c1f85: `ci/pytest_suites.sh` all 16 suites passed (authz 4681 passed, 677 skipped; privilege_escalation 91; web 621, 12 `stack` deselected, 1 xfailed); the Postgres clock tests 12 passed; `ci/lint_python.sh b1aa182f` clean (61 files); 3.8 guard 913 files, 0 problems; mypy no issues in 533 files.
   - Status `ready`.
+
+- 2026-10-06 backend-0k, notes for WP-3d: section "Merging with WP-3d" mirrors WP-3d.md's merge notes for WP-0k, each edit confirmed on a scratch merge of WP-3d 11de4403 into fdcad802 (tests/web 801 passed, clock 12, authz pure 4681, privilege_escalation 91, mypy clean); the C-5 rules are restated in terms of custom claims in either layout, and rule 2 now names the round-4 account set. Docs only.
 
 ## Interrogate (units 6 to 9)
 

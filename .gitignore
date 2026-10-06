@@ -19,7 +19,6 @@ build/
 dist/
 nohup.out
 .dependency_hash.json
-.env
 
 web/public/places-map/PICTURES.zip
 web/public/places-map/web/pictures
@@ -185,7 +184,6 @@ pipeline/out
 api_log
 
 # VSCode
-.vscode/
 *.code-workspace
 
 # Jupyter notebook checkpoints
@@ -228,3 +226,4 @@ scripts/agents/__pycache__/
 
 # hypothesis example database (contract and pipeline property tests)
 .hypothesis/
+config.bat

@@ -224,6 +224,10 @@ class AuthenticationResource(Resource):
                 user.id,
                 token,
                 user_manager.hash_password(password),
+                # A deactivation made after the checks above is not undone.
+                User.status_id.in_(
+                    [UserStatusEnum.ACTIVE.value, UserStatusEnum.PENDING.value]
+                ),
             ):
                 raise GenericValidationError({"token": "invalid_reset_link"})
 

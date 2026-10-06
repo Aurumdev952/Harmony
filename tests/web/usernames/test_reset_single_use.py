@@ -164,3 +164,38 @@ def test_of_two_concurrent_registrations_with_one_invitation_only_one_writes(
                 sqlalchemy.text('SELECT status_id FROM "user" WHERE id = 4')
             ).scalar()
     assert status == UserStatusEnum.PENDING.value
+
+
+def _status(app, user_id):
+    with app.app_context():
+        engine = app.extensions['sqlalchemy'].db.engine
+        with engine.connect() as connection:
+            return connection.execute(
+                sqlalchemy.text('SELECT status_id FROM "user" WHERE id = :id'),
+                {'id': user_id},
+            ).scalar()
+
+
+def test_a_reset_does_not_undo_a_deactivation_made_meanwhile(app, monkeypatch):
+    """The account is deactivated between the reset's checks and its write:
+    the write is conditional on an active or pending status too."""
+    token = mailed_reset_token(app, JANE)
+    may_set = auth_models.may_set_password_from_reset
+
+    def deactivated_meanwhile(user):
+        allowed = may_set(user)
+        with app.app_context():
+            engine = app.extensions['sqlalchemy'].db.engine
+            with engine.begin() as connection:
+                connection.execute(
+                    sqlalchemy.text('UPDATE "user" SET status_id = :s WHERE id = :id'),
+                    {'s': UserStatusEnum.INACTIVE.value, 'id': JANE},
+                )
+        return allowed
+
+    monkeypatch.setattr(
+        auth_models, 'may_set_password_from_reset', deactivated_meanwhile
+    )
+
+    _refused(app, token, FIRST)
+    assert _status(app, JANE) == UserStatusEnum.INACTIVE.value

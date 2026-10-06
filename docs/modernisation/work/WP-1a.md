@@ -96,6 +96,7 @@ None.
   - `task_gate.py WP-1a` reports only the status and the two open verdicts, with no claim or ownership problems.
 
   `stack.sh stop` left no perf container running and kept the volumes. Status stays `review`; qa and reviewer verdicts are requested for round 2.
+- 2026-10-06 qa-10 unit R3.1 (reviewer round 2, 1): `tests/perf/conftest.py` registers and loads a Hypothesis profile with `deadline=None`, as `tests/contract/test_schema.py` does. Under load, the default 200 ms deadline failed the bootstrap properties at random (DeadlineExceeded, then Flaky), and `tests/perf` is in the CI gate. Check: `test_hypothesis_runs_without_a_deadline` was seen failing first (`timedelta(milliseconds=200) is None`). With the profile, `uv run --locked pytest tests/perf` gives 47 passed at load average 77 (110 s). `ci/pytest_suites.sh` is rerun at the end of round 3.
 
 ## Evidence
 

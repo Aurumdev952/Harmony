@@ -18,7 +18,7 @@ from pathlib import Path
 import baseline
 import pytest
 from baseline import PerfSample
-from hypothesis import given
+from hypothesis import given, settings
 from hypothesis import strategies as st
 
 latencies = st.lists(
@@ -28,6 +28,14 @@ latencies = st.lists(
 
 def sample(case_id: str, p95: float) -> PerfSample:
     return PerfSample(case_id, 'table', p95 / 2, p95, 100, 1.0, 30, 1.0, p95, 1)
+
+
+def test_hypothesis_runs_without_a_deadline():
+    # These properties run the bootstrap (thousands of resamples) and assert
+    # results, not speed; on a loaded host the default 200 ms deadline fails
+    # them at random (DeadlineExceeded, then Flaky). conftest.py loads the
+    # profile.
+    assert settings().deadline is None
 
 
 @given(latencies, st.floats(min_value=0, max_value=1))

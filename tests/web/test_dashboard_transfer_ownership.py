@@ -140,13 +140,19 @@ def fixture_app():
     api.add_resource(ResourceStub)
     api.add_resource(DashboardResource)
 
-    with app.app_context():
-        metadata = db.Model.metadata
-        metadata.create_all(db.engine, tables=[metadata.tables[n] for n in TABLES])
-        _seed_roles(db.session)
-        yield app
-    DashboardResource.api = None
-    DashboardResource.routes = dict(_DASHBOARD_ROUTES)
+    try:
+        with app.app_context():
+            # A lone run checks foreign keys as the full run does, where
+            # web.server.database.setup turns them on for every SQLite connection.
+            db.session.execute('PRAGMA foreign_keys=ON')
+            assert db.session.execute('PRAGMA foreign_keys').scalar() == 1
+            metadata = db.Model.metadata
+            metadata.create_all(db.engine, tables=[metadata.tables[n] for n in TABLES])
+            _seed_roles(db.session)
+            yield app
+    finally:
+        DashboardResource.api = None
+        DashboardResource.routes = dict(_DASHBOARD_ROUTES)
 
 
 def _seed_roles(session):

@@ -13,3 +13,4 @@
 - [Golden fixture regeneration](golden_fixture_regeneration.md) — regenerate druid_query.json for a deliberate query change, prove only intended forms moved
 - [Tooling traps](tooling_traps.md) — lint gate scope post WP-2f, golden record --check, expected pipeline skip, ruff py39 with-format
 - [E2E harness traps](e2e_harness_traps.md) — visual in pinned image, a11y/visual before e2e, settle before axe, rootless DNS after reboot
+- [Auth upgrade live diff](auth_upgrade_live_diff.md) — WP-3d recipe: base vs branch stack probe diff, old-lib token minting, in-container render tokens, redirect chains

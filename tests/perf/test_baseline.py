@@ -482,7 +482,7 @@ def test_a_committed_run_never_overwrites_a_recorded_run(tmp_path: Path):
 
 def test_the_error_budget_is_split_over_both_bounds_of_every_case():
     # Each case has two one-sided bounds (p95 and paired median), and either
-    # can fail it, so an A/A run fails at most FAMILY_ALPHA of the time only
+    # can fail it, so an A/A run fails about FAMILY_ALPHA of the time only
     # when the budget is split over twice the number of cases.
     assert baseline.FAMILY_ALPHA == 0.05
     assert baseline.case_alpha(24) == pytest.approx(0.05 / 48)

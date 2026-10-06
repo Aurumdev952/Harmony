@@ -26,11 +26,12 @@ resampled as pairs) is over 1:
   slowdown of every request by a factor raises p95 by the same factor.
 
 Each bound's one-sided level is 5% split over both bounds of every case
-(Bonferroni), so an A/A run fails at most one time in twenty; the README gives
-the rates measured by scripts/perf/probes/level.py. The report gives each case's `detects`: the
-smallest slowdown of every candidate request that would have failed it. On an
-A/A run that is what the run could see; a passing run's claim is only as
-strong as its largest `detects`.
+(Bonferroni), so an A/A run fails about one time in twenty: 3.0% on this
+host's real noise and 6.6% under heavy synthetic stalls, as measured by
+scripts/perf/probes/level.py (the README gives the table). The report gives
+each case's `detects`: the smallest slowdown of every candidate request that
+would have failed it. On an A/A run that is what the run could see; a passing
+run's claim is only as strong as its largest `detects`.
 
     scripts/perf/stack.sh up && scripts/perf/stack.sh ui
     scripts/perf/stack.sh reference    # git merge-base HEAD mig/integration
@@ -281,7 +282,7 @@ def summarise_dashboard(record: dict[str, Any]) -> PerfSample:
 def case_alpha(cases: int) -> float:
     """The level of each one-sided bound. A case has two bounds (p95 and
     paired median) and either can fail it, so the family budget is split over
-    twice the cases: an A/A run then fails any bound at most FAMILY_ALPHA of
+    twice the cases: an A/A run then fails any bound about FAMILY_ALPHA of
     the time (Bonferroni)."""
     return FAMILY_ALPHA / (2 * cases)
 

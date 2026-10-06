@@ -1,11 +1,9 @@
 """WP-1h: what the web app and the renderer service must agree on.
 
-The web app keeps its own copies of the renderer's limits, from when its image
-ran Python 3.8 and could not import the renderer package. The 3.13 image can, so
-the copies are due to go (backend request in WP-3b); until then this host-lane
-test fails when the two drift apart. It is not under
-tests/worker/renderer, which also runs inside the renderer image, where the web
-app is not installed.
+The web app takes the renderer's request ranges from harmony.worker.renderer.spec
+and sets its own defaults, timeouts and limits, which must fit inside the
+renderer's. This host-lane test is not under tests/worker/renderer, which also
+runs inside the renderer image, where the web app is not installed.
 """
 
 import os
@@ -44,16 +42,19 @@ def test_one_account_cannot_fill_the_renderer(monkeypatch):
     assert cap < _compose_default_concurrency()
 
 
+def test_the_route_checks_args_against_the_renderers_own_ranges():
+    # The web app falls back to its defaults for an arg outside these, so a copy
+    # that drifted wider would send requests the renderer refuses with a 400.
+    assert page_renderer.WIDTHS is spec.WIDTHS
+    assert page_renderer.HEIGHTS is spec.HEIGHTS
+    assert page_renderer.PDF_PAGE_SIZES is spec.PDF_PAGE_SIZES
+
+
 def test_the_web_app_asks_only_for_what_the_renderer_accepts(monkeypatch):
-    # The web app falls back to its defaults for an arg outside these, so a
-    # copy that drifts wider sends requests the renderer refuses with a 400.
     monkeypatch.delenv('RENDERER_MAX_TIMEOUT_SECONDS', raising=False)
     monkeypatch.delenv('RENDERER_MAX_BYTES', raising=False)
     renderer = settings_from_env()
 
-    assert page_renderer.WIDTHS == spec.WIDTHS
-    assert page_renderer.HEIGHTS == spec.HEIGHTS
-    assert page_renderer.PDF_PAGE_SIZES == spec.PDF_PAGE_SIZES
     assert page_renderer.CONTENT_TYPES == server.CONTENT_TYPES
     assert set(page_renderer.CONTENT_TYPES) == set(spec.FORMATS)
     assert page_renderer.DEFAULT_WIDTH in spec.WIDTHS

@@ -15,8 +15,8 @@ from harmony.worker.renderer.errors import InvalidRenderRequest
 __all__ = ['InvalidRenderRequest', 'RenderSpec', 'Viewport', 'parse_render_request']
 
 FORMATS = ('pdf', 'png', 'jpeg')
-# Copied in web/server/routes/views/page_renderer.py until WP-3b; checked by
-# tests/worker/test_renderer_web_drift.py.
+# The web app's render routes check their args against these
+# (web/server/routes/views/page_renderer.py).
 WIDTHS = range(320, 3841)
 HEIGHTS = range(240, 4321)
 PDF_PAGE_SIZES = ('A3', 'A4', 'A5', 'Legal', 'Letter', 'Tabloid')

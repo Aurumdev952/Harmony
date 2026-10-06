@@ -19,6 +19,7 @@ from flask_user import current_user
 from werkzeug.exceptions import HTTPException, ServiceUnavailable, Unauthorized
 
 from config import settings
+from harmony.worker.renderer.spec import HEIGHTS, PDF_PAGE_SIZES, WIDTHS
 from log import LOG
 from models.alchemy.dashboard import Dashboard
 from models.alchemy.user import User
@@ -55,13 +56,6 @@ CONTENT_TYPES = {'pdf': 'application/pdf', 'png': 'image/png', 'jpeg': 'image/jp
 
 DEFAULT_WIDTH = 1280
 DEFAULT_HEIGHT = 1024
-# The ranges the renderer service accepts (harmony/worker/renderer/spec.py),
-# copied because this app's image runs Python 3.8, which cannot import the
-# renderer package, until WP-3b. tests/worker/test_renderer_web_drift.py fails
-# when they drift.
-WIDTHS = range(320, 3841)
-HEIGHTS = range(240, 4321)
-PDF_PAGE_SIZES = ('A3', 'A4', 'A5', 'Legal', 'Letter', 'Tabloid')
 
 
 class RendersInFlight(ServiceUnavailable):

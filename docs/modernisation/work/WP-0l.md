@@ -81,11 +81,13 @@ None.
 
 ## Merging with WP-0k
 
-WP-0k (`mig/WP-0k-configured-links-exact-usernames`, in review) changes `try_get_user` and `resource.py:112`. On merge:
-- keep WP-0k's `try_get_user` body, which calls `find_named_account` (`web/server/security/usernames.py`). It follows the same rule as `find_by_name`. Do not use `find_user_by_username`, which ranks active accounts first. Drop the `find_by_name` import from `users.py` if nothing else there uses it;
-- in `resource.py` keep this branch's `update_resource_roles`, with `try_get_user` as the user lookup;
-- keep WP-0k's other `users.py` changes (`invite_users`, `get_anonymous_user`, `update_user_api_tokens`);
-- remove the strict `xfail` from `test_signing_in_with_a_look_alike_username_never_acts_as_its_account`: it XPASSes, and so fails, once WP-0k's login signs `user.username`.
+WP-0l merges only with or after WP-0k (INV-3 row 15). Checked against WP-0k fa44242 (the reviewer checked 1a64caf); the lead names the head to merge at close-out. On merge:
+- **`users.py` `try_get_user`**: keep WP-0k's body, which calls `find_named_account` (`web/server/security/usernames.py`). Do not use `find_user_by_username`, which ranks active accounts first. `find_named_account` and `find_by_name` then hold the same rule twice, so make one call the other. For usernames they agree: usernames are unique as stored, so at most one row has the exact spelling. The simplest form is `find_named_account(username, session)` returning `find_by_name(User, username, session, name_field='username')`. Drop the `find_by_name` import from `users.py` if nothing else there uses it.
+- **`resource.py`**: keep this branch's `update_resource_roles`, with `try_get_user` as the user lookup. WP-0k only changed the line this branch rewrote.
+- **Other `users.py` changes**: keep WP-0k's (`invite_users`, `get_anonymous_user`, `update_user_api_tokens`).
+- **`no_mail` fixtures** in `tests/privilege_escalation/test_exact_name_matching.py` (qa) and `test_named_lookups.py`: patch `deployment_url` in `web.server.api.dashboard_api_models` and `web.server.api.permission_api_models` instead of `url_for`. WP-0k removed `url_for` from both modules, and `monkeypatch.setattr` on a missing attribute errors.
+- **Strict xfail**: remove it from `test_signing_in_with_a_look_alike_username_never_acts_as_its_account`. Once WP-0k's login signs `user.username`, the test XPASSes, which fails a strict xfail.
+- **Gates**: run all of `tests/privilege_escalation`, `tests/web`, `tests/authz` with the live layer, and the contract replay on the merged tree.
 
 ## Recorded, not changed
 

@@ -73,7 +73,7 @@ All commands run from your worktree. Paired mode needs at least 30 rounds per si
    ```bash
    scripts/perf/stack.sh stop                    # keeps volumes; `down` deletes everything
    ```
-   `stop` lasts only until the Docker daemon restarts. Druid's containers are `restart: always`, so a daemon restart or a reboot starts them again, and they take CPU from everyone else on the host. Run `stop` again afterwards. After a reboot, `up` reruns Druid's extension loader while the JVMs are down, and the loader downloads its jars. If containers cannot reach the internet, `docker start` the stopped Druid containers first: `up` then sees them running and skips the loader.
+   `stop` lasts only until the Docker daemon restarts. Druid's containers are `restart: always`, so a daemon restart or a reboot starts them again, and they take CPU from everyone else on the host. Run `stop` again afterwards. After a reboot, `up` reruns Druid's extension loader while the JVMs are down, and the loader downloads its jars. If containers cannot reach the internet, `docker start` the stopped Druid containers first: `up` then sees them running and skips the loader. If the stack was last started from a worktree that has since been removed, the `druid` forwarder and the web containers bind-mount files from that worktree and cannot start. Then `docker start` only Druid and its support containers (postgres, zookeeper, memcache, coordinator, broker, historical, middlemanager, router), and run `stack.sh up` from your current worktree, which recreates the forwarder and the web side on your checkout.
 
 ## The phase-exit run
 

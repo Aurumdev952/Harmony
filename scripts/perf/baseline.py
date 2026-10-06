@@ -93,6 +93,7 @@ import math
 import os
 import platform
 import random
+import re
 import statistics
 import subprocess
 import sys
@@ -1046,6 +1047,17 @@ def run(args: argparse.Namespace) -> int:
     return report_comparison(base, stem.with_suffix('.jsonl')) if base else 0
 
 
+def run_label(value: str) -> str:
+    """A --label: letters, digits, underscores and hyphens only. The overwrite
+    refusal globs `<stem>.*`, so a dot would turn part of a committed-mode
+    label into a suffix, and glob characters would match other runs or none."""
+    if not re.fullmatch(r'[A-Za-z0-9_-]*', value):
+        raise argparse.ArgumentTypeError(
+            f'{value!r}: use only letters, digits, underscores and hyphens'
+        )
+    return value
+
+
 def parse_args(argv: list[str]) -> argparse.Namespace:
     parser = argparse.ArgumentParser(description=__doc__.split('\n')[0])
     parser.add_argument('--rounds', type=int, default=100)
@@ -1060,7 +1072,12 @@ def parse_args(argv: list[str]) -> argparse.Namespace:
     )
     parser.add_argument('--dashboard-rounds', type=int, default=30)
     parser.add_argument('--dashboard-warmup', type=int, default=2)
-    parser.add_argument('--label', default='', help='suffix for the output file names')
+    parser.add_argument(
+        '--label',
+        type=run_label,
+        default='',
+        help='suffix for the output file names (letters, digits, _ and -)',
+    )
     parser.add_argument('--out', type=Path, default=RESULTS_DIR)
     parser.add_argument(
         '--dataset', default='', help='dataset description for the report'

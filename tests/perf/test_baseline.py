@@ -18,7 +18,7 @@ from pathlib import Path
 import baseline
 import pytest
 from baseline import PerfSample
-from hypothesis import given, settings
+from hypothesis import HealthCheck, given, settings
 from hypothesis import strategies as st
 
 latencies = st.lists(
@@ -36,6 +36,13 @@ def test_hypothesis_runs_without_a_deadline():
     # them at random (DeadlineExceeded, then Flaky). conftest.py loads the
     # profile.
     assert settings().deadline is None
+
+
+def test_hypothesis_does_not_fail_a_slow_draw_on_a_loaded_host():
+    # The same load makes generating examples slow: FailedHealthCheck
+    # (too_slow) was seen at load 72. The properties' results do not depend
+    # on how fast the examples arrive.
+    assert HealthCheck.too_slow in settings().suppress_health_check
 
 
 @given(latencies, st.floats(min_value=0, max_value=1))
@@ -451,6 +458,51 @@ def test_a_rerun_never_overwrites_a_recorded_run(tmp_path: Path, capsys):
     assert {
         path.name: path.read_bytes() for path in stem.parent.glob(f'{stem.name}.*')
     } == recorded
+
+
+@pytest.mark.parametrize('label', ['run.1', 'run*', 'run?', 'run[1]', 'a/b', 'a b'])
+def test_a_label_that_could_dodge_the_overwrite_refusal_is_refused(label):
+    # The refusal globs `<stem>.*`: a dot in a committed-mode label turns part
+    # of it into a suffix, and glob characters match other runs or nothing.
+    with pytest.raises(SystemExit):
+        baseline.parse_args(['--label', label])
+
+
+@pytest.mark.parametrize('label', ['', 'WP-1b', 'WP-1b-rerun1', 'phase_1_exit'])
+def test_letters_digits_underscores_and_hyphens_make_a_label(label):
+    assert baseline.parse_args(['--label', label]).label == label
+
+
+def test_a_run_refuses_a_recorded_name_before_measuring(tmp_path: Path, monkeypatch):
+    # A 30-minute run must not be lost at the end: run() names the run when
+    # it starts and refuses before sending a single timed request.
+    for name, value in (
+        ('PERF_CANDIDATE_URL', 'http://candidate.invalid'),
+        ('PERF_CANDIDATE_UI_URL', 'http://candidate-ui.invalid'),
+        ('PERF_REFERENCE_URL', 'http://reference.invalid'),
+        ('PERF_REFERENCE_UI_URL', 'http://reference-ui.invalid'),
+        ('PERF_REFERENCE_SHA', 'a' * 40),
+    ):
+        monkeypatch.setenv(name, value)
+    for name in ('PERF_REQUEST_LOG_DIR', 'PERF_COORDINATOR_URL', 'PERF_BROKER_URL'):
+        monkeypatch.delenv(name, raising=False)
+    monkeypatch.setattr(baseline, 'login', lambda url: object())
+
+    def no_measuring(*args, **kwargs):
+        raise AssertionError('measured before refusing')
+
+    monkeypatch.setattr(baseline, 'measure_case', no_measuring)
+    monkeypatch.setattr(baseline, 'measure_dashboards', no_measuring)
+    date = baseline.dt.datetime.now(baseline.dt.timezone.utc).date().isoformat()
+    stem = baseline.paired_stem(
+        tmp_path, date, 'a' * 40, baseline.git('rev-parse', 'HEAD'), 'WP-1b'
+    )
+    stem.parent.mkdir(parents=True)
+    Path(f'{stem}.md').write_text('a failing run\n')
+    args = baseline.parse_args(['--label', 'WP-1b', '--out', str(tmp_path)])
+    with pytest.raises(SystemExit, match='pick a new --label'):
+        baseline.run(args)
+    assert Path(f'{stem}.md').read_text() == 'a failing run\n'
 
 
 def test_a_committed_run_never_overwrites_a_recorded_run(tmp_path: Path):

@@ -1,7 +1,7 @@
 ---
 wp: "0j"
 title: "Refuse username changes and password resets that reach a higher-privileged account"
-status: review
+status: ready
 owner_role: "backend"
 instances:
   - name: "backend-0j"
@@ -224,6 +224,11 @@ None.
   - Row 4 now says callers without the route permission get 404 too (Low 2). The group member table naming hidden administrators is a WP-5d residual (Info 3). A Request asks qa for the live pin for row 7.
   Check: the 15 new tests failed 14 at `dd186b0b` (administrator removed, or 200 instead of 404); after the fix, the harness passes 194. `tests/web` 283, `tests/authz` 4681 + 631 skipped (each run on its own, as CI does). Mutants: 3 group-member mutants killed (12, 8 and 1 failed), and the 3 author mutants re-killed after the move. Lint, mypy and the 3.8 guard: see the commit.
 - 2026-10-06 backend-0j round 2 unit 15: qa's round-3 approval at `f7d8f678` recorded. Its Low and Info are fixed in this file. Row 7 now says "membership unchanged", because `PATCH /api2/group/<id>` writes name and roles before the member check. The `UserResourceManager` section names `hidden_users.visible_username`. Group deletion removing a hidden administrator's membership is listed as a WP-5d residual. Check: this file.
+- 2026-10-06 backend-0j round 2 unit 16: merged qa's row 7 pins `3bdb040c` (`45f3a2fb`), then `mig/integration` `b1aa182f` exactly, as the lead asked: it is the commit WP-0k merged, and WP-3b is resolved at the joint merge. No conflicts. Checks on the merged tree:
+  - `ci/pytest_suites.sh` exit 0: alerts 9, authz 4681 + 649 skipped, contract 62, core 188, db 26, druid 17 + 11 skipped, druid_setup 83, frontend none, golden 272, graphql 22, perf 63, pipeline 129 + 1 skipped, privilege_escalation 195, toolchain 12, web 397 + 1 xfailed, worker 151 + 1 skipped;
+  - `ci/lint_python.sh b1aa182f`: ruff clean, 11 changed files formatted; mypy no issues in 532 files; `check_py38_syntax.py` 901 files, 0 problems;
+  - CPython 3.8.20: `tests/privilege_escalation` 195 passed.
+  Status `ready`.
 
 ## Interrogate (unit 6)
 

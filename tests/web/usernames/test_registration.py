@@ -67,6 +67,20 @@ def test_an_empty_invitation_token_registers_nobody(app):
     assert _row(app, 1) == before
 
 
+def test_an_empty_invitation_token_does_not_register_a_pending_account_holding_none(
+    app,
+):
+    """A pending account whose token was cleared (or never set) holds the
+    empty string, so only the empty-token guard stops this."""
+    _run(app, 'UPDATE "user" SET reset_password_token = \'\' WHERE id = 4')
+    before = _row(app, 4)
+
+    with pytest.raises(BadRequest):
+        _register(app, 'Pending.User@moh.gov.rw', '')
+
+    assert _row(app, 4) == before
+
+
 @pytest.mark.parametrize('status', [UserStatusEnum.ACTIVE, UserStatusEnum.INACTIVE])
 def test_a_reset_token_does_not_register_an_account_that_is_not_pending(app, status):
     _run(

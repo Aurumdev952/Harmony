@@ -67,9 +67,10 @@ def _signed_in_id(app, identity):
 # A session minted before WP-0k holds the string the user typed, which signed
 # in the first account its ILIKE pattern matched, so its spelling says nothing
 # about which account it was issued to. It signs in the account only when that
-# pattern matches exactly one account that is not a pending invitation
-# (pending accounts never signed in), and nobody otherwise. Typing `john_doe`
-# signed in `john.doe` or `john_doe`; such a token now signs in neither.
+# pattern matches exactly one account that could sign in on `main`: any
+# account except a pending invitation with no password (nothing checked the
+# status there). It signs in nobody otherwise. Typing `john_doe` signed in
+# `john.doe` or `john_doe`; such a token now signs in neither.
 LEGACY_TOKEN_LOOKUPS = [
     ('john.doe@moh.gov.rw', 1),
     ('john_doe@moh.gov.rw', None),

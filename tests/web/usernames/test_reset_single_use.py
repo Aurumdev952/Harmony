@@ -199,3 +199,21 @@ def test_a_reset_does_not_undo_a_deactivation_made_meanwhile(app, monkeypatch):
 
     _refused(app, token, FIRST)
     assert _status(app, JANE) == UserStatusEnum.INACTIVE.value
+
+
+def test_a_spent_token_is_refused_before_the_password_is_hashed(app, monkeypatch):
+    """The early compare keeps a spent or forged token from costing a bcrypt
+    hash; the conditional write alone would refuse it only after hashing."""
+    token = mailed_reset_token(app, JANE)
+    _store_token(app, JANE, 'a-newer-reset-token')
+    hashed = []
+    hash_password = app.user_manager.hash_password
+    monkeypatch.setattr(
+        app.user_manager,
+        'hash_password',
+        lambda password: hashed.append(password) or hash_password(password),
+    )
+
+    _refused(app, token, FIRST)
+
+    assert hashed == []

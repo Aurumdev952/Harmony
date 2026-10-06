@@ -17,12 +17,13 @@ from werkzeug.exceptions import Unauthorized
 from models.alchemy.user import UserStatusEnum
 from tests.web.usernames.accounts import PASSWORD
 from tests.web.usernames.tokens import (
+    complete_reset,
+    mailed_reset_token,
     api_token,
     login,
     session_token_without_account_id,
     signed_in_id,
 )
-from web.server.api.authentication_api_models import AuthenticationResource
 from web.server.routes.views.authentication import authentication_required
 from web.server.util.api_validation import GenericValidationError
 
@@ -123,11 +124,8 @@ NEW_PASSWORD = 'a new password 2B!'
 
 
 def _complete_reset(app, user_id):
-    '''`POST /api2/authentication/reset_password` with a valid reset token.'''
-    reset = AuthenticationResource.reset_password.view_func
-    with app.test_request_context('/api2/authentication/reset_password', method='POST'):
-        token = app.user_manager.generate_token(user_id)
-        return reset(None, token=token, password=NEW_PASSWORD)
+    '''`POST /api2/authentication/reset_password` with the token a mail carries.'''
+    return complete_reset(app, mailed_reset_token(app, user_id), NEW_PASSWORD)
 
 
 def _status(app, user_id):

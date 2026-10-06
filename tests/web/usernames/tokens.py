@@ -2,6 +2,8 @@
 
 import json
 
+import sqlalchemy
+
 from flask_jwt_extended import create_access_token
 from flask_login import current_user
 
@@ -38,3 +40,27 @@ def login(app, email, password=PASSWORD):
     with app.test_request_context('/api2/authentication/login?set_cookie=false'):
         response = login_route(None, email=email, password=password, remember_me=False)
         return json.loads(response.get_data())['access_token']
+
+
+def mailed_reset_token(app, user_id):
+    """A reset token as a reset or invitation mail carries it: generated for the
+    account and stored as its `reset_password_token`."""
+    with app.test_request_context('/'):
+        token = app.user_manager.generate_token(user_id)
+    with app.app_context():
+        engine = app.extensions['sqlalchemy'].db.engine
+        with engine.begin() as connection:
+            connection.execute(
+                sqlalchemy.text(
+                    'UPDATE "user" SET reset_password_token = :token WHERE id = :id'
+                ),
+                {'token': token, 'id': user_id},
+            )
+    return token
+
+
+def complete_reset(app, token, password):
+    """`POST /api2/authentication/reset_password`."""
+    reset = AuthenticationResource.reset_password.view_func
+    with app.test_request_context('/api2/authentication/reset_password', method='POST'):
+        return reset(None, token=token, password=password)

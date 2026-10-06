@@ -15,6 +15,7 @@ import pytest
 import sqlalchemy
 
 from models.alchemy.user import UserStatusEnum
+from tests.web.usernames.tokens import mailed_reset_token
 from web.server.api.authentication_api_models import AuthenticationResource
 
 NEW_PASSWORD = 'a new password 2B!'
@@ -44,8 +45,7 @@ def _set_status(app, user_id, status):
 
 
 def _token(app, user_id):
-    with app.test_request_context('/'):
-        return app.user_manager.generate_token(user_id)
+    return mailed_reset_token(app, user_id)
 
 
 @pytest.mark.parametrize(
@@ -62,8 +62,8 @@ def test_flask_user_reset_view_only_sends_the_browser_to_harmonys_page(
     app, user_id, status, method
 ):
     _set_status(app, user_id, status)
-    before = _row(app, user_id)
     token = _token(app, user_id)
+    before = _row(app, user_id)
 
     response = app.test_client().open(
         f'/user/reset-password/{token}',

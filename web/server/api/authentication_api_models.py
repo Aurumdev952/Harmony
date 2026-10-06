@@ -1,3 +1,4 @@
+import hmac
 import json
 from http.client import OK, BAD_REQUEST
 from datetime import timedelta
@@ -8,6 +9,7 @@ from flask_potion.routes import Route
 from flask_potion.schema import FieldSet
 from flask_user.emails import send_password_changed_email
 from flask_user.signals import user_registered, user_reset_password
+from sqlalchemy import and_, update
 from werkzeug.exceptions import BadRequest
 
 from models.alchemy.user import User, UserStatusEnum
@@ -28,6 +30,27 @@ from web.server.routes.views.authentication import try_authenticate_user
 from web.server.util.api_validation import GenericValidationError
 from web.server.security.usernames import username_taken
 from web.server.util.authentication import create_user_access_token, login_user
+
+
+def _spend_token(
+    session, user_id: int, token: str, password_hash: str, *conditions
+) -> bool:
+    '''Set account `user_id`'s password, activate it and clear its token, only
+    while it still holds `token`: of concurrent requests carrying one token,
+    one writes. The names typed at registration are not stored; `User` has no
+    columns for them (WP-5d).'''
+    result = session.execute(
+        update(User.__table__)
+        .where(
+            and_(User.id == user_id, User.reset_password_token == token, *conditions)
+        )
+        .values(
+            password=password_hash,
+            status_id=UserStatusEnum.ACTIVE.value,
+            reset_password_token='',
+        )
+    )
+    return result.rowcount == 1
 
 
 class AuthenticationResource(Resource):
@@ -93,8 +116,6 @@ class AuthenticationResource(Resource):
         user_manager = current_app.user_manager
         with Transaction() as transaction:
             email = payload['email']
-            firstname = payload['firstname']
-            lastname = payload['lastname']
             password = payload['password']
             invite_token = payload['invite_token']
 
@@ -131,19 +152,14 @@ class AuthenticationResource(Resource):
             ):
                 raise BadRequest("Another account has this email address")
 
-            # Enable user account; the invitation is spent.
-            pending_user.status_id = UserStatusEnum.ACTIVE.value
-            pending_user.reset_password_token = ''
-
-            # Hash password field
-            hashed_password = user_manager.hash_password(password)
-            pending_user.password = hashed_password
-
-            pending_user.firstname = firstname
-            pending_user.lastname = lastname
-
-            # Add User record using named arguments 'user_fields'
-            transaction.add_or_update(pending_user)
+            if not _spend_token(
+                transaction.run_raw(),
+                pending_user.id,
+                invite_token,
+                user_manager.hash_password(password),
+                User.status_id == UserStatusEnum.PENDING.value,
+            ):
+                raise BadRequest("Invalid invitation link")
 
         # Send user_registered signal
         # pylint: disable=protected-access
@@ -190,17 +206,26 @@ class AuthenticationResource(Resource):
             raise GenericValidationError({"token": "expired_token"})
 
         user = user_manager.get_user_by_id(user_id)
-        if user is None or not may_set_password_from_reset(user):
+        # The signature and age alone would let a token work for two days after
+        # it was used or replaced: it must still be the one the account holds.
+        if (
+            user is None
+            or not user.reset_password_token
+            or not hmac.compare_digest(user.reset_password_token, token)
+            or not may_set_password_from_reset(user)
+        ):
             raise GenericValidationError({"token": "invalid_reset_link"})
 
         # A pending account that follows a reset link, as an admin can send to an
         # invitee, sets its first password: it is registering.
-        user.status_id = UserStatusEnum.ACTIVE.value
-        hashed_password = current_app.user_manager.hash_password(password)
-        user.password = hashed_password
-
         with Transaction() as transaction:
-            transaction.add_or_update(user)
+            if not _spend_token(
+                transaction.run_raw(),
+                user.id,
+                token,
+                user_manager.hash_password(password),
+            ):
+                raise GenericValidationError({"token": "invalid_reset_link"})
 
         if user_manager.enable_email and user_manager.send_password_changed_email:
             send_password_changed_email(user)

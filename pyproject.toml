@@ -5,12 +5,16 @@ version = "0"
 requires-python = "==3.13.*"
 # Shared by the web server and the pipeline images.
 dependencies = [
-    "setuptools==71.1.0",
+    # 78.1.1 fixes PYSEC-2025-49. Flask 1.0, Werkzeug 0.16 and gunicorn 20 import
+    # pkg_resources, which setuptools 82 removed, so the 83.0.0 fix (PYSEC-2026-3447)
+    # waits on WP-3c to WP-3e.
+    "setuptools==78.1.1",
     # Before 22.1, slotted classes (related.immutable) break zero-argument super()
     # on Python 3.11+; 24.1 is the first release supporting 3.13.
     "attrs==24.1.0",
-    # Also pinned in the Dockerfiles; some installs need wheel before anything else.
-    "wheel==0.43.0",
+    # Nothing in the repository imports it; kept from the pip-built images.
+    # 0.46.2 fixes CVE-2026-24049.
+    "wheel==0.46.2",
     "Cython<3.0.0",
     "celery==5.4.0",
     "Werkzeug==0.16.1",

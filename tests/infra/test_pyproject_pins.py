@@ -107,3 +107,28 @@ def test_the_locked_environment_satisfies_every_installed_requirement(tmp_path):
         capture_output=True, text=True, cwd=tmp_path, check=False,
     )  # fmt: skip
     assert result.returncode == 0, result.stdout + result.stderr
+
+
+# The release that fixes each advisory pip-audit reported on the lock (security
+# review of WP-3b). setuptools stays below 82, the first release without
+# pkg_resources, which Flask 1.0, Werkzeug 0.16 and gunicorn 20 import at run time;
+# PYSEC-2026-3447 (fixed in 83.0.0) waits on WP-3c to WP-3e.
+ADVISORY_FLOORS = {
+    "anyio": "4.14.2",
+    "pyasn1": "0.6.4",
+    "setuptools": "78.1.1",
+    "wheel": "0.46.2",
+}
+
+
+def test_locked_versions_clear_the_known_advisories():
+    from packaging.version import Version
+
+    lock = tomllib.loads((REPO / "uv.lock").read_text())
+    locked = {p["name"]: p["version"] for p in lock["package"]}
+    behind = {
+        name: locked[name]
+        for name, floor in ADVISORY_FLOORS.items()
+        if Version(locked[name]) < Version(floor)
+    }
+    assert behind == {}

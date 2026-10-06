@@ -1,8 +1,8 @@
-"""WP-0i: failed renders and stuck cache claims.
+"""WP-0i, WP-1h: failed renders and stuck cache claims.
 
-An unreachable urlbox must not put the request URL, which carries the urlbox API
-key and the minted token, into any log (INV-6). These tests send real requests
-to a closed loopback port; nothing leaves the host.
+A failed or unreachable renderer must not put the minted token into any log
+(INV-6). These tests send real requests to a closed loopback port; nothing
+leaves the host.
 """
 
 import base64
@@ -17,19 +17,23 @@ from flask import Flask
 from flask_caching import Cache
 
 from log import LOG
-from render_fakes import DASHBOARD_SLUG, USERS, DictCache
+from render_fakes import DASHBOARD_SLUG, SENDER, DictCache, FakeRedis
 from web.server.redis import thumbnail_storage_service
 from web.server.routes.views import page_renderer as page_renderer_views
 from web.server.routes.views.dashboard import get_email_attachments
+from web.server.routes.views.page_renderer import claim
 
 SLUG = DASHBOARD_SLUG
 VIEWER = 'viewer@tests.invalid'
-API_KEY = 'urlbox-key-that-must-not-be-logged'
 
 
-@pytest.fixture(name='render_log')
-def fixture_render_log(app, renderer, monkeypatch, caplog):
-    monkeypatch.setattr(page_renderer_views.settings, 'URLBOX_API_KEY', API_KEY)
+@pytest.fixture(name='unreachable_renderer')
+def fixture_unreachable_renderer(app, renderer, monkeypatch, caplog):
+    with socket.socket() as probe:
+        probe.bind(('127.0.0.1', 0))
+        port = probe.getsockname()[1]
+    monkeypatch.setattr(page_renderer_views, 'requests', requests)
+    monkeypatch.setattr(page_renderer_views, 'RENDERER_URL', f'http://127.0.0.1:{port}')
     # Production logs an unhandled exception instead of raising it into the test.
     monkeypatch.setitem(app.config, 'PROPAGATE_EXCEPTIONS', False)
     caplog.set_level(logging.DEBUG)
@@ -38,84 +42,45 @@ def fixture_render_log(app, renderer, monkeypatch, caplog):
     LOG.removeHandler(caplog.handler)
 
 
-@pytest.fixture(name='unreachable_urlbox')
-def fixture_unreachable_urlbox(render_log, monkeypatch):
-    with socket.socket() as probe:
-        probe.bind(('127.0.0.1', 0))
-        port = probe.getsockname()[1]
-    monkeypatch.setattr(page_renderer_views, 'requests', requests)
-    monkeypatch.setattr(
-        page_renderer_views, 'URLBOX_API_URL', f'http://127.0.0.1:{port}'
-    )
-    return render_log
-
-
 def _logged(caplog) -> str:
     return '\n'.join(caplog.handler.format(record) for record in caplog.records)
 
 
-def _assert_no_secrets_logged(caplog):
-    logged = _logged(caplog)
-    assert API_KEY not in logged
-    assert 'accessKey' not in logged
-    assert 'eyJ' not in logged  # the start of any JWT
-    return logged
-
-
 def _assert_failure_logged_without_secrets(caplog, output_format):
-    logged = _assert_no_secrets_logged(caplog)
-    assert f'Urlbox request for {output_format} of /dashboard/{SLUG} failed' in logged
-
-
-@pytest.mark.parametrize(
-    'path, output_format',
-    [
-        (f'/dashboard/{SLUG}/pdf', 'pdf'),
-        (f'/dashboard/{SLUG}/jpeg', 'jpg'),
-        (f'/api2/storage/retrieve?key={SLUG}', 'png'),
-    ],
-)
-def test_urlbox_error_status_is_logged_without_secrets(
-    client, renderer, render_log, path, output_format
-):
-    renderer.status_code = 500
-
-    client.get(path, headers={'X-Test-User': VIEWER})
-
-    [call] = renderer.calls
-    assert API_KEY in call.url
-    logged = _assert_no_secrets_logged(render_log)
+    logged = _logged(caplog)
+    # Every minted token is a JWT, and every JWT starts with this header prefix.
+    assert 'eyJ' not in logged
     assert (
-        f'Urlbox failed to generate {output_format} for /dashboard/{SLUG} '
-        'with status code 500'
+        f'Renderer request for {output_format} of dashboard {SLUG} failed: '
+        'ConnectionError'
     ) in logged
 
 
-def test_unreachable_urlbox_fails_the_render_route_without_logging_secrets(
-    client, unreachable_urlbox
+def test_unreachable_renderer_fails_the_render_route_without_logging_secrets(
+    client, unreachable_renderer
 ):
     response = client.get(f'/dashboard/{SLUG}/pdf', headers={'X-Test-User': VIEWER})
 
     assert response.status_code == 500
-    _assert_failure_logged_without_secrets(unreachable_urlbox, 'pdf')
+    _assert_failure_logged_without_secrets(unreachable_renderer, 'pdf')
 
 
 @pytest.mark.parametrize(
     'formats, output_format',
-    [({'should_attach_pdf': True}, 'pdf'), ({'should_embed_image': True}, 'jpg')],
+    [({'should_attach_pdf': True}, 'pdf'), ({'should_embed_image': True}, 'jpeg')],
 )
-def test_unreachable_urlbox_fails_an_email_render_without_logging_secrets(
-    app, unreachable_urlbox, formats, output_format
+def test_unreachable_renderer_fails_an_email_render_without_logging_secrets(
+    app, unreachable_renderer, formats, output_format
 ):
-    with app.test_request_context('/'):
+    with app.test_request_context('/', headers=SENDER):
         app.preprocess_request()
-        assert get_email_attachments(USERS[VIEWER], SLUG, **formats) == (None, None)
+        assert get_email_attachments(VIEWER, SLUG, **formats) == (None, None)
 
-    _assert_failure_logged_without_secrets(unreachable_urlbox, output_format)
+    _assert_failure_logged_without_secrets(unreachable_renderer, output_format)
 
 
-def test_unreachable_urlbox_fails_a_thumbnail_without_logging_secrets(
-    app, client, unreachable_urlbox
+def test_unreachable_renderer_fails_a_thumbnail_without_logging_secrets(
+    app, client, unreachable_renderer
 ):
     response = client.get(
         f'/api2/storage/retrieve?key={SLUG}', headers={'X-Test-User': VIEWER}
@@ -124,7 +89,32 @@ def test_unreachable_urlbox_fails_a_thumbnail_without_logging_secrets(
     assert response.status_code == 200
     assert json.loads(response.data) == ''
     assert app.cache.values == {}
-    _assert_failure_logged_without_secrets(unreachable_urlbox, 'png')
+    _assert_failure_logged_without_secrets(unreachable_renderer, 'png')
+
+
+@pytest.mark.parametrize(
+    'path, output_format',
+    [
+        (f'/dashboard/{SLUG}/pdf', 'pdf'),
+        (f'/dashboard/{SLUG}/jpeg', 'jpeg'),
+        (f'/api2/storage/retrieve?key={SLUG}', 'png'),
+    ],
+)
+def test_a_renderer_error_status_is_logged_without_secrets(
+    client, renderer, unreachable_renderer, monkeypatch, path, output_format
+):
+    monkeypatch.setattr(page_renderer_views, 'requests', renderer)
+    renderer.status_code = 500
+
+    client.get(path, headers={'X-Test-User': VIEWER})
+
+    [call] = renderer.calls
+    assert call.params['token'].startswith('eyJ')
+    logged = _logged(unreachable_renderer)
+    assert 'eyJ' not in logged
+    assert (
+        f'Renderer failed to render {output_format} of dashboard {SLUG}: status 500'
+    ) in logged
 
 
 class _BoundedFileSystemCache(FileSystemCache):
@@ -157,7 +147,7 @@ def test_expired_file_cache_entry_is_rendered_again(
     headers = {'X-Test-User': VIEWER}
     url = f'/api2/storage/retrieve?key={SLUG}'
     client.get(url, headers=headers)
-    [key] = cache.keys
+    [key] = [key for key in cache.keys if key.startswith('thumbnail:')]
     cache.set(key, 'stale-thumbnail', timeout=-1)  # still on disk, already expired
 
     response = client.get(url, headers=headers)
@@ -255,17 +245,36 @@ def test_redis_miss_after_a_failed_claim_does_not_release_another_callers_claim(
     assert renderer.calls == []
 
 
-@pytest.mark.parametrize(
-    'config, keeps_expired',
-    [
-        ({'CACHE_TYPE': 'FileSystemCache'}, True),
-        ({'CACHE_TYPE': 'RedisCache', 'CACHE_REDIS_PORT': 1}, False),
-    ],
-)
-def test_production_cache_backends_are_told_apart(tmp_path, config, keeps_expired):
+def test_an_expired_claim_behind_the_apps_file_cache_is_taken_again(tmp_path):
     # The app's cache is a flask_caching.Cache wrapping a cachelib backend.
     app = Flask('tests.web', root_path=str(tmp_path), instance_path=str(tmp_path))
-    cache = Cache(app, config={**config, 'CACHE_DIR': str(tmp_path)})
+    cache = Cache(
+        app, config={'CACHE_TYPE': 'FileSystemCache', 'CACHE_DIR': str(tmp_path)}
+    )
 
     with app.app_context():
-        assert thumbnail_storage_service._keeps_expired_entries(cache) is keeps_expired
+        cache.set('claim', 'dead worker', timeout=-1)
+        assert claim(cache, 'claim', 'mine', 60)
+        assert cache.get('claim') == 'mine'
+        assert not claim(cache, 'claim', 'theirs', 60)
+
+
+def test_a_claim_behind_the_apps_redis_cache_is_one_set_nx_ex(tmp_path):
+    app = Flask('tests.web', root_path=str(tmp_path), instance_path=str(tmp_path))
+    cache = Cache(
+        app,
+        config={
+            'CACHE_TYPE': 'RedisCache',
+            'CACHE_REDIS_PORT': 1,
+            'CACHE_KEY_PREFIX': 'zen-test-',
+        },
+    )
+    fake = FakeRedis()
+
+    with app.app_context():
+        cache.cache._write_client = fake  # pylint: disable=protected-access
+        assert claim(cache, 'claim', 'mine', 60)
+        assert not claim(cache, 'claim', 'theirs', 60)
+
+    assert fake.commands == [('set', 'zen-test-claim'), ('set', 'zen-test-claim')]
+    assert fake.ttls == {'zen-test-claim': 60}

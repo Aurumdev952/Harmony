@@ -22,3 +22,5 @@
 - [Gunicorn server checks](gunicorn_server_checks.md) — test web/gunicorn_server.py despite its gevent patch, mypy strict on 3.8, live run with a stub app
 - [Request logging wiring](request_logging_wiring.md) — test create_app/create_celery log wiring: non-gunicorn path gaps, global Celery signals, mypy on tasks
 - [Backend testing traps](backend-testing-traps.md) — real-Postgres fixture from tests/throwaway_postgres.py, contract stack, worktree guard, formatting
+- [Render token traps](render_token_traps.md) — WP-1h: internal vs public origin, one fingerprint, render-token cache keys in tests, lint on old branches
+- [Renderer round-2 traps](renderer_round2_traps.md) — WP-1h: render isolation and tree kill, Werkzeug cookie jar, atomic SET NX EX, mypy strict flags, docker builds

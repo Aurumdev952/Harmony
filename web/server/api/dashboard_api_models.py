@@ -56,6 +56,7 @@ from web.server.routes.views.dashboard import (
 )
 from web.server.routes.views.users import get_current_user
 from web.server.security.permissions import SuperUserPermission, principals
+from web.server.security.render_tokens import is_render_request
 from web.server.util.deployment_links import deployment_url
 from web.server.util.util import EMAIL_PATTERN, get_dashboard_title
 
@@ -718,8 +719,7 @@ class DashboardResource(PrincipalResource):
     def read(self, id):
         with Transaction() as transaction:
             dashboard = super().read(id)
-            dashboard.total_views += 1
-            track_dashboard_access(dashboard.id)
+            record_dashboard_view(dashboard)
             dashboard = transaction.add_or_update(dashboard, flush=True)
 
         # NOTE: Dirty hack to check if the user requested the legacy spec
@@ -1070,6 +1070,15 @@ class DashboardResource(PrincipalResource):
                     transaction.add_or_update(dashboard)
             return None, NO_CONTENT
         return None, UNAUTHORIZED
+
+
+def record_dashboard_view(dashboard):
+    # An export renders the page signed in as the requesting user; that is not
+    # the user viewing the dashboard.
+    if is_render_request():
+        return
+    dashboard.total_views += 1
+    track_dashboard_access(dashboard.id)
 
 
 def track_dashboard_access(dashboard_id, edited=False, increment_view_count=True):

@@ -1,8 +1,8 @@
 '''The dashboard render routes (web/server/routes/page_renderer.py) and the
 thumbnail store (/api2/storage/retrieve), run in-process.
 
-The outbound render call (`requests.get` to urlbox) is replaced by a recorder:
-these tests never contact urlbox. The database lookups of a dashboard by slug
+The outbound render call (`requests.post` to the renderer service) is replaced
+by a recorder. The database lookups of a dashboard by slug
 are replaced by a fixed dashboard, Resource.id 7.
 '''
 
@@ -15,6 +15,7 @@ from types import SimpleNamespace
 from unittest import mock
 
 import pytest
+import requests
 from flask import Blueprint, Flask, g, request
 from flask_jwt_extended import JWTManager, decode_token
 from flask_login import LoginManager
@@ -80,24 +81,33 @@ class _Cache:
 
 class _Rendered:
     status_code = 200
-    url = 'http://urlbox.invalid/rendered'
     content = b'rendered'
+
+    def __init__(self, content_type):
+        self.headers = {'Content-Type': content_type}
 
     def iter_content(self, chunk_size):
         del chunk_size
         yield self.content
+
+    def close(self):
+        pass
 
 
 @pytest.fixture(name='renders')
 def fixture_renders(monkeypatch) -> list:
     calls = []
 
-    def get(url, params, stream, timeout):
-        del stream, timeout
-        calls.append({'url': url, **params})
-        return _Rendered()
+    def post(url, json, timeout, stream):
+        del url, stream, timeout
+        calls.append({**json, 'cookie': 'accessKey=' + json['token']})
+        return _Rendered(page_views.CONTENT_TYPES[json['format']])
 
-    monkeypatch.setattr(page_views, 'requests', SimpleNamespace(get=get))
+    monkeypatch.setattr(
+        page_views,
+        'requests',
+        SimpleNamespace(post=post, RequestException=requests.RequestException),
+    )
     monkeypatch.setattr(page_views, 'Transaction', _Dashboards)
     monkeypatch.setattr(
         dashboard_views,
@@ -214,11 +224,18 @@ def test_render_route(principal, route, status, rendered_as, render_app, renders
     (call,) = renders
     claims = _token_claims(render_app, call)
     assert claims['identity'] == rendered_as
-    assert claims['user_claims'] == {
+    user_claims = dict(claims['user_claims'])
+    # C-5 (WP-1h): render tokens add `render`, `policy` and the account's
+    # `user_id`, the claim WP-0k binds every session with.
+    assert set(user_claims) - {'needs', 'query_needs'} <= {
+        'render',
+        'policy',
+        'user_id',
+    }
+    assert user_claims['user_id'] == SIGNED_IN_USER_ID
+    assert {k: user_claims[k] for k in ('needs', 'query_needs')} == {
         'needs': [['view_resource', RESOURCE_ID, 'dashboard']],
         'query_needs': ['*'],
-        # WP-0k: bound to the account it renders as (C-5).
-        'user_id': SIGNED_IN_USER_ID,
     }
 
 
@@ -261,8 +278,7 @@ def test_caller_chosen_url_does_not_receive_the_minted_render_token(
 
     assert response.status_code == 200
     (call,) = renders
-    origin = render_app.zen_config.general.DEPLOYMENT_BASE_URL.rstrip('/')
-    assert call['url'].startswith(f'{origin}/dashboard/{SLUG}?')
+    assert call['url'].startswith(f'{page_views.RENDER_WEB_ORIGIN}/dashboard/{SLUG}?')
     assert _token_claims(render_app, call)['identity'] == rendered_as
 
 

@@ -1,6 +1,7 @@
 """WP-0i: the dashboard render routes and the thumbnail cache (N1, N2, N7).
 
-The outbound urlbox call is replaced by `FakeRenderer`; nothing leaves the process.
+The call to the renderer service is replaced by `FakeRenderer`; nothing leaves the
+process.
 """
 
 import base64
@@ -13,6 +14,7 @@ from render_fakes import (
     DASHBOARDS,
     DASHBOARD_SLUG,
     DEPLOYMENT_ORIGIN,
+    SENDER,
     USERS,
     FakeDashboard,
 )
@@ -92,9 +94,6 @@ def test_viewer_gets_a_render_made_as_themselves(client, renderer, route):
     [call] = renderer.calls
     assert call.identity == VIEWER
     assert call.claims['needs'] == [['view_resource', 7, 'dashboard']]
-    # Bound to the account, so it never signs in a later account that reuses
-    # the username (WP-0k).
-    assert call.claims['user_id'] == USERS[VIEWER].id
 
 
 @pytest.mark.parametrize('route', RENDER_ROUTES)
@@ -106,8 +105,16 @@ def test_request_args_cannot_redirect_the_minted_token(client, renderer, route):
 
     assert response.status_code == 200
     [call] = renderer.calls
-    assert call.params['force'] == 'true'
-    assert call.params['url'].startswith(f'{DEPLOYMENT_ORIGIN}/')
+    assert set(call.params) == {
+        'url',
+        'token',
+        'format',
+        'viewport',
+        'full_page',
+        'pdf',
+        'timeout_seconds',
+    }
+    assert call.params['url'].startswith('http://web:5000/')
     assert call.params['url'].split('?')[0].endswith(f'/dashboard/{SLUG}')
     assert call.identity == VIEWER
 
@@ -253,22 +260,20 @@ def test_slug_reused_by_another_dashboard_does_not_serve_the_old_thumbnail(
     [
         (
             'https://attacker.invalid/fr/dashboard/elsewhere#h=a1b2c3',
-            f'{DEPLOYMENT_ORIGIN}/fr/dashboard/{SLUG}?screenshot=1&pdf=1#h=a1b2c3',
+            f'http://web:5000/fr/dashboard/{SLUG}?screenshot=1&pdf=1#h=a1b2c3',
         ),
         (
             'https://attacker.invalid/steal',
-            f'{DEPLOYMENT_ORIGIN}/dashboard/{SLUG}?screenshot=1&pdf=1',
+            f'http://web:5000/dashboard/{SLUG}?screenshot=1&pdf=1',
         ),
-        (None, f'{DEPLOYMENT_ORIGIN}/dashboard/{SLUG}?screenshot=1&pdf=1'),
+        (None, f'http://web:5000/dashboard/{SLUG}?screenshot=1&pdf=1'),
     ],
 )
 def test_emailed_render_loads_this_apps_dashboard_whatever_link_is_sent(
     app, renderer, link, page
 ):
-    with app.test_request_context('/'):
-        get_email_attachments(
-            USERS[VIEWER], SLUG, should_attach_pdf=True, dashboard_url=link
-        )
+    with app.test_request_context('/', headers=SENDER):
+        get_email_attachments(VIEWER, SLUG, should_attach_pdf=True, dashboard_url=link)
 
     [call] = renderer.calls
     assert call.params['url'] == page

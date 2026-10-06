@@ -54,7 +54,7 @@ DASHBOARD_LINKS = [
 def test_dashboard_share_links_the_dashboard_page(app, mailer, dashboard_url, expected):
     with request_as(app, {'HTTP_HOST': 'attacker.invalid'}, username=INVITER.username):
         send_email(
-            INVITER,
+            INVITER.username,
             DASHBOARD,
             ['viewer@harmony.example.org'],
             'A dashboard for you',

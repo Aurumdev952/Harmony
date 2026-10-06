@@ -1,4 +1,6 @@
+import hashlib
 import itertools
+import json
 from typing import Optional
 from logging import LoggerAdapter
 
@@ -36,14 +38,16 @@ from web.server.routes.views.authorization import (
     AuthorizedOperation,
     WhitelistedPermission,
 )
+from web.server.routes.views.query_policy import canonical_policy
 from web.server.security.permissions import SuperUserPermission
 from web.server.security.usernames import find_legacy_token_account
 from web.server.util.authentication import USER_ID_CLAIM
+from web.server.security.render_tokens import (
+    RENDER_POLICY_CLAIM,
+    RENDER_TOKEN_QUERY_NEEDS,
+    is_spent_render_token,
+)
 from web.server.util.util import get_user_string, get_remote_ip_address
-
-# Dashboard render tokens keep whatever query policy the account they are issued
-# for holds.
-RENDER_TOKEN_QUERY_NEEDS = ['*']
 
 
 def register_for_signals(app, principals):
@@ -180,6 +184,18 @@ def render_token_query_needs():
     return _compute_token_query_needs(RENDER_TOKEN_QUERY_NEEDS)
 
 
+def query_policy_fingerprint():
+    '''A stable digest of the query policy a render made as the current user runs
+    under. Two users share a cached thumbnail only when it is the same, and a
+    render token is refused once its user's digest no longer matches.
+    '''
+    if SuperUserPermission().can():
+        policy = 'superuser'
+    else:
+        policy = canonical_policy(render_token_query_needs())
+    return hashlib.sha256(json.dumps(policy, sort_keys=True).encode()).hexdigest()
+
+
 def _compute_token_provides(claims):
     needs = claims.get('needs', [])
     query_needs = claims.get('query_needs', [])
@@ -209,7 +225,14 @@ def _install_token_needs(identity):
 
     There's also a special dimension name `source` to control what sources are allowed.
     """
-    identity.provides = _compute_token_provides(get_jwt_claims())
+    claims = get_jwt_claims()
+    pinned_policy = claims.get(RENDER_POLICY_CLAIM)
+    if pinned_policy is not None and pinned_policy != query_policy_fingerprint():
+        # The user's policy changed after the render was requested; the render
+        # may be cached under the old digest, so it gets nothing.
+        identity.provides = set()
+        return
+    identity.provides = _compute_token_provides(claims)
 
 
 def on_identity_loaded(sender, identity):
@@ -334,7 +357,8 @@ def account_for_token(
 
     The token names its account by id: an API token through its `api_token`
     row, read on every request so nothing outlives a revoke or a user delete; a
-    session or a render token through its `user_id` claim. A token with
+    session or a render token through its `user_id` claim; a render token only
+    while its render is live (single use, SEC-7). A token with
     neither, a session issued before WP-0k, gets the one account its username
     can mean. The account must still be active, still have the exact username
     the token names, and not have been created in a later second than the
@@ -343,7 +367,7 @@ def account_for_token(
     zone. An account with no `created` (written before the column existed, or
     outside the ORM) is not checked against `iat`.
     '''
-    if issued_at is None:
+    if issued_at is None or is_spent_render_token(claims):
         return None
     if 'id' in claims:
         issued_to = api_token_user_id(claims['id'])
@@ -356,11 +380,17 @@ def account_for_token(
         if legacy is None:
             return None
         issued_to, username = legacy.id, legacy.username
+    return active_account(issued_to, username, issued_at)
+
+
+def active_account(user_id: int, username: str, issued_at: int) -> Optional[User]:
+    '''Account `user_id`, if it is active, still has exactly `username` and was
+    not created in a later second than `issued_at`.'''
     return (
         get_db_adapter()
         .session.query(User)
         .filter(
-            User.id == issued_to,
+            User.id == user_id,
             User.username == username,
             User.status_id == UserStatusEnum.ACTIVE.value,
             or_(

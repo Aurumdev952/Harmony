@@ -40,11 +40,13 @@ from web.server.routes.views.authorization import is_authorized
 from web.server.routes.views.feed import add_share_notification
 from web.server.routes.views.users import add_user_acl, get_current_user, try_get_user
 from web.server.routes.views.page_renderer import (
+    EMAIL_SLOT_WAIT_SECONDS,
+    RendersInFlight,
     grid_dashboard_to_pdf,
     grid_dashboard_to_image,
 )
-from web.server.util.deployment_links import page_args, shared_page_url
 
+from web.server.util.deployment_links import page_args, shared_page_url
 from web.server.util.util import get_user_string, get_dashboard_title
 
 
@@ -391,8 +393,26 @@ class DashboardManager(AuthorizationResourceManager):
         ).first()
 
 
+def _render_for_email(render, locale, slug, auth_user_email, session_hash):
+    '''A render for an email, or None if it failed. It waits a while for the
+    sender's render slot. A share has already sent its notifications, so a
+    sender whose slot stays busy gets a failed render, as any other failure,
+    rather than a 503.
+    '''
+    try:
+        return render(
+            locale,
+            slug,
+            auth_user_email=auth_user_email,
+            session_hash=session_hash,
+            slot_wait_seconds=EMAIL_SLOT_WAIT_SECONDS,
+        )
+    except RendersInFlight:
+        return None
+
+
 def get_email_attachments(
-    auth_user,
+    auth_user_email,
     slug,
     should_attach_pdf=False,
     should_embed_image=False,
@@ -402,31 +422,25 @@ def get_email_attachments(
     image_name = None
     locale, session_hash = page_args(dashboard_url, 'dashboard.grid_dashboard')
     if should_attach_pdf:
-        render_response = grid_dashboard_to_pdf(
-            locale,
-            slug,
-            auth_user=auth_user,
-            session_hash=session_hash,
+        rendered_pdf = _render_for_email(
+            grid_dashboard_to_pdf, locale, slug, auth_user_email, session_hash
         )
-        if render_response is None or render_response.status_code != 200:
-            g.request_logger.error(f'Failed to render dashboard: "{slug}" to PDF')
+        if rendered_pdf is None:
+            LOG.error(f'Failed to render dashboard: "{slug}" to PDF')
             return None, None
         attachments.append(
             (
                 'attachment',
-                (f'{slug}.pdf', base64.encodebytes(render_response.content).decode()),
+                (f'{slug}.pdf', base64.encodebytes(rendered_pdf.content).decode()),
             )
         )
 
     if should_embed_image:
-        image_render_response = grid_dashboard_to_image(
-            locale,
-            slug,
-            auth_user=auth_user,
-            session_hash=session_hash,
+        rendered_image = _render_for_email(
+            grid_dashboard_to_image, locale, slug, auth_user_email, session_hash
         )
-        if image_render_response is None or image_render_response.status_code != 200:
-            g.request_logger.error(f'Failed to render dashboard: "{slug}" to JPEG')
+        if rendered_image is None:
+            LOG.error(f'Failed to render dashboard: "{slug}" to JPEG')
             return None, None
         image_name = f'{slug}.jpeg'
         attachments.append(
@@ -434,17 +448,19 @@ def get_email_attachments(
                 "inline",
                 (
                     f'{slug}.jpeg',
-                    base64.encodebytes(image_render_response.content).decode(),
+                    base64.encodebytes(rendered_image.content).decode(),
                 ),
             )
         )
     return attachments, image_name
 
 
-def send_email(auth_user, dashboard, recipient_list, body, subject, sender, **kwargs):
+def send_email(
+    auth_user_email, dashboard, recipient_list, body, subject, sender, **kwargs
+):
     '''Send an email to user with or without attachments
     Args:
-        auth_user (User): The account the attachments are rendered as
+        auth_user_email (str): Authenticating user email
         dashboard (Dashboard): Dashboard to be shared
         recipient_list (List): A list of recipient's emails
         body(str): Email body
@@ -466,7 +482,7 @@ def send_email(auth_user, dashboard, recipient_list, body, subject, sender, **kw
     use_email_thread = kwargs.get('use_email_thread')
     slug = dashboard.slug
     attachments, image_name = get_email_attachments(
-        auth_user, slug, should_attach_pdf, should_embed_image, dashboard_url
+        auth_user_email, slug, should_attach_pdf, should_embed_image, dashboard_url
     )
 
     email_message = current_app.email_renderer.create_share_dashboard_pdf_message(
@@ -514,6 +530,7 @@ def share_dashboard_via_email(
         should_embed_image (bool): Value to embed image in email
         is_scheduled_report (bool): Value to schedule a report
     '''
+    current_user_email = current_user.username
     use_email_thread = kwargs.get('use_email_thread')
     for recipient in recipient_list:
         add_share_notification(
@@ -526,7 +543,7 @@ def share_dashboard_via_email(
         # use current user email for dashboard/pdf generation
         # and/or use a single email thread
         send_email(
-            current_user,
+            current_user_email,
             dashboard,
             recipient_list,
             body,
@@ -543,19 +560,18 @@ def share_dashboard_via_email(
         if recipient_user and recipient_user.status_id == UserStatusEnum.ACTIVE.value:
             # When user exists and is registered on the platform, use their
             # email as the token subject claim for dashboard/pdf generation
-            send_email(
-                recipient_user, dashboard, [email], body, subject, sender, **kwargs
-            )
+            send_email(email, dashboard, [email], body, subject, sender, **kwargs)
         elif (
             recipient_user and recipient_user.status_id == UserStatusEnum.PENDING.value
         ):
             # When user exists but is unregistered on the platform, send email
             # but do not generate dashboard/pdf attachments
-            # NOTE: This prevents urlbox JWT from triggering identifies events
+            # A pending user has not signed up, so no render token is minted
+            # as them.
             kwargs['should_attach_pdf'] = False
             kwargs['should_embed_image'] = False
             send_email(
-                recipient_user,
+                email,
                 dashboard,
                 [email],
                 body,
@@ -570,7 +586,7 @@ def share_dashboard_via_email(
             kwargs['should_attach_pdf'] = False
             kwargs['should_embed_image'] = False
             send_email(
-                current_user,
+                current_user_email,
                 dashboard,
                 [email],
                 body,

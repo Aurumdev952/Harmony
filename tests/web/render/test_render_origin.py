@@ -1,9 +1,11 @@
-"""WP-0i: renders and emailed links use the deployment's configured origin.
+"""WP-0i, WP-1h: renders and emailed links use configured origins.
 
 The app sets no SERVER_NAME, ProxyFix or trusted hosts, as in production, so
 neither a request's Host header nor its script root may choose where a minted
-token is sent. gunicorn 20.0.4 copies a `SCRIPT_NAME` request header into the
-WSGI environ, so the script root is caller-controlled too.
+token or an emailed link goes. gunicorn 20.0.4 copies a `SCRIPT_NAME` request
+header into the WSGI environ, so the script root is caller-controlled too.
+Renders load RENDER_WEB_ORIGIN, the internal origin the renderer accepts;
+emailed links use DEPLOYMENT_BASE_URL.
 """
 
 from types import SimpleNamespace
@@ -12,8 +14,9 @@ from urllib.parse import urlsplit
 import pytest
 from flask import g
 
-from render_fakes import DASHBOARDS, DASHBOARD_SLUG, DEPLOYMENT_ORIGIN, USERS
+from render_fakes import DASHBOARDS, DASHBOARD_SLUG, DEPLOYMENT_ORIGIN, SENDER
 from web.server.routes.views.dashboard import get_email_attachments, send_email
+from web.server.routes.views.page_renderer import RENDER_WEB_ORIGIN
 from web.server.util.deployment_links import deployment_origin
 
 SLUG = DASHBOARD_SLUG
@@ -21,6 +24,7 @@ VIEWER = 'viewer@tests.invalid'
 HOSTILE_HOSTS = ['attacker.invalid', 'real.org:@attacker.invalid']
 HOSTILE_SCRIPT_NAMES = ['@attacker.invalid', '.attacker.invalid', '/prefix']
 PAGE = f'{DEPLOYMENT_ORIGIN}/dashboard/{SLUG}'
+RENDERED_PAGE = f'{RENDER_WEB_ORIGIN}/dashboard/{SLUG}'
 
 
 def _netloc(url):
@@ -33,19 +37,19 @@ def fixture_no_server_name(app):
 
 
 @pytest.mark.parametrize('host', HOSTILE_HOSTS)
-def test_render_route_sends_the_token_to_the_configured_origin(client, renderer, host):
+def test_render_route_sends_the_token_to_the_internal_origin(client, renderer, host):
     response = client.get(
         f'/dashboard/{SLUG}/pdf', headers={'Host': host, 'X-Test-User': VIEWER}
     )
 
     assert response.status_code == 200
     [call] = renderer.calls
-    assert call.params['url'] == f'{PAGE}?screenshot=1&pdf=1'
+    assert call.params['url'] == f'{RENDERED_PAGE}?screenshot=1&pdf=1'
     assert call.identity == VIEWER
 
 
 @pytest.mark.parametrize('host', HOSTILE_HOSTS)
-def test_thumbnail_retrieve_renders_the_configured_origin(client, renderer, host):
+def test_thumbnail_retrieve_renders_the_internal_origin(client, renderer, host):
     response = client.get(
         f'/api2/storage/retrieve?key={SLUG}',
         headers={'Host': host, 'X-Test-User': VIEWER},
@@ -53,18 +57,18 @@ def test_thumbnail_retrieve_renders_the_configured_origin(client, renderer, host
 
     assert response.status_code == 200
     [call] = renderer.calls
-    assert call.params['url'] == f'{PAGE}?screenshot=1&thumbnail=1'
+    assert call.params['url'] == f'{RENDERED_PAGE}?screenshot=1&thumbnail=1'
 
 
 @pytest.mark.parametrize('host', HOSTILE_HOSTS)
-def test_emailed_render_sends_the_recipient_token_to_the_configured_origin(
+def test_emailed_render_sends_the_recipient_token_to_the_internal_origin(
     app, renderer, host
 ):
-    with app.test_request_context('/', headers={'Host': host}):
-        get_email_attachments(USERS[VIEWER], SLUG, should_attach_pdf=True)
+    with app.test_request_context('/', headers={'Host': host, **SENDER}):
+        get_email_attachments(VIEWER, SLUG, should_attach_pdf=True)
 
     [call] = renderer.calls
-    assert call.params['url'] == f'{PAGE}?screenshot=1&pdf=1'
+    assert call.params['url'] == f'{RENDERED_PAGE}?screenshot=1&pdf=1'
     assert call.identity == VIEWER
 
 
@@ -89,7 +93,7 @@ def test_emailed_link_points_at_the_configured_origin(app, renderer, monkeypatch
     with app.test_request_context('/', headers={'Host': host}):
         g.request_logger = app.logger
         send_email(
-            USERS[VIEWER],
+            VIEWER,
             DASHBOARDS[SLUG],
             ['recipient@tests.invalid'],
             'body',
@@ -111,8 +115,8 @@ def test_render_route_ignores_the_request_script_root(client, renderer, script_n
 
     assert response.status_code == 200
     [call] = renderer.calls
-    assert call.params['url'] == f'{PAGE}?screenshot=1&pdf=1'
-    assert _netloc(call.params['url']) == _netloc(DEPLOYMENT_ORIGIN)
+    assert call.params['url'] == f'{RENDERED_PAGE}?screenshot=1&pdf=1'
+    assert _netloc(call.params['url']) == _netloc(RENDER_WEB_ORIGIN)
 
 
 @pytest.mark.parametrize('script_name', HOSTILE_SCRIPT_NAMES)
@@ -127,16 +131,18 @@ def test_thumbnail_retrieve_ignores_the_request_script_root(
 
     assert response.status_code == 200
     [call] = renderer.calls
-    assert call.params['url'] == f'{PAGE}?screenshot=1&thumbnail=1'
+    assert call.params['url'] == f'{RENDERED_PAGE}?screenshot=1&thumbnail=1'
 
 
 @pytest.mark.parametrize('script_name', HOSTILE_SCRIPT_NAMES)
 def test_emailed_render_ignores_the_request_script_root(app, renderer, script_name):
-    with app.test_request_context('/', environ_overrides={'SCRIPT_NAME': script_name}):
-        get_email_attachments(USERS[VIEWER], SLUG, should_attach_pdf=True)
+    with app.test_request_context(
+        '/', headers=SENDER, environ_overrides={'SCRIPT_NAME': script_name}
+    ):
+        get_email_attachments(VIEWER, SLUG, should_attach_pdf=True)
 
     [call] = renderer.calls
-    assert call.params['url'] == f'{PAGE}?screenshot=1&pdf=1'
+    assert call.params['url'] == f'{RENDERED_PAGE}?screenshot=1&pdf=1'
 
 
 @pytest.mark.parametrize('script_name', HOSTILE_SCRIPT_NAMES)
@@ -150,7 +156,7 @@ def test_emailed_link_ignores_the_request_script_root(
     with app.test_request_context('/', environ_overrides={'SCRIPT_NAME': script_name}):
         g.request_logger = app.logger
         send_email(
-            USERS[VIEWER],
+            VIEWER,
             DASHBOARDS[SLUG],
             ['recipient@tests.invalid'],
             'body',
@@ -198,20 +204,22 @@ def test_unusable_configured_origin_is_refused(configured):
         deployment_origin(configured)
 
 
-def test_render_with_an_unusable_configured_origin_makes_no_outbound_call(
+def test_renders_never_load_the_configured_public_origin(
     app, client, renderer, monkeypatch
 ):
+    # Renders load RENDER_WEB_ORIGIN, the renderer's only allowed origin, so a
+    # bad DEPLOYMENT_BASE_URL cannot redirect a token (startup refuses one anyway).
     monkeypatch.setattr(
         app.zen_config.general,
         'DEPLOYMENT_BASE_URL',
         'https://harmony.tests.invalid@attacker.invalid',
     )
-    monkeypatch.setitem(app.config, 'PROPAGATE_EXCEPTIONS', False)
 
     response = client.get(f'/dashboard/{SLUG}/pdf', headers={'X-Test-User': VIEWER})
 
-    assert response.status_code == 500
-    assert renderer.calls == []
+    assert response.status_code == 200
+    [call] = renderer.calls
+    assert call.params['url'] == f'{RENDERED_PAGE}?screenshot=1&pdf=1'
 
 
 @pytest.mark.parametrize(

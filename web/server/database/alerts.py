@@ -38,8 +38,7 @@ def make_author_alert_administrator(
     add_user_acl(
         user or current_user,
         'alert_admin',
-        ResourceTypeEnum.ALERT.name,
-        authorization_item.name,
+        authorization_item,
         session=transaction.run_raw(),
         commit=False,
     )
@@ -86,7 +85,7 @@ def get_sources_for_field(field_id: str) -> Set[str]:
     with Transaction() as transaction:
         return {
             datasource_id
-            for datasource_id, in transaction.run_raw()
+            for (datasource_id,) in transaction.run_raw()
             .query(FieldPipelineDatasourceMapping.pipeline_datasource_id)
             .filter(FieldPipelineDatasourceMapping.field_id == field_id)
         }

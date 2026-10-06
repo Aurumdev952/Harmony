@@ -564,7 +564,9 @@ def _signed_in_session(stack, kind: str, username: str, password: str, uri: str)
     if kind == 'api token':
         return bearer(stack.admin_json('POST', f'{uri}/generate_api_token')['token'])
     if kind in ('render token', 'render token cookie'):
-        # As `grid_dashboard_urlbox_renderer` mints it since WP-0k.
+        # The shape WP-0k mints: `user_id` and the narrowed needs. WP-1h adds a
+        # single-use `render` claim registered in the app cache while the
+        # render runs, which this suite cannot register; its own tests cover it.
         token = mint_token(username, {**render_claims, 'user_id': account_id})
         if kind == 'render token':
             return bearer(token)

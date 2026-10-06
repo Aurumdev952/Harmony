@@ -37,7 +37,6 @@ UNREGISTERED_USER_USERNAME = 'anonymous_user_tracking@zenysis.com'
 UNREGISTERED_USER_FIRST = 'Anonymous'
 UNREGISTERED_USER_LAST = 'User'
 
-SUCCESS_USER_ROLE_ADDED = 'USER_ROLE_ADDED'
 SUCCESS_USER_ROLE_DELETED = 'USER_ROLE_DELETED'
 
 Invitee = namedtuple('Invitee', ['name', 'email'])
@@ -170,25 +169,22 @@ def add_user_acl(
     session: 'Optional[Session]' = None,
     flush: bool = True,
     commit: bool = True,
-) -> Tuple[UserAcl, bool]:
+) -> UserAcl:
     '''Gives `user` the resource role `resource_role_name` on `resource`, the
-    row the caller holds, never one found again by its name.
+    row the caller holds, never one found again by its name. Returns the ACL,
+    new or already held.
     '''
     session = session or get_db_adapter().session
     resource_role = try_get_resource_role(resource_role_name, resource, session)
     entity = try_get_user_acl(user.id, resource_role.id, resource.id, session)
-    exists = False
-
     if not entity:
-        exists = True
         entity = UserAcl(
             user_id=user.id, resource_role_id=resource_role.id, resource_id=resource.id
         )
         before_user_role_change.send(user, role=resource_role)
         add_entity(session, entity, flush, commit)
         after_user_role_change.send(user, role=resource_role)
-
-    return (entity, exists)
+    return entity
 
 
 def delete_user_role(
@@ -269,7 +265,7 @@ def update_user_resource_roles(
 
     # Flushed and committed once below, so the update is one transaction.
     new_role_entities = [
-        add_user_acl(user, role_name, resource, session, flush=False, commit=False)[0]
+        add_user_acl(user, role_name, resource, session, flush=False, commit=False)
         for role_name in role_names
     ]
 

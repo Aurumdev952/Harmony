@@ -59,8 +59,10 @@ def refuse_legacy_role_grant():
 
 
 def refuse_legacy_role_map_grants(role_mapping):
+    '''Refuses a legacy role map that names any role. One naming none still
+    means "remove every role", as it always did.'''
     if any(
-        spec.get('sitewideRoles') or spec.get('resources')
+        spec.get('sitewideRoles') or any((spec.get('resources') or {}).values())
         for spec in role_mapping.values()
     ):
         refuse_legacy_role_grant()

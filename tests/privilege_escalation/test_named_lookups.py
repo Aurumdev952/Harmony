@@ -703,6 +703,34 @@ def test_a_non_empty_legacy_role_map_is_refused_and_keeps_the_roles(
     ]
 
 
+@pytest.mark.parametrize('target', ['user', 'group'])
+def test_a_legacy_role_map_naming_no_role_still_removes_every_role(
+    app, db, make_user, target
+):
+    admin = make_user(['admin'])
+    held = db.session.query(Role).filter_by(name='manager').one()
+    if target == 'user':
+        target_id = _account(app, db, f'target-{_tag()}@named.test')
+        db.session.query(User).get(target_id).roles = [held]
+    else:
+        group = Group(name=f'group-{_tag()}', roles=[held])
+        db.session.add(group)
+        db.session.flush()
+        target_id = group.id
+    db.session.commit()
+
+    response = admin.request(
+        'PATCH',
+        f'/api2/{target}/{target_id}/roles',
+        {'SITE': {'sitewideRoles': [], 'resources': {f'dashboard-{_tag()}': []}}},
+    )
+
+    assert response.status_code == 200
+    db.session.expire_all()
+    model = User if target == 'user' else Group
+    assert db.session.query(model).get(target_id).roles == []
+
+
 @pytest.mark.parametrize(
     ('resource_type', 'refusal'), [(None, BadRequest), ('no_such_type', ItemNotFound)]
 )

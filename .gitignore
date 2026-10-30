@@ -19,7 +19,6 @@ build/
 dist/
 nohup.out
 .dependency_hash.json
-.env
 
 web/public/places-map/PICTURES.zip
 web/public/places-map/web/pictures
@@ -185,7 +184,6 @@ pipeline/out
 api_log
 
 # VSCode
-.vscode/
 *.code-workspace
 
 # Jupyter notebook checkpoints
@@ -224,3 +222,4 @@ dask-worker-space/
 .claude/settings.local.json
 .claude/agent-memory-local/
 scripts/agents/__pycache__/
+config.bat

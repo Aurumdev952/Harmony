@@ -302,7 +302,7 @@ def api_transfer_dashboard_ownership(dashboard, new_author):
             old_author_string,
             new_author_string,
         )
-        bulk_transfer_dashboard_ownership(transaction, dashboard, new_author)
+        transfer_dashboard_ownership(transaction, dashboard, new_author)
         logger.info('Transfer was successful.')
 
 

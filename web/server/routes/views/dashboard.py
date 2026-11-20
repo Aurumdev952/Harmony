@@ -247,8 +247,7 @@ def make_author_dashboard_administrator(transaction, authorization_item, user=No
     add_user_acl(
         user or current_user,
         'dashboard_admin',
-        ResourceTypeEnum.DASHBOARD.name,
-        authorization_item.name,
+        authorization_item,
         session=transaction.run_raw(),
         commit=False,
     )

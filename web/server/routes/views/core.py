@@ -96,33 +96,68 @@ def try_get_role_and_resource(
             }
         )
 
-    role_permission_resource_type = role.permissions[0].resource_type
-    if (
-        resource
-        and role
-        and resource.resource_type_id != role_permission_resource_type.id
-    ):
-        errors.append(
-            {
-                'fields': ['resourceType', 'roleName'],
-                'message': (
-                    'Role \'%s\' is only valid for resource type: \'%s\'. '
-                    'Resource \'%s\' is of type \'%s\'. '
-                )
-                % (
-                    role.name,
-                    role_permission_resource_type.name,
-                    resource.name,
-                    resource.resource_type.name,
-                ),
-            }
-        )
+    if resource and role:
+        errors.extend(_resource_type_mismatch(role, resource))
 
+    _raise_lookup_errors(errors)
+    return (role, resource_type_entity, resource)
+
+
+def try_get_resource_role(role_name, resource, session=None):
+    '''The resource role named `role_name`, for `resource`, a row the caller
+    holds: it is never looked up again by its name.
+
+    Raises
+    -------
+    werkzeug.exceptions.NotFound
+        If no role has that name, or the role is for another resource type.
+    '''
+    (role, _, _) = try_get_role_and_resource(
+        role_name, resource.resource_type.name.name, session=session
+    )
+    _raise_lookup_errors(_resource_type_mismatch(role, resource))
+    return role
+
+
+def find_named_resource(role_spec, session=None):
+    '''The resource that `role_spec`, a dictionary with `role_name`,
+    `resource_type` and `resource_name`, names, for edits that name resources
+    rather than hold them.
+    '''
+    (_, _, resource) = try_get_role_and_resource(
+        role_spec['role_name'],
+        role_spec['resource_type'],
+        role_spec.get('resource_name'),
+        session,
+    )
+    return resource
+
+
+def _resource_type_mismatch(role, resource):
+    role_resource_type = role.permissions[0].resource_type
+    if resource.resource_type_id == role_resource_type.id:
+        return []
+    return [
+        {
+            'fields': ['resourceType', 'roleName'],
+            'message': (
+                'Role \'%s\' is only valid for resource type: \'%s\'. '
+                'Resource \'%s\' is of type \'%s\'. '
+            )
+            % (
+                role.name,
+                role_resource_type.name,
+                resource.name,
+                resource.resource_type.name,
+            ),
+        }
+    ]
+
+
+def _raise_lookup_errors(errors):
     if errors:
         message = {
             'errors': errors,
             'message': 'Errors were encountered while trying to retrieve role and resource data.',
         }
         raise NotFound(message)
-
-    return (role, resource_type_entity, resource)

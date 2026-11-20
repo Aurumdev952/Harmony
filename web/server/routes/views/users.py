@@ -20,7 +20,11 @@ from web.server.data.data_access import (
     Transaction,
 )
 from web.server.errors import UserAlreadyInvited
-from web.server.routes.views.core import try_get_role_and_resource
+from web.server.routes.views.core import (
+    find_named_resource,
+    try_get_resource_role,
+    try_get_role_and_resource,
+)
 from web.server.routes.views.invite import send_invite_emails
 from web.server.util.util import get_user_string, Success
 from web.server.potion.access import get_id_from_uri
@@ -197,24 +201,23 @@ def add_user_role(
 def add_user_acl(
     user: User,
     resource_role_name: str,
-    resource_type: str,
-    resource_name: Optional[str],
+    resource: Resource,
     session: 'Optional[Session]' = None,
     flush: bool = True,
     commit: bool = True,
 ) -> Tuple[UserAcl, bool]:
+    '''Gives `user` the resource role `resource_role_name` on `resource`, the
+    row the caller holds, never one found again by its name.
+    '''
     session = session or get_db_adapter().session
-    (resource_role, resource_type, resource) = try_get_role_and_resource(
-        resource_role_name, resource_type, resource_name, session
-    )
-    resource_id = resource.id if resource else None
-    entity = try_get_user_acl(user.id, resource_role.id, resource_id, session)
+    resource_role = try_get_resource_role(resource_role_name, resource, session)
+    entity = try_get_user_acl(user.id, resource_role.id, resource.id, session)
     exists = False
 
     if not entity:
         exists = True
         entity = UserAcl(
-            user_id=user.id, resource_role_id=resource_role.id, resource_id=resource_id
+            user_id=user.id, resource_role_id=resource_role.id, resource_id=resource.id
         )
         before_user_role_change.send(user, role=resource_role)
         add_entity(session, entity, flush, commit)
@@ -338,19 +341,13 @@ def update_user_resource_roles(
 
     for new_role in new_resource_roles:
         role_name = new_role['role_name']
-        resource_type = new_role['resource_type']
-        resource_name = resource.name if resource else new_role.get('resource_name')
+        # Without `resource`, each role names its resource.
+        target = resource or find_named_resource(new_role, session)
 
         # Do not flush or commit these changes. We want to perform the update in a transacted
         # fashion.
         (result, _) = add_user_acl(
-            user,
-            role_name,
-            resource_type,
-            resource_name,
-            session,
-            flush=False,
-            commit=False,
+            user, role_name, target, session, flush=False, commit=False
         )
         new_role_entities.append(result)
 

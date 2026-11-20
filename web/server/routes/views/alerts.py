@@ -2,7 +2,6 @@ from flask import current_app, g
 
 from log import LOG
 from models.alchemy.alerts import AlertDefinition, AlertNotification
-from models.alchemy.permission import ResourceTypeEnum
 from web.server.data.data_access import Transaction
 from web.server.routes.views.query_policy import (
     enumerate_query_needs,
@@ -95,8 +94,7 @@ def add_user_as_alert_administrator(transaction, resource_entity, user_entity):
     add_user_acl(
         user_entity,
         'alert_admin',
-        ResourceTypeEnum.ALERT.name,
-        resource_entity.name,
+        resource_entity,
         session=transaction.run_raw(),
         commit=False,
     )
